@@ -84,7 +84,7 @@ export function ResetPasswordForm({
               </Link>
               <h1 className="text-xl font-bold">Reset Password</h1>
               <div className="text-center text-sm">
-                Remember your password?{" "}
+                Remember your password?
                 <Link href="/login" className="underline underline-offset-4">
                   Sign in
                 </Link>

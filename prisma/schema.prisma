@@ -1,0 +1,33 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String    @id @default(uuid())
+  name      String
+  email     String    @unique
+  password  String
+  role      Role      @default(ADMIN_ARTICLE)
+  createdAt DateTime  @default(now())
+  sessions  Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN_ARTICLE
+  ADMIN_INVOICE
+}

@@ -74,7 +74,7 @@ export function ForgotPasswordForm({
               </Link>
               <h1 className="text-xl font-bold">Forgot Password</h1>
               <div className="text-center text-sm">
-                Remember your password?{" "}
+                Remember your password?
                 <Link href="/login" className="underline underline-offset-4">
                   Sign in
                 </Link>
@@ -103,7 +103,7 @@ export function ForgotPasswordForm({
         </form>
       </Form>
       <div className="text-muted-foreground *:[a]:hover:text-primary text-center text-xs text-balance *:[a]:underline *:[a]:underline-offset-4">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
+        By clicking continue, you agree to our <a href="#">Terms of Service</a>
         and <Link href="/">Privacy Policy</Link>.
       </div>
     </div>
