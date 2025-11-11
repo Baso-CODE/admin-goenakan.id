@@ -15,9 +15,6 @@ export default function AddVendorPage() {
       const tokenJson = await tokenRes.json();
       const token = tokenJson?.token;
 
-      console.log("🔑 Token result:", token);
-      console.log("📦 Data to send:", data);
-
       const res = await fetch("http://localhost:8000/vendors", {
         method: "POST",
         headers: {
@@ -40,14 +37,8 @@ export default function AddVendorPage() {
         }),
       });
 
-      const text = await res.text();
-      console.log("🧾 Backend response:", res.status, text);
-
-      if (!res.ok) throw new Error(`Failed: ${res.status} ${text}`);
-
       toast.success("Vendor created successfully!");
       router.push("/super-admin/vendors");
-      router.refresh();
     } catch (err) {
       console.error("❌ Error add vendor:", err);
       toast.error(err instanceof Error ? err.message : "Failed to add vendor");

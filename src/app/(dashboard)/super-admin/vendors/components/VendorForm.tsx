@@ -140,7 +140,6 @@ export default function VendorForm({
     if (initialData) form.reset(initialData);
   }, [initialData, form]);
 
-  // === Fetch Contact Platforms ===
   useEffect(() => {
     const fetchContactPlatforms = async () => {
       try {
@@ -156,14 +155,12 @@ export default function VendorForm({
 
         setContactPlatforms(data);
       } catch (error) {
-        console.error("❌ Error loading contact platforms:", error);
         toast.error("Failed to load contact platforms");
       }
     };
     fetchContactPlatforms();
   }, []);
 
-  // === Fetch Vendor Categories Active ===
   useEffect(() => {
     const fetchCategories = async () => {
       setLoadingCategories(true);
@@ -176,11 +173,10 @@ export default function VendorForm({
             headers: { Authorization: `Bearer ${token}` },
           }
         );
-        if (!res.ok) throw new Error("Failed to fetch categories");
+
         const data = await res.json();
         setVendorCategories(data);
       } catch (error) {
-        console.error("❌ Error loading vendor categories:", error);
         toast.error("Failed to load vendor categories");
       } finally {
         setLoadingCategories(false);
@@ -189,7 +185,6 @@ export default function VendorForm({
     fetchCategories();
   }, []);
 
-  // === Fetch Vendor Items Active ===
   useEffect(() => {
     const fetchVendorItems = async () => {
       try {

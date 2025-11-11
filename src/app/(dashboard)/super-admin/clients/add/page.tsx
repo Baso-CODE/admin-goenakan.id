@@ -26,7 +26,6 @@ import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-// === ZOD SCHEMA ===
 const clientSchema = z.object({
   type: z.enum(["B2B", "B2C"]),
 });
@@ -80,7 +79,6 @@ const ClientAddForm = () => {
   const { data: session } = useSession();
   const router = useRouter();
 
-  // === FETCH PROVINCE ===
   useEffect(() => {
     fetch("https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json")
       .then((res) => res.json())
@@ -88,7 +86,6 @@ const ClientAddForm = () => {
       .catch((err) => console.error("Error fetch provinces:", err));
   }, []);
 
-  // === FETCH CITY BERDASARKAN PROVINSI ===
   useEffect(() => {
     if (formData.b2b_province) {
       const prov = provinces.find((p) => p.name === formData.b2b_province);
@@ -105,7 +102,6 @@ const ClientAddForm = () => {
     }
   }, [formData.b2b_province, provinces]);
 
-  // === HANDLE CHANGE ===
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {

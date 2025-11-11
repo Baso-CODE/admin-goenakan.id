@@ -34,12 +34,10 @@ const contactPlatformSchema = z.object({
     .string()
     .min(2, { message: "Platform name must be at least 2 characters." }),
   slug: z.string().min(1, { message: "Slug is required." }),
-  icon: z.string().optional(),
+  icon: z.string().min(1, { message: "Icon is required" }),
 
   isActive: z.boolean(),
 });
-
-const iconNames = Object.keys(LucideIcons).slice(0, 50);
 
 export type ContactPlatformFormValues = z.infer<typeof contactPlatformSchema>;
 

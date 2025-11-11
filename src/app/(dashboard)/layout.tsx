@@ -26,6 +26,5 @@ export default async function DashboardGuardLayout({
     return redirect("/");
   }
 
-  // 4. Lolos Proteksi: Render Layout Client
   return <DashboardLayoutClient>{children}</DashboardLayoutClient>;
 }

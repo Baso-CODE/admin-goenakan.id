@@ -13,7 +13,6 @@ export default function EditVendorPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // === FETCH DATA VENDOR ===
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -72,8 +71,6 @@ export default function EditVendorPage() {
           },
         ],
       };
-
-      console.log("📦 Data to update:", payload);
 
       const res = await fetch(`http://localhost:8000/vendors/${id}`, {
         method: "PATCH",

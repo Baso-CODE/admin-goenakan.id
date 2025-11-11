@@ -47,7 +47,6 @@ const ProductCategoriesPage = () => {
 
   const [page, setPage] = useState(1);
 
-  // === FETCH DATA DARI BACKEND ===
   const fetchCategories = async () => {
     setLoading(true);
     setError(null);

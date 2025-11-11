@@ -26,19 +26,16 @@ export default function DashboardLayoutClient({
 }) {
   const pathname = usePathname();
 
-  // Pisahkan URL menjadi segmen-segmen
   const segments = pathname
     .split("/")
     .filter((seg) => seg && seg !== "dashboard");
 
-  // Format tiap segmen agar tampil rapi di breadcrumb
   const formatSegment = (segment: string) => {
-    if (/^[0-9a-fA-F-]{10,}$/.test(segment)) return ""; // UUID → Detail
-    if (!isNaN(Number(segment))) return `ID ${segment}`; // Angka → ID 123
+    if (/^[0-9a-fA-F-]{10,}$/.test(segment)) return "";
+    if (!isNaN(Number(segment))) return `ID ${segment}`;
     return segment.charAt(0).toUpperCase() + segment.slice(1);
   };
 
-  // Buat list breadcrumb dinamis berdasarkan segmen URL
   const breadcrumbPaths = segments.map((seg, i) => ({
     name: formatSegment(seg),
     href: `/${segments.slice(0, i + 1).join("/")}`,
@@ -57,7 +54,6 @@ export default function DashboardLayoutClient({
               className="mr-2 data-[orientation=vertical]:h-4"
             />
 
-            {/* === BREADCRUMB DINAMIS === */}
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>

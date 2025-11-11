@@ -15,7 +15,7 @@ import {
   Globe,
   Star,
 } from "lucide-react";
-import * as LucideIcons from "lucide-react"; // ✅ Import semua icon
+import * as LucideIcons from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
@@ -44,7 +44,7 @@ interface Contact {
     id: string;
     name: string;
     slug: string;
-    icon?: string; // Nama icon dari lucide-react
+    icon?: string;
   };
 }
 
@@ -109,7 +109,6 @@ const DetailPageVendor: React.FC = () => {
       </div>
     );
 
-  // Helper untuk deteksi apakah contactId adalah URL
   const formatContactLink = (contactId: string) => {
     if (contactId.startsWith("http")) return contactId;
     if (contactId.includes("@")) return `mailto:${contactId}`;

@@ -22,17 +22,13 @@ export default function AddProductPage() {
     setIsSubmitting(true);
     const formData = new FormData();
 
-    // 1. Tambahkan Files (Images)
     if (files.images) {
-      // Loop FileList untuk 'images'
       for (let i = 0; i < files.images.length; i++) {
         formData.append("images", files.images[i]);
       }
     }
 
-    // 2. Tambahkan Files (Videos)
     if (files.videos) {
-      // Loop FileList untuk 'videos'
       for (let i = 0; i < files.videos.length; i++) {
         formData.append("videos", files.videos[i]);
       }
@@ -58,7 +54,7 @@ export default function AddProductPage() {
       }
 
       toast.success("Product created successfully!");
-      router.push("/super-admin/products"); // Ganti ke halaman list produk
+      router.push("/super-admin/products");
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to add product");

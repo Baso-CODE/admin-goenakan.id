@@ -16,12 +16,6 @@ type VendorItem = {
   categoryId: string;
 };
 
-// export type VendorFormValues = {
-//   type: string;
-//   categoryId: string;
-//   itemIds: string[];
-// };
-
 interface UseVendorFormFilterProps {
   form: UseFormReturn<VendorFormValues>;
   vendorCategories: VendorCategory[];
@@ -38,7 +32,6 @@ export function useVendorFormFilter({
   >([]);
   const [filteredItems, setFilteredItems] = useState<VendorItem[]>([]);
 
-  // === Filter Category berdasarkan Type ===
   useEffect(() => {
     const selectedType = form.watch("type");
 
@@ -53,7 +46,6 @@ export function useVendorFormFilter({
     setFilteredCategories(filtered);
   }, [form.watch("type"), vendorCategories]);
 
-  // === Filter Item berdasarkan Category ===
   useEffect(() => {
     const selectedCategory = form.watch("categoryId");
 
@@ -67,7 +59,6 @@ export function useVendorFormFilter({
     );
     setFilteredItems(filtered);
 
-    // Tetap simpan item yang valid
     const currentItemIds = form.getValues("itemIds");
     const stillValidItemIds = currentItemIds.filter((id) =>
       vendorItems.some((item) => item.id === id)

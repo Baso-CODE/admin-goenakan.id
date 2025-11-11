@@ -14,7 +14,6 @@ import {
   GalleryHorizontal,
   ImageIcon,
   InfoIcon,
-  MoveDiagonal,
   VideoIcon,
 } from "lucide-react";
 import { useParams } from "next/navigation";

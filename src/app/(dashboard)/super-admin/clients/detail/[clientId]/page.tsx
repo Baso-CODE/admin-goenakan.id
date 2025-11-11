@@ -62,7 +62,7 @@ const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
           <strong>Perusahaan:</strong> {data.companyName}
         </p>
         <p>
-          <strong>Website:</strong>{" "}
+          <strong>Website:</strong>
           <a
             href={data.website}
             target="_blank"
@@ -75,7 +75,7 @@ const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
           <strong>Departemen:</strong> {data.department}
         </p>
         <p>
-          <strong>Purchase Channel:</strong>{" "}
+          <strong>Purchase Channel:</strong>
           <Badge variant={"outline"} className="ml-1">
             {data.purchaseChannel}
           </Badge>

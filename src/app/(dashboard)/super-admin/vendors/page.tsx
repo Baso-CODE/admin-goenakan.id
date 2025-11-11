@@ -64,7 +64,6 @@ const Vendors = () => {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
 
-  // === Fetch data dari backend ===
   const fetchVendors = async () => {
     setLoading(true);
     setError(null);
@@ -101,7 +100,6 @@ const Vendors = () => {
     fetchVendors();
   }, [page, debouncedSearch, statusFilter]);
 
-  // === RENDER ===
   return (
     <div className="space-y-4 overflow-x-hidden w-full  mx-auto">
       {/* === Header === */}

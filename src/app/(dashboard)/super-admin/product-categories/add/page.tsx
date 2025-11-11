@@ -17,7 +17,6 @@ const AddCategoryProduct = () => {
 
       if (!token) throw new Error("No token found");
 
-      // 2️⃣ Kirim data ke backend Express
       const res = await fetch("http://localhost:8000/product-categories", {
         method: "POST",
         headers: {

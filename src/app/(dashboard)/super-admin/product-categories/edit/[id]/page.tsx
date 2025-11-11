@@ -20,7 +20,7 @@ const EditCategoryVendor = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      setIsLoading(true); // Mulai loading
+      setIsLoading(true);
       try {
         const tokenRes = await fetch("/api/auth/token");
         if (!tokenRes.ok) throw new Error("Failed to get token");

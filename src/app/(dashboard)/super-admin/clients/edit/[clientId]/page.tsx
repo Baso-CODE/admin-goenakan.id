@@ -220,7 +220,7 @@ const ClientEditForm: React.FC = () => {
       toast.error("Terjadi kesalahan saat update data.");
     }
   };
-  // --- BAGIAN FORM (SAMA SEPERTI ADD) ---
+
   const B2BFormFields = (
     <>
       <h3 className="text-lg font-semibold border-b pb-2">Detail Perusahaan</h3>

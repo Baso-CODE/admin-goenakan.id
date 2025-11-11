@@ -27,7 +27,6 @@ import {
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
 
-// === TYPE DEFINITIONS ===
 type ClientType = "B2B" | "B2C";
 
 interface ClientBase {
@@ -60,7 +59,6 @@ interface PaginationMeta {
   hasPrevious: boolean;
 }
 
-// === COMPONENT ===
 const ClientManagementTable: React.FC = () => {
   const [clients, setClients] = useState<ClientData[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({
@@ -77,7 +75,6 @@ const ClientManagementTable: React.FC = () => {
   const debouncedSearch = useDebounce(search, 500);
   const [clientTypeFilter, setClientTypeFilter] = useState<string>("ALL");
 
-  // === FETCH CLIENT DATA ===
   useEffect(() => {
     const fetchClients = async () => {
       setLoading(true);

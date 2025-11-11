@@ -46,16 +46,15 @@ export default function ProductCategoryForm({
     },
   });
 
-  // 🧠 Auto-generate slug dari name
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
       if (name === "name" && value.name) {
         const slug = value.name
           .toLowerCase()
           .trim()
-          .replace(/[^\w\s-]/g, "") // hapus simbol
-          .replace(/\s+/g, "-"); // ubah spasi jadi -
-        form.setValue("slug", slug, { shouldValidate: true });
+          .replace(/[^\w\s-]/g, "")
+          .replace(/\s+/g, "-");
+        -form.setValue("slug", slug, { shouldValidate: true });
       }
     });
     return () => subscription.unsubscribe();

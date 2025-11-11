@@ -60,7 +60,6 @@ export default function EditProductPage() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      // === 1️⃣ Update core product data ===
       const { attributes, priceTiers, ...coreData } = data;
       const coreRes = await fetch(`http://localhost:8000/products/${id}`, {
         method: "PATCH",
@@ -72,7 +71,6 @@ export default function EditProductPage() {
       });
       if (!coreRes.ok) throw new Error("Failed to update core product data");
 
-      // === 2️⃣ Update attributes (jika ada perubahan) ===
       if (attributes && attributes.length > 0) {
         const attrRes = await fetch(
           `http://localhost:8000/products/${id}/attributes`,
@@ -88,7 +86,6 @@ export default function EditProductPage() {
         if (!attrRes.ok) throw new Error("Failed to update attributes");
       }
 
-      // === 3️⃣ Update price tiers (jika ada perubahan) ===
       if (priceTiers && priceTiers.length > 0) {
         const priceRes = await fetch(
           `http://localhost:8000/products/${id}/price-tiers`,
@@ -104,7 +101,6 @@ export default function EditProductPage() {
         if (!priceRes.ok) throw new Error("Failed to update price tiers");
       }
 
-      // === 4️⃣ Upload new images ===
       if (files.images && files.images.length > 0) {
         for (let i = 0; i < files.images.length; i++) {
           const formData = new FormData();
@@ -122,7 +118,6 @@ export default function EditProductPage() {
         }
       }
 
-      // === 5️⃣ Upload new videos ===
       if (files.videos && files.videos.length > 0) {
         for (let i = 0; i < files.videos.length; i++) {
           const formData = new FormData();
