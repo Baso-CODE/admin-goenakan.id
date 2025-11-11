@@ -35,7 +35,6 @@ export default function EditSalesPage() {
           phone: data.phone,
           signatureUrl: data.signatureUrl || "",
           isActive: data.isActive,
-          bankAccounts: data.bankAccounts || [],
         });
       } catch (err) {
         console.error("❌ Error fetching sales data:", err);
@@ -48,8 +47,17 @@ export default function EditSalesPage() {
     if (id) fetchData();
   }, [id]);
 
-  const handleUpdateSales = async (data: SalesFormValues) => {
+  const handleUpdateSales = async (data: SalesFormValues, file?: File) => {
     setIsSubmitting(true);
+
+    const formData = new FormData();
+
+    if (file) {
+      formData.append("signature", file, file.name);
+    }
+
+    const { signatureFile, signatureUrl, ...salesData } = data;
+    formData.append("data", JSON.stringify(salesData));
     try {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
@@ -57,18 +65,9 @@ export default function EditSalesPage() {
       const res = await fetch(`http://localhost:8000/sales/${id}`, {
         method: "PATCH",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-
-        body: JSON.stringify({
-          prefix: data.prefix,
-          name: data.name,
-          phone: data.phone,
-          signatureUrl: data.signatureUrl || null,
-          isActive: data.isActive,
-          // bankAccounts tidak disertakan di sini
-        }),
+        body: formData,
       });
 
       if (!res.ok) {
@@ -77,7 +76,6 @@ export default function EditSalesPage() {
       }
 
       toast.success("Sales person updated successfully!");
-      // 9. Ganti rute navigasi
       router.push("/super-admin/sales");
       router.refresh();
     } catch (err) {

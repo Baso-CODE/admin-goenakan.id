@@ -11,7 +11,11 @@ import {
   Wrench,
   PackageSearch,
   Loader2,
+  Contact,
+  Globe,
+  Star,
 } from "lucide-react";
+import * as LucideIcons from "lucide-react"; // ✅ Import semua icon
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
@@ -29,18 +33,30 @@ interface VendorItem {
   name: string;
   description?: string;
   price?: number;
-  category?: Category;
+  category?: Category | null;
+}
+
+interface Contact {
+  id: string;
+  contactId: string;
+  isPrimary: boolean;
+  platform: {
+    id: string;
+    name: string;
+    slug: string;
+    icon?: string; // Nama icon dari lucide-react
+  };
 }
 
 interface VendorDetail {
   id: string;
   companyName: string;
   picName: string;
-  phone: string;
   country: string;
   address: string;
   isActive: boolean;
   items: VendorItem[];
+  contacts: Contact[];
 }
 
 // === Page Component ===
@@ -61,9 +77,7 @@ const DetailPageVendor: React.FC = () => {
         const res = await fetch(
           `http://localhost:8000/vendors/detail/${vendorId}`,
           {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
 
@@ -95,10 +109,18 @@ const DetailPageVendor: React.FC = () => {
       </div>
     );
 
+  // Helper untuk deteksi apakah contactId adalah URL
+  const formatContactLink = (contactId: string) => {
+    if (contactId.startsWith("http")) return contactId;
+    if (contactId.includes("@")) return `mailto:${contactId}`;
+    if (/^\+?\d+$/.test(contactId)) return `https://wa.me/${contactId}`;
+    return contactId;
+  };
+
   return (
-    <div className="space-y-8 w-full max-w-7xl mx-auto">
+    <div className="space-y-10 w-full mx-auto">
       {/* === HEADER === */}
-      <header className="flex items-center justify-between">
+      <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-3xl font-bold flex items-center gap-3">
             {vendor.companyName}
@@ -113,8 +135,9 @@ const DetailPageVendor: React.FC = () => {
               {vendor.isActive ? "Active" : "Inactive"}
             </Badge>
           </h1>
-          <p className="text-muted-foreground">
-            <span className="font-mono">{vendor.country}</span>
+          <p className="text-muted-foreground flex items-center gap-2">
+            <MapPin className="w-4 h-4" />
+            {vendor.country}
           </p>
         </div>
 
@@ -150,21 +173,71 @@ const DetailPageVendor: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* PIC Info */}
+        {/* PIC Info + Contacts */}
         <Card className="shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-xl">
               <User className="w-5 h-5 text-green-500" />
-              PIC (Person in Charge)
+              PIC & Kontak
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="space-y-4 text-sm">
             <p>
               <strong>Nama PIC:</strong> {vendor.picName}
             </p>
-            <p>
-              <strong>No. Telepon:</strong> {vendor.phone}
-            </p>
+
+            <div className="space-y-2">
+              <p className="font-semibold text-gray-700 flex items-center gap-2">
+                <Contact className="w-4 h-4" /> Kontak Vendor
+              </p>
+
+              {vendor.contacts.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  Tidak ada kontak terdaftar.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1  gap-3">
+                  {vendor.contacts.map((contact) => {
+                    const Icon =
+                      (LucideIcons as any)[contact.platform.icon || "Globe"] ||
+                      Globe;
+
+                    return (
+                      <div
+                        key={contact.id}
+                        className="border rounded-lg p-3 bg-white hover:bg-gray-50 transition flex flex-col gap-1"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Icon className="w-4 h-4 text-primary" />
+                            <span className="font-medium">
+                              {contact.platform.name}
+                            </span>
+                          </div>
+
+                          {contact.isPrimary && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs text-green-600 border-green-300 flex items-center gap-1"
+                            >
+                              <Star className="w-3 h-3" /> Primary
+                            </Badge>
+                          )}
+                        </div>
+
+                        <Link
+                          href={formatContactLink(contact.contactId)}
+                          target="_blank"
+                          className="text-sm text-blue-600 hover:underline break-all"
+                        >
+                          {contact.contactId}
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </section>
@@ -186,17 +259,15 @@ const DetailPageVendor: React.FC = () => {
                 className="shadow-sm hover:shadow-md transition"
               >
                 <CardHeader className="pb-2">
-                  <CardTitle>
-                    {item.category && (
-                      <Badge
-                        variant="outline"
-                        className="text-xs text-indigo-700 border-indigo-200"
-                      >
-                        {item.category.name}
-                      </Badge>
-                    )}
-                  </CardTitle>
-                  <CardTitle className=" text-base font-semibold">
+                  {item.category && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs text-indigo-700 border-indigo-200"
+                    >
+                      {item.category.name}
+                    </Badge>
+                  )}
+                  <CardTitle className="text-base font-semibold mt-1">
                     {item.name}
                   </CardTitle>
                 </CardHeader>

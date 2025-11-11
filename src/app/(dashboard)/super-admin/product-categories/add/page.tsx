@@ -40,7 +40,7 @@ const AddCategoryProduct = () => {
     }
   };
   return (
-    <div className="space-y-4 w-[1100px]">
+    <div className="space-y-4 ">
       <h2 className="text-xl font-semibold tracking-tight uppercase">
         Add Category Product
       </h2>

@@ -28,7 +28,6 @@ import { z } from "zod";
 
 // === ZOD SCHEMA ===
 const clientSchema = z.object({
-  custCode: z.string().min(3, "Kode klien wajib diisi"),
   type: z.enum(["B2B", "B2C"]),
 });
 
@@ -36,7 +35,6 @@ const clientSchema = z.object({
 type ClientType = "B2B" | "B2C" | "";
 
 interface ClientFormData {
-  custCode: string;
   type: ClientType;
   b2b_companyName: string;
   b2b_department: string;
@@ -56,7 +54,6 @@ interface ClientFormData {
 }
 
 const initialFormData: ClientFormData = {
-  custCode: "",
   type: "",
   b2b_companyName: "",
   b2b_department: "",
@@ -125,7 +122,6 @@ const ClientAddForm = () => {
     e.preventDefault();
 
     const validation = clientSchema.safeParse({
-      custCode: formData.custCode,
       type: formData.type,
     });
     if (!validation.success) {
@@ -146,7 +142,7 @@ const ClientAddForm = () => {
         clientType === "B2C"
           ? {
               type: "B2C",
-              custCode: formData.custCode,
+
               prefix: formData.b2c_prefix,
               name: formData.b2c_name,
               phone: formData.b2c_phone,
@@ -155,7 +151,7 @@ const ClientAddForm = () => {
             }
           : {
               type: "B2B",
-              custCode: formData.custCode,
+
               companyName: formData.b2b_companyName,
               department: formData.b2b_department,
               prefix: formData.b2b_prefix,
@@ -207,17 +203,6 @@ const ClientAddForm = () => {
           <CardContent className="space-y-6">
             {/* === FIELD DASAR === */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-4">
-              <div className="space-y-2">
-                <Label htmlFor="custCode">Kode Klien *</Label>
-                <Input
-                  id="custCode"
-                  name="custCode"
-                  value={formData.custCode}
-                  onChange={handleChange}
-                  placeholder="Contoh: CUST-B2B-005"
-                />
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="type">Tipe Klien *</Label>
                 <Select
@@ -275,7 +260,7 @@ const ClientAddForm = () => {
                     <Label>Saluran Pembelian</Label>
                     <Input
                       name="b2c_purchaseChannel"
-                      value={formData.b2c_purchaseChannel}
+                      value={formData.b2b_purchaseChannel}
                       onChange={handleChange}
                     />
                   </div>
@@ -286,13 +271,26 @@ const ClientAddForm = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="b2b_prefix">Prefix (Mr./Ms.)</Label>
-                    <Input
-                      id="b2b_prefix"
+                    <Select
                       name="b2b_prefix"
                       value={formData.b2b_prefix}
-                      onChange={handleChange}
-                    />
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({ ...prev, b2b_prefix: value }))
+                      }
+                    >
+                      <SelectTrigger id="b2b_prefix">
+                        <SelectValue placeholder="Select prefix" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Mr.">Mr.</SelectItem>
+                        <SelectItem value="Ms.">Ms.</SelectItem>
+                        <SelectItem value="Mrs.">Mrs.</SelectItem>
+                        <SelectItem value="Bpk.">Bpk.</SelectItem>
+                        <SelectItem value="Ibu.">Ibu.</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="b2b_picName">Nama PIC *</Label>
                     <Input
@@ -386,12 +384,24 @@ const ClientAddForm = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="b2c_prefix">Prefix (Mr./Ms.)</Label>
-                    <Input
-                      id="b2c_prefix"
+                    <Select
                       name="b2c_prefix"
                       value={formData.b2c_prefix}
-                      onChange={handleChange}
-                    />
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({ ...prev, b2c_prefix: value }))
+                      }
+                    >
+                      <SelectTrigger id="b2c_prefix">
+                        <SelectValue placeholder="Select prefix" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Mr.">Mr.</SelectItem>
+                        <SelectItem value="Ms.">Ms.</SelectItem>
+                        <SelectItem value="Mrs.">Mrs.</SelectItem>
+                        <SelectItem value="Bpk.">Bpk.</SelectItem>
+                        <SelectItem value="Ibu.">Ibu.</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="b2c_name">Nama Lengkap *</Label>

@@ -45,7 +45,7 @@ const AddItemVendor = () => {
   };
 
   return (
-    <div className="space-y-4 w-full max-w-7xl mx-auto">
+    <div className="space-y-4 w-full  mx-auto">
       <h2 className="text-xl font-semibold tracking-tight uppercase">
         Add Vendor Item
       </h2>

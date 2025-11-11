@@ -7,7 +7,6 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 
 // === ICONS ===
@@ -18,22 +17,22 @@ import {
   FileText,
   Frame,
   GalleryVerticalEnd,
-  LayoutDashboard,
-  PieChart,
+  HandshakeIcon,
+  ListOrdered,
   Map,
+  Package,
+  PieChart,
   Settings,
   Store,
-  Users,
-  Package,
   Tags,
   UserCircle,
-  HandshakeIcon,
+  Users,
 } from "lucide-react";
 import { NavMain } from "./NavMain";
+import { NavDashboards } from "./nav-dashboard";
 import { NavProjects } from "./nav-project";
 import { NavUser } from "./nav-user";
 import { TeamSwitcher } from "./team-switcher";
-import { NavDashboards } from "./nav-dashboard";
 
 export default function SidebarRole({ ...props }) {
   const { data: session } = useSession();
@@ -66,6 +65,7 @@ export default function SidebarRole({ ...props }) {
           { title: "Vendors", url: "/super-admin/vendors" },
           { title: "Vendor Items", url: "/super-admin/vendor-items" },
           { title: "Vendor Categories", url: "/super-admin/vendor-categories" },
+          { title: "Platform", url: "/super-admin/contact-platforms" },
         ],
       },
       {
@@ -121,6 +121,15 @@ export default function SidebarRole({ ...props }) {
         items: [
           { title: "All Sales", url: "/super-admin/sales" },
           { title: "All Account Bank Sales", url: "/super-admin/sales/bank" },
+        ],
+      },
+      {
+        title: "Order Management",
+        url: "#",
+        icon: ListOrdered,
+        items: [
+          { title: "All Order", url: "/super-admin/orders" },
+          { title: "Order Analyst", url: "/super-admin/orders/add" },
         ],
       },
       { title: "Settings", url: "/super-admin/settings", icon: Settings },

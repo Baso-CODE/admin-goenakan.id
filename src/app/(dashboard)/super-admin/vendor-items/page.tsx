@@ -95,7 +95,7 @@ const VendorItems = () => {
   }, [page, debouncedSearch, statusFilter]);
 
   return (
-    <div className="space-y-4 overflow-x-hidden w-full max-w-7xl mx-auto">
+    <div className="space-y-4 overflow-x-hidden w-full  mx-auto">
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 overflow-x-auto">
           <CardTitle className="text-xl font-semibold whitespace-nowrap">
@@ -145,7 +145,7 @@ const VendorItems = () => {
             <Table className="min-w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[250px]">Item Name</TableHead>
+                  <TableHead className="w-[280px]">Item Name</TableHead>
                   <TableHead className="min-w-[250px]">Description</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Status</TableHead>

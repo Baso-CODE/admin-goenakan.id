@@ -18,10 +18,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, ClipboardList, UserRoundPlus } from "lucide-react";
-import { useSession } from "next-auth/react";
+import {
+  Barcode,
+  ChevronLeft,
+  ClipboardList,
+  UserRoundPlus,
+} from "lucide-react";
+
 import Link from "next/link";
-import { useRouter, useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 type ClientType = "B2B" | "B2C" | "";
@@ -256,13 +261,36 @@ const ClientEditForm: React.FC = () => {
             />
           </div>
         </div>
-        <div className="space-y-2">
-          <Label>Nama PIC *</Label>
-          <Input
-            name="b2b_picName"
-            value={formData.b2b_picName}
-            onChange={handleChange}
-          />
+        <div className="grid grid-cols-2 gap-4 space-y-2">
+          <div className="space-y-2">
+            <Label htmlFor="b2b_prefix">Prefix (Mr./Ms.)</Label>
+            <Select
+              name="b2b_prefix"
+              value={formData.b2b_prefix}
+              onValueChange={(value) =>
+                setFormData((prev) => ({ ...prev, b2b_prefix: value }))
+              }
+            >
+              <SelectTrigger id="b2b_prefix">
+                <SelectValue placeholder="Select prefix" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Mr.">Mr.</SelectItem>
+                <SelectItem value="Ms.">Ms.</SelectItem>
+                <SelectItem value="Mrs.">Mrs.</SelectItem>
+                <SelectItem value="Bpk.">Bpk.</SelectItem>
+                <SelectItem value="Ibu.">Ibu.</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Nama PIC *</Label>
+            <Input
+              name="b2b_picName"
+              value={formData.b2b_picName}
+              onChange={handleChange}
+            />
+          </div>
         </div>
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-2">
@@ -330,13 +358,36 @@ const ClientEditForm: React.FC = () => {
     <>
       <h3 className="text-lg font-semibold border-b pb-2">Detail Individu</h3>
       <div className="space-y-4">
-        <div className=" space-y-2">
-          <Label>Nama Lengkap *</Label>
-          <Input
-            name="b2c_name"
-            value={formData.b2c_name}
-            onChange={handleChange}
-          />
+        <div className="grid grid-cols-2 gap-4 space-y-2">
+          <div className="space-y-2">
+            <Label htmlFor="b2c_prefix">Prefix (Mr./Ms.)</Label>
+            <Select
+              name="b2c_prefix"
+              value={formData.b2c_prefix}
+              onValueChange={(value) =>
+                setFormData((prev) => ({ ...prev, b2c_prefix: value }))
+              }
+            >
+              <SelectTrigger id="b2c_prefix">
+                <SelectValue placeholder="Select prefix" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Mr.">Mr.</SelectItem>
+                <SelectItem value="Ms.">Ms.</SelectItem>
+                <SelectItem value="Mrs.">Mrs.</SelectItem>
+                <SelectItem value="Bpk.">Bpk.</SelectItem>
+                <SelectItem value="Ibu.">Ibu.</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className=" space-y-2">
+            <Label>Nama Lengkap *</Label>
+            <Input
+              name="b2c_name"
+              value={formData.b2c_name}
+              onChange={handleChange}
+            />
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-4 space-y-2">
           <div className="space-y-2">
@@ -388,11 +439,15 @@ const ClientEditForm: React.FC = () => {
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 gap-4 border-b pb-4">
               <div className="space-y-2">
-                <Label>Kode Klien</Label>
+                <Label className="flex items-center gap-2">
+                  <Barcode className="h-4 w-4 text-muted-foreground" />
+                  Kode Klien
+                </Label>
                 <Input
                   name="custCode"
                   value={formData.custCode}
                   onChange={handleChange}
+                  disabled
                 />
               </div>
               <div className="space-y-2">

@@ -1,9 +1,7 @@
 // src/app/super-admin/sales/[id]/page.tsx (ASUMSI LOKASI FILE)
 "use client";
 
-import { useParams } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
-import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -11,22 +9,29 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
-  User,
-  Phone,
-  CheckCircle2,
-  XCircle,
-  Link2,
-  FileText,
-  Loader2,
-  Banknote,
   ArrowLeft,
+  CheckCircle2,
+  FileText,
   Info,
+  Link2,
+  Loader2,
+  Phone,
+  User,
 } from "lucide-react";
+import { useParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import SalesBankForm from "../../components/SalesBankForm";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Definisi Tipe Data Sales (sesuai respons backend)
 interface SalesBank {
@@ -55,6 +60,7 @@ export default function SalesDetailPage() {
   const { id } = useParams();
   const [salesData, setSalesData] = useState<SalesData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Fungsi untuk mengambil data sales
   const fetchSalesData = useCallback(async () => {
@@ -116,12 +122,16 @@ export default function SalesDetailPage() {
   }));
 
   return (
-    <div className="space-y-8 p-4 md:p-6 w-full max-w-[1200px] mx-auto">
+    <div className="space-y-4 overflow-x-hidden w-full mx-auto">
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">
           Sales Detail: {salesData.prefix} {salesData.name}
         </h2>
-        <Button onClick={() => window.history.back()} variant="outline">
+        <Button
+          onClick={() => window.history.back()}
+          variant="outline"
+          className="cursor-pointer"
+        >
           <ArrowLeft className="h-4 w-4 mr-2" /> Back to List
         </Button>
       </div>
@@ -152,6 +162,7 @@ export default function SalesDetailPage() {
                 <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
                 Active Status
               </p>
+
               <Badge
                 variant={salesData.isActive ? "default" : "secondary"}
                 className="mt-1"
@@ -159,19 +170,43 @@ export default function SalesDetailPage() {
                 {salesData.isActive ? "Active" : "Inactive"}
               </Badge>
             </div>
-            {/* Signature URL */}
-            <DetailItem
-              icon={Link2}
-              label="Signature URL"
-              value={salesData.signatureUrl || "- Not Set -"}
-              isLink={!!salesData.signatureUrl}
-            />
-            {/* Created/Updated At */}
+
+            <div className="space-y-1">
+              <p className="text-sm font-medium leading-none flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-muted-foreground" />
+                Signature
+              </p>
+              {salesData.signatureUrl ? (
+                <div className="mt-2">
+                  {/* Container yang bisa diklik */}
+                  <div
+                    className="border rounded-md p-1 max-w-[10rem] cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setIsDialogOpen(true)}
+                  >
+                    <img
+                      src={salesData.signatureUrl}
+                      alt={`Signature of ${salesData.name}`}
+                      className="w-full h-auto object-contain max-h-24 rounded-md"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Click to view full image
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  - No signature uploaded -
+                </p>
+              )}
+            </div>
+
+            {/* Created/Updated At (Ini adalah field sisanya) */}
             <DetailItem
               icon={FileText}
               label="Created At"
               value={new Date(salesData.createdAt).toLocaleDateString()}
             />
+
             <DetailItem
               icon={FileText}
               label="Last Updated"
@@ -187,6 +222,27 @@ export default function SalesDetailPage() {
         initialBankAccounts={initialBankAccountsForForm}
         onUpdateSuccess={fetchSalesData}
       />
+
+      {/* --- Komponen Dialog Tanda Tangan --- */}
+      {salesData.signatureUrl && (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-4xl p-0">
+            <DialogHeader className="p-4 border-b">
+              <DialogTitle>Full Signature Preview</DialogTitle>
+              <DialogDescription>
+                Tanda tangan untuk sales: {salesData.prefix} {salesData.name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="p-4">
+              <img
+                src={salesData.signatureUrl}
+                alt={`Full Signature of ${salesData.name}`}
+                className="w-full h-auto object-contain max-h-[80vh]"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

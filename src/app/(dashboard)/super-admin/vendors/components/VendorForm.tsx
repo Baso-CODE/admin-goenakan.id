@@ -1,50 +1,15 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import * as LucideIcons from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { toast } from "sonner";
+import { z } from "zod";
 
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import {
-  Building2,
-  User,
-  Phone,
-  Globe2,
-  MapPin,
-  CheckCircle2,
-  PackageSearch,
-  Loader2,
-  ClipboardList,
-  ChevronsUpDown,
-  Check,
-} from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Command,
   CommandEmpty,
@@ -53,6 +18,46 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+import {
+  AtSign,
+  Building2,
+  Check,
+  CheckCircle2,
+  ChevronsUpDown,
+  ClipboardList,
+  Globe2,
+  Layers,
+  Loader2,
+  MapPin,
+  Network,
+  PackageSearch,
+  Tag,
+  User,
+} from "lucide-react";
+import { useVendorFormFilter } from "../hooks/useVendorFormFilter";
 
 // === ZOD SCHEMA ===
 const vendorSchema = z.object({
@@ -62,20 +67,20 @@ const vendorSchema = z.object({
   picName: z
     .string()
     .min(2, { message: "PIC name must be at least 2 characters." }),
-  phone: z
-    .string()
-    .min(9, { message: "Phone number too short." })
-    .regex(/^(\+?\d{7,15})$/, { message: "Invalid phone number format." }),
+
   country: z
     .string()
     .min(2, { message: "Country must be at least 2 characters." }),
   address: z.string().min(5, "Address must be at least 5 characters"),
   isActive: z.boolean(),
+  type: z.string().min(1, { message: "Please select type." }),
+  categoryId: z.string().min(1, { message: "Please select category." }),
   itemIds: z
     .array(z.string())
     .nonempty({ message: "Please select at least one service type." }),
+  platformId: z.string().min(1, { message: "Please select platform." }),
+  contactId: z.string().min(3, { message: "Contact ID required." }),
 });
-
 export type VendorFormValues = z.infer<typeof vendorSchema>;
 
 export default function VendorForm({
@@ -89,11 +94,100 @@ export default function VendorForm({
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
+  const [categoryTypes] = useState([
+    { id: "SERVICE", name: "Service" },
+    { id: "PRODUCT", name: "Product" },
+  ]);
+
+  const [contactPlatforms, setContactPlatforms] = useState<
+    { id: string; name: string; slug: string; icon: string }[]
+  >([]);
+  console.log("contact platforms", contactPlatforms);
+
+  const [vendorCategories, setVendorCategories] = useState<
+    { id: string; name: string; type: string }[]
+  >([]);
   const [vendorItems, setVendorItems] = useState<
-    { id: string; name: string }[]
+    { id: string; name: string; categoryId: string }[]
   >([]);
 
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const [isComboboxOpen, setIsComboboxOpen] = useState(false);
+
+  const form = useForm<VendorFormValues>({
+    resolver: zodResolver(vendorSchema),
+    defaultValues: initialData || {
+      companyName: "",
+      picName: "",
+      country: "",
+      address: "",
+      isActive: true,
+      type: "",
+      categoryId: "",
+      itemIds: [],
+      platformId: "",
+      contactId: "",
+    },
+  });
+
+  const { filteredCategories, filteredItems } = useVendorFormFilter({
+    form,
+    vendorCategories,
+    vendorItems,
+  });
+
+  useEffect(() => {
+    if (initialData) form.reset(initialData);
+  }, [initialData, form]);
+
+  // === Fetch Contact Platforms ===
+  useEffect(() => {
+    const fetchContactPlatforms = async () => {
+      try {
+        const tokenRes = await fetch("/api/auth/token");
+        const { token } = await tokenRes.json();
+        const res = await fetch(
+          "http://localhost:8000/contact-platforms/active",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const data = await res.json();
+
+        setContactPlatforms(data);
+      } catch (error) {
+        console.error("❌ Error loading contact platforms:", error);
+        toast.error("Failed to load contact platforms");
+      }
+    };
+    fetchContactPlatforms();
+  }, []);
+
+  // === Fetch Vendor Categories Active ===
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setLoadingCategories(true);
+      try {
+        const tokenRes = await fetch("/api/auth/token");
+        const { token } = await tokenRes.json();
+        const res = await fetch(
+          "http://localhost:8000/vendor-categories/active",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (!res.ok) throw new Error("Failed to fetch categories");
+        const data = await res.json();
+        setVendorCategories(data);
+      } catch (error) {
+        console.error("❌ Error loading vendor categories:", error);
+        toast.error("Failed to load vendor categories");
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   // === Fetch Vendor Items Active ===
   useEffect(() => {
@@ -101,12 +195,10 @@ export default function VendorForm({
       try {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
-
         const res = await fetch("http://localhost:8000/vendor-items/active", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("Failed to fetch vendor items");
-
         const data = await res.json();
         setVendorItems(data);
       } catch (error) {
@@ -114,33 +206,24 @@ export default function VendorForm({
         toast.error("Failed to load service types");
       }
     };
-
     fetchVendorItems();
   }, []);
 
-  const form = useForm<VendorFormValues>({
-    resolver: zodResolver(vendorSchema),
-    defaultValues: initialData || {
-      companyName: "",
-      picName: "",
-      phone: "",
-      country: "",
-      address: "",
-      isActive: true,
-      itemIds: [],
-    },
-  });
-
-  useEffect(() => {
-    if (initialData) form.reset(initialData);
-  }, [initialData, form]);
-
   const handleSubmit = (values: VendorFormValues) => {
-    onSubmit(values);
+    const payload = {
+      ...values,
+      contacts: [
+        {
+          platformId: values.platformId!,
+          contactId: values.contactId!,
+        },
+      ],
+    };
+    onSubmit(payload);
   };
 
   return (
-    <Card className="w-full ">
+    <Card className="">
       {isLoading && (
         <div className="absolute inset-0 bg-background/70 z-10 flex items-center justify-center rounded-lg">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -198,19 +281,65 @@ export default function VendorForm({
                 )}
               />
 
-              {/* Phone */}
               <FormField
                 control={form.control}
-                name="phone"
+                name="platformId"
+                render={({ field }) => (
+                  <FormItem className="w-full">
+                    <FormLabel className="flex items-center gap-2">
+                      <Network className="h-4 w-4 text-muted-foreground" />
+                      Contact Platform
+                    </FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={isLoading || isSubmitting}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select platform" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {contactPlatforms.length > 0 ? (
+                          contactPlatforms.map((platform) => {
+                            const Icon =
+                              (LucideIcons as any)[platform.icon] ||
+                              LucideIcons.HelpCircle;
+                            return (
+                              <SelectItem key={platform.id} value={platform.id}>
+                                <div className="flex items-center gap-2">
+                                  <Icon className="h-4 w-4 text-muted-foreground" />
+                                  {platform.name}
+                                </div>
+                              </SelectItem>
+                            );
+                          })
+                        ) : (
+                          <SelectItem value="none" disabled>
+                            No platform found
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Contact ID */}
+              <FormField
+                control={form.control}
+                name="contactId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      Phone
+                      <AtSign className="h-4 w-4 text-muted-foreground" />
+                      Contact ID / Username
                     </FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="+62..."
+                        placeholder="e.g. +6281234 / @username"
                         {...field}
                         disabled={isLoading || isSubmitting}
                       />
@@ -264,41 +393,100 @@ export default function VendorForm({
                 )}
               />
 
-              {/* Active Status */}
+              {/* Type */}
               <FormField
                 control={form.control}
-                name="isActive"
+                name="type"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-                      Active Status
+                      <Layers className="h-4 w-4 text-muted-foreground" />
+                      Type
                     </FormLabel>
-                    <div className="flex items-center gap-3">
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                      <span className="text-sm text-muted-foreground">
-                        {field.value ? "Active" : "Inactive"}
-                      </span>
-                    </div>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={isLoading || isSubmitting}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categoryTypes.length > 0 ? (
+                          categoryTypes.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="none" disabled>
+                            No types available
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* 🔄 ITEM ID FIELD MENGGUNAKAN COMBOBOX MULTI-SELECT 🔄 */}
+              {/* Category */}
+              <FormField
+                control={form.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-muted-foreground" />
+                      Category
+                    </FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={!form.watch("type") || loadingCategories}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              !form.watch("type")
+                                ? "Select type first"
+                                : "Select category"
+                            }
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {filteredCategories.length > 0 ? (
+                          filteredCategories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="none" disabled>
+                            No categories available
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Vendor Items */}
               <FormField
                 control={form.control}
                 name="itemIds"
                 render={({ field }) => (
-                  <FormItem className="md:col-span-2">
+                  <FormItem className="">
                     <FormLabel className="flex items-center gap-2">
                       <PackageSearch className="h-4 w-4 text-muted-foreground" />
                       Vendor Items
                     </FormLabel>
-
                     <Popover
                       open={isComboboxOpen}
                       onOpenChange={setIsComboboxOpen}
@@ -325,20 +513,20 @@ export default function VendorForm({
                           <CommandList>
                             <CommandEmpty>Item tidak ditemukan.</CommandEmpty>
                             <CommandGroup>
-                              {vendorItems.map((item) => {
+                              {filteredItems.map((item) => {
                                 const isSelected = field.value.includes(
                                   item.id
                                 );
                                 return (
                                   <CommandItem
                                     key={item.id}
-                                    value={item.name} // Gunakan nama untuk pencarian
+                                    value={item.name}
                                     onSelect={() => {
                                       const newIds = isSelected
                                         ? field.value.filter(
                                             (v) => v !== item.id
-                                          ) // Hapus
-                                        : [...field.value, item.id]; // Tambah
+                                          )
+                                        : [...field.value, item.id];
                                       field.onChange(newIds);
                                     }}
                                   >
@@ -357,13 +545,10 @@ export default function VendorForm({
                         </Command>
                       </PopoverContent>
                     </Popover>
-
-                    {/* Tampilkan item yang sudah dipilih sebagai Badge */}
                     <div className="flex flex-wrap gap-2 mt-2">
                       {field.value.map((id) => {
                         const item = vendorItems.find((i) => i.id === id);
-                        if (!item) return null; // Handle item yang mungkin sudah dihapus atau belum dimuat
-
+                        if (!item) return null;
                         return (
                           <Badge
                             key={id}
@@ -380,12 +565,34 @@ export default function VendorForm({
                         );
                       })}
                     </div>
-
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              {/* 🔄 AKHIR BLOK ITEM ID DENGAN COMBOBOX 🔄 */}
+
+              {/* Active Status */}
+              <FormField
+                control={form.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="self-start">
+                    <FormLabel className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                      Active Status
+                    </FormLabel>
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {field.value ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             <div className="flex justify-end">

@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, UserPlus } from "lucide-react";
+import { Search, UserCircle, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -23,9 +24,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDate } from "@/utils/formatDate";
 import { useDebounce } from "@/helper/debounce";
-import { Skeleton } from "@/components/ui/skeleton";
+import { formatDate } from "@/utils/formatDate";
 
 // === TYPE DEFINITIONS ===
 type ClientType = "B2B" | "B2C";
@@ -126,11 +126,12 @@ const ClientManagementTable: React.FC = () => {
 
   // === RENDER ===
   return (
-    <div className="space-y-4 w-full max-w-8xl mx-auto">
+    <div className="space-y-4 w-full  mx-auto">
       {/* === HEADER & FILTER === */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <CardTitle className="text-2xl font-bold">
+          <CardTitle className="text-2xl font-bold whitespace-nowrap flex items-center gap-2">
+            <UserCircle className="h-7 w-7 font-bold" />
             Client Management
           </CardTitle>
 

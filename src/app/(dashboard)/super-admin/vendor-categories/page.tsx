@@ -95,7 +95,7 @@ const VendorCategories = () => {
   }, [page, debouncedSearch, typeFilter]);
 
   return (
-    <div className="space-y-4 w-full max-w-8xl mx-auto">
+    <div className="space-y-4 w-full  mx-auto">
       {/* === HEADER === */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">

@@ -8,12 +8,12 @@ import VendorForm, { VendorFormValues } from "../../components/VendorForm";
 export default function EditVendorPage() {
   const { id } = useParams();
   const router = useRouter();
-  const [vendorData, setVendorData] = useState<VendorFormValues | undefined>();
-  console.log("ini adalah data dari vendor", vendorData);
 
+  const [vendorData, setVendorData] = useState<VendorFormValues | undefined>();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // === FETCH DATA VENDOR ===
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -25,17 +25,20 @@ export default function EditVendorPage() {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (!res.ok) throw new Error("Failed to fetch vendor data");
-
         const data = await res.json();
+        console.log("ini adalah data saya🔥🔥🔥🔥🔥🔥", data);
+
         setVendorData({
           companyName: data.companyName,
           picName: data.picName,
-          phone: data.phone,
           country: data.country,
+          type: "",
+          categoryId: "",
           address: data.address,
           isActive: data.isActive,
-          itemIds: data.vendorItems?.map((v: any) => v.item.id) || [],
+          itemIds: data.vendorItems?.map((v: any) => v.id) || [],
+          platformId: data.contacts?.[0]?.platform?.id || "",
+          contactId: data.contacts?.[0]?.contactId || "",
         });
       } catch (err) {
         console.error("❌ Error fetching vendor data:", err);
@@ -48,11 +51,29 @@ export default function EditVendorPage() {
     if (id) fetchData();
   }, [id]);
 
+  // === HANDLE UPDATE ===
   const handleUpdateVendor = async (data: VendorFormValues) => {
     setIsSubmitting(true);
     try {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
+
+      const payload = {
+        companyName: data.companyName,
+        picName: data.picName,
+        country: data.country,
+        address: data.address,
+        isActive: data.isActive,
+        itemIds: data.itemIds,
+        contacts: [
+          {
+            platformId: data.platformId,
+            contactId: data.contactId,
+          },
+        ],
+      };
+
+      console.log("📦 Data to update:", payload);
 
       const res = await fetch(`http://localhost:8000/vendors/${id}`, {
         method: "PATCH",
@@ -60,23 +81,14 @@ export default function EditVendorPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          companyName: data.companyName,
-          picName: data.picName,
-          phone: data.phone,
-          country: data.country,
-          address: data.address,
-          isActive: data.isActive,
-          itemIds: data.itemIds,
-        }),
+        body: JSON.stringify(payload),
       });
-
-      if (!res.ok) throw new Error("Failed to update vendor");
 
       toast.success("Vendor updated successfully!");
       router.push("/super-admin/vendors");
       router.refresh();
     } catch (err) {
+      console.error("❌ Error updating vendor:", err);
       toast.error(
         err instanceof Error ? err.message : "Failed to update vendor"
       );
@@ -86,7 +98,7 @@ export default function EditVendorPage() {
   };
 
   return (
-    <div className="space-y-4 w-[1100px]">
+    <div className="space-y-4">
       <h2 className="text-xl font-semibold tracking-tight uppercase">
         Edit Vendor
       </h2>
