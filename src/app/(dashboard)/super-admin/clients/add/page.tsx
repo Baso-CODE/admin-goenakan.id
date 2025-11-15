@@ -255,7 +255,7 @@ const ClientAddForm = () => {
                   <div className="space-y-2">
                     <Label>Saluran Pembelian</Label>
                     <Input
-                      name="b2c_purchaseChannel"
+                      name="b2b_purchaseChannel"
                       value={formData.b2b_purchaseChannel}
                       onChange={handleChange}
                     />

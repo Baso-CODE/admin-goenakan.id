@@ -22,7 +22,6 @@ const productCategorySchema = z.object({
   name: z
     .string()
     .min(2, { message: "Category name must be at least 2 characters." }),
-  slug: z.string().min(1, "Slug is required."),
 });
 
 export type ProductCategoryFormValues = z.infer<typeof productCategorySchema>;
@@ -42,23 +41,8 @@ export default function ProductCategoryForm({
     resolver: zodResolver(productCategorySchema),
     defaultValues: initialData || {
       name: "",
-      slug: "",
     },
   });
-
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name === "name" && value.name) {
-        const slug = value.name
-          .toLowerCase()
-          .trim()
-          .replace(/[^\w\s-]/g, "")
-          .replace(/\s+/g, "-");
-        -form.setValue("slug", slug, { shouldValidate: true });
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [form]);
 
   useEffect(() => {
     if (initialData) form.reset(initialData);
@@ -95,28 +79,6 @@ export default function ProductCategoryForm({
                     <FormControl>
                       <Input
                         placeholder="Enter category name"
-                        {...field}
-                        disabled={isLoading || isSubmitting}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* === Slug (auto generated) === */}
-              <FormField
-                control={form.control}
-                name="slug"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                      Slug
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Auto-generated from name"
                         {...field}
                         disabled={isLoading || isSubmitting}
                       />

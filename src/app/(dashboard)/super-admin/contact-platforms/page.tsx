@@ -130,7 +130,7 @@ const ContactPlatforms = () => {
                 <TableHead>Icon</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="">Actions</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -148,7 +148,7 @@ const ContactPlatforms = () => {
                       <Skeleton className="h-6 w-6 rounded-md" />
                     </TableCell>
                     <TableCell className="h-12">
-                      <Skeleton className="h-4 w-[80px]" />
+                      <Skeleton className="h-4 w-20" />
                     </TableCell>
                     <TableCell className="h-12">
                       <Skeleton className="h-4 w-[100px]" />
@@ -200,7 +200,7 @@ const ContactPlatforms = () => {
                       <TableCell>
                         {formatDate(data.createdAt, { style: "relative" })}
                       </TableCell>
-                      <TableCell className="text-right space-x-2">
+                      <TableCell className=" space-x-2">
                         <Link
                           href={`/super-admin/contact-platforms/edit/${data.id}`}
                         >

@@ -36,7 +36,7 @@ export default function EditContactPlatform() {
         const data = await res.json();
         setPlatformData({
           name: data.name,
-          slug: data.slug,
+
           icon: data.icon,
           isActive: data.isActive,
         });

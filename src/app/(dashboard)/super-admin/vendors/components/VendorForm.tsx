@@ -60,28 +60,38 @@ import {
 import { useVendorFormFilter } from "../hooks/useVendorFormFilter";
 
 // === ZOD SCHEMA ===
-const vendorSchema = z.object({
+const baseVendorSchema = {
   companyName: z
     .string()
     .min(2, { message: "Company name must be at least 2 characters." }),
   picName: z
     .string()
     .min(2, { message: "PIC name must be at least 2 characters." }),
-
   country: z
     .string()
     .min(2, { message: "Country must be at least 2 characters." }),
   address: z.string().min(5, "Address must be at least 5 characters"),
   isActive: z.boolean(),
-  type: z.string().min(1, { message: "Please select type." }),
-  categoryId: z.string().min(1, { message: "Please select category." }),
-  itemIds: z
-    .array(z.string())
-    .nonempty({ message: "Please select at least one service type." }),
+  itemIds: z.array(z.string()).optional(),
   platformId: z.string().min(1, { message: "Please select platform." }),
   contactId: z.string().min(3, { message: "Contact ID required." }),
+};
+
+export const createVendorSchema = z.object({
+  ...baseVendorSchema,
+  type: z.string().min(1, { message: "Please select type." }),
+  categoryId: z.string().min(1, { message: "Please select category." }),
 });
-export type VendorFormValues = z.infer<typeof vendorSchema>;
+
+export const updateVendorSchema = z.object({
+  ...baseVendorSchema,
+  type: z.string().optional(),
+  categoryId: z.string().optional(),
+});
+
+export type VendorFormValues = z.infer<
+  typeof createVendorSchema | typeof updateVendorSchema
+>;
 
 export default function VendorForm({
   initialData,
@@ -115,7 +125,9 @@ export default function VendorForm({
   const [isComboboxOpen, setIsComboboxOpen] = useState(false);
 
   const form = useForm<VendorFormValues>({
-    resolver: zodResolver(vendorSchema),
+    resolver: zodResolver(
+      initialData ? updateVendorSchema : createVendorSchema
+    ),
     defaultValues: initialData || {
       companyName: "",
       picName: "",
@@ -495,8 +507,8 @@ export default function VendorForm({
                             className="w-full justify-between"
                             disabled={isLoading || isSubmitting}
                           >
-                            {field.value.length > 0
-                              ? `${field.value.length} item dipilih`
+                            {(field.value ?? []).length > 0
+                              ? `${(field.value ?? []).length} item dipilih`
                               : "Pilih item yang ditawarkan..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -509,7 +521,7 @@ export default function VendorForm({
                             <CommandEmpty>Item tidak ditemukan.</CommandEmpty>
                             <CommandGroup>
                               {filteredItems.map((item) => {
-                                const isSelected = field.value.includes(
+                                const isSelected = (field.value ?? []).includes(
                                   item.id
                                 );
                                 return (
@@ -518,10 +530,10 @@ export default function VendorForm({
                                     value={item.name}
                                     onSelect={() => {
                                       const newIds = isSelected
-                                        ? field.value.filter(
+                                        ? (field.value ?? []).filter(
                                             (v) => v !== item.id
                                           )
-                                        : [...field.value, item.id];
+                                        : [...(field.value ?? []), item.id];
                                       field.onChange(newIds);
                                     }}
                                   >
@@ -541,7 +553,7 @@ export default function VendorForm({
                       </PopoverContent>
                     </Popover>
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {field.value.map((id) => {
+                      {(field.value ?? []).map((id) => {
                         const item = vendorItems.find((i) => i.id === id);
                         if (!item) return null;
                         return (
@@ -551,7 +563,7 @@ export default function VendorForm({
                             className="cursor-pointer"
                             onClick={() =>
                               field.onChange(
-                                field.value.filter((v) => v !== id)
+                                (field.value ?? []).filter((v) => v !== id)
                               )
                             }
                           >

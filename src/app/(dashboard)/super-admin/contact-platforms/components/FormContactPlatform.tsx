@@ -33,7 +33,7 @@ const contactPlatformSchema = z.object({
   name: z
     .string()
     .min(2, { message: "Platform name must be at least 2 characters." }),
-  slug: z.string().min(1, { message: "Slug is required." }),
+
   icon: z.string().min(1, { message: "Icon is required" }),
 
   isActive: z.boolean(),
@@ -56,7 +56,6 @@ export default function ContactPlatformForm({
     resolver: zodResolver(contactPlatformSchema),
     defaultValues: initialData || {
       name: "",
-      slug: "",
       icon: "",
       isActive: true,
     },
@@ -84,7 +83,7 @@ export default function ContactPlatformForm({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-6 w-full"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Name */}
               <FormField
                 control={form.control}
@@ -98,28 +97,6 @@ export default function ContactPlatformForm({
                     <FormControl>
                       <Input
                         placeholder="Enter platform name"
-                        {...field}
-                        disabled={isLoading || isSubmitting}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Slug */}
-              <FormField
-                control={form.control}
-                name="slug"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <Link2 className="h-4 w-4 text-muted-foreground" />
-                      Slug
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter unique slug (e.g. whatsapp, email)"
                         {...field}
                         disabled={isLoading || isSubmitting}
                       />

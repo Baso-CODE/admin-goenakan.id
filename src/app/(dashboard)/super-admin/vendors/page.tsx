@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,21 +28,21 @@ import { formatDate } from "@/utils/formatDate";
 import { useDebounce } from "@/helper/debounce";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// === Type definitions ===
 type Vendor = {
   id: string;
   companyName: string;
   picName: string;
-  phone: string;
   country: string;
   isActive: boolean;
   createdAt: string;
-  vendorItems?: {
-    item: {
+  contacts?: {
+    id: string;
+    contactId: string;
+    platform: {
       id: string;
       name: string;
-      description: string;
-      category: { id: string; name: string };
+      slug: string;
+      icon: string;
     };
   }[];
 };
@@ -73,18 +74,15 @@ const Vendors = () => {
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
-
         isActive: statusFilter,
       });
       if (debouncedSearch.trim()) {
         params.append("search", debouncedSearch.trim());
       }
-      const res = await fetch(`http://localhost:8000/vendors?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
 
+      const res = await fetch(`http://localhost:8000/vendors?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const result = await res.json();
       setVendors(result.data || []);
       setMeta(result.meta);
@@ -101,16 +99,14 @@ const Vendors = () => {
   }, [page, debouncedSearch, statusFilter]);
 
   return (
-    <div className="space-y-4 overflow-x-hidden w-full  mx-auto">
-      {/* === Header === */}
+    <div className="space-y-4 overflow-x-hidden w-full mx-auto">
       <Card>
-        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 overflow-x-auto">
-          <CardTitle className="text-xl font-semibold whitespace-nowrap">
+        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <CardTitle className="text-xl font-semibold">
             Vendor Management
           </CardTitle>
 
           <div className="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
-            {/* Search */}
             <div className="relative flex-1 md:w-64 min-w-[200px]">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -122,12 +118,11 @@ const Vendors = () => {
               />
             </div>
 
-            {/* Filter active/inactive */}
             <Select
               value={statusFilter}
               onValueChange={(val) => setStatusFilter(val)}
             >
-              <SelectTrigger className="w-[150px] min-w-[150px]">
+              <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Filter status" />
               </SelectTrigger>
               <SelectContent>
@@ -140,15 +135,14 @@ const Vendors = () => {
         </CardHeader>
       </Card>
 
-      {/* === Button Add Vendor === */}
       <div className="p-1 flex justify-start">
         <Link href="/super-admin/vendors/add">
-          <Button size="sm" className="gap-2 cursor-pointer">
+          <Button size="sm" className="gap-2">
             + Add Vendor
           </Button>
         </Link>
       </div>
-      {/* === Table === */}
+
       <Card className="w-full">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -157,73 +151,75 @@ const Vendors = () => {
                 <TableRow>
                   <TableHead className="w-[200px]">Company Name</TableHead>
                   <TableHead>PIC Name</TableHead>
-                  <TableHead>Phone</TableHead>
+                  <TableHead>Contact</TableHead>
                   <TableHead>Country</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
+                  <TableHead className="w-40 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* Penanganan Loading menggunakan Skeleton */}
                 {loading ? (
-                  // Ulangi baris skeleton, misalnya 5 baris
-                  Array.from({ length: 5 }).map((_, index) => (
-                    <TableRow key={index}>
-                      {/* Kolom 1: Company Name (w-[200px]) */}
-                      <TableCell className="h-12 w-[200px]">
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell>
                         <Skeleton className="h-4 w-[180px]" />
                       </TableCell>
-                      {/* Kolom 2: PIC Name */}
-                      <TableCell className="h-12">
+                      <TableCell>
                         <Skeleton className="h-4 w-[150px]" />
                       </TableCell>
-                      {/* Kolom 3: Phone */}
-                      <TableCell className="h-12">
+                      <TableCell>
                         <Skeleton className="h-4 w-[120px]" />
                       </TableCell>
-                      {/* Kolom 4: Country */}
-                      <TableCell className="h-12">
+                      <TableCell>
                         <Skeleton className="h-4 w-20" />
                       </TableCell>
-                      {/* Kolom 5: Status */}
-                      <TableCell className="h-12">
+                      <TableCell>
                         <Skeleton className="h-4 w-[60px]" />
                       </TableCell>
-                      {/* Kolom 6: Created */}
-                      <TableCell className="h-12">
+                      <TableCell>
                         <Skeleton className="h-4 w-[100px]" />
                       </TableCell>
-                      {/* Kolom 7: Actions (text-center) */}
-                      <TableCell className="h-12 text-center">
-                        {/* Untuk mensimulasikan tombol Edit & Detail */}
-                        <div className="flex justify-end space-x-2">
-                          <Skeleton className="h-8 w-[50px]" />
-                          <Skeleton className="h-8 w-[60px]" />
-                          <Skeleton className="h-8 w-[60px]" />
-                        </div>
+                      <TableCell className="text-right">
+                        <Skeleton className="h-8 w-[120px]" />
                       </TableCell>
                     </TableRow>
                   ))
                 ) : error ? (
-                  /* Penanganan Error */
                   <TableRow>
                     <TableCell
-                      colSpan={7} // Jumlah kolom: 7
+                      colSpan={7}
                       className="text-center text-red-500 py-6"
                     >
-                      Error: {error || "Failed to load vendors."}
+                      {error}
                     </TableCell>
                   </TableRow>
                 ) : vendors.length > 0 ? (
-                  /* Menampilkan Data Vendor */
                   vendors.map((vendor) => (
                     <TableRow key={vendor.id}>
                       <TableCell className="font-medium">
                         {vendor.companyName}
                       </TableCell>
                       <TableCell>{vendor.picName}</TableCell>
-                      <TableCell>{vendor.phone}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2 flex-wrap">
+                          {vendor.contacts?.map((c) => {
+                            const Icon =
+                              (LucideIcons as any)[c.platform.icon] ||
+                              LucideIcons.MessageCircle;
+                            return (
+                              <Link
+                                key={c.id}
+                                href={c.contactId}
+                                target="_blank"
+                                className="text-muted-foreground hover:text-primary transition flex items-center gap-1.5"
+                              >
+                                <Icon className="h-4 w-4" /> {c.platform.name}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </TableCell>
                       <TableCell>{vendor.country}</TableCell>
                       <TableCell>
                         {vendor.isActive ? (
@@ -231,10 +227,7 @@ const Vendors = () => {
                             Active
                           </Badge>
                         ) : (
-                          <Badge
-                            variant="destructive"
-                            className="bg-red-500/10 text-red-600 border-red-500/20"
-                          >
+                          <Badge className="bg-red-500/10 text-red-600 border-red-500/20">
                             Inactive
                           </Badge>
                         )}
@@ -242,40 +235,24 @@ const Vendors = () => {
                       <TableCell>
                         {formatDate(vendor.createdAt, { style: "relative" })}
                       </TableCell>
-                      <TableCell className="text-center space-x-2">
+                      <TableCell className="text-right space-x-2 w-40">
                         <Link href={`/super-admin/vendors/edit/${vendor.id}`}>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="cursor-pointer"
-                          >
+                          <Button variant="outline" size="sm">
                             Edit
                           </Button>
                         </Link>
                         <Link href={`/super-admin/vendors/detail/${vendor.id}`}>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="text-xs cursor-pointer"
-                          >
+                          <Button variant="secondary" size="sm">
                             Detail
                           </Button>
                         </Link>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="text-xs cursor-pointer"
-                        >
-                          Delete
-                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
-                  /* Data Kosong */
                   <TableRow>
                     <TableCell
-                      colSpan={7} // Jumlah kolom: 7
+                      colSpan={7}
                       className="text-center py-6 text-muted-foreground"
                     >
                       No vendors found.
@@ -288,7 +265,6 @@ const Vendors = () => {
         </CardContent>
       </Card>
 
-      {/* === Pagination === */}
       {meta && (
         <div className="flex justify-between items-center p-4 border-t text-sm text-muted-foreground">
           <p>

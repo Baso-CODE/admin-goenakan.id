@@ -88,7 +88,7 @@ const ProductCategoriesPage = () => {
   }, [page, debouncedSearch]);
 
   return (
-    <div className="space-y-4 w-full max-w-8xl mx-auto">
+    <div className="space-y-4 w-auto mx-auto">
       {/* === HEADER === */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -130,7 +130,7 @@ const ProductCategoriesPage = () => {
                 <TableHead className="w-[250px]">Category Name</TableHead>
                 <TableHead>Slug</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="">Actions</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -152,8 +152,8 @@ const ProductCategoriesPage = () => {
                       <Skeleton className="h-4 w-[100px]" />
                     </TableCell>
                     {/* Kolom 4: Actions (text-right) */}
-                    <TableCell className="h-12 w-[20%] text-right">
-                      <div className="flex justify-end space-x-2">
+                    <TableCell className="h-12 w-[20%] ">
+                      <div className="flex  space-x-2">
                         <Skeleton className="h-8 w-[50px]" />
                         {/* Edit Button */}
                         <Skeleton className="h-8 w-[60px]" />
@@ -181,7 +181,7 @@ const ProductCategoriesPage = () => {
                     <TableCell>
                       {formatDate(data.createdAt, { style: "relative" })}
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
+                    <TableCell className=" space-x-2">
                       <Link
                         href={`/super-admin/product-categories/edit/${data.id}`}
                       >
