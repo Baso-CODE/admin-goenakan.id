@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronLeft, ClipboardList } from "lucide-react";
+import { ChevronLeft, ClipboardList, DeleteIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -40,8 +40,17 @@ interface PurchaseChannel {
   createdAt: Date;
   updatedAt: Date;
 }
+interface Departement {
+  id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 interface PICFormData {
+  prefix: string;
   name: string;
   email?: string;
   phone?: string;
@@ -58,7 +67,6 @@ interface ClientFormData {
   // ============================
   b2b_companyName?: string;
   b2b_departmentId?: string; // updated
-  b2b_prefix?: string;
   b2b_phone?: string;
   b2b_email?: string;
   b2b_website?: string;
@@ -90,7 +98,6 @@ const initialFormData: ClientFormData = {
   // ============================
   b2b_companyName: "",
   b2b_departmentId: "",
-  b2b_prefix: "",
   b2b_phone: "",
   b2b_email: "",
   b2b_website: "",
@@ -102,6 +109,7 @@ const initialFormData: ClientFormData = {
   // MULTIPLE PIC
   b2b_pics: [
     {
+      prefix: "",
       name: "",
       email: "",
       phone: "",
@@ -126,9 +134,43 @@ const ClientAddForm = () => {
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
     []
   );
+  const [departments, setDepartments] = useState<Departement[]>([]);
 
   const { data: session } = useSession();
   const router = useRouter();
+
+  useEffect(() => {
+    const fetchMasterData = async () => {
+      try {
+        const tokenRes = await fetch("/api/auth/token");
+        const { token } = await tokenRes.json();
+
+        if (!token) throw new Error("No token found");
+
+        // Fetch purchase channels
+        const pcRes = await fetch(
+          "http://localhost:8000/purchase-channels/list",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const pcData = await pcRes.json();
+        setPurchaseChannels(pcData);
+
+        // Fetch departments
+        const depRes = await fetch("http://localhost:8000/departments/list", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const depData = await depRes.json();
+        setDepartments(depData);
+      } catch (err) {
+        console.error("❌ Failed to fetch master data:", err);
+        toast.error("Gagal mengambil data Purchase Channel / Departemen");
+      }
+    };
+
+    fetchMasterData();
+  }, []);
 
   useEffect(() => {
     fetch("https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json")
@@ -207,7 +249,6 @@ const ClientAddForm = () => {
               // === B2B ===
               companyName: formData.b2b_companyName,
               departmentId: formData.b2b_departmentId,
-              prefix: formData.b2b_prefix,
               phone: formData.b2b_phone,
               email: formData.b2b_email,
               website: formData.b2b_website,
@@ -218,6 +259,7 @@ const ClientAddForm = () => {
 
               // MULTIPLE PIC
               pics: formData.b2b_pics.map((pic) => ({
+                prefix: pic.prefix,
                 name: pic.name,
                 email: pic.email,
                 phone: pic.phone,
@@ -355,7 +397,7 @@ const ClientAddForm = () => {
                   </div>
 
                   {/* DEPARTMENT */}
-                  {/* <div className="space-y-2">
+                  <div className="space-y-2">
                     <Label>Departemen</Label>
                     <Select
                       value={formData.b2b_departmentId}
@@ -377,7 +419,7 @@ const ClientAddForm = () => {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div> */}
+                  </div>
                 </div>
 
                 {/* === ADDRESS COMPANY === */}
@@ -451,7 +493,35 @@ const ClientAddForm = () => {
                     key={index}
                     className="border p-4 rounded-lg space-y-4 bg-muted/40"
                   >
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      {/* PREFIX PIC */}
+                      <div className="space-y-2">
+                        <Label>Prefix (Mr./Ms.)</Label>
+                        <Select
+                          value={pic.prefix}
+                          onValueChange={(value) => {
+                            const updated = [...formData.b2b_pics];
+                            updated[index].prefix = value;
+                            setFormData((prev) => ({
+                              ...prev,
+                              b2b_pics: updated,
+                            }));
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select prefix" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Mr.">Mr.</SelectItem>
+                            <SelectItem value="Ms.">Ms.</SelectItem>
+                            <SelectItem value="Mrs.">Mrs.</SelectItem>
+                            <SelectItem value="Bpk.">Bpk.</SelectItem>
+                            <SelectItem value="Ibu.">Ibu.</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* NAMA PIC */}
                       <div className="space-y-2">
                         <Label>Nama PIC *</Label>
                         <Input
@@ -468,6 +538,7 @@ const ClientAddForm = () => {
                         />
                       </div>
 
+                      {/* EMAIL PIC */}
                       <div className="space-y-2">
                         <Label>Email PIC</Label>
                         <Input
@@ -483,6 +554,7 @@ const ClientAddForm = () => {
                         />
                       </div>
 
+                      {/* TELEPON PIC */}
                       <div className="space-y-2">
                         <Label>Telepon PIC</Label>
                         <Input
@@ -499,7 +571,7 @@ const ClientAddForm = () => {
                       </div>
                     </div>
 
-                    {/* REMOVE PIC if more than 1 */}
+                    {/* DELETE PIC BUTTON */}
                     {formData.b2b_pics.length > 1 && (
                       <Button
                         variant="destructive"
@@ -513,7 +585,7 @@ const ClientAddForm = () => {
                           }));
                         }}
                       >
-                        Hapus PIC
+                        <DeleteIcon />
                       </Button>
                     )}
                   </div>
@@ -528,7 +600,7 @@ const ClientAddForm = () => {
                       ...prev,
                       b2b_pics: [
                         ...prev.b2b_pics,
-                        { name: "", email: "", phone: "" },
+                        { prefix: "", name: "", email: "", phone: "" },
                       ],
                     }))
                   }

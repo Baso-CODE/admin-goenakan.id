@@ -151,7 +151,7 @@ const PurchaseChannelsPage = () => {
                       <Skeleton className="h-4 w-[200px]" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-4 w-[80px]" />
+                      <Skeleton className="h-4 w-20" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-4 w-[100px]" />

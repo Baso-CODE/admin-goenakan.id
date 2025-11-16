@@ -97,6 +97,7 @@ export default function SidebarRole({ ...props }) {
         icon: UserCircle,
         items: [
           { title: "All Client", url: "/super-admin/clients" },
+          { title: "Departments", url: "/super-admin/departments" },
           { title: "Add Client", url: "/super-admin/clients/add" },
         ],
       },

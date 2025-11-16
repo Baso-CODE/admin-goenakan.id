@@ -4,7 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Building, MapPin, Trash2, User, Wrench } from "lucide-react";
+import {
+  Building,
+  LaptopMinimalCheck,
+  MapPin,
+  Trash2,
+  User,
+  Wrench,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -13,27 +20,51 @@ import { toast } from "sonner";
 // === Tipe Data ===
 type ClientType = "B2B" | "B2C";
 
+interface PurchaseChannel {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface Department {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface ClientB2CPurchaseChannel {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface ClientB2C {
   id: string;
   prefix: string;
   name: string;
   phone: string;
   fullAddress: string;
-  purchaseChannel: string;
+  purchaseChannel: PurchaseChannel; // UPDATE
 }
 
 interface ClientB2B {
   id: string;
   companyName: string;
-  department: string;
+  department: Department; // UPDATE
   prefix: string;
-  picName: string;
   phone: string;
   email: string;
   website: string;
   province: string;
   city: string;
-  purchaseChannel: string;
+  fullAddress: string; // UPDATE
+  purchaseChannel: PurchaseChannel; // UPDATE
+  pics: {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+  }[];
 }
 
 interface ClientDetail {
@@ -50,73 +81,147 @@ interface ClientDetail {
 // === B2B Component ===
 const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <Card className="shadow-sm md:col-span-2 ">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <Building className="w-5 h-5 text-indigo-500" />
-          Informasi Perusahaan
-        </CardTitle>
+    {/* Informasi Perusahaan */}
+    <Card className="shadow-sm border md:col-span-2">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-indigo-100">
+            <Building className="w-5 h-5 text-indigo-600" />
+          </div>
+          <CardTitle className="text-xl font-semibold tracking-wide">
+            Informasi Perusahaan
+          </CardTitle>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        <p>
-          <strong>Perusahaan:</strong> {data.companyName}
-        </p>
-        <p>
-          <strong>Website:</strong>
-          <a
-            href={data.website}
-            target="_blank"
-            className="text-blue-500 hover:underline"
+
+      <CardContent className="space-y-4 text-[15px]">
+        <div className="grid grid-cols-3">
+          <span className="text-muted-foreground font-medium">Perusahaan</span>
+          <span className="col-span-2 font-semibold text-gray-900">
+            {data.companyName}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3">
+          <span className="text-muted-foreground font-medium">Website</span>
+          <span className="col-span-2">
+            <a
+              className="text-blue-600 font-medium hover:underline"
+              href={data.website}
+              target="_blank"
+            >
+              {data.website}
+            </a>
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3">
+          <span className="text-muted-foreground font-medium">Departemen</span>
+          <span className="col-span-2 font-semibold text-gray-900">
+            {data.department?.name}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3">
+          <span className="text-muted-foreground font-medium">
+            Purchase Channel
+          </span>
+          <span className="col-span-2">
+            <Badge variant="secondary" className="px-3 py-1 rounded-lg">
+              {data.purchaseChannel?.name}
+            </Badge>
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+
+    <Card className="shadow-sm md:col-span-2 border rounded-xl">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-green-100">
+            <User className="w-5 h-5 text-green-600" />
+          </div>
+          <CardTitle className="text-xl font-semibold tracking-wide">
+            PIC (Person in Charge)
+          </CardTitle>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {data.pics.map((pic) => (
+          <div
+            key={pic.id}
+            className="p-4 border rounded-xl bg-muted/40 space-y-3"
           >
-            {data.website}
-          </a>
-        </p>
-        <p>
-          <strong>Departemen:</strong> {data.department}
-        </p>
-        <p>
-          <strong>Purchase Channel:</strong>
-          <Badge variant={"outline"} className="ml-1">
-            {data.purchaseChannel}
-          </Badge>
-        </p>
+            {/* NAMA */}
+            <div className="grid grid-cols-3">
+              <span className="text-muted-foreground font-medium">Nama</span>
+              <span className="col-span-2 font-semibold">{pic.name}</span>
+            </div>
+
+            {/* EMAIL */}
+            <div className="grid grid-cols-3">
+              <span className="text-muted-foreground font-medium">Email</span>
+              <span className="col-span-2">
+                {pic.email ? (
+                  <a
+                    href={`mailto:${pic.email}`}
+                    className="text-blue-600 hover:underline font-medium"
+                  >
+                    {pic.email}
+                  </a>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
+                )}
+              </span>
+            </div>
+
+            {/* TELEPON */}
+            <div className="grid grid-cols-3">
+              <span className="text-muted-foreground font-medium">Telepon</span>
+              <span className="col-span-2 font-semibold">
+                {pic.phone ?? "-"}
+              </span>
+            </div>
+          </div>
+        ))}
       </CardContent>
     </Card>
 
-    <Card className="shadow-sm md:col-span-2 ">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <User className="w-5 h-5 text-green-500" />
-          PIC (Person in Charge)
-        </CardTitle>
+    <Card className="shadow-sm md:col-span-2 border rounded-xl">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-red-100">
+            <MapPin className="w-5 h-5 text-red-600" />
+          </div>
+          <CardTitle className="text-xl font-semibold tracking-wide">
+            Alamat Perusahaan
+          </CardTitle>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        <p>
-          <strong>Nama PIC:</strong> {data.prefix} {data.picName}
-        </p>
-        <p>
-          <strong>Email:</strong> {data.email}
-        </p>
-        <p>
-          <strong>Telepon:</strong> {data.phone}
-        </p>
-      </CardContent>
-    </Card>
 
-    <Card className="md:col-span-2 shadow-sm">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <MapPin className="w-5 h-5 text-red-500" />
-          Alamat Perusahaan
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        <p>
-          <strong>Provinsi:</strong> {data.province}
-        </p>
-        <p>
-          <strong>Kota:</strong> {data.city}
-        </p>
+      <CardContent className="space-y-4 text-sm">
+        {/* ALAMAT */}
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">
+            Alamat Lengkap
+          </span>
+          <span className="col-span-2 font-semibold leading-relaxed">
+            {data.fullAddress}
+          </span>
+        </div>
+
+        {/* PROVINSI */}
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Provinsi</span>
+          <span className="col-span-2 font-semibold">{data.province}</span>
+        </div>
+
+        {/* KOTA */}
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Kota</span>
+          <span className="col-span-2 font-semibold">{data.city}</span>
+        </div>
       </CardContent>
     </Card>
   </div>
@@ -125,35 +230,67 @@ const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
 // === B2C Component ===
 const B2CDetails: React.FC<{ data: ClientB2C }> = ({ data }) => (
   <div className="grid grid-cols-1 gap-6">
-    <Card className="shadow-sm">
-      <CardHeader className="">
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <User className="w-5 h-5 text-yellow-600" />
-          Informasi Individu
-        </CardTitle>
+    {/* === Informasi Individu === */}
+    <Card className="shadow-sm border rounded-xl">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-yellow-100">
+            <User className="w-5 h-5 text-yellow-700" />
+          </div>
+          <CardTitle className="text-xl font-semibold tracking-wide">
+            Informasi Individu
+          </CardTitle>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        <p>
-          <strong>Nama Lengkap:</strong> {data.prefix} {data.name}
-        </p>
-        <p>
-          <strong>Telepon:</strong> {data.phone}
-        </p>
-        <p>
-          <strong>Saluran Pembelian:</strong> {data.purchaseChannel}
-        </p>
+
+      <CardContent className="space-y-4 text-sm">
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">
+            Nama Lengkap
+          </span>
+          <span className="col-span-2 font-semibold">
+            {data.prefix} {data.name}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Telepon</span>
+          <span className="col-span-2 font-semibold">{data.phone}</span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">
+            Purchase Channel
+          </span>
+          <span className="col-span-2">
+            <Badge variant="outline" className="font-semibold">
+              {data.purchaseChannel.name}
+            </Badge>
+          </span>
+        </div>
       </CardContent>
     </Card>
 
-    <Card className="shadow-sm">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <MapPin className="w-5 h-5 text-red-500" />
-          Alamat Pengiriman
-        </CardTitle>
+    {/* === Alamat Pengiriman === */}
+    <Card className="shadow-sm border rounded-xl">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-red-100">
+            <MapPin className="w-5 h-5 text-red-600" />
+          </div>
+          <CardTitle className="text-xl font-semibold tracking-wide">
+            Alamat Pengiriman
+          </CardTitle>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        <p>{data.fullAddress}</p>
+
+      <CardContent className="space-y-4 text-sm">
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Alamat</span>
+          <span className="col-span-2 font-semibold leading-relaxed">
+            {data.fullAddress}
+          </span>
+        </div>
       </CardContent>
     </Card>
   </div>
@@ -231,52 +368,90 @@ const ClientDetailPage: React.FC = () => {
     );
 
   return (
-    <div className="space-y-8 w-full">
+    <div className="space-y-10 w-full">
+      {/* === HEADER PREMIUM === */}
       <header className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            {titleName}
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <h1 className="text-4xl font-bold tracking-tight">{titleName}</h1>
+
             <Badge
-              variant="secondary"
-              className={`text-sm ${
-                client.type === "B2B"
-                  ? "bg-indigo-100 text-indigo-700"
-                  : "bg-yellow-100 text-yellow-700"
-              }`}
+              variant="outline"
+              className={`px-3 py-1 text-sm font-semibold flex items-center gap-1 rounded-lg
+            ${
+              client.type === "B2B"
+                ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                : "bg-yellow-50 text-yellow-700 border-yellow-200"
+            }
+          `}
             >
+              {/* ICON */}
+              {client.type === "B2B" ? (
+                <Building className="w-3.5 h-3.5" />
+              ) : (
+                <User className="w-3.5 h-3.5" />
+              )}
               {client.type}
             </Badge>
-          </h1>
-          <p className="text-muted-foreground">
-            Kode Klien: <span className="font-mono">{client.custCode}</span> |
-            Bergabung: {new Date(client.createdAt).toLocaleDateString()}
-          </p>
+          </div>
+
+          {/* METADATA */}
+          <div
+            className="text-sm text-muted-foreground flex items-center gap-3 flex-wrap 
+                   bg-muted/40 px-4 py-2 rounded-lg w-fit border"
+          >
+            <span>
+              <span className="font-medium">Kode Klien:</span>{" "}
+              <span className="font-mono text-[13px]">{client.custCode}</span>
+            </span>
+
+            <span className="text-gray-400">•</span>
+
+            <span>
+              <span className="font-medium">Bergabung:</span>{" "}
+              {new Date(client.createdAt).toLocaleDateString()}
+            </span>
+          </div>
         </div>
       </header>
 
       <Separator />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_1fr] gap-6">
-        {/* === Left Column: Detail === */}
+      {/* === MAIN GRID === */}
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_1fr] gap-8">
+        {/* == LEFT DETAILS == */}
         <div>{SpecificDetailsComponent}</div>
 
-        {/* === Right Column: Quick Actions === */}
-        <div className="lg:sticky lg:top-20 h-fit space-y-4">
-          <Card className="shadow-md border border-gray-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold">
-                Quick Actions
-              </CardTitle>
+        {/* == RIGHT QUICK ACTIONS == */}
+        <div className="lg:sticky lg:top-24 h-fit space-y-5">
+          <Card className="shadow-sm border rounded-xl">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-slate-100 rounded-lg">
+                  <LaptopMinimalCheck className="w-4 h-4 text-slate-700" />
+                </div>
+                <CardTitle className="text-lg font-semibold tracking-wide">
+                  Quick Actions
+                </CardTitle>
+              </div>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <Link href={`/super-admin/clients/edit/${client.id}`}>
-                <Button variant="secondary" className="w-full gap-2">
+
+            <CardContent className="space-y-4 h-fit">
+              <Link
+                href={`/super-admin/clients/edit/${client.id}`}
+                className="block"
+              >
+                <Button
+                  variant="secondary"
+                  className="w-full gap-2 py-2.5 rounded-xl hover:bg-secondary transition"
+                >
                   <Wrench className="w-4 h-4" /> Edit Client
                 </Button>
               </Link>
+
               <Button
                 variant="destructive"
-                className="w-full gap-2"
+                className="w-full gap-2 py-2.5 rounded-xl hover:bg-destructive/90  transition"
                 onClick={handleDelete}
               >
                 <Trash2 className="w-4 h-4" /> Delete Client
