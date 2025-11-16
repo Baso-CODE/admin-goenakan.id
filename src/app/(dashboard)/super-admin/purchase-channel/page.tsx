@@ -1,0 +1,261 @@
+"use client";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+import { useDebounce } from "@/helper/debounce";
+import { formatDate } from "@/utils/formatDate";
+
+import { Search } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+
+type PurchaseChannel = {
+  id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+  createdAt: string;
+};
+
+type Meta = {
+  hasNext: boolean;
+  hasPrevious: boolean;
+  page: number;
+  perPage: number;
+  total: number;
+};
+
+const PurchaseChannelsPage = () => {
+  const [channels, setChannels] = useState<PurchaseChannel[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [meta, setMeta] = useState<Meta | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 500);
+
+  const [page, setPage] = useState(1);
+
+  const fetchChannels = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const params = new URLSearchParams({
+        page: page.toString(),
+        take: "10",
+      });
+
+      if (debouncedSearch.trim()) {
+        params.append("search", debouncedSearch.trim());
+      }
+
+      const res = await fetch(
+        `http://localhost:8000/purchase-channels?${params}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+
+      const result = await res.json();
+
+      setChannels(result.data || []);
+      setMeta(result.meta);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unknown error");
+      toast.error("Failed to load purchase channels");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchChannels();
+  }, [page, debouncedSearch]);
+
+  return (
+    <div className="space-y-4 w-auto mx-auto">
+      {/* === HEADER === */}
+      <Card>
+        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <CardTitle className="text-xl font-semibold">
+            Purchase Channel Management
+          </CardTitle>
+
+          <div className="flex gap-3 w-full md:w-auto">
+            {/* SEARCH */}
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search purchase channel..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {/* === ADD BUTTON === */}
+      <div className="p-1 flex justify-start">
+        <Link href="/super-admin/purchase-channel/add">
+          <Button size="sm" className="gap-2 cursor-pointer">
+            + Add Purchase Channel
+          </Button>
+        </Link>
+      </div>
+
+      {/* === TABLE === */}
+      <Card className="w-full">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[250px]">Name</TableHead>
+                <TableHead>Slug</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {loading ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={index}>
+                    <TableCell>
+                      <Skeleton className="h-4 w-[150px]" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-[200px]" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-[80px]" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-[100px]" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Skeleton className="h-8 w-[50px]" />
+                        <Skeleton className="h-8 w-[60px]" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : error ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="text-center text-red-500 py-6"
+                  >
+                    Error: Failed to load purchase channels.
+                  </TableCell>
+                </TableRow>
+              ) : channels.length > 0 ? (
+                channels.map((data) => (
+                  <TableRow key={data.id}>
+                    <TableCell className="font-medium">{data.name}</TableCell>
+                    <TableCell>{data.slug}</TableCell>
+                    <TableCell>
+                      {data.isActive ? (
+                        <Badge className="bg-green-500">Active</Badge>
+                      ) : (
+                        <Badge variant="destructive">Inactive</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {formatDate(data.createdAt, { style: "relative" })}
+                    </TableCell>
+                    <TableCell className=" space-x-2">
+                      <Link
+                        href={`/super-admin/purchase-channel/edit/${data.slug}`}
+                      >
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="cursor-pointer"
+                        >
+                          Edit
+                        </Button>
+                      </Link>
+
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="text-xs cursor-pointer"
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="text-center py-6 text-muted-foreground"
+                  >
+                    No purchase channels found.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* === PAGINATION === */}
+      {meta && (
+        <div className="flex justify-between items-center p-4 border-t text-sm text-muted-foreground">
+          <p>
+            Page {meta.page} of {Math.ceil(meta.total / meta.perPage)}
+          </p>
+
+          <div className="space-x-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!meta.hasPrevious}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Previous
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!meta.hasNext}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PurchaseChannelsPage;

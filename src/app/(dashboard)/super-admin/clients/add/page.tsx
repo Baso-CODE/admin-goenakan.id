@@ -30,45 +30,92 @@ const clientSchema = z.object({
   type: z.enum(["B2B", "B2C"]),
 });
 
-// === TIPE ===
 type ClientType = "B2B" | "B2C" | "";
+
+interface PurchaseChannel {
+  id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface PICFormData {
+  name: string;
+  email?: string;
+  phone?: string;
+}
 
 interface ClientFormData {
   type: ClientType;
-  b2b_companyName: string;
-  b2b_department: string;
-  b2b_prefix: string;
-  b2b_picName: string;
-  b2b_phone: string;
-  b2b_email: string;
-  b2b_website: string;
-  b2b_province: string;
-  b2b_city: string;
-  b2b_purchaseChannel: string;
-  b2c_prefix: string;
-  b2c_name: string;
-  b2c_phone: string;
-  b2c_fullAddress: string;
-  b2c_purchaseChannel: string;
+
+  // COMMON
+  custCode?: string;
+
+  // ============================
+  // B2B FIELDS
+  // ============================
+  b2b_companyName?: string;
+  b2b_departmentId?: string; // updated
+  b2b_prefix?: string;
+  b2b_phone?: string;
+  b2b_email?: string;
+  b2b_website?: string;
+  b2b_province?: string;
+  b2b_city?: string;
+  b2b_fullAddress?: string;
+  b2b_purchaseChannelId?: string; // updated
+
+  // MULTIPLE PIC
+  b2b_pics: PICFormData[]; // NEW (multiple PICs)
+
+  // ============================
+  // B2C FIELDS
+  // ============================
+  b2c_name?: string;
+  b2c_prefix?: string;
+  b2c_phone?: string;
+  b2c_fullAddressB2C?: string; // updated
+  b2c_purchaseChannelIdB2C?: string; // updated
 }
 
 const initialFormData: ClientFormData = {
   type: "",
+
+  custCode: "",
+
+  // ============================
+  // B2B FIELD
+  // ============================
   b2b_companyName: "",
-  b2b_department: "",
+  b2b_departmentId: "",
   b2b_prefix: "",
-  b2b_picName: "",
   b2b_phone: "",
   b2b_email: "",
   b2b_website: "",
   b2b_province: "",
   b2b_city: "",
-  b2b_purchaseChannel: "",
-  b2c_prefix: "",
+  b2b_fullAddress: "",
+  b2b_purchaseChannelId: "",
+
+  // MULTIPLE PIC
+  b2b_pics: [
+    {
+      name: "",
+      email: "",
+      phone: "",
+    },
+  ],
+
+  // ============================
+  // B2C FIELD
+  // ============================
   b2c_name: "",
+  b2c_prefix: "",
   b2c_phone: "",
-  b2c_fullAddress: "",
-  b2c_purchaseChannel: "",
+  b2c_fullAddressB2C: "",
+  b2c_purchaseChannelIdB2C: "",
 };
 
 const ClientAddForm = () => {
@@ -76,6 +123,10 @@ const ClientAddForm = () => {
   const [clientType, setClientType] = useState<ClientType>("");
   const [provinces, setProvinces] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
+  const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
+    []
+  );
+
   const { data: session } = useSession();
   const router = useRouter();
 
@@ -139,25 +190,38 @@ const ClientAddForm = () => {
           ? {
               type: "B2C",
 
-              prefix: formData.b2c_prefix,
+              custCode: formData.custCode,
+
+              // === B2C ===
               name: formData.b2c_name,
+              prefix: formData.b2c_prefix,
               phone: formData.b2c_phone,
-              fullAddress: formData.b2c_fullAddress,
-              purchaseChannel: formData.b2c_purchaseChannel,
+              fullAddressB2C: formData.b2c_fullAddressB2C,
+              purchaseChannelIdB2C: formData.b2c_purchaseChannelIdB2C,
             }
           : {
               type: "B2B",
 
+              custCode: formData.custCode,
+
+              // === B2B ===
               companyName: formData.b2b_companyName,
-              department: formData.b2b_department,
+              departmentId: formData.b2b_departmentId,
               prefix: formData.b2b_prefix,
-              picName: formData.b2b_picName,
               phone: formData.b2b_phone,
               email: formData.b2b_email,
               website: formData.b2b_website,
               province: formData.b2b_province,
               city: formData.b2b_city,
-              purchaseChannel: formData.b2b_purchaseChannel,
+              fullAddress: formData.b2b_fullAddress,
+              purchaseChannelId: formData.b2b_purchaseChannelId,
+
+              // MULTIPLE PIC
+              pics: formData.b2b_pics.map((pic) => ({
+                name: pic.name,
+                email: pic.email,
+                phone: pic.phone,
+              })),
             };
 
       await fetch("http://localhost:8000/clients", {
@@ -220,120 +284,128 @@ const ClientAddForm = () => {
             {clientType === "B2B" && (
               <div className="space-y-4 pt-4">
                 <h3 className="text-lg font-semibold border-b pb-2">
-                  Detail Perusahaan
+                  Detail Perusahaan (B2B)
                 </h3>
+
+                {/* === COMPANY CONTACT === */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="b2b_companyName">Nama Perusahaan *</Label>
+                    <Label>Nama Perusahaan *</Label>
                     <Input
-                      id="b2b_companyName"
                       name="b2b_companyName"
                       value={formData.b2b_companyName}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="b2b_email">Email *</Label>
-                    <Input
-                      id="b2b_email"
-                      name="b2b_email"
-                      type="email"
-                      value={formData.b2b_email}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="b2b_website">Website</Label>
-                    <Input
-                      id="b2b_website"
-                      name="b2b_website"
-                      value={formData.b2b_website}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Saluran Pembelian</Label>
-                    <Input
-                      name="b2b_purchaseChannel"
-                      value={formData.b2b_purchaseChannel}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
-                <h4 className="font-medium mt-6">
-                  Detail PIC (Person In Charge)
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="b2b_prefix">Prefix (Mr./Ms.)</Label>
-                    <Select
-                      name="b2b_prefix"
-                      value={formData.b2b_prefix}
-                      onValueChange={(value) =>
-                        setFormData((prev) => ({ ...prev, b2b_prefix: value }))
-                      }
-                    >
-                      <SelectTrigger id="b2b_prefix">
-                        <SelectValue placeholder="Select prefix" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Mr.">Mr.</SelectItem>
-                        <SelectItem value="Ms.">Ms.</SelectItem>
-                        <SelectItem value="Mrs.">Mrs.</SelectItem>
-                        <SelectItem value="Bpk.">Bpk.</SelectItem>
-                        <SelectItem value="Ibu.">Ibu.</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="b2b_picName">Nama PIC *</Label>
-                    <Input
-                      id="b2b_picName"
-                      name="b2b_picName"
-                      value={formData.b2b_picName}
                       onChange={handleChange}
                       required
                     />
                   </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="b2b_department">Departemen</Label>
+                    <Label>Email Kantor *</Label>
                     <Input
-                      id="b2b_department"
-                      name="b2b_department"
-                      value={formData.b2b_department}
+                      name="b2b_email"
+                      type="email"
+                      value={formData.b2b_email}
                       onChange={handleChange}
+                      required
                     />
                   </div>
-                </div>
-                {/* === PILIH PROVINSI DAN KOTA === */}
-                <div className="grid grid-cols-3 gap-4">
+
                   <div className="space-y-2">
-                    <Label htmlFor="b2b_phone">Telepon PIC *</Label>
+                    <Label>Telepon Kantor *</Label>
                     <Input
-                      id="b2b_phone"
                       name="b2b_phone"
                       value={formData.b2b_phone}
                       onChange={handleChange}
                       required
                     />
                   </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="b2b_province" className="w-full">
-                      Provinsi *
-                    </Label>
+                    <Label>Website</Label>
+                    <Input
+                      name="b2b_website"
+                      value={formData.b2b_website}
+                      onChange={handleChange}
+                    />
+                  </div>
+
+                  {/* PURCHASE CHANNEL */}
+                  <div className="space-y-2">
+                    <Label>Saluran Pembelian *</Label>
                     <Select
-                      onValueChange={(val) =>
+                      value={formData.b2b_purchaseChannelId}
+                      onValueChange={(value) =>
                         setFormData((prev) => ({
                           ...prev,
-                          b2b_province: val,
+                          b2b_purchaseChannelId: value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih Saluran Pembelian" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {purchaseChannels.map((pc) => (
+                          <SelectItem key={pc.id} value={pc.id}>
+                            {pc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* DEPARTMENT */}
+                  {/* <div className="space-y-2">
+                    <Label>Departemen</Label>
+                    <Select
+                      value={formData.b2b_departmentId}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          b2b_departmentId: value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih Departemen" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map((dep) => (
+                          <SelectItem key={dep.id} value={dep.id}>
+                            {dep.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div> */}
+                </div>
+
+                {/* === ADDRESS COMPANY === */}
+                <div className="space-y-2 mt-4">
+                  <Label>Alamat Lengkap *</Label>
+                  <Textarea
+                    name="b2b_fullAddress"
+                    value={formData.b2b_fullAddress}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                {/* === PROVINCE & CITY === */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Provinsi *</Label>
+                    <Select
+                      value={formData.b2b_province}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          b2b_province: value,
                           b2b_city: "",
                         }))
                       }
-                      value={formData.b2b_province}
                     >
-                      <SelectTrigger id="b2b_province">
+                      <SelectTrigger>
                         <SelectValue placeholder="Pilih Provinsi" />
                       </SelectTrigger>
                       <SelectContent>
@@ -347,15 +419,15 @@ const ClientAddForm = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="b2b_city">Kota/Kabupaten *</Label>
+                    <Label>Kota *</Label>
                     <Select
+                      disabled={!formData.b2b_province}
+                      value={formData.b2b_city}
                       onValueChange={(val) =>
                         setFormData((prev) => ({ ...prev, b2b_city: val }))
                       }
-                      value={formData.b2b_city}
-                      disabled={!formData.b2b_province}
                     >
-                      <SelectTrigger id="b2b_city">
+                      <SelectTrigger>
                         <SelectValue placeholder="Pilih Kota" />
                       </SelectTrigger>
                       <SelectContent>
@@ -368,6 +440,101 @@ const ClientAddForm = () => {
                     </Select>
                   </div>
                 </div>
+
+                {/* === MULTIPLE PIC === */}
+                <h4 className="font-medium mt-8 mb-2">
+                  PIC (Person In Charge)
+                </h4>
+
+                {formData.b2b_pics.map((pic, index) => (
+                  <div
+                    key={index}
+                    className="border p-4 rounded-lg space-y-4 bg-muted/40"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label>Nama PIC *</Label>
+                        <Input
+                          value={pic.name}
+                          onChange={(e) => {
+                            const updated = [...formData.b2b_pics];
+                            updated[index].name = e.target.value;
+                            setFormData((prev) => ({
+                              ...prev,
+                              b2b_pics: updated,
+                            }));
+                          }}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Email PIC</Label>
+                        <Input
+                          value={pic.email}
+                          onChange={(e) => {
+                            const updated = [...formData.b2b_pics];
+                            updated[index].email = e.target.value;
+                            setFormData((prev) => ({
+                              ...prev,
+                              b2b_pics: updated,
+                            }));
+                          }}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Telepon PIC</Label>
+                        <Input
+                          value={pic.phone}
+                          onChange={(e) => {
+                            const updated = [...formData.b2b_pics];
+                            updated[index].phone = e.target.value;
+                            setFormData((prev) => ({
+                              ...prev,
+                              b2b_pics: updated,
+                            }));
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* REMOVE PIC if more than 1 */}
+                    {formData.b2b_pics.length > 1 && (
+                      <Button
+                        variant="destructive"
+                        onClick={() => {
+                          const updated = formData.b2b_pics.filter(
+                            (_, i) => i !== index
+                          );
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2b_pics: updated,
+                          }));
+                        }}
+                      >
+                        Hapus PIC
+                      </Button>
+                    )}
+                  </div>
+                ))}
+
+                {/* ADD NEW PIC */}
+                <Button
+                  variant="secondary"
+                  className="mt-2"
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      b2b_pics: [
+                        ...prev.b2b_pics,
+                        { name: "", email: "", phone: "" },
+                      ],
+                    }))
+                  }
+                >
+                  + Tambah PIC
+                </Button>
               </div>
             )}
 
@@ -377,6 +544,8 @@ const ClientAddForm = () => {
                 <h3 className="text-lg font-semibold border-b pb-2">
                   Detail Individu (B2C)
                 </h3>
+
+                {/* PREFIX + NAME */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="b2c_prefix">Prefix (Mr./Ms.)</Label>
@@ -399,6 +568,7 @@ const ClientAddForm = () => {
                       </SelectContent>
                     </Select>
                   </div>
+
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="b2c_name">Nama Lengkap *</Label>
                     <Input
@@ -410,6 +580,8 @@ const ClientAddForm = () => {
                     />
                   </div>
                 </div>
+
+                {/* PHONE + PURCHASE CHANNEL */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="b2c_phone">Telepon *</Label>
@@ -421,24 +593,44 @@ const ClientAddForm = () => {
                       required
                     />
                   </div>
+
+                  {/* PURCHASE CHANNEL DROPDOWN (DB) */}
                   <div className="space-y-2">
-                    <Label htmlFor="b2c_purchaseChannel">
-                      Saluran Pembelian
+                    <Label htmlFor="b2c_purchaseChannelIdB2C">
+                      Saluran Pembelian *
                     </Label>
-                    <Input
-                      id="b2c_purchaseChannel"
-                      name="b2c_purchaseChannel"
-                      value={formData.b2c_purchaseChannel}
-                      onChange={handleChange}
-                    />
+                    <Select
+                      name="b2c_purchaseChannelIdB2C"
+                      value={formData.b2c_purchaseChannelIdB2C}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          b2c_purchaseChannelIdB2C: value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger id="b2c_purchaseChannelIdB2C">
+                        <SelectValue placeholder="Pilih saluran pembelian" />
+                      </SelectTrigger>
+
+                      <SelectContent>
+                        {purchaseChannels?.map((pc) => (
+                          <SelectItem key={pc.id} value={pc.id}>
+                            {pc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
+
+                {/* FULL ADDRESS */}
                 <div className="space-y-2">
-                  <Label htmlFor="b2c_fullAddress">Alamat Lengkap *</Label>
+                  <Label htmlFor="b2c_fullAddressB2C">Alamat Lengkap *</Label>
                   <Textarea
-                    id="b2c_fullAddress"
-                    name="b2c_fullAddress"
-                    value={formData.b2c_fullAddress}
+                    id="b2c_fullAddressB2C"
+                    name="b2c_fullAddressB2C"
+                    value={formData.b2c_fullAddressB2C}
                     onChange={handleChange}
                     required
                   />

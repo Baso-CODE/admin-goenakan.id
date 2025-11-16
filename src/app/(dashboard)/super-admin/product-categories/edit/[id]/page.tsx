@@ -37,7 +37,6 @@ const EditCategoryVendor = () => {
         const data = await res.json();
         setCategoryData({
           name: data.name,
-          slug: data.slug,
         });
       } catch (err) {
         console.error("❌ Failed to load data:", err);

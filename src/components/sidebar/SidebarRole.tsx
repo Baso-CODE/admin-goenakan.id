@@ -19,6 +19,7 @@ import {
   GalleryVerticalEnd,
   HandshakeIcon,
   ListOrdered,
+  LucideChartNetwork,
   Map,
   Package,
   PieChart,
@@ -134,8 +135,12 @@ export default function SidebarRole({ ...props }) {
       },
       { title: "Settings", url: "/super-admin/settings", icon: Settings },
     ],
-    projects: [
-      { name: "Design Engineering", url: "#", icon: Frame },
+    Etc: [
+      {
+        name: "Purchase Channel",
+        url: "/super-admin/purchase-channel",
+        icon: LucideChartNetwork,
+      },
       { name: "Sales & Marketing", url: "#", icon: PieChart },
       { name: "Travel", url: "#", icon: Map },
     ],
@@ -161,7 +166,7 @@ export default function SidebarRole({ ...props }) {
       <SidebarContent>
         <NavDashboards projects={data.dashboard} />
         <NavMain items={filteredNavMain} />
-        {role === "SUPER_ADMIN" && <NavProjects projects={data.projects} />}
+        {role === "SUPER_ADMIN" && <NavProjects projects={data.Etc} />}
       </SidebarContent>
 
       <SidebarFooter>
