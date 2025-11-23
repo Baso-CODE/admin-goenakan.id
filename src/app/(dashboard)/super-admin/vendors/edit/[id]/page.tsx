@@ -25,12 +25,16 @@ export default function EditVendorPage() {
         });
 
         const data = await res.json();
-        console.log("ini adalah data saya🔥🔥🔥🔥🔥🔥", data);
 
         setVendorData({
           companyName: data.companyName,
           picName: data.picName,
           country: data.country,
+          province: data.province,
+          city: data.city,
+          district: data.district,
+          subDistrict: data.subDistrict,
+          postalCode: data.postalCode,
           type: "",
           categoryId: "",
           address: data.address,
@@ -61,6 +65,11 @@ export default function EditVendorPage() {
         companyName: data.companyName,
         picName: data.picName,
         country: data.country,
+        province: data.province,
+        city: data.city,
+        district: data.district,
+        subDistrict: data.subDistrict,
+        postalCode: data.postalCode,
         address: data.address,
         isActive: data.isActive,
         itemIds: data.itemIds,

@@ -186,9 +186,7 @@ const DepartmentPage = () => {
                       {formatDate(data.createdAt, { style: "relative" })}
                     </TableCell>
                     <TableCell className=" space-x-2">
-                      <Link
-                        href={`/super-admin/purchase-channel/edit/${data.slug}`}
-                      >
+                      <Link href={`/super-admin/departments/edit/${data.slug}`}>
                         <Button
                           variant="outline"
                           size="sm"

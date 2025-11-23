@@ -82,9 +82,7 @@ export default function DashboardLayoutClient({
         </header>
 
         {/* === MAIN CONTENT === */}
-        <main className="p-4 h-[calc(100vh-4rem)] overflow-y-auto">
-          {children}
-        </main>
+        <main className="p-4 overflow-y-auto">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );

@@ -7,11 +7,11 @@ import DepartmentForm, {
   DepartmentFormValues,
 } from "../../components/formDepartment";
 
-const EditPurchaseChannel = () => {
+const EditDepartment = () => {
   const { slug } = useParams();
   const router = useRouter();
 
-  const [purchaseChannelData, setPurchaseChannelData] = useState<
+  const [departmentsData, setDepartmentsData] = useState<
     DepartmentFormValues | undefined
   >(undefined);
 
@@ -31,27 +31,24 @@ const EditPurchaseChannel = () => {
 
         const { token } = await tokenRes.json();
 
-        const res = await fetch(
-          `http://localhost:8000/purchase-channels/${slug}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const res = await fetch(`http://localhost:8000/departments/${slug}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!res.ok) throw new Error("Failed to fetch department data");
 
         const data = await res.json();
 
-        setPurchaseChannelData({
+        setDepartmentsData({
           name: data.name,
           isActive: data.isActive,
         });
       } catch (err) {
         console.error(err);
         toast.error("Failed to load department data.");
-        setPurchaseChannelData(undefined);
+        setDepartmentsData(undefined);
       } finally {
         setIsLoading(false);
       }
@@ -63,9 +60,7 @@ const EditPurchaseChannel = () => {
   // ============================
   // UPDATE DATA
   // ============================
-  const handleUpdatePurchaseChannel = async (
-    formValues: DepartmentFormValues
-  ) => {
+  const handleUpdateDepartments = async (formValues: DepartmentFormValues) => {
     try {
       setIsSubmitting(true);
 
@@ -103,12 +98,12 @@ const EditPurchaseChannel = () => {
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-semibold tracking-tight uppercase">
-        Edit Purchase Channel
+        Edit Department {slug}
       </h2>
 
       <DepartmentForm
-        initialData={purchaseChannelData}
-        onSubmit={handleUpdatePurchaseChannel}
+        initialData={departmentsData}
+        onSubmit={handleUpdateDepartments}
         isLoading={isLoading}
         isSubmitting={isSubmitting}
       />
@@ -116,4 +111,4 @@ const EditPurchaseChannel = () => {
   );
 };
 
-export default EditPurchaseChannel;
+export default EditDepartment;

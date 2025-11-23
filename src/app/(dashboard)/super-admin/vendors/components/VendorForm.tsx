@@ -58,6 +58,8 @@ import {
   User,
 } from "lucide-react";
 import { useVendorFormFilter } from "../hooks/useVendorFormFilter";
+import { countries } from "@/lib/countries";
+import VendorAddressField from "./VendorAddressField";
 
 // === ZOD SCHEMA ===
 const baseVendorSchema = {
@@ -67,9 +69,12 @@ const baseVendorSchema = {
   picName: z
     .string()
     .min(2, { message: "PIC name must be at least 2 characters." }),
-  country: z
-    .string()
-    .min(2, { message: "Country must be at least 2 characters." }),
+  country: z.string().optional(),
+  province: z.string().optional(),
+  city: z.string().optional(),
+  district: z.string().optional(),
+  subDistrict: z.string().optional(),
+  postalCode: z.string().optional(),
   address: z.string().min(5, "Address must be at least 5 characters"),
   isActive: z.boolean(),
   itemIds: z.array(z.string()).optional(),
@@ -124,6 +129,75 @@ export default function VendorForm({
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [isComboboxOpen, setIsComboboxOpen] = useState(false);
 
+  const [provinces, setProvinces] = useState<any[]>([]);
+  const [cities, setCities] = useState<any[]>([]);
+  const [districts, setDistricts] = useState<any[]>([]);
+  const [subDistricts, setSubDistrict] = useState<any[]>([]);
+
+  // provincies
+  useEffect(() => {
+    fetch("https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json")
+      .then((res) => res.json())
+      .then((data) => setProvinces(data))
+      .catch((err) => console.error("Error fetch provinces:", err));
+  }, []);
+
+  // city / kabupaten
+  useEffect(() => {
+    const handler = async (provinceName: string, setCitiesFn: any) => {
+      const prov = provinces.find((p) => p.name === provinceName);
+      if (prov) {
+        const res = await fetch(
+          `https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${prov.id}.json`
+        );
+        const data = await res.json();
+        setCitiesFn(data);
+      } else {
+        setCitiesFn([]);
+      }
+    };
+  }, [provinces]);
+
+  // kecamatan
+  useEffect(() => {
+    const handler = async (
+      cityName: string,
+      citiesRef: any[],
+      setDistrictFn: any
+    ) => {
+      const city = citiesRef.find((c) => c.name === cityName);
+      if (city) {
+        const res = await fetch(
+          `https://www.emsifa.com/api-wilayah-indonesia/api/districts/${city.id}.json`
+        );
+        const data = await res.json();
+        setDistrictFn(data);
+      } else {
+        setDistrictFn([]);
+      }
+    };
+  }, [cities]);
+
+  // kelurahan
+  useEffect(() => {
+    const handler = async (
+      distName: string,
+      districtRef: any[],
+      setSubFn: any
+    ) => {
+      const dist = districtRef.find((d) => d.name === distName);
+      if (dist) {
+        const res = await fetch(
+          `https://www.emsifa.com/api-wilayah-indonesia/api/villages/${dist.id}.json`
+        );
+        const data = await res.json();
+        setSubFn(data);
+      } else {
+        setSubFn([]);
+      }
+    };
+  }, [districts]);
+
   const form = useForm<VendorFormValues>({
     resolver: zodResolver(
       initialData ? updateVendorSchema : createVendorSchema
@@ -132,6 +206,11 @@ export default function VendorForm({
       companyName: "",
       picName: "",
       country: "",
+      province: "",
+      city: "",
+      district: "",
+      subDistrict: "",
+      postalCode: "",
       address: "",
       isActive: true,
       type: "",
@@ -243,7 +322,7 @@ export default function VendorForm({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-6"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               {/* Company Name */}
               <FormField
                 control={form.control}
@@ -252,7 +331,7 @@ export default function VendorForm({
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
                       <Building2 className="h-4 w-4 text-muted-foreground" />
-                      Company Name
+                      Company Name *
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -274,7 +353,7 @@ export default function VendorForm({
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
                       <User className="h-4 w-4 text-muted-foreground" />
-                      PIC Name
+                      PIC Name *
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -295,7 +374,7 @@ export default function VendorForm({
                   <FormItem className="w-full">
                     <FormLabel className="flex items-center gap-2">
                       <Network className="h-4 w-4 text-muted-foreground" />
-                      Contact Platform
+                      Contact Platform *
                     </FormLabel>
                     <Select
                       onValueChange={field.onChange}
@@ -342,7 +421,7 @@ export default function VendorForm({
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
                       <AtSign className="h-4 w-4 text-muted-foreground" />
-                      Contact ID / Username
+                      Contact ID / Username *
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -356,49 +435,34 @@ export default function VendorForm({
                 )}
               />
 
-              {/* Country */}
-              <FormField
-                control={form.control}
-                name="country"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <Globe2 className="h-4 w-4 text-muted-foreground" />
-                      Country
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter country"
-                        {...field}
-                        disabled={isLoading || isSubmitting}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Vendor Address */}
+              <div className="col-span-1 md:col-span-2">
+                <VendorAddressField form={form} />
+              </div>
 
               {/* Address */}
-              <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      Address
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter address"
-                        {...field}
-                        disabled={isLoading || isSubmitting}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="col-span-1 md:col-span-2">
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        Address
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter address"
+                          {...field}
+                          disabled={isLoading || isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               {/* Type */}
               <FormField

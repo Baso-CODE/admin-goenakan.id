@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,7 +10,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -19,12 +17,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronLeft, ClipboardList, DeleteIcon } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { ChevronLeft, ClipboardList, Trash2 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
+
+import { countries } from "@/lib/countries";
 
 const clientSchema = z.object({
   type: z.enum(["B2B", "B2C"]),
@@ -62,30 +64,48 @@ interface ClientFormData {
   // COMMON
   custCode?: string;
 
-  // ============================
-  // B2B FIELDS
-  // ============================
+  // ======================================================
+  // ========================== B2B ========================
+  // ======================================================
+
   b2b_companyName?: string;
-  b2b_departmentId?: string; // updated
+  b2b_departmentId?: string;
   b2b_phone?: string;
   b2b_email?: string;
   b2b_website?: string;
+
+  // ----------- B2B ADDRESS -----------
+  b2b_country?: string;
   b2b_province?: string;
   b2b_city?: string;
+  b2b_district?: string; // Kecamatan
+  b2b_subDistrict?: string; // Kelurahan
+  b2b_postalCode?: string;
   b2b_fullAddress?: string;
-  b2b_purchaseChannelId?: string; // updated
+
+  b2b_purchaseChannelId?: string;
 
   // MULTIPLE PIC
-  b2b_pics: PICFormData[]; // NEW (multiple PICs)
+  b2b_pics: PICFormData[];
 
-  // ============================
-  // B2C FIELDS
-  // ============================
+  // ======================================================
+  // ========================== B2C ========================
+  // ======================================================
+
   b2c_name?: string;
   b2c_prefix?: string;
   b2c_phone?: string;
-  b2c_fullAddressB2C?: string; // updated
-  b2c_purchaseChannelIdB2C?: string; // updated
+
+  // ----------- B2C ADDRESS -----------
+  b2c_country?: string;
+  b2c_province?: string;
+  b2c_city?: string;
+  b2c_district?: string; // Kecamatan
+  b2c_subDistrict?: string; // Kelurahan
+  b2c_postalCode?: string;
+  b2c_fullAddressB2C?: string;
+
+  b2c_purchaseChannelIdB2C?: string;
 }
 
 const initialFormData: ClientFormData = {
@@ -94,16 +114,25 @@ const initialFormData: ClientFormData = {
   custCode: "",
 
   // ============================
-  // B2B FIELD
+  // B2B FIELDS
   // ============================
   b2b_companyName: "",
   b2b_departmentId: "",
+
   b2b_phone: "",
   b2b_email: "",
   b2b_website: "",
+
+  // ADDRESS STRUCTURE
+  b2b_country: "",
   b2b_province: "",
   b2b_city: "",
+  b2b_district: "", // kecamatan
+  b2b_subDistrict: "", // kelurahan
+  b2b_postalCode: "",
+
   b2b_fullAddress: "",
+
   b2b_purchaseChannelId: "",
 
   // MULTIPLE PIC
@@ -117,11 +146,20 @@ const initialFormData: ClientFormData = {
   ],
 
   // ============================
-  // B2C FIELD
+  // B2C FIELDS
   // ============================
   b2c_name: "",
   b2c_prefix: "",
   b2c_phone: "",
+
+  // ADDRESS STRUCTURE
+  b2c_country: "",
+  b2c_province: "",
+  b2c_city: "", // kabupaten/kota
+  b2c_district: "", // kecamatan
+  b2c_subDistrict: "", // kelurahan
+  b2c_postalCode: "",
+
   b2c_fullAddressB2C: "",
   b2c_purchaseChannelIdB2C: "",
 };
@@ -130,7 +168,16 @@ const ClientAddForm = () => {
   const [formData, setFormData] = useState(initialFormData);
   const [clientType, setClientType] = useState<ClientType>("");
   const [provinces, setProvinces] = useState<any[]>([]);
+
   const [cities, setCities] = useState<any[]>([]);
+  const [districts, setDistricts] = useState<any[]>([]);
+  const [subDistricts, setSubDistrict] = useState<any[]>([]);
+
+  // STATE WILAYAH B2C
+  const [citiesB2C, setCitiesB2C] = useState<any[]>([]);
+  const [districtsB2C, setDistrictsB2C] = useState<any[]>([]);
+  const [subDistrictB2C, setSubDistrictB2C] = useState<any[]>([]);
+
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
     []
   );
@@ -179,21 +226,111 @@ const ClientAddForm = () => {
       .catch((err) => console.error("Error fetch provinces:", err));
   }, []);
 
+  // city / kabupaten
   useEffect(() => {
-    if (formData.b2b_province) {
-      const prov = provinces.find((p) => p.name === formData.b2b_province);
+    const handler = async (provinceName: string, setCitiesFn: any) => {
+      const prov = provinces.find((p) => p.name === provinceName);
       if (prov) {
-        fetch(
+        const res = await fetch(
           `https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${prov.id}.json`
-        )
-          .then((res) => res.json())
-          .then((data) => setCities(data))
-          .catch((err) => console.error("Error fetch cities:", err));
+        );
+        const data = await res.json();
+        setCitiesFn(data);
+      } else {
+        setCitiesFn([]);
       }
-    } else {
-      setCities([]);
+    };
+
+    // B2B
+    if (formData.b2b_country === "Indonesia" && formData.b2b_province) {
+      handler(formData.b2b_province, setCities);
     }
-  }, [formData.b2b_province, provinces]);
+
+    // B2C
+    if (formData.b2c_country === "Indonesia" && formData.b2c_province) {
+      handler(formData.b2c_province, setCitiesB2C);
+    }
+  }, [
+    formData.b2b_province,
+    formData.b2c_province,
+    formData.b2b_country,
+    formData.b2c_country,
+    provinces,
+  ]);
+
+  // kecamatan
+  useEffect(() => {
+    const handler = async (
+      cityName: string,
+      citiesRef: any[],
+      setDistrictFn: any
+    ) => {
+      const city = citiesRef.find((c) => c.name === cityName);
+      if (city) {
+        const res = await fetch(
+          `https://www.emsifa.com/api-wilayah-indonesia/api/districts/${city.id}.json`
+        );
+        const data = await res.json();
+        setDistrictFn(data);
+      } else {
+        setDistrictFn([]);
+      }
+    };
+
+    // B2B
+    if (formData.b2b_country === "Indonesia" && formData.b2b_city) {
+      handler(formData.b2b_city, cities, setDistricts);
+    }
+
+    // B2C
+    if (formData.b2c_country === "Indonesia" && formData.b2c_city) {
+      handler(formData.b2c_city, citiesB2C, setDistrictsB2C);
+    }
+  }, [
+    formData.b2b_city,
+    formData.b2c_city,
+    formData.b2b_country,
+    formData.b2c_country,
+    cities,
+    citiesB2C,
+  ]);
+
+  // kelurahan
+  useEffect(() => {
+    const handler = async (
+      distName: string,
+      districtRef: any[],
+      setSubFn: any
+    ) => {
+      const dist = districtRef.find((d) => d.name === distName);
+      if (dist) {
+        const res = await fetch(
+          `https://www.emsifa.com/api-wilayah-indonesia/api/villages/${dist.id}.json`
+        );
+        const data = await res.json();
+        setSubFn(data);
+      } else {
+        setSubFn([]);
+      }
+    };
+
+    // B2B
+    if (formData.b2b_country === "Indonesia" && formData.b2b_district) {
+      handler(formData.b2b_district, districts, setSubDistrict);
+    }
+
+    // B2C
+    if (formData.b2c_country === "Indonesia" && formData.b2c_district) {
+      handler(formData.b2c_district, districtsB2C, setSubDistrictB2C);
+    }
+  }, [
+    formData.b2b_district,
+    formData.b2c_district,
+    formData.b2b_country,
+    formData.b2c_country,
+    districts,
+    districtsB2C,
+  ]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -238,8 +375,17 @@ const ClientAddForm = () => {
               name: formData.b2c_name,
               prefix: formData.b2c_prefix,
               phone: formData.b2c_phone,
-              fullAddressB2C: formData.b2c_fullAddressB2C,
-              purchaseChannelIdB2C: formData.b2c_purchaseChannelIdB2C,
+
+              // ADDRESS
+              country: formData.b2c_country,
+              province: formData.b2c_province,
+              city: formData.b2c_city,
+              district: formData.b2c_district,
+              subDistrict: formData.b2c_subDistrict,
+              postalCode: formData.b2c_postalCode,
+
+              fullAddress: formData.b2c_fullAddressB2C,
+              purchaseChannelId: formData.b2c_purchaseChannelIdB2C,
             }
           : {
               type: "B2B",
@@ -252,8 +398,15 @@ const ClientAddForm = () => {
               phone: formData.b2b_phone,
               email: formData.b2b_email,
               website: formData.b2b_website,
+
+              // ADDRESS
+              country: formData.b2b_country,
               province: formData.b2b_province,
               city: formData.b2b_city,
+              district: formData.b2b_district, // kecamatan
+              subDistrict: formData.b2b_subDistrict, // kelurahan
+              postalCode: formData.b2b_postalCode,
+
               fullAddress: formData.b2b_fullAddress,
               purchaseChannelId: formData.b2b_purchaseChannelId,
 
@@ -283,7 +436,7 @@ const ClientAddForm = () => {
   };
 
   return (
-    <div className="w-full max-w-full space-y-6">
+    <div className="w-full max-w-full">
       <Link
         href="/client-management/clients"
         className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-primary"
@@ -342,32 +495,31 @@ const ClientAddForm = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Email Kantor *</Label>
+                    <Label>Email Kantor </Label>
                     <Input
                       name="b2b_email"
                       type="email"
                       value={formData.b2b_email}
                       onChange={handleChange}
-                      required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Telepon Kantor *</Label>
+                    <Label>Telepon Kantor </Label>
                     <Input
                       name="b2b_phone"
                       value={formData.b2b_phone}
                       onChange={handleChange}
-                      required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Website</Label>
+                    <Label>Website *</Label>
                     <Input
                       name="b2b_website"
                       value={formData.b2b_website}
                       onChange={handleChange}
+                      required
                     />
                   </div>
 
@@ -398,7 +550,7 @@ const ClientAddForm = () => {
 
                   {/* DEPARTMENT */}
                   <div className="space-y-2">
-                    <Label>Departemen</Label>
+                    <Label>Departemen *</Label>
                     <Select
                       value={formData.b2b_departmentId}
                       onValueChange={(value) =>
@@ -411,7 +563,7 @@ const ClientAddForm = () => {
                       <SelectTrigger>
                         <SelectValue placeholder="Pilih Departemen" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent aria-required>
                         {departments.map((dep) => (
                           <SelectItem key={dep.id} value={dep.id}>
                             {dep.name}
@@ -422,9 +574,224 @@ const ClientAddForm = () => {
                   </div>
                 </div>
 
+                <h3 className="text-lg font-semibold border-b pb-2">Alamat</h3>
+                {/* === ADDRESS SECTION === */}
+                <div className="grid grid-cols-3 gap-4">
+                  {/* === COUNTRY === */}
+                  <div className="space-y-2">
+                    <Label>Negara</Label>
+                    <Select
+                      value={formData.b2b_country}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          b2b_country: value,
+                          b2b_province: "",
+                          b2b_city: "",
+                          b2b_district: "",
+                          b2b_subDistrict: "",
+                          b2b_postalCode: "",
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih Negara" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-64">
+                        {countries.map((c) => (
+                          <SelectItem key={c.code} value={c.name}>
+                            <span className="flex items-center gap-2">
+                              <span>{c.flag}</span> {c.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* === PROVINCE === */}
+                  <div className="space-y-2">
+                    <Label>Provinsi</Label>
+                    {formData.b2b_country === "Indonesia" ? (
+                      <Select
+                        value={formData.b2b_province}
+                        onValueChange={(value) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2b_province: value,
+                            b2b_city: "",
+                            b2b_district: "",
+                            b2b_subDistrict: "",
+                            b2b_postalCode: "",
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih Provinsi" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {provinces.map((prov) => (
+                            <SelectItem key={prov.id} value={prov.name}>
+                              {prov.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        placeholder="Masukkan Provinsi"
+                        value={formData.b2b_province}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2b_province: e.target.value,
+                          }))
+                        }
+                      />
+                    )}
+                  </div>
+
+                  {/* === CITY === */}
+                  <div className="space-y-2">
+                    <Label>Kota / Kabupaten </Label>
+                    {formData.b2b_country === "Indonesia" ? (
+                      <Select
+                        disabled={!formData.b2b_province}
+                        value={formData.b2b_city}
+                        onValueChange={(val) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2b_city: val,
+                            b2b_district: "",
+                            b2b_subDistrict: "",
+                            b2b_postalCode: "",
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih Kota / Kabupaten" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {cities.map((city) => (
+                            <SelectItem key={city.id} value={city.name}>
+                              {city.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        placeholder="Masukkan Kota"
+                        value={formData.b2b_city}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2b_city: e.target.value,
+                          }))
+                        }
+                      />
+                    )}
+                  </div>
+
+                  {/* === DISTRICT === */}
+                  <div className="space-y-2">
+                    <Label>Kecamatan </Label>
+                    {formData.b2b_country === "Indonesia" ? (
+                      <Select
+                        disabled={!formData.b2b_city}
+                        value={formData.b2b_district}
+                        onValueChange={(val) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2b_district: val,
+                            b2b_subDistrict: "",
+                            b2b_postalCode: "",
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih Kecamatan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {districts.map((d) => (
+                            <SelectItem key={d.id} value={d.name}>
+                              {d.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        placeholder="Masukkan Kecamatan"
+                        value={formData.b2b_district}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2b_district: e.target.value,
+                          }))
+                        }
+                      />
+                    )}
+                  </div>
+
+                  {/* === SUB-DISTRICT === */}
+                  <div className="space-y-2">
+                    <Label>Kelurahan </Label>
+                    {formData.b2b_country === "Indonesia" ? (
+                      <Select
+                        disabled={!formData.b2b_district}
+                        value={formData.b2b_subDistrict}
+                        onValueChange={(val) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2b_subDistrict: val,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih Kelurahan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {subDistricts.map((v) => (
+                            <SelectItem key={v.id} value={v.name}>
+                              {v.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        placeholder="Masukkan Kelurahan"
+                        value={formData.b2b_subDistrict}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2b_subDistrict: e.target.value,
+                          }))
+                        }
+                      />
+                    )}
+                  </div>
+
+                  {/* === POSTAL CODE === */}
+                  <div className="space-y-2">
+                    <Label>Kode Pos </Label>
+                    <Input
+                      placeholder="Kode Pos"
+                      value={formData.b2b_postalCode}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          b2b_postalCode: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
                 {/* === ADDRESS COMPANY === */}
                 <div className="space-y-2 mt-4">
-                  <Label>Alamat Lengkap *</Label>
+                  <Label>Alamat Lengkap </Label>
                   <Textarea
                     name="b2b_fullAddress"
                     value={formData.b2b_fullAddress}
@@ -433,165 +800,105 @@ const ClientAddForm = () => {
                   />
                 </div>
 
-                {/* === PROVINCE & CITY === */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>Provinsi *</Label>
-                    <Select
-                      value={formData.b2b_province}
-                      onValueChange={(value) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          b2b_province: value,
-                          b2b_city: "",
-                        }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih Provinsi" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {provinces.map((prov) => (
-                          <SelectItem key={prov.id} value={prov.name}>
-                            {prov.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Kota *</Label>
-                    <Select
-                      disabled={!formData.b2b_province}
-                      value={formData.b2b_city}
-                      onValueChange={(val) =>
-                        setFormData((prev) => ({ ...prev, b2b_city: val }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih Kota" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {cities.map((city) => (
-                          <SelectItem key={city.id} value={city.name}>
-                            {city.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
                 {/* === MULTIPLE PIC === */}
-                <h4 className="font-medium mt-8 mb-2">
+                <h4 className="font-medium mt-8 mb-2 border-b pb-2">
                   PIC (Person In Charge)
                 </h4>
 
-                {formData.b2b_pics.map((pic, index) => (
-                  <div
-                    key={index}
-                    className="border p-4 rounded-lg space-y-4 bg-muted/40"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      {/* PREFIX PIC */}
-                      <div className="space-y-2">
-                        <Label>Prefix (Mr./Ms.)</Label>
-                        <Select
-                          value={pic.prefix}
-                          onValueChange={(value) => {
-                            const updated = [...formData.b2b_pics];
-                            updated[index].prefix = value;
-                            setFormData((prev) => ({
-                              ...prev,
-                              b2b_pics: updated,
-                            }));
-                          }}
+                {formData.b2b_pics.map((pic, index) => {
+                  const updateField = (
+                    field: keyof PICFormData,
+                    value: string
+                  ) => {
+                    const updated = [...formData.b2b_pics];
+                    updated[index] = { ...updated[index], [field]: value };
+                    setFormData((prev) => ({ ...prev, b2b_pics: updated }));
+                  };
+
+                  const removePic = () => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      b2b_pics: prev.b2b_pics.filter((_, i) => i !== index),
+                    }));
+                  };
+
+                  return (
+                    <Card
+                      key={index}
+                      className="p-4 bg-card shadow-sm relative mb-4"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {/* DELETE BUTTON */}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute top-2 right-2 h-6 w-6 p-0"
+                          onClick={removePic}
                         >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select prefix" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Mr.">Mr.</SelectItem>
-                            <SelectItem value="Ms.">Ms.</SelectItem>
-                            <SelectItem value="Mrs.">Mrs.</SelectItem>
-                            <SelectItem value="Bpk.">Bpk.</SelectItem>
-                            <SelectItem value="Ibu.">Ibu.</SelectItem>
-                          </SelectContent>
-                        </Select>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+
+                        {/* PREFIX */}
+
+                        <div className="space-y-2">
+                          <Label>Prefix</Label>
+                          <Select
+                            value={pic.prefix}
+                            onValueChange={(value) =>
+                              updateField("prefix", value)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select prefix" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Mr.">Mr.</SelectItem>
+                              <SelectItem value="Ms.">Ms.</SelectItem>
+                              <SelectItem value="Mrs.">Mrs.</SelectItem>
+                              <SelectItem value="Bpk.">Bpk.</SelectItem>
+                              <SelectItem value="Ibu.">Ibu.</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Nama PIC *</Label>
+                          <Input
+                            required
+                            value={pic.name}
+                            onChange={(e) =>
+                              updateField("name", e.target.value)
+                            }
+                          />
+                        </div>
+
+                        {/* EMAIL & PHONE */}
+
+                        <div className="space-y-2">
+                          <Label>Email PIC</Label>
+                          <Input
+                            value={pic.email}
+                            onChange={(e) =>
+                              updateField("email", e.target.value)
+                            }
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Telepon PIC</Label>
+                          <Input
+                            value={pic.phone}
+                            onChange={(e) =>
+                              updateField("phone", e.target.value)
+                            }
+                          />
+                        </div>
                       </div>
+                    </Card>
+                  );
+                })}
 
-                      {/* NAMA PIC */}
-                      <div className="space-y-2">
-                        <Label>Nama PIC *</Label>
-                        <Input
-                          value={pic.name}
-                          onChange={(e) => {
-                            const updated = [...formData.b2b_pics];
-                            updated[index].name = e.target.value;
-                            setFormData((prev) => ({
-                              ...prev,
-                              b2b_pics: updated,
-                            }));
-                          }}
-                          required
-                        />
-                      </div>
-
-                      {/* EMAIL PIC */}
-                      <div className="space-y-2">
-                        <Label>Email PIC</Label>
-                        <Input
-                          value={pic.email}
-                          onChange={(e) => {
-                            const updated = [...formData.b2b_pics];
-                            updated[index].email = e.target.value;
-                            setFormData((prev) => ({
-                              ...prev,
-                              b2b_pics: updated,
-                            }));
-                          }}
-                        />
-                      </div>
-
-                      {/* TELEPON PIC */}
-                      <div className="space-y-2">
-                        <Label>Telepon PIC</Label>
-                        <Input
-                          value={pic.phone}
-                          onChange={(e) => {
-                            const updated = [...formData.b2b_pics];
-                            updated[index].phone = e.target.value;
-                            setFormData((prev) => ({
-                              ...prev,
-                              b2b_pics: updated,
-                            }));
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* DELETE PIC BUTTON */}
-                    {formData.b2b_pics.length > 1 && (
-                      <Button
-                        variant="destructive"
-                        onClick={() => {
-                          const updated = formData.b2b_pics.filter(
-                            (_, i) => i !== index
-                          );
-                          setFormData((prev) => ({
-                            ...prev,
-                            b2b_pics: updated,
-                          }));
-                        }}
-                      >
-                        <DeleteIcon />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-
-                {/* ADD NEW PIC */}
                 <Button
                   variant="secondary"
                   className="mt-2"
@@ -620,15 +927,14 @@ const ClientAddForm = () => {
                 {/* PREFIX + NAME */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="b2c_prefix">Prefix (Mr./Ms.)</Label>
+                    <Label>Prefix (Mr./Ms.)</Label>
                     <Select
-                      name="b2c_prefix"
                       value={formData.b2c_prefix}
                       onValueChange={(value) =>
                         setFormData((prev) => ({ ...prev, b2c_prefix: value }))
                       }
                     >
-                      <SelectTrigger id="b2c_prefix">
+                      <SelectTrigger>
                         <SelectValue placeholder="Select prefix" />
                       </SelectTrigger>
                       <SelectContent>
@@ -642,11 +948,10 @@ const ClientAddForm = () => {
                   </div>
 
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="b2c_name">Nama Lengkap *</Label>
+                    <Label>Nama Lengkap *</Label>
                     <Input
-                      id="b2c_name"
-                      name="b2c_name"
                       value={formData.b2c_name}
+                      name="b2c_name"
                       onChange={handleChange}
                       required
                     />
@@ -656,23 +961,17 @@ const ClientAddForm = () => {
                 {/* PHONE + PURCHASE CHANNEL */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="b2c_phone">Telepon *</Label>
+                    <Label>Telepon</Label>
                     <Input
-                      id="b2c_phone"
                       name="b2c_phone"
                       value={formData.b2c_phone}
                       onChange={handleChange}
-                      required
                     />
                   </div>
 
-                  {/* PURCHASE CHANNEL DROPDOWN (DB) */}
                   <div className="space-y-2">
-                    <Label htmlFor="b2c_purchaseChannelIdB2C">
-                      Saluran Pembelian *
-                    </Label>
+                    <Label>Saluran Pembelian *</Label>
                     <Select
-                      name="b2c_purchaseChannelIdB2C"
                       value={formData.b2c_purchaseChannelIdB2C}
                       onValueChange={(value) =>
                         setFormData((prev) => ({
@@ -681,10 +980,9 @@ const ClientAddForm = () => {
                         }))
                       }
                     >
-                      <SelectTrigger id="b2c_purchaseChannelIdB2C">
+                      <SelectTrigger>
                         <SelectValue placeholder="Pilih saluran pembelian" />
                       </SelectTrigger>
-
                       <SelectContent>
                         {purchaseChannels?.map((pc) => (
                           <SelectItem key={pc.id} value={pc.id}>
@@ -696,11 +994,226 @@ const ClientAddForm = () => {
                   </div>
                 </div>
 
+                {/* === ADDRESS ====================== */}
+                <h3 className="text-lg font-semibold border-b pb-2">Alamat</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* COUNTRY */}
+                  <div className="space-y-2">
+                    <Label>Negara </Label>
+                    <Select
+                      value={formData.b2c_country}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          b2c_country: value,
+                          b2c_province: "",
+                          b2c_city: "",
+                          b2c_district: "",
+                          b2c_subDistrict: "",
+                          b2c_postalCode: "",
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih Negara" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-64">
+                        {countries.map((c) => (
+                          <SelectItem key={c.code} value={c.name}>
+                            <span className="flex items-center gap-2">
+                              <span>{c.flag}</span> {c.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* PROVINCE */}
+                  <div className="space-y-2">
+                    <Label>Provinsi </Label>
+                    {formData.b2c_country === "Indonesia" ? (
+                      <Select
+                        value={formData.b2c_province}
+                        onValueChange={(v) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2c_province: v,
+                            b2c_city: "",
+                            b2c_district: "",
+                            b2c_subDistrict: "",
+                            b2c_postalCode: "",
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih Provinsi" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {provinces.map((prov) => (
+                            <SelectItem key={prov.id} value={prov.name}>
+                              {prov.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        placeholder="Masukkan Provinsi"
+                        value={formData.b2c_province}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2c_province: e.target.value,
+                          }))
+                        }
+                      />
+                    )}
+                  </div>
+
+                  {/* CITY */}
+                  <div className="space-y-2">
+                    <Label>Kota / Kabupaten </Label>
+                    {formData.b2c_country === "Indonesia" ? (
+                      <Select
+                        disabled={!formData.b2c_province}
+                        value={formData.b2c_city}
+                        onValueChange={(v) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2c_city: v,
+                            b2c_district: "",
+                            b2c_subDistrict: "",
+                            b2c_postalCode: "",
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih Kota / Kabupaten" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {citiesB2C.map((city) => (
+                            <SelectItem key={city.id} value={city.name}>
+                              {city.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        placeholder="Masukkan Kota"
+                        value={formData.b2c_city}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2c_city: e.target.value,
+                          }))
+                        }
+                      />
+                    )}
+                  </div>
+
+                  {/* DISTRICT */}
+                  <div className="space-y-2">
+                    <Label>Kecamatan </Label>
+                    {formData.b2c_country === "Indonesia" ? (
+                      <Select
+                        disabled={!formData.b2c_city}
+                        value={formData.b2c_district}
+                        onValueChange={(v) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2c_district: v,
+                            b2c_subDistrict: "",
+                            b2c_postalCode: "",
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih Kecamatan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {districtsB2C.map((d) => (
+                            <SelectItem key={d.id} value={d.name}>
+                              {d.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        placeholder="Masukkan Kecamatan"
+                        value={formData.b2c_district}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2c_district: e.target.value,
+                          }))
+                        }
+                      />
+                    )}
+                  </div>
+
+                  {/* SUBDISTRICT */}
+                  <div className="space-y-2">
+                    <Label>Kelurahan </Label>
+                    {formData.b2c_country === "Indonesia" ? (
+                      <Select
+                        disabled={!formData.b2c_district}
+                        value={formData.b2c_subDistrict}
+                        onValueChange={(v) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2c_subDistrict: v,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih Kelurahan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {subDistrictB2C.map((v) => (
+                            <SelectItem key={v.id} value={v.name}>
+                              {v.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        placeholder="Masukkan Kelurahan"
+                        value={formData.b2c_subDistrict}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            b2c_subDistrict: e.target.value,
+                          }))
+                        }
+                      />
+                    )}
+                  </div>
+
+                  {/* POSTAL CODE */}
+                  <div className="space-y-2">
+                    <Label>Kode Pos </Label>
+                    <Input
+                      placeholder="Kode Pos"
+                      value={formData.b2c_postalCode}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          b2c_postalCode: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
                 {/* FULL ADDRESS */}
                 <div className="space-y-2">
-                  <Label htmlFor="b2c_fullAddressB2C">Alamat Lengkap *</Label>
+                  <Label>Alamat Lengkap </Label>
                   <Textarea
-                    id="b2c_fullAddressB2C"
                     name="b2c_fullAddressB2C"
                     value={formData.b2c_fullAddressB2C}
                     onChange={handleChange}

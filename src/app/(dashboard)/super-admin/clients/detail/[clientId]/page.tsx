@@ -43,6 +43,12 @@ interface ClientB2C {
   prefix: string;
   name: string;
   phone: string;
+  country: string;
+  province: string;
+  city: string;
+  district: string;
+  subDistrict: string;
+  postalCode: string;
   fullAddress: string;
   purchaseChannel: PurchaseChannel; // UPDATE
 }
@@ -50,19 +56,24 @@ interface ClientB2C {
 interface ClientB2B {
   id: string;
   companyName: string;
-  department: Department; // UPDATE
-  prefix: string;
+  department: Department;
+
   phone: string;
   email: string;
   website: string;
+  country: string;
   province: string;
   city: string;
+  district: string;
+  subDistrict: string;
+  postalCode: string;
   fullAddress: string; // UPDATE
   purchaseChannel: PurchaseChannel; // UPDATE
   pics: {
     id: string;
     name: string;
     email?: string;
+    prefix: string;
     phone?: string;
   }[];
 }
@@ -156,7 +167,9 @@ const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
             {/* NAMA */}
             <div className="grid grid-cols-3">
               <span className="text-muted-foreground font-medium">Nama</span>
-              <span className="col-span-2 font-semibold">{pic.name}</span>
+              <span className="col-span-2 font-semibold">
+                {pic.prefix} {pic.name}
+              </span>
             </div>
 
             {/* EMAIL */}
@@ -201,6 +214,52 @@ const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
       </CardHeader>
 
       <CardContent className="space-y-4 text-sm">
+        {/* Country */}
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Negara</span>
+          <span className="col-span-2 font-semibold uppercase">
+            {data.country}
+          </span>
+        </div>
+
+        {/* PROVINSI */}
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Provinsi</span>
+          <span className="col-span-2 font-semibold uppercase">
+            {data.province}
+          </span>
+        </div>
+
+        {/* KOTA */}
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Kota</span>
+          <span className="col-span-2 font-semibold">{data.city}</span>
+        </div>
+
+        {/* DISTRICT */}
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Kecamatan</span>
+          <span className="col-span-2 font-semibold uppercase">
+            {data.district}
+          </span>
+        </div>
+
+        {/* DISTRICT */}
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Kelurahan</span>
+          <span className="col-span-2 font-semibold uppercase">
+            {data.subDistrict}
+          </span>
+        </div>
+
+        {/* POS KODE */}
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Pos Kode</span>
+          <span className="col-span-2 font-semibold uppercase">
+            {data.postalCode}
+          </span>
+        </div>
+
         {/* ALAMAT */}
         <div className="grid grid-cols-3 gap-2">
           <span className="text-muted-foreground font-medium">
@@ -209,18 +268,6 @@ const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
           <span className="col-span-2 font-semibold leading-relaxed">
             {data.fullAddress}
           </span>
-        </div>
-
-        {/* PROVINSI */}
-        <div className="grid grid-cols-3 gap-2">
-          <span className="text-muted-foreground font-medium">Provinsi</span>
-          <span className="col-span-2 font-semibold">{data.province}</span>
-        </div>
-
-        {/* KOTA */}
-        <div className="grid grid-cols-3 gap-2">
-          <span className="text-muted-foreground font-medium">Kota</span>
-          <span className="col-span-2 font-semibold">{data.city}</span>
         </div>
       </CardContent>
     </Card>
@@ -286,6 +333,44 @@ const B2CDetails: React.FC<{ data: ClientB2C }> = ({ data }) => (
 
       <CardContent className="space-y-4 text-sm">
         <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Negara</span>
+          <span className="col-span-2 font-semibold leading-relaxed">
+            {data.country}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Provinsi</span>
+          <span className="col-span-2 font-semibold leading-relaxed">
+            {data.province}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">
+            Kota/Kabupaten
+          </span>
+          <span className="col-span-2 font-semibold leading-relaxed">
+            {data.city}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Kecamatan</span>
+          <span className="col-span-2 font-semibold leading-relaxed">
+            {data.district}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Kelurahan</span>
+          <span className="col-span-2 font-semibold leading-relaxed">
+            {data.subDistrict}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <span className="text-muted-foreground font-medium">Kode Pos</span>
+          <span className="col-span-2 font-semibold leading-relaxed">
+            {data.postalCode}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
           <span className="text-muted-foreground font-medium">Alamat</span>
           <span className="col-span-2 font-semibold leading-relaxed">
             {data.fullAddress}
@@ -303,6 +388,8 @@ const ClientDetailPage: React.FC = () => {
   const router = useRouter();
 
   const [client, setClient] = useState<ClientDetail | null>(null);
+  console.log("ini adalah data client", client);
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
