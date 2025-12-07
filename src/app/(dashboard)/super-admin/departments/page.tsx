@@ -4,6 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -17,12 +24,12 @@ import {
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
 
-import { Search } from "lucide-react";
+import { FileDown, Loader2, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-type PurchaseChannel = {
+type Departments = {
   id: string;
   name: string;
   slug: string;
@@ -38,17 +45,28 @@ type Meta = {
   total: number;
 };
 
+interface DepartmentExportQuery {
+  startDate?: string;
+  endDate?: string;
+  isActive?: "true" | "false" | "ALL";
+  search?: string;
+}
+
 const DepartmentPage = () => {
-  const [channels, setChannels] = useState<PurchaseChannel[]>([]);
+  const [departments, setDepartments] = useState<Departments[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
-
   const [page, setPage] = useState(1);
 
-  const fetchChannels = async () => {
+  const [exportStartDate, setExportStartDate] = useState<string>("");
+  const [exportEndDate, setExportEndDate] = useState<string>("");
+  const [exportIsActive, setExportIsActive] = useState<string>("ALL");
+  const [exporting, setExporting] = useState<boolean>(false);
+
+  const fetchDepartments = async () => {
     setLoading(true);
     setError(null);
 
@@ -75,7 +93,7 @@ const DepartmentPage = () => {
 
       const result = await res.json();
 
-      setChannels(result.data || []);
+      setDepartments(result.data || []);
       setMeta(result.meta);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Unknown error");
@@ -86,8 +104,76 @@ const DepartmentPage = () => {
   };
 
   useEffect(() => {
-    fetchChannels();
+    fetchDepartments();
   }, [page, debouncedSearch]);
+
+  const handleExportDepartment = async () => {
+    setExporting(true);
+    try {
+      // 1. Ambil Token Autentikasi
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      // 2. Kumpulkan Filter
+      const exportFilters: DepartmentExportQuery = {
+        // Filter Waktu DARI STATE EXPORT
+        ...(exportStartDate && { startDate: exportStartDate }),
+        ...(exportEndDate && { endDate: exportEndDate }),
+
+        // Filter Status DARI STATE EXPORT
+        ...(exportIsActive !== "ALL" && {
+          isActive: exportIsActive as "true" | "false",
+        }),
+
+        ...(search.trim() && { search: search.trim() }),
+      };
+
+      const queryString = new URLSearchParams(
+        exportFilters as Record<string, string>
+      ).toString();
+
+      // URL untuk export (Endpoint: http://localhost:8000/departments/export/excel)
+      const exportUrl = `http://localhost:8000/departments/export/excel?${queryString}`;
+
+      const response = await fetch(exportUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Server Error:", errorText);
+        throw new Error("Export failed. Server responded with an error.");
+      }
+
+      // 3. Proses File Binary (Blob)
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("Content-Disposition");
+
+      const filenameMatch = contentDisposition?.match(/filename="(.+?)"/i);
+      const filename = filenameMatch
+        ? filenameMatch[1]
+        : `departments_export_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Data Department berhasil di-export ke Excel!");
+    } catch (error) {
+      console.error("Export Error:", error);
+      toast.error("Gagal meng-export data. Periksa koneksi atau hak akses.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="space-y-4 w-auto mx-auto">
@@ -114,14 +200,79 @@ const DepartmentPage = () => {
         </CardHeader>
       </Card>
 
-      {/* === ADD BUTTON === */}
-      <div className="p-1 flex justify-start">
-        <Link href="/super-admin/departments/add">
-          <Button size="sm" className="gap-2 cursor-pointer">
-            + Add Department
+      {/* --- FILTER DAN EXPORT BARU --- */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <h3 className="w-full text-sm font-semibold text-muted-foreground">
+            Export Filter (opsional, berdasarkan created date):
+          </h3>
+
+          {/* Filter Status Aktif */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              Status (Export)
+            </label>
+            <Select value={exportIsActive} onValueChange={setExportIsActive}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua</SelectItem>
+                <SelectItem value="true">Active</SelectItem>
+                <SelectItem value="false">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Filter Tanggal Mulai */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              Start Date
+            </label>
+            <Input
+              type="date"
+              value={exportStartDate}
+              onChange={(e) => setExportStartDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Filter Tanggal Akhir */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              End Date
+            </label>
+            <Input
+              type="date"
+              value={exportEndDate}
+              onChange={(e) => setExportEndDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Tombol Add Department */}
+          <Link href="/super-admin/departments/add" className="ml-auto">
+            <Button size="sm" className="gap-2 cursor-pointer">
+              + Add Department
+            </Button>
+          </Link>
+
+          {/* Tombol Export */}
+          <Button
+            size="sm"
+            className="gap-2 bg-green-600 hover:bg-green-700"
+            onClick={handleExportDepartment}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            {exporting ? "Preparing..." : "Export to Excel"}
           </Button>
-        </Link>
-      </div>
+        </div>
+      </Card>
 
       {/* === TABLE === */}
       <Card className="w-full">
@@ -170,8 +321,8 @@ const DepartmentPage = () => {
                     Error: Failed to load department.
                   </TableCell>
                 </TableRow>
-              ) : channels.length > 0 ? (
-                channels.map((data) => (
+              ) : departments.length > 0 ? (
+                departments.map((data) => (
                   <TableRow key={data.id}>
                     <TableCell className="font-medium">{data.name}</TableCell>
                     <TableCell>{data.slug}</TableCell>

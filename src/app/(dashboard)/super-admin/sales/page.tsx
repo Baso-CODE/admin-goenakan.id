@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Search } from "lucide-react";
+import { Search, FileDown, Loader2 } from "lucide-react"; // Import FileDown dan Loader2
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,7 +51,15 @@ type Meta = {
   total: number;
 };
 
+// Interface untuk Query Export Sales
+interface SalesExportQuery {
+  startDate?: string;
+  endDate?: string;
+  isActive?: "true" | "false" | "ALL";
+}
+
 const Sales = () => {
+  // --- STATE DATA DAN PAGINATION ---
   const [sales, setSales] = useState<SalesPerson[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
@@ -61,6 +69,13 @@ const Sales = () => {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
 
+  // --- STATE UNTUK EXPORT FILTER ---
+  const [exportStartDate, setExportStartDate] = useState<string>("");
+  const [exportEndDate, setExportEndDate] = useState<string>("");
+  const [exportIsActive, setExportIsActive] = useState<string>("ALL");
+  const [exporting, setExporting] = useState<boolean>(false); // State untuk loading button export
+
+  // --- FUNGSI FETCH DATA (Untuk Tabel) ---
   const fetchSales = async () => {
     setLoading(true);
     setError(null);
@@ -70,13 +85,13 @@ const Sales = () => {
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
+        // Menggunakan statusFilter dari filter tabel
         isActive: statusFilter,
       });
       if (debouncedSearch.trim()) {
         params.append("search", debouncedSearch.trim());
       }
 
-      // Mengganti endpoint ke /sales
       const res = await fetch(`http://localhost:8000/sales?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -99,6 +114,71 @@ const Sales = () => {
     }
   };
 
+  // --- FUNGSI HANDLE EXPORT (Implementasi Baru) ---
+  const handleExportSales = async () => {
+    setExporting(true);
+    try {
+      // 1. Ambil Token Autentikasi
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      // 2. Kumpulkan Filter (menggunakan state filter export)
+      const exportFilters: SalesExportQuery = {
+        ...(exportStartDate && { startDate: exportStartDate }),
+        ...(exportEndDate && { endDate: exportEndDate }),
+        // Menggunakan state filter status khusus export
+        ...(exportIsActive !== "ALL" && {
+          isActive: exportIsActive as "true" | "false",
+        }),
+      };
+
+      const queryString = new URLSearchParams(
+        exportFilters as Record<string, string>
+      ).toString();
+
+      // URL untuk export (Sesuaikan dengan endpoint backend Anda)
+      const exportUrl = `http://localhost:8000/sales/export/excel?${queryString}`;
+
+      const response = await fetch(exportUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Server Error:", errorText);
+        throw new Error("Export failed. Server responded with an error.");
+      }
+
+      // 3. Proses File Binary (Blob)
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("Content-Disposition");
+
+      const filenameMatch = contentDisposition?.match(/filename="(.+?)"/i);
+      const filename = filenameMatch
+        ? filenameMatch[1]
+        : `sales_export_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Data Sales berhasil di-export ke Excel!");
+    } catch (error) {
+      console.error("Export Error:", error);
+      toast.error("Gagal meng-export data. Periksa koneksi atau hak akses.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   useEffect(() => {
     fetchSales();
   }, [page, debouncedSearch, statusFilter]);
@@ -106,11 +186,11 @@ const Sales = () => {
   // === RENDER ===
   return (
     <div className="space-y-4 overflow-x-hidden w-full mx-auto">
-      {/* === Header === */}
+      {/* === Header & Search/Filter Tabel === */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 overflow-x-auto">
           <CardTitle className="text-xl font-semibold whitespace-nowrap">
-            Sales Management
+            Sales Management 📈
           </CardTitle>
 
           <div className="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
@@ -126,16 +206,19 @@ const Sales = () => {
               />
             </div>
 
-            {/* Filter active/inactive */}
+            {/* Filter active/inactive (Untuk Tabel) */}
             <Select
               value={statusFilter}
-              onValueChange={(val) => setStatusFilter(val)}
+              onValueChange={(val) => {
+                setStatusFilter(val);
+                setPage(1); // Reset page saat filter tabel berubah
+              }}
             >
               <SelectTrigger className="w-[150px] min-w-[150px]">
                 <SelectValue placeholder="Filter status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value="ALL">All Status</SelectItem>
                 <SelectItem value="true">Active</SelectItem>
                 <SelectItem value="false">Inactive</SelectItem>
               </SelectContent>
@@ -144,14 +227,80 @@ const Sales = () => {
         </CardHeader>
       </Card>
 
-      {/* === Button Add Sales === */}
-      <div className="p-1 flex justify-start">
-        <Link href="/super-admin/sales/add">
-          <Button size="sm" className="gap-2">
-            + Add Sales
+      {/* --- FILTER DAN EXPORT BARU --- */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <h3 className="w-full text-sm font-semibold text-muted-foreground">
+            Export Filter (opsional, berdasarkan Created Date):
+          </h3>
+
+          {/* Filter Status Aktif (Untuk Export) */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              Status (Export)
+            </label>
+            <Select value={exportIsActive} onValueChange={setExportIsActive}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua</SelectItem>
+                <SelectItem value="true">Active</SelectItem>
+                <SelectItem value="false">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Filter Tanggal Mulai (Untuk Export) */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              Start Date
+            </label>
+            <Input
+              type="date"
+              value={exportStartDate}
+              onChange={(e) => setExportStartDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Filter Tanggal Akhir (Untuk Export) */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              End Date
+            </label>
+            <Input
+              type="date"
+              value={exportEndDate}
+              onChange={(e) => setExportEndDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Tombol Add Sales */}
+          <Link href="/super-admin/sales/add" className="ml-auto">
+            <Button size="sm" className="gap-2 cursor-pointer">
+              + Add Sales
+            </Button>
+          </Link>
+
+          {/* Tombol Export */}
+          <Button
+            size="sm"
+            className="gap-2 bg-green-600 hover:bg-green-700"
+            onClick={handleExportSales}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            {exporting ? "Preparing..." : "Export to Excel"}
           </Button>
-        </Link>
-      </div>
+        </div>
+      </Card>
+
       {/* === Table === */}
       <Card className="w-full">
         <CardContent className="p-0">
@@ -167,27 +316,21 @@ const Sales = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* Penanganan Loading menggunakan Skeleton */}
                 {loading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      {/* Kolom 1: Prefix & Name */}
                       <TableCell className="h-12 w-[250px]">
                         <Skeleton className="h-4 w-[200px]" />
                       </TableCell>
-                      {/* Kolom 2: Phone */}
                       <TableCell className="h-12">
                         <Skeleton className="h-4 w-[120px]" />
                       </TableCell>
-                      {/* Kolom 3: Status */}
                       <TableCell className="h-12">
                         <Skeleton className="h-4 w-[60px]" />
                       </TableCell>
-                      {/* Kolom 4: Created */}
                       <TableCell className="h-12">
                         <Skeleton className="h-4 w-[100px]" />
                       </TableCell>
-                      {/* Kolom 5: Actions */}
                       <TableCell className="h-12 text-center">
                         <div className="flex justify-end space-x-2">
                           <Skeleton className="h-8 w-[50px]" />
@@ -198,17 +341,15 @@ const Sales = () => {
                     </TableRow>
                   ))
                 ) : error ? (
-                  /* Penanganan Error */
                   <TableRow>
                     <TableCell
-                      colSpan={5} // Jumlah kolom: 5
+                      colSpan={5}
                       className="text-center text-red-500 py-6"
                     >
                       Error: {error || "Failed to load sales data."}
                     </TableCell>
                   </TableRow>
                 ) : sales.length > 0 ? (
-                  /* Menampilkan Data Sales */
                   sales.map((sale) => (
                     <TableRow key={sale.id}>
                       <TableCell className="font-medium">
@@ -256,7 +397,7 @@ const Sales = () => {
                           variant="destructive"
                           size="sm"
                           className="text-xs cursor-pointer"
-                          // onClick={() => handleDelete(sale.id)} // TODO: Implement soft delete
+                          // onClick={() => handleDelete(sale.id)}
                         >
                           Delete
                         </Button>
@@ -264,10 +405,9 @@ const Sales = () => {
                     </TableRow>
                   ))
                 ) : (
-                  /* Data Kosong */
                   <TableRow>
                     <TableCell
-                      colSpan={5} // Jumlah kolom: 5
+                      colSpan={5}
                       className="text-center py-6 text-muted-foreground"
                     >
                       No sales found.

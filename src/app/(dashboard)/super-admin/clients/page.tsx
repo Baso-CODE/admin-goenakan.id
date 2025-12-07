@@ -1,8 +1,9 @@
 "use client";
 
-import { Search, UserCircle, UserPlus } from "lucide-react";
+import { FileDown, Loader2, Search, UserCircle, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { toast } from "sonner"; // Import toast untuk notifikasi
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ interface ClientBase {
 interface ClientB2B extends ClientBase {
   type: "B2B";
   companyName: string;
-  picName: string;
+  picName?: string; // Diperbaiki, harusnya optional atau null
 }
 
 interface ClientB2C extends ClientBase {
@@ -59,6 +60,13 @@ interface PaginationMeta {
   hasPrevious: boolean;
 }
 
+// Interface untuk Query Export
+interface ClientExportQuery {
+  type?: ClientType | "ALL";
+  startDate?: string;
+  endDate?: string;
+}
+
 const ClientManagementTable: React.FC = () => {
   const [clients, setClients] = useState<ClientData[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({
@@ -70,10 +78,25 @@ const ClientManagementTable: React.FC = () => {
   });
 
   const [loading, setLoading] = useState<boolean>(true);
+  const [exporting, setExporting] = useState<boolean>(false); // State untuk proses export
   const [error, setError] = useState<string | null>(null);
+
+  // State Filter
   const [search, setSearch] = useState<string>("");
   const debouncedSearch = useDebounce(search, 500);
   const [clientTypeFilter, setClientTypeFilter] = useState<string>("ALL");
+  const [startDate, setStartDate] = useState<string>(""); // Filter tanggal
+  const [endDate, setEndDate] = useState<string>(""); // Filter tanggal
+
+  // Fungsi untuk mereset halaman ke 1 saat filter utama berubah
+  const handleFilterChange = (filterUpdate: Partial<ClientExportQuery>) => {
+    setMeta((prev) => ({ ...prev, page: 1 }));
+    // Update filter type
+    if (filterUpdate.type !== undefined) {
+      setClientTypeFilter(filterUpdate.type);
+    }
+    // Search sudah ditangani oleh debouncedSearch useEffect
+  };
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -84,11 +107,14 @@ const ClientManagementTable: React.FC = () => {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        // Query params
+        // Query params untuk LIST (Pagination dan Filter Dasar)
         const params = new URLSearchParams({
           page: meta.page.toString(),
           take: meta.perPage.toString(),
           type: clientTypeFilter,
+          // Tambahkan filter tanggal ke list jika diperlukan untuk visual
+          ...(startDate && { startDate }),
+          ...(endDate && { endDate }),
         });
         if (debouncedSearch.trim()) {
           params.append("search", debouncedSearch.trim());
@@ -101,8 +127,12 @@ const ClientManagementTable: React.FC = () => {
         });
 
         const result = await res.json();
-        setClients(result.data || []);
-        setMeta(result.meta || meta);
+        if (res.ok) {
+          setClients(result.data || []);
+          setMeta(result.meta || meta);
+        } else {
+          throw new Error(result.message || "Failed to fetch data");
+        }
       } catch (err) {
         console.error("❌ Error fetching clients:", err);
         setError(err instanceof Error ? err.message : "Unknown error");
@@ -112,19 +142,97 @@ const ClientManagementTable: React.FC = () => {
     };
 
     fetchClients();
-  }, [meta.page, clientTypeFilter, debouncedSearch]);
+  }, [
+    meta.page,
+    meta.perPage,
+    clientTypeFilter,
+    debouncedSearch,
+    startDate,
+    endDate,
+  ]);
+
+  // === FUNGSI HANDLE EXPORT ===
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      // 1. Ambil Token Autentikasi
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      // 2. Kumpulkan Filter (menggunakan semua filter yang ada)
+      const exportFilters: ClientExportQuery & { search?: string } = {
+        type: clientTypeFilter as ClientType | "ALL",
+        // Tambahkan filter tanggal yang sedang aktif
+        ...(startDate && { startDate }),
+        ...(endDate && { endDate }),
+        // Tambahkan search/debounce search yang sedang aktif
+        ...(search.trim() && { search: search.trim() }),
+      };
+
+      const queryString = new URLSearchParams(
+        exportFilters as Record<string, string>
+      ).toString();
+
+      // URL untuk export
+      const exportUrl = `http://localhost:8000/clients/export/excel?${queryString}`;
+
+      const response = await fetch(exportUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Server Error:", errorText);
+        throw new Error("Export failed. Server responded with an error.");
+      }
+
+      // 3. Proses File Binary (Blob)
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("Content-Disposition");
+
+      // Ambil nama file dari header
+      const filenameMatch = contentDisposition?.match(/filename="(.+?)"/i);
+      const filename = filenameMatch
+        ? filenameMatch[1]
+        : `clients_export_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      // Membuat URL objek untuk file yang akan diunduh
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename; // Nama file download
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url); // Bersihkan URL
+
+      toast.success("Data Klien berhasil di-export ke Excel!");
+    } catch (error) {
+      console.error("Export Error:", error);
+      toast.error(
+        "Gagal meng-export data. Pastikan filter sudah benar dan Anda memiliki akses."
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // === UTILITIES ===
   const getClientName = (client: ClientData) =>
-    client.type === "B2B" ? client.companyName : client.name;
+    client.type === "B2B"
+      ? (client as ClientB2B).companyName
+      : (client as ClientB2C).name;
 
   const getClientPicOrEmail = (client: ClientData) =>
-    client.type === "B2B" ? client.picName : client.email;
+    client.type === "B2B" ? (client as ClientB2B).picName : client.email;
 
   // === RENDER ===
   return (
-    <div className="space-y-4 w-full  mx-auto">
-      {/* === HEADER & FILTER === */}
+    <div className="space-y-4 w-full mx-auto">
+      {/* === HEADER & FILTER UTAMA === */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <CardTitle className="text-2xl font-bold whitespace-nowrap flex items-center gap-2">
@@ -136,7 +244,9 @@ const ClientManagementTable: React.FC = () => {
             {/* === FILTER TYPE === */}
             <Select
               value={clientTypeFilter}
-              onValueChange={setClientTypeFilter}
+              onValueChange={(val) =>
+                handleFilterChange({ type: val as ClientType | "ALL" })
+              }
             >
               <SelectTrigger className="w-full md:w-[150px]">
                 <SelectValue placeholder="Client Type" />
@@ -166,14 +276,72 @@ const ClientManagementTable: React.FC = () => {
         </CardHeader>
       </Card>
 
-      {/* === ADD CLIENT BUTTON === */}
-      <div className="p-1 flex justify-start">
-        <Link href="/super-admin/clients/add">
-          <Button size="sm" className="gap-2">
-            <UserPlus className="h-4 w-4" /> Add New Client
+      {/* --- GARIS PEMISAH --- */}
+      <hr />
+
+      {/* === FILTER DAN EXPORT BARU === */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <h3 className="w-full text-sm font-semibold text-muted-foreground">
+            Export Filter (opsional):
+          </h3>
+
+          {/* Filter Tanggal Mulai */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              Start Date (Created)
+            </label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setMeta((prev) => ({ ...prev, page: 1 })); // Reset page
+              }}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Filter Tanggal Akhir */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              End Date (Created)
+            </label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setMeta((prev) => ({ ...prev, page: 1 })); // Reset page
+              }}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Tombol Add Client */}
+          <Link href="/super-admin/clients/add" className="ml-auto">
+            <Button size="sm" className="gap-2">
+              <UserPlus className="h-4 w-4" /> Add New Client
+            </Button>
+          </Link>
+
+          {/* Tombol Export */}
+          <Button
+            size="sm"
+            className="gap-2 bg-green-600 hover:bg-green-700"
+            onClick={handleExport}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            {exporting ? "Preparing..." : "Export to Excel"}
           </Button>
-        </Link>
-      </div>
+        </div>
+      </Card>
+      {/* --- END: FILTER DAN EXPORT BARU --- */}
 
       {/* === TABLE === */}
       <Card className="w-full overflow-hidden shadow-lg">
@@ -236,7 +404,6 @@ const ClientManagementTable: React.FC = () => {
                     <TableCell className="h-12 text-right">
                       <div className="flex justify-end">
                         <Skeleton className="h-8 w-[60px]" />
-                        {/* View Button */}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -306,6 +473,7 @@ const ClientManagementTable: React.FC = () => {
           </Table>
         </CardContent>
       </Card>
+
       {/* === PAGINATION === */}
       {meta.total > 0 && (
         <div className="flex justify-between items-center p-4 border-t text-sm text-muted-foreground">
