@@ -488,14 +488,14 @@ const ClientDetailPage: React.FC = () => {
                    bg-muted/40 px-4 py-2 rounded-lg w-fit border"
           >
             <span>
-              <span className="font-medium">Kode Klien:</span>{" "}
+              <span className="font-medium">Kode Klien:</span>
               <span className="font-mono text-[13px]">{client.custCode}</span>
             </span>
 
             <span className="text-gray-400">•</span>
 
             <span>
-              <span className="font-medium">Bergabung:</span>{" "}
+              <span className="font-medium">Bergabung:</span>
               {new Date(client.createdAt).toLocaleDateString()}
             </span>
           </div>

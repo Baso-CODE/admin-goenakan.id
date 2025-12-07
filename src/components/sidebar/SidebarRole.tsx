@@ -11,6 +11,7 @@ import { useSession } from "next-auth/react";
 
 // === ICONS ===
 import {
+  AlignHorizontalDistributeStart,
   AudioWaveform,
   Command,
   FileSpreadsheet,
@@ -79,6 +80,11 @@ export default function SidebarRole({ ...props }) {
             title: "Product Categories",
             url: "/super-admin/product-categories",
             icon: Tags,
+          },
+          {
+            title: "Product Attributes",
+            url: "/super-admin/product-attributes",
+            icon: AlignHorizontalDistributeStart,
           },
         ],
       },

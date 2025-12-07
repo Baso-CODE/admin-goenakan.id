@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import ProductForm, { ProductFormValues } from "../components/FormProduct";
+import ProductFormV2, { ProductFormValues } from "../components/FormProductV2";
 
-// Tipe data files dari ProductForm
 type FileUploads = {
-  images?: FileList;
-  videos?: FileList;
+  images: FileList | null;
+  videos: FileList | null;
+  variantImages: File[][];
 };
 
 export default function AddProductPage() {
@@ -20,35 +20,46 @@ export default function AddProductPage() {
     files: FileUploads
   ) => {
     setIsSubmitting(true);
-    const formData = new FormData();
-
-    if (files.images) {
-      for (let i = 0; i < files.images.length; i++) {
-        formData.append("images", files.images[i]);
-      }
-    }
-
-    if (files.videos) {
-      for (let i = 0; i < files.videos.length; i++) {
-        formData.append("videos", files.videos[i]);
-      }
-    }
-
-    formData.append("data", JSON.stringify(data));
 
     try {
+      const formData = new FormData();
+
+      // 1️⃣ Append images
+      if (files.images) {
+        Array.from(files.images).forEach((file) =>
+          formData.append("images", file)
+        );
+      }
+
+      // 2️⃣ Append videos
+      if (files.videos) {
+        Array.from(files.videos).forEach((file) =>
+          formData.append("videos", file)
+        );
+      }
+
+      if (files.variantImages && files.variantImages.length > 0) {
+        files.variantImages.forEach((group) => {
+          group.forEach((file) => {
+            formData.append("variantImages", file);
+          });
+        });
+      }
+
+      const productDataJson = JSON.stringify(data);
+      formData.append("data", productDataJson);
+
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
       const res = await fetch("http://localhost:8000/products", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
       const result = await res.json();
+
       if (!res.ok) {
         throw new Error(result.message || "Failed to create product");
       }
@@ -68,7 +79,8 @@ export default function AddProductPage() {
       <h2 className="text-xl font-semibold tracking-tight uppercase">
         Tambah Produk Baru
       </h2>
-      <ProductForm onSubmit={handleAddProduct} isSubmitting={isSubmitting} />
+
+      <ProductFormV2 onSubmit={handleAddProduct} isSubmitting={isSubmitting} />
     </div>
   );
 }

@@ -1,8 +1,3 @@
-"use client";
-
-import { useState } from "react";
-import Image from "next/image";
-import { X } from "lucide-react";
 import {
   FormControl,
   FormField,
@@ -11,13 +6,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import Image from "next/image";
+import { useState } from "react";
 
 interface UploadImagesProps {
   form: any;
   name: string;
   label?: string;
   max?: number;
+  onFilesChange?: (files: FileList) => void; // NEW
 }
 
 export function UploadImages({
@@ -25,6 +22,7 @@ export function UploadImages({
   name,
   label = "Upload Gambar",
   max = 10,
+  onFilesChange,
 }: UploadImagesProps) {
   const [previews, setPreviews] = useState<string[]>([]);
 
@@ -34,9 +32,10 @@ export function UploadImages({
       name={name}
       render={({ field: { onChange, ref } }) => (
         <FormItem>
-          <FormLabel className="">
+          <FormLabel>
             {label} (Maks {max})
           </FormLabel>
+
           <FormControl>
             <Input
               type="file"
@@ -47,11 +46,17 @@ export function UploadImages({
                 const files = e.target.files;
                 if (!files) return;
 
+                // RHF update
                 onChange(files);
+
+                // Inform parent component
+                onFilesChange?.(files);
+
+                // Preview
                 const urls = Array.from(files).map((file) =>
                   URL.createObjectURL(file)
                 );
-                setPreviews((prev) => [...prev, ...urls]);
+                setPreviews(urls);
               }}
             />
           </FormControl>
@@ -69,17 +74,6 @@ export function UploadImages({
                     fill
                     className="object-cover"
                   />
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="destructive"
-                    className="absolute top-1 right-1 h-5 w-5"
-                    onClick={() =>
-                      setPreviews((prev) => prev.filter((_, i) => i !== index))
-                    }
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
                 </div>
               ))}
             </div>

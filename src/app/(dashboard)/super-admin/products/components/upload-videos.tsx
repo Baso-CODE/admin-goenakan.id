@@ -17,6 +17,7 @@ interface UploadVideosProps {
   name: string;
   label?: string;
   max?: number;
+  onFilesChange?: (files: FileList) => void; // <— TAMBAHAN
 }
 
 export function UploadVideos({
@@ -24,6 +25,7 @@ export function UploadVideos({
   name,
   label = "Upload Video",
   max = 3,
+  onFilesChange,
 }: UploadVideosProps) {
   const [previews, setPreviews] = useState<string[]>([]);
 
@@ -36,6 +38,7 @@ export function UploadVideos({
           <FormLabel>
             {label} (Maks {max})
           </FormLabel>
+
           <FormControl>
             <Input
               type="file"
@@ -46,7 +49,15 @@ export function UploadVideos({
                 const files = e.target.files;
                 if (!files) return;
 
+                // kirim ke react-hook-form
                 onChange(files);
+
+                // kirim ke state luar (productVideosFiles)
+                if (onFilesChange) {
+                  onFilesChange(files);
+                }
+
+                // buat preview video
                 const urls = Array.from(files).map((file) =>
                   URL.createObjectURL(file)
                 );
@@ -67,6 +78,7 @@ export function UploadVideos({
                     controls
                     className="w-full h-full object-cover"
                   />
+
                   <Button
                     type="button"
                     size="icon"

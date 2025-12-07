@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search } from "lucide-react";
+import { FileDown, Loader2, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
@@ -48,12 +48,18 @@ const VendorCategories = () => {
   const [categories, setCategories] = useState<VendorCategory[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
 
   const [page, setPage] = useState(1);
+
+  // State Filter Export (Baru)
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [isActiveFilter, setIsActiveFilter] = useState<string>("ALL");
 
   // === FETCH DATA DARI BACKEND ===
   const fetchCategories = async () => {
@@ -94,6 +100,67 @@ const VendorCategories = () => {
     fetchCategories();
   }, [page, debouncedSearch, typeFilter]);
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      // 1. Ambil Token Autentikasi
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      // 2. Kumpulkan Filter
+      const exportFilters: Record<string, string> = {};
+
+      if (startDate) exportFilters.startDate = startDate;
+      if (endDate) exportFilters.endDate = endDate;
+      // Gunakan typeFilter yang sudah ada untuk filter TYPE
+      if (typeFilter && typeFilter !== "ALL") exportFilters.type = typeFilter;
+
+      // Filter isActive
+      if (isActiveFilter !== "ALL") exportFilters.isActive = isActiveFilter;
+
+      const queryString = new URLSearchParams(exportFilters).toString();
+
+      const exportUrl = `http://localhost:8000/vendor-categories/export/excel?${queryString}`;
+
+      const response = await fetch(exportUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Export failed. Server responded with an error.");
+      }
+
+      // 4. Proses File Binary (Blob)
+      const blob = await response.blob();
+      const filename =
+        response.headers
+          .get("Content-Disposition")
+          ?.match(/filename="(.+)"/)?.[1] || "vendor_categories_export.xlsx";
+
+      // Membuat URL objek untuk file yang akan diunduh
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename; // Nama file download
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url); // Bersihkan URL
+
+      toast.success("Data berhasil di-export ke Excel!");
+    } catch (error) {
+      console.error("Export Error:", error);
+      toast.error(
+        "Gagal meng-export data. Pastikan filter sudah benar dan Anda memiliki akses."
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4 w-full  mx-auto">
       {/* === HEADER === */}
@@ -133,6 +200,69 @@ const VendorCategories = () => {
           </div>
         </CardHeader>
       </Card>
+
+      {/* === FILTER DAN EXPORT BARU === */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <h3 className="w-full text-sm font-semibold text-muted-foreground">
+            Export Filters:
+          </h3>
+
+          {/* Filter Status Aktif */}
+          <Select value={isActiveFilter} onValueChange={setIsActiveFilter}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Status</SelectItem>
+              <SelectItem value="true">Active</SelectItem>
+              <SelectItem value="false">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Filter Tanggal Mulai */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              Start Date
+            </label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Filter Tanggal Akhir */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              End Date
+            </label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Tombol Export */}
+          <Button
+            size="sm"
+            className="gap-2 bg-green-600 hover:bg-green-700 ml-auto"
+            onClick={handleExport}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            {exporting ? "Exporting..." : "Export to Excel"}
+          </Button>
+        </div>
+      </Card>
+      {/* --- END: FILTER DAN EXPORT BARU --- */}
       {/* === ADD BUTTON === */}
       <div className="p-1 flex justify-start">
         <Link href="/super-admin/vendor-categories/add">

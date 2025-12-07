@@ -65,6 +65,13 @@ const Vendors = () => {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
 
+  // export
+  const [exporting, setExporting] = useState(false);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [exportIsActiveFilter, setExportIsActiveFilter] = useState<string>(
+    "ALL"
+  );
   const fetchVendors = async () => {
     setLoading(true);
     setError(null);
@@ -97,6 +104,63 @@ const Vendors = () => {
   useEffect(() => {
     fetchVendors();
   }, [page, debouncedSearch, statusFilter]);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      // Kumpulkan Filter untuk Export
+      const exportFilters: Record<string, string> = {};
+
+      if (startDate) exportFilters.startDate = startDate;
+      if (endDate) exportFilters.endDate = endDate;
+      // Gunakan filter status aktif khusus untuk export
+      if (exportIsActiveFilter !== "ALL")
+        exportFilters.isActive = exportIsActiveFilter;
+
+      const queryString = new URLSearchParams(exportFilters).toString();
+      const exportUrl = `http://localhost:8000/vendors/export/excel?${queryString}`;
+
+      const response = await fetch(exportUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Export failed. Server responded with an error.");
+      }
+
+      // Proses File Binary (Blob)
+      const blob = await response.blob();
+      const filename =
+        response.headers
+          .get("Content-Disposition")
+          ?.match(/filename="(.+)"/)?.[1] || "vendor_master_export.xlsx";
+
+      // Membuat URL objek untuk file yang akan diunduh
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Data Vendor berhasil di-export ke Excel!");
+    } catch (error) {
+      console.error("Export Error:", error);
+      toast.error(
+        "Gagal meng-export data. Pastikan filter sudah benar dan Anda memiliki akses."
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="space-y-4 overflow-x-hidden w-full mx-auto">
@@ -135,6 +199,74 @@ const Vendors = () => {
         </CardHeader>
       </Card>
 
+      {/* --- PISAHKAN DENGAN GARIS HORIZONTAL --- */}
+      <hr />
+
+      {/* === FILTER DAN EXPORT BARU === */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <h3 className="w-full text-sm font-semibold text-muted-foreground">
+            Export Filters:
+          </h3>
+
+          {/* Filter Status Aktif Export */}
+          <Select
+            value={exportIsActiveFilter}
+            onValueChange={setExportIsActiveFilter}
+          >
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Status</SelectItem>
+              <SelectItem value="true">Active</SelectItem>
+              <SelectItem value="false">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Filter Tanggal Mulai */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              Start Date
+            </label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Filter Tanggal Akhir */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              End Date
+            </label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Tombol Export */}
+          <Button
+            size="sm"
+            className="gap-2 bg-green-600 hover:bg-green-700 ml-auto"
+            onClick={handleExport}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <LucideIcons.Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <LucideIcons.FileDown className="h-4 w-4" />
+            )}
+            {exporting ? "Exporting..." : "Export to Excel"}
+          </Button>
+        </div>
+      </Card>
+      {/* --- END: FILTER DAN EXPORT BARU --- */}
       <div className="p-1 flex justify-start">
         <Link href="/super-admin/vendors/add">
           <Button size="sm" className="gap-2">
