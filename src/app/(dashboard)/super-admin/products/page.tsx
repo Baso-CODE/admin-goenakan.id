@@ -10,6 +10,8 @@ import {
   Trash2,
   EyeClosedIcon,
   ScanEye,
+  Loader2,
+  FileDown,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,18 +69,33 @@ type Meta = {
   total: number;
 };
 
+interface ProductExportQuery {
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+  categoryId?: string;
+  isCustom?: "true" | "false" | "ALL";
+}
 const Products = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [isCustomFilter, setIsCustomFilter] = useState<string>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
 
+  const [exportStartDate, setExportStartDate] = useState<string>("");
+  const [exportEndDate, setExportEndDate] = useState<string>("");
+  const [exportCategoryId, setExportCategoryId] = useState<string>("ALL");
+  const [exportIsCustomFilter, setExportIsCustomFilter] = useState<string>(
+    "ALL"
+  );
+  const [exportSearch, setExportSearch] = useState<string>("");
   const debouncedSearch = useDebounce(search, 500);
 
   // === Fetch Categories ===
@@ -88,7 +105,7 @@ const Products = () => {
       const { token } = await tokenRes.json();
 
       const res = await fetch("http://localhost:8000/product-categories/list", {
-          headers: {
+        headers: {
           Authorization: `Bearer ${token}`,
         },
       });
@@ -149,8 +166,77 @@ const Products = () => {
 
   useEffect(() => {
     fetchProducts();
+    setExportSearch(debouncedSearch);
   }, [page, debouncedSearch, isCustomFilter, categoryFilter]);
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      // 1. Ambil Token Autentikasi
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      // 2. Kumpulkan Filter Export
+      const exportFilters: ProductExportQuery = {};
+
+      if (exportStartDate) exportFilters.startDate = exportStartDate;
+      if (exportEndDate) exportFilters.endDate = exportEndDate;
+
+      // Filter yang berasal dari filter tampilan utama juga dapat digunakan (opsional)
+      // Disini kita menggunakan filter Export yang terpisah
+      if (exportIsCustomFilter !== "ALL")
+        exportFilters.isCustom = exportIsCustomFilter as "true" | "false";
+      if (exportCategoryId !== "ALL")
+        exportFilters.categoryId = exportCategoryId;
+      if (exportSearch.trim()) exportFilters.search = exportSearch.trim();
+
+      const queryString = new URLSearchParams(
+        exportFilters as Record<string, string>
+      ).toString();
+
+      // PASTIKAN URL INI SESUAI DENGAN ROUTE BACKEND ANDA!
+      // Endpoint: /products/export/excel
+      const exportUrl = `http://localhost:8000/products/export/excel?${queryString}`;
+
+      const response = await fetch(exportUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Export failed. Server responded with an error.");
+      }
+
+      // 3. Proses File Binary (Blob)
+      const blob = await response.blob();
+      // Coba ambil nama file dari header, default jika tidak ada
+      const filename =
+        response.headers
+          .get("Content-Disposition")
+          ?.match(/filename="(.+)"/)?.[1] || "products_export.xlsx";
+
+      // Membuat URL objek untuk file yang akan diunduh
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename; // Nama file download
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url); // Bersihkan URL
+
+      toast.success("Data Products berhasil di-export ke Excel!");
+    } catch (error) {
+      console.error("Export Error:", error);
+      toast.error(
+        "Gagal meng-export data. Pastikan filter sudah benar dan Anda memiliki akses."
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
   // === RENDER ===
   return (
     <div className="space-y-4 overflow-x-hidden w-full mx-auto">
@@ -217,6 +303,101 @@ const Products = () => {
         </CardHeader>
       </Card>
 
+      <hr />
+
+      {/* === FILTER DAN EXPORT BARU (Sama seperti Vendor Items) === */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <h3 className="w-full text-sm font-semibold text-muted-foreground">
+            Export Filters:
+          </h3>
+
+          {/* Filter Type untuk Export */}
+          <Select
+            value={exportIsCustomFilter}
+            onValueChange={setExportIsCustomFilter}
+          >
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Export Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Types</SelectItem>
+              <SelectItem value="false">Standard</SelectItem>
+              <SelectItem value="true">Custom</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Filter Category ID untuk Export */}
+          <Select value={exportCategoryId} onValueChange={setExportCategoryId}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Export Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Categories</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Filter Tanggal Mulai */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              Start Date
+            </label>
+            <Input
+              type="date"
+              value={exportStartDate}
+              onChange={(e) => setExportStartDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Filter Tanggal Akhir */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              End Date
+            </label>
+            <Input
+              type="date"
+              value={exportEndDate}
+              onChange={(e) => setExportEndDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Search Export (Menggunakan debouncedSearch dari filter utama) */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              Search Text
+            </label>
+            <Input
+              type="text"
+              placeholder="Uses current search"
+              value={exportSearch} // Tampilkan nilai debounced
+              onChange={(e) => setExportSearch(e.target.value)}
+              className="w-[200px]"
+            />
+          </div>
+
+          {/* Tombol Export */}
+          <Button
+            size="sm"
+            className="gap-2 bg-green-600 hover:bg-green-700 ml-auto"
+            onClick={handleExport}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            {exporting ? "Exporting..." : "Export to Excel"}
+          </Button>
+        </div>
+      </Card>
       {/* === Button Add Product === */}
       <div className="p-1 flex justify-start">
         <Link href="/super-admin/products/add">

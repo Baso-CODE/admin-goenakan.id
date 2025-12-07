@@ -14,13 +14,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { Search } from "lucide-react";
+import { Search, FileDown, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
 
+// === Type definitions ===
 type AttributeValue = {
   id: string;
   value: string;
@@ -41,18 +42,30 @@ type Meta = {
   total: number;
 };
 
-export default function ProductAttributesPage() {
-  const [attributes, setAttributes] = useState<Attribute[]>([]);
-  console.log("attributes", attributes);
+// Interface untuk Query Export (sesuai kebutuhan backend)
+interface AttributeExportQuery {
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+}
 
+export default function ProductAttributesPage() {
+  // --- STATE UNTUK TABLE ---
+  const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
 
+  // --- STATE BARU UNTUK EXPORT FILTER ---
+  const [exportStartDate, setExportStartDate] = useState<string>("");
+  const [exportEndDate, setExportEndDate] = useState<string>("");
+  const [exportSearch, setExportSearch] = useState<string>(""); // Tambahkan state search untuk export
+  const [exporting, setExporting] = useState<boolean>(false); // State untuk loading button export
+
+  // --- FUNGSI FETCH DATA (Untuk Tabel) ---
   const fetchAttributes = async () => {
     setLoading(true);
     setError(null);
@@ -92,13 +105,81 @@ export default function ProductAttributesPage() {
     }
   };
 
+  // --- FUNGSI HANDLE EXPORT (Implementasi Baru) ---
+  const handleExportAttributes = async () => {
+    setExporting(true);
+    try {
+      // 1. Ambil Token Autentikasi
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      // 2. Kumpulkan Filter
+      const exportFilters: AttributeExportQuery = {
+        ...(exportStartDate && { startDate: exportStartDate }),
+        ...(exportEndDate && { endDate: exportEndDate }),
+        // Gunakan nilai search dari filter export
+        ...(exportSearch.trim() && { search: exportSearch.trim() }),
+      };
+
+      const queryString = new URLSearchParams(
+        exportFilters as Record<string, string>
+      ).toString();
+
+      // Endpoint untuk export (Sesuaikan dengan endpoint backend Anda: /product-attributes/export/excel)
+      const exportUrl = `http://localhost:8000/product-attributes/export/excel?${queryString}`;
+
+      const response = await fetch(exportUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Server Error:", errorText);
+        throw new Error("Export failed. Server responded with an error.");
+      }
+
+      // 3. Proses File Binary (Blob)
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("Content-Disposition");
+
+      const filenameMatch = contentDisposition?.match(/filename="(.+?)"/i);
+      const filename = filenameMatch
+        ? filenameMatch[1]
+        : `product_attributes_export_${new Date()
+            .toISOString()
+            .slice(0, 10)}.xlsx`;
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Data Product Attributes berhasil di-export ke Excel!");
+    } catch (error) {
+      console.error("Export Error:", error);
+      toast.error(
+        "Gagal meng-export data. Pastikan endpoint backend sudah siap."
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+  // --- END FUNGSI HANDLE EXPORT ---
+
   useEffect(() => {
     fetchAttributes();
   }, [page, debouncedSearch]);
 
   return (
     <div className="space-y-4 w-auto mx-auto">
-      {/* ================= HEADER ================= */}
+      {/* ================= HEADER & SEARCH/FILTER TABLE ================= */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <CardTitle className="text-xl font-semibold">
@@ -119,14 +200,77 @@ export default function ProductAttributesPage() {
         </CardHeader>
       </Card>
 
-      {/* ================= ADD BUTTON ================= */}
-      <div className="p-1 flex justify-start">
-        <Link href="/super-admin/product-attributes/add">
-          <Button size="sm" className="gap-2 cursor-pointer">
-            + Add Attribute
+      {/* ================= FILTER DAN EXPORT BARU ================= */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <h3 className="w-full text-sm font-semibold text-muted-foreground">
+            Export Filter (opsional, berdasarkan Created Date):
+          </h3>
+
+          {/* Filter Search (untuk Export) */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              Search (Export)
+            </label>
+            <Input
+              type="text"
+              placeholder="Search by name/slug..."
+              value={exportSearch}
+              onChange={(e) => setExportSearch(e.target.value)}
+              className="w-[200px]"
+            />
+          </div>
+
+          {/* Filter Tanggal Mulai (Untuk Export) */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              Start Date
+            </label>
+            <Input
+              type="date"
+              value={exportStartDate}
+              onChange={(e) => setExportStartDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Filter Tanggal Akhir (Untuk Export) */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-muted-foreground mb-1">
+              End Date
+            </label>
+            <Input
+              type="date"
+              value={exportEndDate}
+              onChange={(e) => setExportEndDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+
+          {/* Tombol Add Attribute */}
+          <Link href="/super-admin/product-attributes/add" className="ml-auto">
+            <Button size="sm" className="gap-2 cursor-pointer">
+              + Add Attribute
+            </Button>
+          </Link>
+
+          {/* Tombol Export */}
+          <Button
+            size="sm"
+            className="gap-2 bg-green-600 hover:bg-green-700" // Warna kustom untuk Attributes
+            onClick={handleExportAttributes}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            {exporting ? "Preparing..." : "Export to Excel"}
           </Button>
-        </Link>
-      </div>
+        </div>
+      </Card>
+      {/* ================= END FILTER DAN EXPORT BARU ================= */}
 
       {/* ================= TABLE ================= */}
       <Card className="w-full">
