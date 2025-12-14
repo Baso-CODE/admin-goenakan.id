@@ -106,7 +106,7 @@ export default function ProductFormV2({
   onSubmit: (
     data: ProductFormValues,
     files: {
-      images: FileList | null;
+      images: File[] | null;
       videos: FileList | null;
       variantImages: File[][];
     }
@@ -179,9 +179,7 @@ export default function ProductFormV2({
   >([]);
   const [variantFilesMap, setVariantFilesMap] = useState<File[][]>([]); // product-level files captured separately
 
-  const [productImagesFiles, setProductImagesFiles] = useState<FileList | null>(
-    null
-  );
+  const [productImagesFiles, setProductImagesFiles] = useState<File[]>([]);
   const [productVideosFiles, setProductVideosFiles] = useState<FileList | null>(
     null
   );
@@ -266,11 +264,10 @@ export default function ProductFormV2({
       };
 
       const filesToSubmit = {
-        images: productImagesFiles,
+        images: productImagesFiles.length > 0 ? productImagesFiles : null,
         videos: productVideosFiles,
         variantImages: variantFilesMap,
       };
-
       await onSubmit(payload, filesToSubmit);
     } catch (err) {
       console.error(err);
@@ -403,24 +400,36 @@ export default function ProductFormV2({
                 </FormItem>
               )}
             />
-            {/* Media - product-level */}
-            <div className="space-y-6 rounded-lg border p-4 items-start">
-              <FormLabel className="text-lg font-semibold">
-                Media Produk
-              </FormLabel>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-2 border rounded-lg bg-card">
+
+            <div className="space-y-6 rounded-xl border border-gray-200 p-6  shadow-sm">
+              <h3 className="text-xl font-bold tracking-tight text-gray-800 border-b pb-3 mb-3">
+                📸 Media Produk
+              </h3>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Kolom 1: Gambar */}
+                <div className="border border-gray-100 p-4 rounded-lg  shadow-sm">
                   <UploadImages
                     form={form}
                     name="imageFiles"
-                    onFilesChange={(files) => setProductImagesFiles(files)}
+                    label="Gambar Utama Produk"
+                    max={10}
+                    onFilesChange={(files) => {
+                      setProductImagesFiles(files);
+                    }}
                   />
                 </div>
-                <div className="p-2 border rounded-lg bg-card">
+
+                {/* Kolom 2: Video */}
+                <div className="border border-gray-100 p-4 rounded-lg  shadow-sm">
                   <UploadVideos
                     form={form}
                     name="videoFiles"
-                    onFilesChange={(files) => setProductVideosFiles(files)}
+                    label="Video Promosi Produk"
+                    max={3}
+                    onFilesChange={(files) => {
+                      setProductVideosFiles(files);
+                    }}
                   />
                 </div>
               </div>
@@ -431,23 +440,23 @@ export default function ProductFormV2({
                 value={attributeSelections}
                 onChange={handleAddAttributeToForm}
               />
-            </div>
-            {/* Button to generate combos (Option B) */}
-            <div className="flex justify-end">
-              <Button
-                variant="secondary"
-                type="button"
-                onClick={handleGenerateVariants}
-              >
-                Generate Variants
-              </Button>
+              <div className="border-t mt-3 pt-3">
+                <div className="flex justify-end">
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={handleGenerateVariants}
+                  >
+                    Generate Variants
+                  </Button>
+                </div>
+              </div>
             </div>
             {combinations.length > 0 && (
               <div className="border rounded p-4">
                 <VariantList
                   combinations={combinations}
                   onChangeMeta={handleVariantMetaChange}
-                  existingMetas={variantMetas}
                 />
               </div>
             )}

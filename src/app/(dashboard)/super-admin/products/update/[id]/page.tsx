@@ -4,15 +4,14 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { EditPriceTiersDialog } from "../../components/EditPriceTiersDialog";
+import FormUpdateAttributes from "../../components/update/AttributesSection";
 import FormProductCore, {
   ProductCoreFormValues,
 } from "../../components/update/CoreSection";
-import FormUpdateAttributes from "../../components/update/AttributesSection";
+import FormUpdateProductMedia from "../../components/update/VariantMediaSection";
 import FormUpdateVariants, {
   VariantFormValues,
 } from "../../components/update/VariantsSection";
-import FormUpdateVariantImages from "../../components/update/VariantImagesSection";
 
 type FileUploads = {
   images?: FileList;
@@ -28,6 +27,8 @@ export default function EditProductPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentSelections, setCurrentSelections] = useState<any[]>([]); // 💡 STATE BARU
+  const [currentFullList, setCurrentFullList] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -100,9 +101,9 @@ export default function EditProductPage() {
       const { token } = await tokenRes.json();
 
       const res = await fetch(
-        `http://localhost:8000/products/${id}/update-attributes`,
+        `http://localhost:8000/products/${id}/attributes`,
         {
-          method: "PATCH",
+          method: "PUT",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -228,6 +229,282 @@ export default function EditProductPage() {
       setIsSubmitting(false);
     }
   };
+
+  const handleAddImage = async (file: File): Promise<void> => {
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const formData = new FormData();
+
+      formData.append("image", file);
+
+      const res = await fetch(`http://localhost:8000/products/${id}/image`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to add image");
+      }
+
+      const updatedProduct = await res.json();
+      setProductData(updatedProduct);
+      toast.success("Gambar berhasil diunggah!");
+    } catch (err) {
+      console.error("Error adding image:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Gagal menambahkan gambar"
+      );
+    }
+  };
+
+  const handleAddVideo = async (file: File): Promise<void> => {
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const formData = new FormData();
+      // Pastikan field 'video' sesuai dengan middleware 'upload.single("video")' di backend
+      formData.append("video", file);
+
+      const res = await fetch(`http://localhost:8000/products/${id}/video`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to add video");
+      }
+
+      const updatedProduct = await res.json();
+      setProductData(updatedProduct); // Update state dengan data produk terbaru
+      toast.success("Video berhasil diunggah!");
+    } catch (err) {
+      console.error("Error adding video:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Gagal menambahkan video"
+      );
+    }
+  };
+
+  const handleDeleteImage = async (mediaId: string): Promise<void> => {
+    setIsSubmitting(true);
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const res = await fetch(
+        `http://localhost:8000/products/image/${mediaId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to delete image");
+      }
+
+      const updatedProduct = await res.json();
+      setProductData(updatedProduct); // Update state dengan data produk terbaru
+      toast.success("Gambar berhasil dihapus!");
+    } catch (err) {
+      console.error("Error deleting image:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Gagal menghapus gambar"
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteVideo = async (mediaId: string): Promise<void> => {
+    setIsSubmitting(true);
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const res = await fetch(
+        `http://localhost:8000/products/video/${mediaId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to delete video");
+      }
+
+      const updatedProduct = await res.json();
+      setProductData(updatedProduct);
+      toast.success("Video berhasil dihapus!");
+    } catch (err) {
+      console.error("Error deleting video:", err);
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus video");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Di EditProductPage.tsx
+
+  // Fungsi utilitas untuk menghasilkan Cross Product dari Attribute Selections
+  const generateCrossProduct = (selections: any[], fullList: any[]) => {
+    if (selections.length === 0) return [];
+
+    // 1. Filter fullList menjadi hanya atribut yang dipilih (selections)
+    const activeAttributes = fullList
+      .filter((attr) => selections.some((sel) => sel.attributeId === attr.id))
+      .map((attr) => ({
+        ...attr,
+        // Filter values hanya yang dipilih
+        values: attr.values.filter((val: any) =>
+          selections
+            .find((sel) => sel.attributeId === attr.id)
+            ?.valueIds.includes(val.id)
+        ),
+      }))
+      .filter((attr) => attr.values.length > 0);
+
+    // Jika tidak ada nilai yang dipilih, kembalikan kosong
+    if (activeAttributes.length === 0) return [];
+
+    // 2. Lakukan Cross Product
+    const combine = (arr: any[]) => {
+      if (arr.length === 0) return [];
+      if (arr.length === 1) return arr[0].values.map((v: any) => [v]);
+
+      const [first, ...rest] = arr;
+      const subCombinations = combine(rest);
+
+      const combinations: any[] = [];
+      for (const val of first.values) {
+        for (const sub of subCombinations) {
+          combinations.push([val, ...(Array.isArray(sub) ? sub : [sub])]);
+        }
+      }
+      return combinations;
+    };
+
+    const rawCombinations = combine(activeAttributes);
+
+    // 3. Format hasil menjadi objek yang mudah dibandingkan (contoh: 'Warna: Merah | Ukuran: XL')
+    const formattedCombinations = rawCombinations.map((combination: any[]) => {
+      const attributeMap: Record<string, string> = {}; // { attr_id: val_id }
+      const nameParts: string[] = []; // ["Merah", "XL"]
+
+      combination.forEach((val) => {
+        attributeMap[val.attributeId] = val.id;
+        nameParts.push(val.value); // Asumsi 'value' adalah nama atribut
+      });
+
+      return {
+        attributeMap, // {attr_1: val_a, attr_2: val_b}
+        variantName: nameParts.join(" • "), // "Merah • XL"
+      };
+    });
+
+    return formattedCombinations;
+  };
+
+  // Fungsi Handler Utama di EditProductPage.tsx
+  const handleGenerateVariants = () => {
+    // 1. Generate semua kombinasi yang valid dari atribut yang dipilih
+    const newCombinations = generateCrossProduct(
+      currentSelections,
+      currentFullList
+    );
+
+    // Ambil variants yang sudah ada
+    const existingVariants = productData?.productVariants || [];
+
+    const newVariantsState: any[] = [];
+    const usedExistingVariantIds = new Set();
+
+    // Helper untuk membuat signature variant (untuk perbandingan)
+    const getVariantSignature = (variant: any) => {
+      // Gabungkan semua ID nilai atribut menjadi string yang terurut
+      const attributeIds = variant.attributeValues
+        .map((av: any) => av.attributeValueId)
+        .sort()
+        .join("|");
+      return attributeIds;
+    };
+
+    // 2. Loop melalui kombinasi BARU dan bandingkan dengan yang sudah ada
+    for (const newComb of newCombinations) {
+      // Buat signature baru
+      const newCombAttributeIds = Object.values(newComb.attributeMap)
+        .sort()
+        .join("|");
+
+      // Cari apakah kombinasi ini sudah ada
+      const existingMatch = existingVariants.find((v: any) => {
+        // Jika variant lama sudah ditandai dihapus, abaikan
+        if (v._isDeleted) return false;
+
+        // Cek apakah signature atributnya cocok
+        const existingSignature = getVariantSignature(v);
+        return existingSignature === newCombAttributeIds;
+      });
+
+      if (existingMatch) {
+        // A. Variant LAMA DITEMUKAN, PERTAHANKAN
+        newVariantsState.push({
+          ...existingMatch, // Pertahankan ID, price, SKU, images, dll.
+          // Pastikan _isDeleted disetel false
+          _isDeleted: false,
+        });
+        usedExistingVariantIds.add(existingMatch.id);
+      } else {
+        // B. Variant BARU DIBUAT
+        newVariantsState.push({
+          id: undefined, // Variant baru, tidak ada ID
+          variantName: newComb.variantName,
+          sku: "",
+          price: 0,
+          images: [],
+          _isDeleted: false,
+          // Simpan attributeValueIds yang akan diperlukan backend untuk menyimpan relasi
+          attributeValueIds: Object.values(newComb.attributeMap),
+        });
+      }
+    }
+
+    const variantsToKeep = existingVariants
+      .filter((v: any) => !usedExistingVariantIds.has(v.id))
+      .map((v: any) => ({
+        ...v,
+        _isDeleted: true,
+      }));
+
+    const finalVariantsState = [...newVariantsState, ...variantsToKeep];
+
+    setProductData((prev: any) => ({
+      ...prev,
+      productVariants: finalVariantsState,
+    }));
+
+    toast.info(
+      `Generated ${newCombinations.length} variants. Check form below.`
+    );
+  };
   return (
     <div className="space-y-4 w-full max-w-full">
       <h2 className="text-xl font-semibold tracking-tight uppercase">
@@ -240,16 +517,31 @@ export default function EditProductPage() {
         isSubmitting={isSubmitting}
       />
 
+      <FormUpdateProductMedia
+        productId={id as string}
+        initialData={productData}
+        isSubmitting={isSubmitting}
+        onAddImage={handleAddImage}
+        onDeleteImage={handleDeleteImage}
+        onAddVideo={handleAddVideo}
+        onDeleteVideo={handleDeleteVideo}
+      />
+
       <FormUpdateAttributes
         initialData={productData}
         isSubmitting={isSubmitting}
         onSubmit={handleUpdateAttributes}
+        onAttributesChange={(selections, fullList) => {
+          setCurrentSelections(selections);
+          setCurrentFullList(fullList);
+        }}
       />
 
       <FormUpdateVariants
         initialData={productData}
         isSubmitting={isSubmitting}
         onSubmit={handleUpdateVariants}
+        onGenerateClick={handleGenerateVariants}
       />
 
       {/* ----------- EXTRA DIALOGS ----------- */}

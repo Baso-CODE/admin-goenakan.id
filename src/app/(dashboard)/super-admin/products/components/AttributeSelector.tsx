@@ -11,9 +11,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2 } from "lucide-react";
+import { Trash2, Plus, GripVertical, Loader2, ListChecks } from "lucide-react"; // Menambahkan ikon baru
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+
+// --- TIPE DATA ---
 
 type AttributeFromServer = {
   id: string;
@@ -21,31 +23,32 @@ type AttributeFromServer = {
   values: { id: string; value: string }[];
 };
 
+type SelectedAttributeRow = {
+  attributeId: string;
+  valueIds: string[];
+};
+
+// --- KOMPONEN UTAMA ---
+
 export function AttributeSelector({
   value,
   onChange,
 }: {
-  value?: { attributeId: string; valueIds: string[] }[];
-  onChange: (
-    v: { attributeId: string; valueIds: string[] }[],
-    full: AttributeFromServer[]
-  ) => void;
+  value?: SelectedAttributeRow[];
+  onChange: (v: SelectedAttributeRow[], full: AttributeFromServer[]) => void;
 }) {
   const [available, setAvailable] = useState<AttributeFromServer[]>([]);
   const [loading, setLoading] = useState(false);
+  const [local, setLocal] = useState<SelectedAttributeRow[]>(value ?? []);
 
-  const [local, setLocal] = useState<
-    { attributeId: string; valueIds: string[] }[]
-  >(value ?? []);
-
-  // NEW: sync when value from parent changes (for prefill)
+  // Sync: Ambil data dari parent saat pertama kali atau saat 'value' berubah
   useEffect(() => {
     if (value) {
       setLocal(value);
     }
   }, [value]);
 
-  // Notify parent
+  // Sync: Beri tahu parent (FormUpdateAttributes) setiap kali 'local' atau 'available' berubah
   useEffect(() => {
     onChange(local, available);
   }, [local, available]);
@@ -53,7 +56,6 @@ export function AttributeSelector({
   // Load attributes from server
   useEffect(() => {
     setLoading(true);
-
     const fetchAttributes = async () => {
       try {
         const tokenRes = await fetch("/api/auth/token");
@@ -73,26 +75,40 @@ export function AttributeSelector({
         setLoading(false);
       }
     };
-
     fetchAttributes();
   }, []);
 
-  // Notify parent on change
-  useEffect(() => {
-    onChange(local, available); // <======== UPDATED
-  }, [local, available]);
+  // --- LOGIC HANDLERS ---
 
-  const add = () =>
+  const add = () => {
+    const lastRow = local[local.length - 1];
+    if (lastRow && !lastRow.attributeId) {
+      toast.warning("Please select an attribute for the previous row first.");
+      return;
+    }
     setLocal((prev) => [...prev, { attributeId: "", valueIds: [] }]);
+  };
 
   const remove = (i: number) =>
     setLocal((prev) => prev.filter((_, idx) => idx !== i));
 
   const setAttributeId = (index: number, id: string) =>
     setLocal((prev) =>
-      prev.map((row, i) =>
-        i === index ? { ...row, attributeId: id, valueIds: [] } : row
-      )
+      prev.map((row, i) => {
+        if (i !== index) return row;
+
+        // Cek duplikasi
+        const isDuplicate = prev.some(
+          (r, j) => j !== index && r.attributeId === id
+        );
+        if (isDuplicate) {
+          toast.error("This attribute has already been selected.");
+          return row; // Kembalikan baris yang lama
+        }
+
+        // Reset valueIds saat attribute berubah
+        return { ...row, attributeId: id, valueIds: [] };
+      })
     );
 
   const toggleValue = (index: number, valueId: string) =>
@@ -109,80 +125,157 @@ export function AttributeSelector({
       )
     );
 
+  // Filter available attributes that are already selected in other rows
+  const getUnselectedAttributes = (currentId: string) => {
+    const selectedIds = local
+      .filter((row) => row.attributeId !== currentId)
+      .map((row) => row.attributeId);
+    return available.filter((attr) => !selectedIds.includes(attr.id));
+  };
+
+  // --- RENDER ---
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h4 className="text-lg font-semibold">Attributes</h4>
-        <Button onClick={add} variant="outline" size="sm">
-          + Add Attribute
+    <div className="space-y-6">
+      <div className="flex items-center justify-between border-b pb-3">
+        <h4 className="text-xl font-bold flex items-center gap-2 text-gray-800">
+          <ListChecks className="h-5 w-5 text-indigo-600" />
+          Product Attributes
+        </h4>
+        <Button onClick={add} variant="default" size="sm" className="space-x-2">
+          <Plus className="h-4 w-4" />
+          <span>Add Attribute Row</span>
         </Button>
       </div>
 
       {loading && (
-        <p className="text-sm text-muted-foreground">Loading attributes…</p>
+        <div className="flex items-center space-x-2 text-sm text-indigo-600">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Loading available attributes...</span>
+        </div>
       )}
 
-      {local.map((row, idx) => {
-        const attr = available.find((a) => a.id === row.attributeId);
+      {/* List Attributes yang Dipilih */}
+      <div className="space-y-4">
+        {local.map((row, idx) => {
+          const attr = available.find((a) => a.id === row.attributeId);
+          const unselectedAttributes = getUnselectedAttributes(row.attributeId);
 
-        return (
-          <Card key={idx} className="border shadow-sm">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="w-full mr-4">
-                  <Label className="text-sm">Attribute</Label>
-                  <Select
-                    value={row.attributeId}
-                    onValueChange={(val) => setAttributeId(idx, val)}
+          return (
+            <Card
+              key={idx}
+              className="border-2 shadow-sm hover:border-indigo-300 transition-colors"
+            >
+              <CardContent className="p-4 space-y-4">
+                {/* BAGIAN ATAS: SELECTOR & DELETE */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-2 w-full">
+                    {/* Handle Bar (Placeholder jika drag-and-drop diimplementasikan) */}
+                    <GripVertical className="h-5 w-5 text-gray-400 cursor-grab hidden sm:block" />
+
+                    <div className="flex-1">
+                      <Label className="text-sm font-semibold">
+                        Attribute #{idx + 1}
+                      </Label>
+                      <Select
+                        value={row.attributeId}
+                        onValueChange={(val) => setAttributeId(idx, val)}
+                        disabled={loading}
+                      >
+                        <SelectTrigger className="mt-1 w-full font-medium">
+                          <SelectValue placeholder="Pilih jenis attribute (e.g., Warna, Ukuran)..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {/* Tampilkan attribute yang sudah dipilih + yang belum dipilih lainnya */}
+                          {unselectedAttributes.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>
+                              {a.name} ({a.values.length} values)
+                            </SelectItem>
+                          ))}
+                          {attr && (
+                            <SelectItem key={attr.id} value={attr.id}>
+                              {attr.name} (Currently Selected)
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Tombol Hapus */}
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="mt-6 shrink-0"
+                    onClick={() => remove(idx)}
                   >
-                    <SelectTrigger className="mt-1 w-full">
-                      <SelectValue placeholder="Pilih attribute..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {available.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
 
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon"
-                  onClick={() => remove(idx)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+                {/* BAGIAN BAWAH: VALUES CHECKBOXES */}
+                <div className="pt-3 border-t">
+                  <Label className="text-sm font-semibold mb-2 block">
+                    Available Values
+                  </Label>
 
-              {/* Values */}
-              {attr ? (
-                <div className="grid grid-cols-2 gap-3">
-                  {attr.values.map((val) => (
-                    <label
-                      key={val.id}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <Checkbox
-                        checked={row.valueIds.includes(val.id)}
-                        onCheckedChange={() => toggleValue(idx, val.id)}
-                      />
-                      {val.value}
-                    </label>
-                  ))}
+                  {attr ? (
+                    attr.values.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-y-3 gap-x-4">
+                        {attr.values.map((val) => (
+                          <label
+                            key={val.id}
+                            className="flex items-center space-x-2 text-sm cursor-pointer border p-2 rounded-md transition-colors hover:bg-gray-100"
+                            style={{
+                              backgroundColor: row.valueIds.includes(val.id)
+                                ? "#eef2ff"
+                                : "transparent", // Warna latar belakang jika dipilih
+                              borderColor: row.valueIds.includes(val.id)
+                                ? "#4f46e5"
+                                : "#e5e7eb", // Warna border jika dipilih
+                            }}
+                          >
+                            <Checkbox
+                              id={`attr-val-${val.id}`}
+                              checked={row.valueIds.includes(val.id)}
+                              onCheckedChange={() => toggleValue(idx, val.id)}
+                              className="h-4 w-4"
+                            />
+                            <span className="truncate">{val.value}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-orange-500 italic">
+                        ⚠️ Attribute "{attr.name}" has no values defined.
+                      </p>
+                    )
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">
+                      Silakan pilih attribute di atas untuk melihat nilai
+                      (values) yang tersedia.
+                    </p>
+                  )}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Pilih attribute untuk menampilkan values.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
+              </CardContent>
+            </Card>
+          );
+        })}
+
+        {local.length === 0 && !loading && (
+          <p className="text-center text-gray-500 py-4 border rounded-lg italic">
+            No attributes selected yet. Click "Add Attribute Row" to start.
+          </p>
+        )}
+      </div>
+
+      {/* <div className="pt-4 border-t flex justify-end">
+        <Button onClick={add} variant="default" size="sm" className="space-x-2">
+          <Plus className="h-4 w-4" />
+          <span>Add Another Attribute Row</span>
+        </Button>
+      </div> */}
     </div>
   );
 }

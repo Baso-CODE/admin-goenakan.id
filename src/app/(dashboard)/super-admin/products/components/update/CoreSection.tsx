@@ -60,7 +60,7 @@ export default function FormProductCore({
   const [loadingCategories, setLoadingCategories] = useState(true);
 
   const form = useForm<ProductCoreFormValues>({
-    resolver: zodResolver(FormCoreSchema),
+    resolver: zodResolver(FormCoreSchema) as any,
     defaultValues: {
       name: "",
       description: "",
@@ -139,25 +139,6 @@ export default function FormProductCore({
             )}
           />
 
-          {/* Description */}
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Deskripsi</FormLabel>
-                <FormControl>
-                  <Textarea
-                    rows={3}
-                    placeholder="Deskripsi produk..."
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
           {/* SKU */}
           <FormField
             control={form.control}
@@ -167,55 +148,6 @@ export default function FormProductCore({
                 <FormLabel>SKU</FormLabel>
                 <FormControl>
                   <Input placeholder="SKU (opsional)" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Base Price */}
-          <FormField
-            control={form.control}
-            name="basePrice"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Harga Dasar</FormLabel>
-                <FormControl>
-                  <Input type="number" placeholder="0" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Custom Product */}
-          <FormField
-            control={form.control}
-            name="isCustom"
-            render={({ field }) => (
-              <FormItem className="flex items-center gap-3">
-                <Checkbox
-                  checked={!!field.value}
-                  onCheckedChange={(v) => field.onChange(Boolean(v))}
-                />
-                <FormLabel>Produk Custom?</FormLabel>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Material Type */}
-          <FormField
-            control={form.control}
-            name="materialType"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Material</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Material (ex: Kayu, Kain, Bambu)"
-                    {...field}
-                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -258,9 +190,75 @@ export default function FormProductCore({
               </FormItem>
             )}
           />
+
+          {/* Base Price */}
+          <FormField
+            control={form.control}
+            name="basePrice"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Harga Dasar</FormLabel>
+                <FormControl>
+                  <Input type="number" placeholder="0" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          {/* Material Type */}
+          <FormField
+            control={form.control}
+            name="materialType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Material</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Material (ex: Kayu, Kain, Bambu)"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          {/* Custom Product */}
+          <FormField
+            control={form.control}
+            name="isCustom"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-3">
+                <Checkbox
+                  checked={!!field.value}
+                  onCheckedChange={(v) => field.onChange(Boolean(v))}
+                />
+                <FormLabel>Produk Custom?</FormLabel>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
 
-        <Button type="submit" disabled={isSubmitting} className="w-full">
+        {/* Description */}
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Deskripsi</FormLabel>
+              <FormControl>
+                <Textarea
+                  rows={3}
+                  placeholder="Deskripsi produk..."
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Button type="submit" disabled={isSubmitting} className="">
           {isSubmitting ? "Updating..." : "Update Core Data"}
         </Button>
       </form>

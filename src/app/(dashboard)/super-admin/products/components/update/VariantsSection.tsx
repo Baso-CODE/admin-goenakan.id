@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Edit, Image as ImageIcon, Plus, Trash2 } from "lucide-react"; // Import ikon
+import { useEffect, useState } from "react";
+import { FormProvider, useFieldArray, useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-
 import {
   Form,
   FormControl,
@@ -16,14 +15,20 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { VariantImageDetail } from "./VariantImageDetail";
+
+// --- SCHEMA & TYPE (Tetap Sama) ---
 
 const ImageSchema = z.object({
-  id: z.string().optional(), // file baru tidak punya id
+  id: z.string().optional(),
   url: z.string().optional(),
   altText: z.string().nullable().optional(),
   isFeatured: z.boolean().nullable().optional(),
-  file: z.any().optional(), // file upload
+  file: z.any().optional(),
   _isDeleted: z.boolean().optional(),
+  // Tambahkan field transient untuk tracking file index di frontend
+  fileIndex: z.number().nullable().optional(),
 });
 
 const VariantSchema = z.object({
@@ -32,9 +37,9 @@ const VariantSchema = z.object({
       id: z.string().optional(),
       variantName: z.string().min(1, "Name is required"),
       sku: z.string().optional(),
-      price: z.preprocess((v) => Number(v), z.number().nonnegative()),
+      price: z.coerce.number().min(0, "Price must be non-negative"),
       _isDeleted: z.boolean().optional(),
-
+      attributeValueIds: z.array(z.string()).optional(), // Penting untuk update
       images: z.array(ImageSchema).optional(),
     })
   ),
@@ -46,22 +51,28 @@ export default function FormUpdateVariants({
   initialData,
   onSubmit,
   isSubmitting,
+  onGenerateClick,
 }: {
   initialData?: any;
   onSubmit: (values: VariantFormValues) => void;
   isSubmitting: boolean;
+  onGenerateClick: () => void;
 }) {
-  const form = useForm<VariantFormValues>({
+  const form = useForm({
     resolver: zodResolver(VariantSchema),
     defaultValues: { variants: [] },
   });
-
-  console.log("ini adlaah initial data", initialData);
 
   const { fields, append, remove, update } = useFieldArray({
     control: form.control,
     name: "variants",
   });
+
+  // State untuk mengelola Image Detail Editor
+  const [editingImage, setEditingImage] = useState<{
+    variantIndex: number;
+    imageIndex: number;
+  } | null>(null);
 
   // PREFILL DATA
   useEffect(() => {
@@ -73,6 +84,9 @@ export default function FormUpdateVariants({
           sku: v.sku ?? "",
           price: Number(v.price) ?? 0,
           _isDeleted: false,
+          // Pastikan attributeValueIds dimuat dari relasi
+          attributeValueIds:
+            v.attributeValues?.map((av: any) => av.attributeValueId) ?? [],
           images: v.images.map((img: any) => ({
             id: img.id,
             url: img.url,
@@ -113,21 +127,27 @@ export default function FormUpdateVariants({
   // =========================
   // IMAGE HANDLING
   // =========================
-  const handleUploadNewImage = (variantIndex: number, file: File) => {
+  const handleUploadNewImage = (variantIndex: number, files: FileList) => {
     const images = form.getValues(`variants.${variantIndex}.images`) ?? [];
+    const newImages: any[] = [];
 
-    // push file baru
-    form.setValue(`variants.${variantIndex}.images`, [
-      ...images,
-      {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      // Set gambar pertama sebagai Featured jika belum ada yang Featured
+      const isFirstImage = images.length === 0 && newImages.length === 0;
+
+      newImages.push({
         id: undefined,
         url: URL.createObjectURL(file),
         file,
         altText: null,
-        isFeatured: false,
+        isFeatured: isFirstImage,
         _isDeleted: false,
-      },
-    ]);
+      });
+    }
+
+    form.setValue(`variants.${variantIndex}.images`, [...images, ...newImages]);
   };
 
   const handleDeleteImage = (variantIndex: number, imgIndex: number) => {
@@ -139,7 +159,6 @@ export default function FormUpdateVariants({
         true
       );
     } else {
-      // jika gambar baru (tidak ada id) → hapus langsung
       const imgs = form.getValues(`variants.${variantIndex}.images`);
       imgs?.splice(imgIndex, 1);
       form.setValue(`variants.${variantIndex}.images`, imgs);
@@ -150,158 +169,238 @@ export default function FormUpdateVariants({
   // FORM UI
   // =========================
   return (
-    <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="space-y-6 border p-6 rounded-xl bg-white shadow-sm"
-      >
-        <h3 className="text-xl font-semibold tracking-tight">
-          Manage Product Variants
-        </h3>
+    <FormProvider {...form}>
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="space-y-6 border p-6 rounded-xl bg-white shadow-sm"
+        >
+          <h3 className="text-xl font-bold tracking-tight text-gray-800">
+            📦 Product Variants Configuration
+          </h3>
+          <p className="text-sm text-gray-500">
+            Define basic properties and media for each product combination.
+          </p>
+          <hr />
 
-        <div className="space-y-6">
-          {fields.map((field, index) => {
-            const deleted = form.watch(`variants.${index}._isDeleted`);
-            const variantImages = form.watch(`variants.${index}.images`) || [];
+          {/* GENERATE BUTTON */}
+          <div className="flex justify-between items-center">
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={onGenerateClick}
+              className="space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Generate Variants from Attributes</span>
+            </Button>
+            <Button variant="outline" type="button" onClick={addVariant}>
+              Add Custom Variant
+            </Button>
+          </div>
+          <hr />
 
-            if (deleted) {
+          <div className="space-y-8">
+            {fields.map((field, index) => {
+              const deleted = form.watch(`variants.${index}._isDeleted`);
+              const variantImages =
+                form.watch(`variants.${index}.images`) || [];
+
+              if (deleted) {
+                return (
+                  <div
+                    key={field.id}
+                    className="border border-red-300 p-3 rounded-lg bg-red-50 text-sm text-red-600 italic"
+                  >
+                    🗑️ Variant **
+                    {form.getValues(`variants.${index}.variantName`)}** marked
+                    for deletion — will be removed on save.
+                  </div>
+                );
+              }
+
               return (
                 <div
                   key={field.id}
-                  className="border p-3 rounded bg-red-50 text-sm text-red-600 italic"
+                  className="border p-6 rounded-xl bg-gray-50 space-y-6"
                 >
-                  Variant deleted — will be removed on save.
-                </div>
-              );
-            }
-
-            return (
-              <div
-                key={field.id}
-                className="border p-4 rounded-lg bg-gray-50 space-y-4"
-              >
-                {/* BASIC INFO */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <FormField
-                    control={form.control}
-                    name={`variants.${index}.variantName`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Variant Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. Black • XL" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name={`variants.${index}.sku`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>SKU</FormLabel>
-                        <FormControl>
-                          <Input placeholder="SKU Code" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name={`variants.${index}.price`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Price</FormLabel>
-                        <FormControl>
-                          <Input type="number" min="0" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex items-end">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <h4 className="font-semibold">
+                      Variant #{index + 1}:{" "}
+                      {form.watch(`variants.${index}.variantName`) ||
+                        "New Variant"}
+                    </h4>
                     <Button
                       type="button"
                       variant="destructive"
+                      size="sm"
                       onClick={() => handleRemoveVariant(index)}
-                      className="w-full"
                     >
+                      <Trash2 className="h-4 w-4 mr-2" />
                       Remove
                     </Button>
                   </div>
-                </div>
 
-                {/* IMAGE SECTION */}
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Variant Images</div>
+                  {/* BASIC INFO */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name={`variants.${index}.variantName`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Variant Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. Black • XL" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  {/* UPLOAD BUTTON */}
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) {
-                        handleUploadNewImage(index, e.target.files[0]);
-                      }
-                    }}
-                  />
+                    <FormField
+                      control={form.control}
+                      name={`variants.${index}.sku`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>SKU</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="SKU Code (Auto-generated if empty)"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  {/* IMAGE LIST */}
-                  <div className="flex gap-3 flex-wrap mt-3">
-                    {variantImages.map((img: any, imgIndex) => {
-                      if (img._isDeleted) return null; // hide deleted
+                    <FormField
+                      control={form.control}
+                      name={`variants.${index}.price`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price (Rp)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              {...field}
+                              onChange={(e) => {
+                                const val =
+                                  e.target.value === ""
+                                    ? 0
+                                    : parseFloat(e.target.value);
+                                field.onChange(val);
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
-                      return (
-                        <div
-                          key={imgIndex}
-                          className="w-24 h-24 border rounded overflow-hidden relative"
-                        >
-                          <img
-                            src={img.url}
-                            className="object-cover w-full h-full"
-                          />
+                  {/* IMAGE SECTION */}
+                  <div className="space-y-4 pt-4 border-t border-gray-200">
+                    <div className="text-sm font-semibold flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4 text-indigo-600" /> Variant
+                      Media
+                    </div>
 
-                          {img.isFeatured && (
-                            <span className="absolute top-1 left-1 text-xs bg-black/70 text-white px-1 rounded">
-                              Featured
-                            </span>
-                          )}
+                    {/* UPLOAD BUTTON AREA */}
+                    <div className="flex gap-4">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={(e) => {
+                          if (e.target.files?.length) {
+                            handleUploadNewImage(index, e.target.files);
+                            e.target.value = ""; // Reset input
+                          }
+                        }}
+                      />
+                    </div>
 
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteImage(index, imgIndex)}
-                            className="absolute top-1 right-1 bg-white/70 px-1 text-xs rounded"
+                    {/* IMAGE LIST - Grid Tampilan Rapi */}
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                      {variantImages.map((img: any, imgIndex) => {
+                        if (img._isDeleted) return null;
+
+                        return (
+                          <div
+                            key={imgIndex}
+                            className="aspect-square border rounded-lg overflow-hidden relative shadow-sm hover:shadow-md transition-shadow group"
                           >
-                            X
-                          </button>
-                        </div>
-                      );
-                    })}
+                            <img
+                              src={img.url}
+                              alt={img.altText || "Variant Image"}
+                              className="object-cover w-full h-full"
+                            />
+
+                            {/* Badge Featured */}
+                            {img.isFeatured && (
+                              <span className="absolute top-1 left-1 text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full font-medium">
+                                Featured
+                              </span>
+                            )}
+
+                            {/* Aksi Overlay (Minimalis) */}
+                            <div className="absolute inset-0 bg-black/50 flex flex-col justify-center items-center opacity-0 group-hover:opacity-100 transition-opacity space-y-2">
+                              {/* Edit Button */}
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8 text-gray-800"
+                                onClick={() =>
+                                  setEditingImage({
+                                    variantIndex: index,
+                                    imageIndex: imgIndex,
+                                  })
+                                }
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              {/* Delete Button */}
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="destructive"
+                                className="h-8 w-8"
+                                onClick={() =>
+                                  handleDeleteImage(index, imgIndex)
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={addVariant}
-          className="w-full"
-        >
-          + Add Variant
-        </Button>
+          <hr />
+          <Button disabled={isSubmitting} className="">
+            {isSubmitting ? "Saving Variant Changes" : " Save All Variants"}
+          </Button>
+        </form>
+      </Form>
 
-        <Button disabled={isSubmitting} className="w-full">
-          {isSubmitting ? "Updating..." : "Update Variants"}
-        </Button>
-      </form>
-    </Form>
+      {/* RENDER IMAGE DETAIL EDITOR */}
+      {editingImage && (
+        <VariantImageDetail
+          variantIndex={editingImage.variantIndex}
+          imageIndex={editingImage.imageIndex}
+          onClose={() => setEditingImage(null)}
+        />
+      )}
+    </FormProvider>
   );
 }

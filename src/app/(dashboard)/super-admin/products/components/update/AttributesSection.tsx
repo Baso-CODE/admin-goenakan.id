@@ -3,15 +3,21 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AttributeSelector } from "../AttributeSelector";
+import { Button } from "@/components/ui/button";
 
 export default function FormUpdateAttributes({
   initialData,
   isSubmitting,
   onSubmit,
+  onAttributesChange,
 }: {
   initialData: any;
   isSubmitting: boolean;
   onSubmit: (payload: any) => Promise<void>;
+  onAttributesChange: (
+    selections: { attributeId: string; valueIds: string[] }[],
+    fullList: any[]
+  ) => void;
 }) {
   const [attributeSelections, setAttributeSelections] = useState<
     { attributeId: string; valueIds: string[] }[]
@@ -45,16 +51,31 @@ export default function FormUpdateAttributes({
 
   const handleSave = async () => {
     try {
+      // 1. BUAT ARRAY ID NILAI ATRIBUT YANG DATAR
+      const allAttributeValueIds = attributeSelections.flatMap(
+        (attr) => attr.valueIds
+      );
+
+      // 2. Kirim payload yang benar sesuai dengan DTO Backend
       const payload = {
-        attributes: attributeSelections,
+        // Backend Anda memerlukan properti ini untuk memproses CRUD atribut.
+        attributeValueIds: allAttributeValueIds,
       };
 
       await onSubmit(payload);
+      // Setelah berhasil update, Anda mungkin ingin me-refresh productData
+      // di komponen induk (EditProductPage) untuk menampilkan perubahan,
+      // meskipun ini tidak wajib jika hanya mengubah atribut yang tidak langsung memengaruhi tampilan utama.
     } catch (err) {
       console.error(err);
+      // toast.error sudah ditangani di komponen induk, tapi bisa dipertahankan di sini
       toast.error("Failed to update attributes");
     }
   };
+
+  useEffect(() => {
+    onAttributesChange(attributeSelections, attributesFullList);
+  }, [attributeSelections, attributesFullList]);
 
   return (
     <div className="border rounded p-4 space-y-4">
@@ -65,16 +86,13 @@ export default function FormUpdateAttributes({
         onChange={(attrs, full) => {
           setAttributeSelections(attrs);
           setAttributesFullList(full);
+          onAttributesChange(attrs, full);
         }}
       />
 
-      <button
-        disabled={isSubmitting}
-        onClick={handleSave}
-        className="px-4 py-2 bg-primary text-white rounded"
-      >
+      <Button disabled={isSubmitting} onClick={handleSave} className="">
         Save Attributes
-      </button>
+      </Button>
     </div>
   );
 }
