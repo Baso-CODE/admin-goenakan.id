@@ -107,7 +107,7 @@ export default function ProductFormV2({
     data: ProductFormValues,
     files: {
       images: File[] | null;
-      videos: FileList | null;
+      videos: File[] | null;
       variantImages: File[][];
     }
   ) => Promise<void>;
@@ -172,17 +172,15 @@ export default function ProductFormV2({
     { label: string; valueIds: string[] }[]
   >([]);
 
-  const [attributesList, setAttributesList] = useState<any[]>([]); // Ganti 'any' dengan tipe yang sesuai jika ada // variant metas & files (collected from VariantList)
+  const [attributesList, setAttributesList] = useState<any[]>([]);
 
   const [variantMetas, setVariantMetas] = useState<
     { variantIndex: number; isFeatured?: boolean; altText?: string }[]
   >([]);
-  const [variantFilesMap, setVariantFilesMap] = useState<File[][]>([]); // product-level files captured separately
+  const [variantFilesMap, setVariantFilesMap] = useState<File[][]>([]);
 
   const [productImagesFiles, setProductImagesFiles] = useState<File[]>([]);
-  const [productVideosFiles, setProductVideosFiles] = useState<FileList | null>(
-    null
-  );
+  const [productVideosFiles, setProductVideosFiles] = useState<File[]>([]);
 
   useEffect(() => {
     // Daftarkan 'attributes' secara manual karena tidak ada input visualnya
@@ -243,7 +241,7 @@ export default function ProductFormV2({
     filesMap: File[][]
   ) => {
     setVariantMetas(metas);
-    form.setValue("variantImagesMetadata", metas); // <<< SINKRONKAN ke Form State
+    form.setValue("variantImagesMetadata", metas);
     setVariantFilesMap(filesMap);
   };
 
@@ -265,7 +263,7 @@ export default function ProductFormV2({
 
       const filesToSubmit = {
         images: productImagesFiles.length > 0 ? productImagesFiles : null,
-        videos: productVideosFiles,
+        videos: productVideosFiles.length > 0 ? productVideosFiles : null,
         variantImages: variantFilesMap,
       };
       await onSubmit(payload, filesToSubmit);
@@ -411,6 +409,7 @@ export default function ProductFormV2({
                 <div className="border border-gray-100 p-4 rounded-lg  shadow-sm">
                   <UploadImages
                     form={form}
+                    metadataName="imagesMetadata"
                     name="imageFiles"
                     label="Gambar Utama Produk"
                     max={10}

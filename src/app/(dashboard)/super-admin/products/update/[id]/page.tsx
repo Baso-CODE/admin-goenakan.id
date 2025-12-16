@@ -23,11 +23,10 @@ export default function EditProductPage() {
   const router = useRouter();
 
   const [productData, setProductData] = useState<any | undefined>();
-  console.log("ini adalah product data", productData);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [currentSelections, setCurrentSelections] = useState<any[]>([]); // 💡 STATE BARU
+  const [currentSelections, setCurrentSelections] = useState<any[]>([]);
   const [currentFullList, setCurrentFullList] = useState<any[]>([]);
 
   useEffect(() => {
@@ -224,6 +223,45 @@ export default function EditProductPage() {
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to update variants"
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateMediaMetadata = async (
+    mediaId: string,
+    updates: { altText?: string; isFeatured?: boolean }
+  ) => {
+    setIsSubmitting(true);
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const res = await fetch(
+        `http://localhost:8000/products/image/${mediaId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(updates),
+        }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to update image details");
+      }
+
+      const updatedProduct = await res.json();
+      setProductData(updatedProduct); // Update UI dengan data terbaru
+      toast.success("Detail gambar berhasil diperbarui");
+    } catch (err) {
+      console.error("Error updating media:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Gagal memperbarui detail gambar"
       );
     } finally {
       setIsSubmitting(false);
@@ -525,6 +563,7 @@ export default function EditProductPage() {
         onDeleteImage={handleDeleteImage}
         onAddVideo={handleAddVideo}
         onDeleteVideo={handleDeleteVideo}
+        onUpdateMediaMetadata={handleUpdateMediaMetadata}
       />
 
       <FormUpdateAttributes

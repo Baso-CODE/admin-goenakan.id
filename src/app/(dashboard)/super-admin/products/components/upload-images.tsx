@@ -8,167 +8,295 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Image as ImageIcon, Plus, X } from "lucide-react";
+import { Image as ImageIcon, Plus, Star, X, Pencil } from "lucide-react";
 import Image from "next/image";
-import { ChangeEvent, useRef, useState } from "react";
+import { ChangeEvent, useRef, useState, useEffect, useCallback } from "react";
+// import { useFormContext } from "react-hook-form"; // Tidak wajib jika pass 'form' via props
+import { ImageDetailModalCore } from "./imageDetailCore";
 
-// Tipe yang diperbarui: onFilesChange sekarang selalu menerima File[]
+// =======================================================
+// 1. Definisikan Tipe Data
+// =======================================================
+
+export interface ImageMeta {
+  url: string;
+  altText: string;
+  isFeatured: boolean;
+  isNew: boolean;
+  id?: string;
+}
+
+export interface ImageItem extends ImageMeta {
+  tempId: number;
+  file?: File;
+}
+
+// =======================================================
+// 2. Props UploadImages
+// =======================================================
+
 interface UploadImagesProps {
   form: any;
   name: string;
+  metadataName: string;
   label?: string;
   max?: number;
-  onFilesChange?: (files: File[]) => void;
+  onFilesChange: (files: File[]) => void;
 }
+
+// =======================================================
+// 3. Komponen UploadImages
+// =======================================================
 
 export function UploadImages({
   form,
   name,
+  metadataName,
   label = "Gambar Produk Utama",
   max = 10,
   onFilesChange,
 }: UploadImagesProps) {
-  // State untuk menyimpan URL blob preview
-  const [previews, setPreviews] = useState<string[]>([]);
-  // File list yang diupload (sumber kebenaran untuk file)
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (
-    e: ChangeEvent<HTMLInputElement>,
-    // rhfOnChange diterima dari FormField, tetapi diabaikan/tidak digunakan untuk file.
-    rhfOnChange: (...event: any[]) => void
-  ) => {
+  // State Lokal
+  const [imageItems, setImageItems] = useState<ImageItem[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedImageItem, setSelectedImageItem] = useState<ImageItem | null>(
+    null
+  );
+  const [tempIdCounter, setTempIdCounter] = useState(0);
+
+  // =======================================================
+  // LOGIKA SINKRONISASI (FIXED INFINITE LOOP)
+  // =======================================================
+
+  useEffect(() => {
+    // 1. Ekstrak Files untuk Parent
+    const filesToUpload = imageItems
+      .filter((item) => item.isNew && item.file)
+      .map((item) => item.file!);
+
+    // 2. Ekstrak Metadata untuk RHF
+    const metadataForForm = imageItems.map((item) => ({
+      isFeatured: item.isFeatured,
+      altText: item.altText,
+    }));
+
+    // --- BAGIAN KRUSIAL UNTUK MENCEGAH LOOP ---
+
+    // A. Kirim File ke Parent
+    // Kita panggil ini agar parent tahu file fisik yang mau diupload
+    onFilesChange(filesToUpload);
+
+    // B. Kirim Metadata ke RHF dengan GUARD (Pencegah Loop)
+    // Ambil nilai yang saat ini ada di RHF
+    const currentRHFValue = form.getValues(metadataName);
+
+    // Bandingkan string JSON-nya.
+    // Jika isinya SAMA PERSIS, JANGAN panggil setValue.
+    if (JSON.stringify(currentRHFValue) !== JSON.stringify(metadataForForm)) {
+      form.setValue(metadataName, metadataForForm, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageItems]);
+  // PENJELASAN DEPENDENCY:
+  // Kita HANYA ingin effect ini jalan kalau 'imageItems' lokal berubah.
+  // Kita sengaja menghapus 'form', 'onFilesChange', dll dari dependency
+  // karena referensi mereka bisa tidak stabil dan memicu loop lagi.
+
+  // =======================================================
+  // LOGIKA LAINNYA (TIDAK BERUBAH)
+  // =======================================================
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const newFiles = Array.from(files);
-    const combinedFiles = [...uploadedFiles, ...newFiles];
+    const combinedLength = imageItems.length + newFiles.length;
 
-    if (combinedFiles.length > max) {
+    if (combinedLength > max) {
       alert(`Maximum ${max} images allowed.`);
       return;
     }
 
-    // 1. Update list File
-    setUploadedFiles(combinedFiles);
+    let currentTempId = tempIdCounter;
+    const newItems: ImageItem[] = newFiles.map((file) => {
+      currentTempId += 1;
+      return {
+        tempId: currentTempId,
+        url: URL.createObjectURL(file),
+        altText: "",
+        isFeatured: false,
+        isNew: true,
+        file: file,
+      };
+    });
 
-    // 2. RHF Update DIHAPUS/DIABAIKAN untuk file besar:
-    // rhfOnChange(combinedFiles); // ❌ Hapus baris ini.
+    setTempIdCounter(currentTempId);
+    setImageItems((prev) => [...prev, ...newItems]);
 
-    // 3. Update Preview
-    const newUrls = newFiles.map((file) => URL.createObjectURL(file));
-    setPreviews((prev) => [...prev, ...newUrls]);
-
-    // 4. Inform parent (Mengirim SEMUA file yang digabungkan)
-    onFilesChange?.(combinedFiles);
-
-    // 5. Kosongkan input agar bisa trigger onChange lagi jika file yang sama dipilih
     if (inputRef.current) {
       inputRef.current.value = "";
     }
   };
 
-  const handleRemovePreview = (
-    indexToRemove: number,
-    // rhfOnChange diterima dari FormField, tetapi diabaikan/tidak digunakan untuk file.
-    rhfOnChange: (...event: any[]) => void
-  ) => {
-    // 1. Hapus URL preview
-    URL.revokeObjectURL(previews[indexToRemove]);
-    setPreviews((prev) => prev.filter((_, idx) => idx !== indexToRemove));
-
-    // 2. Hapus dari list File
-    const updatedFiles = uploadedFiles.filter(
-      (_, idx) => idx !== indexToRemove
+  const handleRemoveItem = (tempIdToRemove: number) => {
+    const itemToRemove = imageItems.find(
+      (item) => item.tempId === tempIdToRemove
     );
-    setUploadedFiles(updatedFiles);
-
-    // 3. RHF Update DIHAPUS/DIABAIKAN untuk file besar:
-    // rhfOnChange(updatedFiles); // ❌ Hapus baris ini.
-
-    // 4. Inform parent (Mengirim list file yang diperbarui)
-    onFilesChange?.(updatedFiles);
+    if (itemToRemove && itemToRemove.isNew) {
+      URL.revokeObjectURL(itemToRemove.url);
+    }
+    setImageItems((prev) =>
+      prev.filter((item) => item.tempId !== tempIdToRemove)
+    );
   };
 
+  const handleOpenModal = (item: ImageItem) => {
+    setSelectedImageItem(item);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedImageItem(null);
+    setIsModalOpen(false);
+  };
+
+  const setImageMetaField = useCallback(
+    (tempId: number, patch: Partial<ImageMeta>) => {
+      setImageItems((prev) =>
+        prev.map((item) =>
+          item.tempId === tempId ? { ...item, ...patch } : item
+        )
+      );
+    },
+    []
+  );
+
+  const setFeaturedImage = useCallback(
+    (tempIdToFeature: number, isFeatured: boolean) => {
+      setImageItems((prev) =>
+        prev.map((item) => ({
+          ...item,
+          isFeatured:
+            item.tempId === tempIdToFeature
+              ? isFeatured
+              : isFeatured
+              ? false
+              : item.isFeatured,
+        }))
+      );
+    },
+    []
+  );
+
   return (
-    <FormField
-      control={form.control}
-      name={name}
-      // Kita tetap membutuhkan field: { onChange } hanya untuk memenuhi
-      // FormField RHF, meskipun kita tidak menggunakannya untuk menyimpan file.
-      render={({ field: { onChange, ref } }) => (
-        <FormItem className="space-y-4">
-          <FormLabel className="text-md font-semibold flex items-center justify-between">
-            {label}{" "}
-            <span className="text-sm font-normal text-gray-500">
-              {" "}
-              (Max: {max} files)
-            </span>
-          </FormLabel>
+    <>
+      <FormField
+        control={form.control}
+        name={name}
+        render={() => (
+          <FormItem className="space-y-4">
+            <FormLabel className="text-md font-semibold flex items-center justify-between">
+              {label}{" "}
+              <span className="text-sm font-normal text-gray-500">
+                (Max: {max} files)
+              </span>
+            </FormLabel>
 
-          {/* Area Pratinjau Gambar */}
-          <div className="flex flex-wrap gap-3 p-3 border border-dashed rounded-lg bg-gray-50 min-h-24">
-            {previews.map((src, index) => (
-              <div
-                key={index}
-                className="relative w-20 h-20 rounded-md overflow-hidden border border-indigo-300 shadow-sm"
-              >
-                <Image
-                  src={src}
-                  alt={`preview-${index}`}
-                  fill
-                  className="object-cover"
-                />
-
-                {/* Tombol Hapus Pratinjau */}
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="destructive"
-                  className="absolute top-1 right-1 h-5 w-5 opacity-90 hover:opacity-100"
-                  // Kita tetap memanggil handler dengan 'onChange' agar field RHF (jika ada) ter-trigger,
-                  // namun fungsi handler sudah dimodifikasi untuk mengabaikan fungsi RHF.
-                  onClick={() => handleRemovePreview(index, onChange)}
+            {/* Area Pratinjau Gambar */}
+            <div className="flex flex-wrap gap-3 p-3 border border-dashed rounded-lg bg-gray-50 min-h-24">
+              {imageItems.map((item) => (
+                <div
+                  key={item.tempId}
+                  className="relative w-24 h-24 rounded-md overflow-hidden border border-gray-300 shadow-sm group"
                 >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ))}
+                  <Image
+                    src={item.url}
+                    alt={item.altText || "Product Image"}
+                    fill
+                    className="object-cover"
+                  />
 
-            {/* Input File (Disembunyikan) */}
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              ref={inputRef}
-              className="hidden"
-              // Kita tetap memanggil handler dengan 'onChange' agar field RHF ter-trigger (meski diabaikan)
-              onChange={(e) => handleFileChange(e, onChange)}
-            />
+                  {/* Badge Featured */}
+                  {item.isFeatured && (
+                    <div className="absolute top-0 left-0 bg-indigo-600 p-1 rounded-br-md">
+                      <Star className="h-3 w-3 fill-white text-white" />
+                    </div>
+                  )}
 
-            {/* Tombol Tambah Gambar */}
-            {uploadedFiles.length < max && (
-              <div
-                onClick={() => inputRef.current?.click()}
-                className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors"
-              >
-                <Plus className="h-5 w-5" />
-                <span className="text-xs mt-1">Add Image</span>
-              </div>
-            )}
+                  {/* Overlay Aksi */}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity space-x-2">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="secondary"
+                      className="h-7 w-7 bg-white text-gray-800 hover:bg-gray-100"
+                      onClick={() => handleOpenModal(item)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="destructive"
+                      className="h-7 w-7"
+                      onClick={() => handleRemoveItem(item.tempId)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
 
-            {previews.length === 0 && (
-              <p className="text-sm text-gray-500 self-center p-2 italic">
-                <ImageIcon className="h-4 w-4 inline-block mr-1 text-indigo-500" />
-                Click 'Add Image' atau seret file ke sini.
-              </p>
-            )}
-          </div>
+              {/* Input File Hidden */}
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                ref={inputRef}
+                className="hidden"
+                onChange={handleFileChange}
+              />
 
-          <FormMessage />
-        </FormItem>
+              {/* Tombol Add */}
+              {imageItems.length < max && (
+                <div
+                  onClick={() => inputRef.current?.click()}
+                  className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors"
+                >
+                  <Plus className="h-6 w-6" />
+                  <span className="text-xs mt-1">Add Image</span>
+                </div>
+              )}
+
+              {imageItems.length === 0 && (
+                <p className="text-sm text-gray-500 self-center p-2 italic">
+                  <ImageIcon className="h-4 w-4 inline-block mr-1 text-indigo-500" />
+                  Click 'Add Image' atau seret file ke sini.
+                </p>
+              )}
+            </div>
+
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      {isModalOpen && selectedImageItem && (
+        <ImageDetailModalCore
+          tempId={selectedImageItem.tempId}
+          imageMeta={selectedImageItem}
+          onClose={handleCloseModal}
+          setImageMetaField={setImageMetaField}
+          setFeaturedImage={setFeaturedImage}
+        />
       )}
-    />
+    </>
   );
 }

@@ -17,7 +17,7 @@ interface UploadVideosProps {
   name: string;
   label?: string;
   max?: number;
-  onFilesChange?: (files: FileList) => void;
+  onFilesChange?: (files: File[]) => void;
 }
 
 export function UploadVideos({
@@ -49,15 +49,12 @@ export function UploadVideos({
     // 1. Update list File
     setUploadedFiles(combinedFiles);
 
-    // 2. Update RHF
-    rhfOnChange(combinedFiles);
-
     // 3. Update Preview
     const newUrls = newFiles.map((file) => URL.createObjectURL(file));
     setPreviews((prev) => [...prev, ...newUrls]);
 
     // 4. Inform parent (jika perlu)
-    onFilesChange?.(files);
+    onFilesChange?.(combinedFiles);
 
     // Kosongkan input
     if (inputRef.current) {
