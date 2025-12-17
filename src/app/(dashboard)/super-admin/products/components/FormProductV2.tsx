@@ -51,6 +51,12 @@ const variantMetaSchema = z.object({
   altText: z.string().optional(),
 });
 
+const videoMetaSchema = z.object({
+  title: z.string().optional(),
+  altText: z.string().optional(),
+  isFeatured: z.boolean().optional(),
+});
+
 const productSchema = z.object({
   name: z.string().min(2),
   sku: z.string().min(1),
@@ -71,12 +77,14 @@ const productSchema = z.object({
       })
     )
     .optional(),
+  videosMetadata: z.array(videoMetaSchema).optional(),
   variantImagesMetadata: z.array(variantMetaSchema).optional(),
 });
 
 // Tipe untuk data FORM
 export type ProductFormValues = z.infer<typeof productSchema> & {
   variantImagesMetadata?: z.infer<typeof variantMetaSchema>[];
+  videosMetadata?: z.infer<typeof videoMetaSchema>[];
 };
 
 // -----------------------------
@@ -147,6 +155,7 @@ export default function ProductFormV2({
           attributes: initialData.attributes ?? [],
           priceTiers: initialData.priceTiers ?? [],
           imagesMetadata: initialData.imagesMetadata ?? [],
+          videosMetadata: [],
           variantImagesMetadata: initialData.variantImagesMetadata ?? [],
         }
       : {
@@ -160,6 +169,7 @@ export default function ProductFormV2({
           attributes: [],
           priceTiers: [],
           imagesMetadata: [],
+          videosMetadata: [],
           variantImagesMetadata: [],
         },
   });
@@ -183,9 +193,9 @@ export default function ProductFormV2({
   const [productVideosFiles, setProductVideosFiles] = useState<File[]>([]);
 
   useEffect(() => {
-    // Daftarkan 'attributes' secara manual karena tidak ada input visualnya
-    form.register("attributes"); // Daftarkan 'variantImagesMetadata'
+    form.register("attributes");
     form.register("variantImagesMetadata");
+    form.register("videosMetadata");
   }, [form]);
 
   const handleGenerateVariants = () => {
@@ -255,6 +265,9 @@ export default function ProductFormV2({
         priceTiers: values.priceTiers?.length ? values.priceTiers : undefined,
         imagesMetadata: values.imagesMetadata?.length
           ? values.imagesMetadata
+          : undefined,
+        videosMetadata: form.getValues("videosMetadata")?.length
+          ? form.getValues("videosMetadata")
           : undefined,
         variantImagesMetadata: form.getValues("variantImagesMetadata")?.length
           ? form.getValues("variantImagesMetadata")
@@ -423,6 +436,7 @@ export default function ProductFormV2({
                 <div className="border border-gray-100 p-4 rounded-lg  shadow-sm">
                   <UploadVideos
                     form={form}
+                    metadataName="videosMetadata"
                     name="videoFiles"
                     label="Video Promosi Produk"
                     max={3}

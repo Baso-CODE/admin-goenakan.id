@@ -7,7 +7,7 @@ import { Check, Star, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 export interface ImageMeta {
-  url: string; // URL Pratinjau
+  url: string;
   altText?: string;
   isFeatured?: boolean;
   isNew?: boolean;

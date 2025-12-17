@@ -24,7 +24,6 @@ export default function EditProductPage() {
 
   const [productData, setProductData] = useState<any | undefined>();
 
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentSelections, setCurrentSelections] = useState<any[]>([]);
   const [currentFullList, setCurrentFullList] = useState<any[]>([]);
@@ -33,7 +32,6 @@ export default function EditProductPage() {
     const fetchData = async () => {
       if (!id) return;
 
-      setIsLoading(true);
       try {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
@@ -51,8 +49,6 @@ export default function EditProductPage() {
       } catch (err) {
         console.error("Error fetching product data:", err);
         toast.error("Failed to load product data");
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -268,6 +264,45 @@ export default function EditProductPage() {
     }
   };
 
+  const handleUpdateVideoMetadata = async (
+    mediaId: string,
+    updates: { altText?: string; title?: string; isFeatured?: boolean }
+  ) => {
+    setIsSubmitting(true);
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const res = await fetch(
+        `http://localhost:8000/products/video/${mediaId}`, // Pastikan endpoint benar
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(updates),
+        }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to update video details");
+      }
+
+      const updatedProduct = await res.json();
+      setProductData(updatedProduct);
+      toast.success("Detail video berhasil diperbarui");
+    } catch (err) {
+      console.error("Error updating video metadata:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Gagal memperbarui detail video"
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleAddImage = async (file: File): Promise<void> => {
     try {
       const tokenRes = await fetch("/api/auth/token");
@@ -307,7 +342,6 @@ export default function EditProductPage() {
       const { token } = await tokenRes.json();
 
       const formData = new FormData();
-      // Pastikan field 'video' sesuai dengan middleware 'upload.single("video")' di backend
       formData.append("video", file);
 
       const res = await fetch(`http://localhost:8000/products/${id}/video`, {
@@ -324,7 +358,7 @@ export default function EditProductPage() {
       }
 
       const updatedProduct = await res.json();
-      setProductData(updatedProduct); // Update state dengan data produk terbaru
+      setProductData(updatedProduct);
       toast.success("Video berhasil diunggah!");
     } catch (err) {
       console.error("Error adding video:", err);
@@ -564,6 +598,7 @@ export default function EditProductPage() {
         onAddVideo={handleAddVideo}
         onDeleteVideo={handleDeleteVideo}
         onUpdateMediaMetadata={handleUpdateMediaMetadata}
+        onUpdateVideoMetadata={handleUpdateVideoMetadata}
       />
 
       <FormUpdateAttributes
@@ -582,22 +617,6 @@ export default function EditProductPage() {
         onSubmit={handleUpdateVariants}
         onGenerateClick={handleGenerateVariants}
       />
-
-      {/* ----------- EXTRA DIALOGS ----------- */}
-      {/* {productData && (
-        <div className="flex gap-2 pt-3">
-          <EditPriceTiersDialog
-            productId={id as string}
-            priceTiers={productData.priceTiers || []}
-            onUpdated={(newTiers) =>
-              setProductData((prev: any) => ({
-                ...prev,
-                priceTiers: newTiers,
-              }))
-            }
-          />
-        </div>
-      )} */}
     </div>
   );
 }

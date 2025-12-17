@@ -1,4 +1,3 @@
-// components/upload-media/UploadImages.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -11,12 +10,8 @@ import {
 import { Image as ImageIcon, Plus, Star, X, Pencil } from "lucide-react";
 import Image from "next/image";
 import { ChangeEvent, useRef, useState, useEffect, useCallback } from "react";
-// import { useFormContext } from "react-hook-form"; // Tidak wajib jika pass 'form' via props
-import { ImageDetailModalCore } from "./imageDetailCore";
 
-// =======================================================
-// 1. Definisikan Tipe Data
-// =======================================================
+import { ImageDetailModalCore } from "./imageDetailCore";
 
 export interface ImageMeta {
   url: string;
@@ -31,10 +26,6 @@ export interface ImageItem extends ImageMeta {
   file?: File;
 }
 
-// =======================================================
-// 2. Props UploadImages
-// =======================================================
-
 interface UploadImagesProps {
   form: any;
   name: string;
@@ -44,9 +35,7 @@ interface UploadImagesProps {
   onFilesChange: (files: File[]) => void;
 }
 
-// =======================================================
 // 3. Komponen UploadImages
-// =======================================================
 
 export function UploadImages({
   form,
@@ -66,51 +55,27 @@ export function UploadImages({
   );
   const [tempIdCounter, setTempIdCounter] = useState(0);
 
-  // =======================================================
-  // LOGIKA SINKRONISASI (FIXED INFINITE LOOP)
-  // =======================================================
-
   useEffect(() => {
-    // 1. Ekstrak Files untuk Parent
     const filesToUpload = imageItems
       .filter((item) => item.isNew && item.file)
       .map((item) => item.file!);
 
-    // 2. Ekstrak Metadata untuk RHF
     const metadataForForm = imageItems.map((item) => ({
       isFeatured: item.isFeatured,
       altText: item.altText,
     }));
 
-    // --- BAGIAN KRUSIAL UNTUK MENCEGAH LOOP ---
-
-    // A. Kirim File ke Parent
-    // Kita panggil ini agar parent tahu file fisik yang mau diupload
     onFilesChange(filesToUpload);
 
-    // B. Kirim Metadata ke RHF dengan GUARD (Pencegah Loop)
-    // Ambil nilai yang saat ini ada di RHF
     const currentRHFValue = form.getValues(metadataName);
 
-    // Bandingkan string JSON-nya.
-    // Jika isinya SAMA PERSIS, JANGAN panggil setValue.
     if (JSON.stringify(currentRHFValue) !== JSON.stringify(metadataForForm)) {
       form.setValue(metadataName, metadataForForm, {
         shouldValidate: true,
         shouldDirty: true,
       });
     }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageItems]);
-  // PENJELASAN DEPENDENCY:
-  // Kita HANYA ingin effect ini jalan kalau 'imageItems' lokal berubah.
-  // Kita sengaja menghapus 'form', 'onFilesChange', dll dari dependency
-  // karena referensi mereka bisa tidak stabil dan memicu loop lagi.
-
-  // =======================================================
-  // LOGIKA LAINNYA (TIDAK BERUBAH)
-  // =======================================================
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -168,7 +133,7 @@ export function UploadImages({
   };
 
   const setImageMetaField = useCallback(
-    (tempId: number, patch: Partial<ImageMeta>) => {
+    (tempId: string | number, patch: Partial<ImageMeta>) => {
       setImageItems((prev) =>
         prev.map((item) =>
           item.tempId === tempId ? { ...item, ...patch } : item
@@ -179,7 +144,7 @@ export function UploadImages({
   );
 
   const setFeaturedImage = useCallback(
-    (tempIdToFeature: number, isFeatured: boolean) => {
+    (tempIdToFeature: string | number, isFeatured: boolean) => {
       setImageItems((prev) =>
         prev.map((item) => ({
           ...item,

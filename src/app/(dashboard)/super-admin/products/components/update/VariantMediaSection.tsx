@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import Image from "next/image";
 import { X, Plus, Star, Pencil } from "lucide-react";
 import { ImageDetailModalCore } from "../imageDetailCore";
+import { VideoDetailModalCore } from "../videoDetailCore";
 
 interface ProductMedia {
   id: string;
@@ -29,10 +30,8 @@ interface FormUpdateProductMediaProps {
   onDeleteImage: (mediaId: string) => Promise<void>;
   onAddVideo: (file: File) => Promise<void>;
   onDeleteVideo: (mediaId: string) => Promise<void>;
-  onUpdateMediaMetadata: (
-    mediaId: string,
-    updates: { altText?: string; isFeatured?: boolean }
-  ) => Promise<void>;
+  onUpdateMediaMetadata: (mediaId: string, updates: any) => Promise<void>;
+  onUpdateVideoMetadata: (mediaId: string, updates: any) => Promise<void>;
 }
 
 // Sub-komponen untuk menampilkan media yang sudah ada dengan tombol hapus
@@ -46,7 +45,7 @@ function ExistingMediaDisplay({
   media: ProductMedia[];
   type: "image" | "video";
   onDelete: (mediaId: string) => Promise<void>;
-  onEdit?: (item: ProductMedia) => void;
+  onEdit: (item: any) => void;
   isSubmitting: boolean;
 }) {
   return (
@@ -57,18 +56,9 @@ function ExistingMediaDisplay({
           className="relative w-24 h-24 rounded-md overflow-hidden border"
         >
           {type === "image" ? (
-            <Image
-              src={m.url}
-              alt={`Existing ${type}`}
-              fill
-              className="object-cover"
-            />
+            <Image src={m.url} alt="img" fill className="object-cover" />
           ) : (
-            <video
-              src={m.url}
-              controls
-              className="w-full h-full object-cover"
-            />
+            <video src={m.url} className="w-full h-full object-cover" />
           )}
 
           {type === "image" && m.isFeatured && (
@@ -78,22 +68,17 @@ function ExistingMediaDisplay({
           )}
 
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-            {/* Tombol Edit (Hanya Image) */}
-            {type === "image" && onEdit && (
-              <Button
-                type="button"
-                size="icon"
-                variant="secondary"
-                className="h-7 w-7 bg-white text-gray-800 hover:bg-gray-100"
-                onClick={() => onEdit(m)}
-                disabled={isSubmitting}
-                title="Edit Details"
-              >
-                <Pencil className="h-3 w-3" />
-              </Button>
-            )}
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              className="h-7 w-7 bg-white text-gray-800"
+              onClick={() => onEdit(m)}
+              disabled={isSubmitting}
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
 
-            {/* Tombol Hapus */}
             <Button
               type="button"
               size="icon"
@@ -101,7 +86,6 @@ function ExistingMediaDisplay({
               className="h-7 w-7"
               onClick={() => onDelete(m.id)}
               disabled={isSubmitting}
-              title="Delete"
             >
               <X className="h-3 w-3" />
             </Button>
@@ -125,11 +109,16 @@ export default function FormUpdateProductMedia({
   onAddVideo,
   onDeleteVideo,
   onUpdateMediaMetadata,
+  onUpdateVideoMetadata,
 }: FormUpdateProductMediaProps) {
   const [isUploading, setIsUploading] = useState(false);
 
   const [selectedMedia, setSelectedMedia] = useState<ProductMedia | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
@@ -143,20 +132,23 @@ export default function FormUpdateProductMedia({
     setIsModalOpen(false);
   };
 
+  const handleOpenVideoModal = (item: any) => {
+    setSelectedVideo(item);
+    setIsVideoModalOpen(true);
+  };
+
+  const handleVideoModalUpdate = (id: string | number, patch: any) => {
+    onUpdateVideoMetadata(id as string, patch);
+    setSelectedVideo((prev: any) => (prev ? { ...prev, ...patch } : null));
+  };
+
   const handleModalUpdateMeta = (id: number | string, patch: any) => {
-    // Karena id dari server string, kita cast saja.
-    // Kita langsung panggil API parent setiap kali ada perubahan di modal.
     if (selectedMedia && selectedMedia.id === id) {
       onUpdateMediaMetadata(id as string, patch);
-
-      // Update state lokal sementara agar UI modal responsif (optional,
-      // tapi karena onUpdateMediaMetadata update `productData` via parent,
-      // biasanya modal akan re-render otomatis jika props berubah)
       setSelectedMedia((prev) => (prev ? { ...prev, ...patch } : null));
     }
   };
 
-  // Adapter: Khusus untuk Featured Image
   const handleModalSetFeatured = (id: number | string, isFeatured: boolean) => {
     if (selectedMedia && selectedMedia.id === id) {
       onUpdateMediaMetadata(id as string, { isFeatured });
@@ -178,7 +170,6 @@ export default function FormUpdateProductMedia({
       console.error("Upload failed", error);
     } finally {
       setIsUploading(false);
-      // Reset input agar bisa upload file yang sama lagi
       if (ref.current) {
         ref.current.value = "";
       }
@@ -232,6 +223,7 @@ export default function FormUpdateProductMedia({
               type="video"
               onDelete={onDeleteVideo}
               isSubmitting={isSubmitting}
+              onEdit={handleOpenVideoModal}
             />
             <div className="mt-3 flex gap-2 items-center">
               <Input
@@ -258,18 +250,31 @@ export default function FormUpdateProductMedia({
       </Card>
       {isModalOpen && selectedMedia && (
         <ImageDetailModalCore
-          // Kita passing ID string, pastikan ModalCore Anda mentoleransi type 'any' atau 'string | number' untuk ID
-          // Jika ModalCore strict number, Anda perlu mengubah type prop di ModalCore-nya.
           tempId={selectedMedia.id as any}
-          // Mapping data agar sesuai dengan shape ImageMeta di modal
           imageMeta={{
             ...selectedMedia,
             isNew: false,
           }}
           onClose={handleCloseModal}
-          // Hubungkan ke Handler API
           setImageMetaField={handleModalUpdateMeta}
           setFeaturedImage={handleModalSetFeatured}
+        />
+      )}
+      {isVideoModalOpen && selectedVideo && (
+        <VideoDetailModalCore
+          tempId={selectedVideo.id}
+          videoMeta={{
+            ...selectedVideo,
+            isNew: false,
+          }}
+          onClose={() => {
+            setIsVideoModalOpen(false);
+            setSelectedVideo(null);
+          }}
+          setVideoMetaField={handleVideoModalUpdate}
+          setFeaturedVideo={(id, isFeatured) =>
+            handleVideoModalUpdate(id, { isFeatured })
+          }
         />
       )}
     </>
