@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 import {
   Form,
   FormField,
@@ -10,6 +12,7 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import {
   Select,
@@ -18,34 +21,77 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import { PlusCircle, Trash2 } from "lucide-react";
+  PlusCircle,
+  Trash2,
+  Check,
+  ChevronsUpDown,
+  RefreshCcw,
+  Settings2,
+} from "lucide-react";
 import { toast } from "sonner";
-import { OrderFormValues, orderSchema } from "./order-schema";
-import { fetchWithToken, postOrder } from "./order-service";
+import { OrderFormValues, orderSchema } from "../order-schema";
+import { fetchWithToken, generatePoNumber, postOrder } from "../order-service";
 
-type Client = { id: string; name: string; phone: string; address: string };
+// Types
+// Di dalam file OrderForm.tsx atau types terpisah
+
+type Client = {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  custCode?: string;
+  type?: "B2B" | "B2C";
+};
 type Sales = { id: string; name: string; phone: string };
 type Vendor = { id: string; companyName: string };
-type Product = { id: string; name: string; basePrice: number };
+type ProductVariant = {
+  id: string;
+  variantName: string;
+  price: number;
+};
+
+type PriceTier = {
+  minQuantity: number;
+  price: number;
+};
+
+type Product = {
+  id: string;
+  name: string;
+  basePrice: number;
+  isCustom: boolean; // Penting untuk logika UI
+  productVariants: ProductVariant[]; // Relasi varian
+  priceTiers: PriceTier[]; // Relasi harga bertingkat
+};
 
 export default function OrderForm() {
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderSchema),
     defaultValues: {
-      dateOrder: "",
+      dateOrder: new Date().toISOString().split("T")[0], // Default to today
       salesCategory: "SALES",
       poNumber: "",
       clientId: "",
+      phone: "",
       shippingAddress: "",
       salesId: "",
       vendorIds: [],
@@ -61,24 +107,27 @@ export default function OrderForm() {
     },
   });
 
-  const { control, handleSubmit, watch, setValue } = form;
+  const { control, handleSubmit, watch, setValue, getValues } = form;
   const { fields, append, remove } = useFieldArray({
     control,
     name: "products",
   });
 
+  // State
   const [clients, setClients] = useState<Client[]>([]);
-  console.log(clients);
-
   const [sales, setSales] = useState<Sales[]>([]);
-  console.log(sales);
-
   const [vendors, setVendors] = useState<Vendor[]>([]);
-  console.log(vendors);
-
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
+  const [generatingPo, setGeneratingPo] = useState(false);
 
+  // Client Combobox State
+  const [clientOpen, setClientOpen] = useState(false);
+
+  // Watchers
+  const selectedClientId = watch("clientId");
+
+  // Load Initial Data
   useEffect(() => {
     async function load() {
       try {
@@ -89,6 +138,8 @@ export default function OrderForm() {
           fetchWithToken("http://localhost:8000/vendors/order/add"),
           fetchWithToken("http://localhost:8000/products/order"),
         ]);
+        console.log("ini adalah data", v);
+
         setClients(c);
         setSales(s);
         setVendors(v);
@@ -102,18 +153,60 @@ export default function OrderForm() {
     load();
   }, []);
 
-  const clientId = watch("clientId");
+  // Effect: Update Shipping Address & Phone when Client changes
   useEffect(() => {
-    const client = clients.find((c) => c.id === clientId);
-    if (client) setValue("shippingAddress", client.address);
-  }, [clientId, clients, setValue]);
+    if (selectedClientId) {
+      const client = clients.find((c) => c.id === selectedClientId);
+      console.log("ini adalah data select client", client);
+
+      if (client) {
+        setValue("shippingAddress", client.address);
+        setValue("phone", client.phone);
+      }
+    }
+  }, [selectedClientId, clients, setValue]);
+
+  // Handler: Generate PO Number
+  const handleGeneratePO = async () => {
+    try {
+      setGeneratingPo(true);
+      const newPo = await generatePoNumber();
+      setValue("poNumber", newPo);
+      toast.success("PO Number generated");
+    } catch (e) {
+      toast.error("Failed to generate PO Number");
+    } finally {
+      setGeneratingPo(false);
+    }
+  };
 
   const onSubmit = async (data: OrderFormValues) => {
     try {
       setLoading(true);
-      await postOrder(data);
+      // Remove phone from payload as it's not in Order model
+      const { phone, ...payload } = data;
+
+      await postOrder(payload);
       toast.success("Order created successfully");
-      form.reset();
+      form.reset({
+        dateOrder: new Date().toISOString().split("T")[0],
+        salesCategory: "SALES",
+        poNumber: "",
+        clientId: "",
+        phone: "",
+        shippingAddress: "",
+        salesId: "",
+        vendorIds: [],
+        products: [
+          {
+            productId: "",
+            quantity: 1,
+            price: 0,
+            customization: "",
+            remarks: "",
+          },
+        ],
+      });
     } catch {
       toast.error("Failed to create order");
     } finally {
@@ -122,7 +215,7 @@ export default function OrderForm() {
   };
 
   return (
-    <Card className=" space-y-4 mx-auto">
+    <Card className="space-y-4 mx-auto">
       <CardHeader>
         <CardTitle className="text-2xl font-semibold">
           Create New Order
@@ -130,9 +223,13 @@ export default function OrderForm() {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* === ORDER BASIC INFO === */}
-            <div className="grid md:grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+            {/* === SECTION 1: ORDER DETAILS === */}
+            <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
+              <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
+                Order Details
+              </h3>
+
               <FormField
                 control={control}
                 name="dateOrder"
@@ -175,39 +272,124 @@ export default function OrderForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>PO Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter PO number" {...field} />
-                    </FormControl>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <Input placeholder="Enter PO number" {...field} />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleGeneratePO}
+                        disabled={generatingPo}
+                      >
+                        {generatingPo ? (
+                          <RefreshCcw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          "Generate"
+                        )}
+                      </Button>
+                    </div>
+                    <FormDescription>
+                      Click Generate if you don't have a PO Number.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+            </div>
 
+            {/* === SECTION 2: CUSTOMER & LOGISTICS === */}
+            <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
+              <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
+                Customer & Logistics
+              </h3>
+
+              {/* Filtering Client Order (Combobox) */}
               <FormField
                 control={control}
                 name="clientId"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>Client / PIC</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select client" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {clients.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name} ({c.phone})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={clientOpen} onOpenChange={setClientOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value
+                              ? clients.find(
+                                  (client) => client.id === field.value
+                                )?.name
+                              : "Select client..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0">
+                        <Command>
+                          <CommandInput placeholder="Search client name..." />
+                          <CommandList>
+                            <CommandEmpty>No client found.</CommandEmpty>
+                            <CommandGroup>
+                              {clients.map((client) => (
+                                <CommandItem
+                                  value={client.name}
+                                  key={client.id}
+                                  onSelect={() => {
+                                    form.setValue("clientId", client.id);
+                                    setClientOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      client.id === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  {client.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              {/* Read Only Phone Number */}
+              <FormField
+                control={control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        readOnly
+                        className="bg-gray-100"
+                        placeholder="Auto-filled from client"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      This info comes from the selected client.
+                    </FormDescription>
+                  </FormItem>
+                )}
+              />
+
+              {/* Shipping Address (Auto-filled but editable) */}
               <FormField
                 control={control}
                 name="shippingAddress"
@@ -215,7 +397,11 @@ export default function OrderForm() {
                   <FormItem className="md:col-span-2">
                     <FormLabel>Shipping Address</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Shipping address" {...field} />
+                      <Textarea
+                        placeholder="Shipping address"
+                        {...field}
+                        rows={3}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -223,24 +409,28 @@ export default function OrderForm() {
               />
             </div>
 
-            {/* === SALES & VENDOR === */}
-            <div className="grid items-start md:grid-cols-2 gap-4">
+            {/* === SECTION 3: SALES & VENDOR === */}
+            <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
+              <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
+                Internal & Vendor
+              </h3>
+
               <FormField
                 control={control}
                 name="salesId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>PIC Sales Goenakan</FormLabel>
+                    <FormLabel>PIC Sales</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select sales" />
+                          <SelectValue placeholder="Select sales person" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {sales.map((s) => (
                           <SelectItem key={s.id} value={s.id}>
-                            {s.name} ({s.phone})
+                            {s.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -255,15 +445,19 @@ export default function OrderForm() {
                 name="vendorIds"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Vendors</FormLabel>
+                    <FormLabel>Vendors (Multiple)</FormLabel>
                     <Select
-                      onValueChange={(val) =>
-                        field.onChange([...new Set([...field.value, val])])
-                      }
+                      onValueChange={(val) => {
+                        // Avoid duplicates
+                        const current = field.value || [];
+                        if (!current.includes(val)) {
+                          field.onChange([...current, val]);
+                        }
+                      }}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select vendors" />
+                          <SelectValue placeholder="Add a vendor..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -275,156 +469,445 @@ export default function OrderForm() {
                       </SelectContent>
                     </Select>
 
-                    {field.value?.length > 0 && (
-                      <ul className="mt-2 border rounded p-2 space-y-1 text-sm">
-                        {field.value.map((id) => {
-                          const vendor = vendors.find((v) => v.id === id);
-                          return (
-                            <li
-                              key={id}
-                              className="flex justify-between items-center border-b last:border-0 pb-1"
+                    {/* Selected Vendor Chips */}
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {field.value?.map((id) => {
+                        const vendor = vendors.find((v) => v.id === id);
+                        if (!vendor) return null;
+                        return (
+                          <div
+                            key={id}
+                            className="flex items-center gap-2 bg-white border px-3 py-1 rounded-full text-sm shadow-sm"
+                          >
+                            <span>{vendor.companyName}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                field.onChange(
+                                  field.value.filter((vId) => vId !== id)
+                                )
+                              }
+                              className="text-red-500 hover:text-red-700 rounded-full p-0.5"
                             >
-                              <span>{vendor?.companyName}</span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() =>
-                                  field.onChange(
-                                    field.value.filter((vId) => vId !== id)
-                                  )
-                                }
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
+                              <XIcon className="w-3 h-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                      {field.value?.length === 0 && (
+                        <p className="text-sm text-gray-400 italic">
+                          No vendors selected.
+                        </p>
+                      )}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
-            {/* === PRODUCTS === */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Products</h3>
-              {fields.map((field, index) => (
-                <div
-                  key={field.id}
-                  className="grid md:grid-cols-5 gap-3 border rounded-lg p-3"
+            {/* === SECTION 4: PRODUCTS === */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-xl text-gray-800">
+                  Order Products
+                </h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    append({
+                      productId: "",
+                      variantId: "",
+                      quantity: 1,
+                      price: 0,
+                      customization: "",
+                      remarks: "",
+                    })
+                  }
+                  className="border-dashed border-gray-400 hover:border-gray-600 hover:bg-gray-50"
                 >
-                  <FormField
-                    control={control}
-                    name={`products.${index}.productId`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Product</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select product" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {products.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <PlusCircle className="w-4 h-4 mr-2" /> Add Product
+                </Button>
+              </div>
 
-                  <FormField
-                    control={control}
-                    name={`products.${index}.quantity`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Qty</FormLabel>
-                        <FormControl>
-                          <Input type="number" min={1} {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={control}
-                    name={`products.${index}.price`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Price</FormLabel>
-                        <FormControl>
-                          <Input type="number" min={0} {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={control}
-                    name={`products.${index}.customization`}
-                    render={({ field }) => (
-                      <FormItem className="md:col-span-2">
-                        <FormLabel>Customization & Remarks</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="e.g., Color red, 500ml, Printing: Screen..."
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {fields.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => remove(index)}
-                      className="text-red-500"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
+              {/* Header Kolom (Hanya muncul di Desktop md ke atas) */}
+              {fields.length > 0 && (
+                <div className="hidden md:grid md:grid-cols-12 gap-4 px-4 py-2 bg-[#975a3e] rounded-t-lg font-medium text-sm text-gray-100">
+                  <div className="col-span-4">Product Details</div>
+                  <div className="col-span-2 text-center">Qty</div>
+                  <div className="col-span-3">Unit Price</div>
+                  <div className="col-span-2 text-right">Subtotal</div>
+                  <div className="col-span-1 text-center">Action</div>
                 </div>
-              ))}
+              )}
 
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  append({
-                    productId: "",
-                    quantity: 1,
-                    price: 0,
-                    customization: "",
-                    remarks: "",
-                  })
-                }
-              >
-                <PlusCircle className="w-4 h-4 mr-2" /> Add Another Product
-              </Button>
+              <div className="space-y-4">
+                {fields.map((field, index) => {
+                  const currentProductId = watch(`products.${index}.productId`);
+                  const selectedProduct = products.find(
+                    (p) => p.id === currentProductId
+                  );
+                  const isCustomProduct = selectedProduct?.isCustom;
+
+                  // Hitung subtotal baris ini
+                  const subtotal =
+                    (watch(`products.${index}.price`) || 0) *
+                    (watch(`products.${index}.quantity`) || 0);
+
+                  return (
+                    <div
+                      key={field.id}
+                      className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
+                    >
+                      {/* === BARIS UTAMA (Product, Qty, Price) === */}
+                      <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                        {/* 1. Product & Variant Selection */}
+                        <div className="md:col-span-4 space-y-3">
+                          {/* Product Select */}
+                          <FormField
+                            control={control}
+                            name={`products.${index}.productId`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="md:hidden">
+                                  Product
+                                </FormLabel>
+                                <Select
+                                  onValueChange={(val) => {
+                                    field.onChange(val);
+                                    form.setValue(
+                                      `products.${index}.variantId`,
+                                      ""
+                                    );
+
+                                    const prod = products.find(
+                                      (p) => p.id === val
+                                    );
+                                    if (prod) {
+                                      if (!prod.isCustom) {
+                                        form.setValue(
+                                          `products.${index}.price`,
+                                          prod.basePrice
+                                        );
+                                      } else {
+                                        form.setValue(
+                                          `products.${index}.price`,
+                                          0
+                                        );
+                                      }
+                                    }
+                                  }}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-10">
+                                      <SelectValue placeholder="Select Product" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {products.map((p) => (
+                                      <SelectItem key={p.id} value={p.id}>
+                                        <div className="flex items-center justify-between w-full gap-4 min-w-[200px]">
+                                          {/* Nama Produk */}
+                                          <span className="font-medium truncate text-gray-700">
+                                            {p.name}
+                                          </span>
+
+                                          {/* Badge Custom dengan Lucide React */}
+                                          {p.isCustom && (
+                                            <div className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
+                                              {/* Ikon Lucide */}
+                                              <Settings2 className="w-3 h-3" />
+                                              <span className="text-[10px] font-bold tracking-wide">
+                                                CUSTOM
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Variant Select (Conditionally Rendered) */}
+                          {isCustomProduct && (
+                            <FormField
+                              control={control}
+                              name={`products.${index}.variantId`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <Select
+                                    onValueChange={(val) => {
+                                      field.onChange(val);
+                                      const variant = selectedProduct?.productVariants.find(
+                                        (v) => v.id === val
+                                      );
+                                      if (variant) {
+                                        form.setValue(
+                                          `products.${index}.price`,
+                                          Number(variant.price)
+                                        );
+                                      }
+                                    }}
+                                    value={field.value}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger className="h-9 text-sm bg-gray-50 border-dashed">
+                                        <SelectValue placeholder="Select Variant" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {selectedProduct?.productVariants.map(
+                                        (v) => (
+                                          <SelectItem key={v.id} value={v.id}>
+                                            {v.variantName}
+                                          </SelectItem>
+                                        )
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+                        </div>
+
+                        {/* 2. Quantity Input */}
+                        <div className="md:col-span-2">
+                          <FormField
+                            control={control}
+                            name={`products.${index}.quantity`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="md:hidden">
+                                  Quantity
+                                </FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      {...field}
+                                      onChange={(e) => {
+                                        const val =
+                                          parseInt(e.target.value) || 0;
+                                        field.onChange(val);
+
+                                        // Logic Price Tiers (Sama seperti sebelumnya)
+                                        if (
+                                          selectedProduct &&
+                                          !selectedProduct.isCustom &&
+                                          selectedProduct.priceTiers?.length > 0
+                                        ) {
+                                          const tiers = [
+                                            ...selectedProduct.priceTiers,
+                                          ].sort(
+                                            (a, b) =>
+                                              b.minQuantity - a.minQuantity
+                                          );
+                                          const applicableTier = tiers.find(
+                                            (tier) => val >= tier.minQuantity
+                                          );
+
+                                          if (applicableTier) {
+                                            form.setValue(
+                                              `products.${index}.price`,
+                                              Number(applicableTier.price)
+                                            );
+                                            toast.info(
+                                              `Price updated to tier ≥${applicableTier.minQuantity}`
+                                            );
+                                          } else {
+                                            form.setValue(
+                                              `products.${index}.price`,
+                                              selectedProduct.basePrice
+                                            );
+                                          }
+                                        }
+                                      }}
+                                      className="text-center h-10"
+                                    />
+                                    <span className="absolute right-3 top-2.5 text-xs text-gray-400 pointer-events-none">
+                                      pcs
+                                    </span>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        {/* 3. Unit Price Input */}
+                        <div className="md:col-span-3">
+                          <FormField
+                            control={control}
+                            name={`products.${index}.price`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="md:hidden">
+                                  Unit Price
+                                </FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-xs text-gray-500 font-medium">
+                                      Rp
+                                    </span>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      {...field}
+                                      className="pl-9 h-10 text-right font-mono"
+                                    />
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        {/* 4. Subtotal Display */}
+                        <div className="md:col-span-2 flex flex-col justify-center items-end h-10 pt-8 md:pt-0">
+                          <span className="md:hidden text-xs text-gray-500 mb-1">
+                            Subtotal
+                          </span>
+                          <span className="font-semibold text-gray-900 font-mono">
+                            {subtotal.toLocaleString("id-ID", {
+                              style: "currency",
+                              currency: "IDR",
+                            })}
+                          </span>
+                        </div>
+
+                        {/* 5. Delete Action */}
+                        <div className="md:col-span-1 flex justify-center pt-8 md:pt-0">
+                          {fields.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => remove(index)}
+                              className="text-gray-400 hover:text-red-600 hover:bg-red-50"
+                              title="Remove Item"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* === BARIS TAMBAHAN (Customization & Remarks) === */}
+                      <div className="bg-gray-50/50 p-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4 rounded-b-lg">
+                        <FormField
+                          control={control}
+                          name={`products.${index}.customization`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input
+                                    placeholder="Add Customization details..."
+                                    {...field}
+                                    className="text-sm border-gray-200 focus:border-blue-300 pl-8 bg-white"
+                                  />
+                                  <span className="absolute left-2.5 top-2.5 text-gray-400">
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M12 20h9" />
+                                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                                    </svg>
+                                  </span>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={control}
+                          name={`products.${index}.remarks`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input
+                                    placeholder="Internal remarks (optional)..."
+                                    {...field}
+                                    className="text-sm border-gray-200 focus:border-blue-300 pl-8 bg-white"
+                                  />
+                                  <span className="absolute left-2.5 top-2.5 text-gray-400">
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                      <polyline points="14 2 14 8 20 8" />
+                                      <line x1="16" y1="13" x2="8" y2="13" />
+                                      <line x1="16" y1="17" x2="8" y2="17" />
+                                      <polyline points="10 9 9 9 8 9" />
+                                    </svg>
+                                  </span>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Submitting..." : "Submit Order"}
+            <Button type="submit" className=" text-md" disabled={loading}>
+              {loading ? "Submitting Order..." : "Create Order"}
             </Button>
           </form>
         </Form>
       </CardContent>
     </Card>
+  );
+}
+
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
   );
 }

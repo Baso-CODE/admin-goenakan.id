@@ -1,0 +1,67 @@
+export async function getToken() {
+  const res = await fetch("/api/auth/token");
+  if (!res.ok) throw new Error("Failed to fetch token");
+  const data = await res.json();
+  return data.token;
+}
+
+export async function fetchWithToken(url: string) {
+  const token = await getToken();
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Failed to fetch ${url}`);
+  return res.json();
+}
+
+export async function postOrder(data: any) {
+  const token = await getToken();
+  const res = await fetch("http://localhost:8000/orders", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to create order");
+  return res.json();
+}
+
+export async function generatePoNumber() {
+  const token = await getToken();
+  const res = await fetch("http://localhost:8000/orders/generate-po", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    const date = new Date();
+    const random = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, "0");
+    return `PO-${date.getFullYear()}${(date.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}-${random}`;
+  }
+
+  const data = await res.json();
+  return data.poNumber;
+}
+
+export async function fetchOrderById(id: string) {
+  return fetchWithToken(`http://localhost:8000/orders/${id}/edit-data`);
+}
+
+export async function updateOrder(id: string, data: any) {
+  const token = await getToken();
+  const res = await fetch(`http://localhost:8000/orders/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update order");
+  return res.json();
+}

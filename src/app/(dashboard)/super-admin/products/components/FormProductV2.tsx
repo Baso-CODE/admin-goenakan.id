@@ -65,6 +65,10 @@ const productSchema = z.object({
   basePrice: z.number().min(0, "Base price must be >= 0"),
   isCustom: z.boolean().optional(),
   materialType: z.string().optional(),
+  weight: z.number().min(0, "Weight must be >= 0").optional(),
+  width: z.number().min(0, "Width must be >= 0").optional(),
+  height: z.number().min(0, "Height must be >= 0").optional(),
+  length: z.number().min(0, "Length must be >= 0").optional(),
 
   // === OPSIONAL ===
   attributes: z.array(attributeSelectionSchema).optional(),
@@ -148,30 +152,24 @@ export default function ProductFormV2({
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: initialData
-      ? {
-          ...initialData,
-          basePrice: Number(initialData.basePrice ?? 0),
-          attributes: initialData.attributes ?? [],
-          priceTiers: initialData.priceTiers ?? [],
-          imagesMetadata: initialData.imagesMetadata ?? [],
-          videosMetadata: [],
-          variantImagesMetadata: initialData.variantImagesMetadata ?? [],
-        }
-      : {
-          name: "",
-          sku: "",
-          categoryId: "",
-          description: "",
-          basePrice: 0,
-          isCustom: false,
-          materialType: "",
-          attributes: [],
-          priceTiers: [],
-          imagesMetadata: [],
-          videosMetadata: [],
-          variantImagesMetadata: [],
-        },
+    defaultValues: {
+      name: "",
+      sku: "",
+      categoryId: "",
+      description: "",
+      basePrice: 0,
+      weight: 0,
+      width: 0,
+      height: 0,
+      length: 0,
+      isCustom: false,
+      materialType: "",
+      attributes: [],
+      priceTiers: [],
+      imagesMetadata: [],
+      videosMetadata: [],
+      variantImagesMetadata: [],
+    },
   });
 
   const [attributeSelections, setAttributeSelections] = useState<
@@ -260,6 +258,10 @@ export default function ProductFormV2({
       const payload: ProductFormValues = {
         ...values,
         basePrice: Number(values.basePrice),
+        weight: Number(values.weight || 0),
+        width: Number(values.width || 0),
+        height: Number(values.height || 0),
+        length: Number(values.length || 0),
         attributes:
           attributeSelections.length > 0 ? attributeSelections : undefined,
         priceTiers: values.priceTiers?.length ? values.priceTiers : undefined,
@@ -395,6 +397,77 @@ export default function ProductFormV2({
                         onCheckedChange={field.onChange}
                       />
                     </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+            {/* Grid untuk Dimensi Produk */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4 mt-4">
+              <FormField
+                control={form.control}
+                name="weight"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Berat (gram)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="length"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Panjang (cm)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="width"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Lebar (cm)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="height"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tinggi (cm)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                      />
+                    </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
