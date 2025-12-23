@@ -12,11 +12,7 @@ import FormUpdateProductMedia from "../../components/update/VariantMediaSection"
 import FormUpdateVariants, {
   VariantFormValues,
 } from "../../components/update/VariantsSection";
-
-type FileUploads = {
-  images?: FileList;
-  videos?: FileList;
-};
+import FormUpdatePriceTiers from "../../components/update/FormUpdatePriceTier";
 
 export default function EditProductPage() {
   const { id } = useParams();
@@ -142,26 +138,20 @@ export default function EditProductPage() {
 
         const variantImages: any[] = [];
 
-        // Proses Gambar dalam Varian
         v.images?.forEach((img) => {
-          if (img._isDeleted) return; // Lewati gambar yang ditandai dihapus
+          if (img._isDeleted) return;
 
           if (img.file && img.file instanceof File) {
-            // Jika ini adalah file baru:
-
-            // 1. Tambahkan File ke array global filesToUpload
             filesToUpload.push(img.file);
 
-            // 2. Tambahkan metadata gambar ke DTO dengan 'fileIndex' global
             variantImages.push({
               id: img.id, // null/undefined jika baru
               altText: img.altText,
               isFeatured: img.isFeatured,
-              // fileIndex = index file ini di dalam array filesToUpload
+
               fileIndex: filesToUpload.length - 1,
             });
           } else {
-            // Jika ini adalah gambar lama (dari DB), tambahkan metadata tanpa fileIndex
             variantImages.push({
               id: img.id,
               altText: img.altText,
@@ -225,6 +215,8 @@ export default function EditProductPage() {
     }
   };
 
+  // Di dalam EditProductPage.tsx
+
   const handleUpdateMediaMetadata = async (
     mediaId: string,
     updates: { altText?: string; isFeatured?: boolean }
@@ -235,7 +227,7 @@ export default function EditProductPage() {
       const { token } = await tokenRes.json();
 
       const res = await fetch(
-        `http://localhost:8000/products/image/${mediaId}`,
+        `http://localhost:8000/products/image/${mediaId}/seo`,
         {
           method: "PATCH",
           headers: {
@@ -251,8 +243,35 @@ export default function EditProductPage() {
         throw new Error(errorData.message || "Failed to update image details");
       }
 
-      const updatedProduct = await res.json();
-      setProductData(updatedProduct); // Update UI dengan data terbaru
+      // 1. Dapatkan data IMAGE yang sudah diupdate dari backend
+      const updatedImage = await res.json();
+
+      // 2. Update State secara Manual (Immutably)
+      setProductData((prev: any) => {
+        if (!prev) return prev;
+
+        // Clone array images
+        let newImages = [...prev.images];
+
+        // Jika user mengubah isFeatured menjadi true, kita harus set false yang lain di state UI
+        if (updates.isFeatured === true) {
+          newImages = newImages.map((img) => ({
+            ...img,
+            isFeatured: false, // Reset semua jadi false dulu
+          }));
+        }
+
+        // Update image yang spesifik dengan data baru dari backend
+        newImages = newImages.map((img) =>
+          img.id === mediaId ? { ...img, ...updatedImage } : img
+        );
+
+        return {
+          ...prev,
+          images: newImages,
+        };
+      });
+
       toast.success("Detail gambar berhasil diperbarui");
     } catch (err) {
       console.error("Error updating media:", err);
@@ -274,7 +293,7 @@ export default function EditProductPage() {
       const { token } = await tokenRes.json();
 
       const res = await fetch(
-        `http://localhost:8000/products/video/${mediaId}`, // Pastikan endpoint benar
+        `http://localhost:8000/products/video/${mediaId}/seo`,
         {
           method: "PATCH",
           headers: {
@@ -290,8 +309,34 @@ export default function EditProductPage() {
         throw new Error(errorData.message || "Failed to update video details");
       }
 
-      const updatedProduct = await res.json();
-      setProductData(updatedProduct);
+      // 1. Dapatkan data VIDEO yang sudah diupdate
+      const updatedVideo = await res.json();
+
+      // 2. Update State Manual
+      setProductData((prev: any) => {
+        if (!prev) return prev;
+
+        let newVideos = [...prev.videos];
+
+        // Reset isFeatured lain jika yang ini jadi featured
+        if (updates.isFeatured === true) {
+          newVideos = newVideos.map((vid) => ({
+            ...vid,
+            isFeatured: false,
+          }));
+        }
+
+        // Update video target
+        newVideos = newVideos.map((vid) =>
+          vid.id === mediaId ? { ...vid, ...updatedVideo } : vid
+        );
+
+        return {
+          ...prev,
+          videos: newVideos,
+        };
+      });
+
       toast.success("Detail video berhasil diperbarui");
     } catch (err) {
       console.error("Error updating video metadata:", err);
@@ -434,8 +479,6 @@ export default function EditProductPage() {
     }
   };
 
-  // Di EditProductPage.tsx
-
   // Fungsi utilitas untuk menghasilkan Cross Product dari Attribute Selections
   const generateCrossProduct = (selections: any[], fullList: any[]) => {
     if (selections.length === 0) return [];
@@ -577,16 +620,66 @@ export default function EditProductPage() {
       `Generated ${newCombinations.length} variants. Check form below.`
     );
   };
+
+  // HANDLER BARU: Update Price Tiers
+  const handleUpdatePriceTiers = async (tiers: any[]) => {
+    setIsSubmitting(true);
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const res = await fetch(
+        `http://localhost:8000/products/${id}/price-tiers`, // Endpoint update (sesuaikan jika beda)
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(tiers), // Kirim array tiers
+        }
+      );
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || "Failed to update price tiers");
+      }
+
+      toast.success("Price tiers updated successfully");
+
+      // Refresh data agar UI terupdate
+      const updatedProductRes = await fetch(
+        `http://localhost:8000/products/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const updatedProduct = await updatedProductRes.json();
+      setProductData(updatedProduct);
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update tiers"
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   return (
     <div className="space-y-4 w-full max-w-full">
       <h2 className="text-xl font-semibold tracking-tight uppercase">
         Edit Produk
       </h2>
-
       <FormProductCore
         initialData={productData}
         onSubmit={handleUpdateProduct}
         isSubmitting={isSubmitting}
+      />
+
+      <FormUpdatePriceTiers
+        initialData={productData}
+        isSubmitting={isSubmitting}
+        onSubmit={handleUpdatePriceTiers}
       />
 
       <FormUpdateProductMedia
@@ -600,7 +693,6 @@ export default function EditProductPage() {
         onUpdateMediaMetadata={handleUpdateMediaMetadata}
         onUpdateVideoMetadata={handleUpdateVideoMetadata}
       />
-
       <FormUpdateAttributes
         initialData={productData}
         isSubmitting={isSubmitting}
@@ -610,7 +702,6 @@ export default function EditProductPage() {
           setCurrentFullList(fullList);
         }}
       />
-
       <FormUpdateVariants
         initialData={productData}
         isSubmitting={isSubmitting}

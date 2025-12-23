@@ -18,12 +18,14 @@ interface ImageDetailModalProps {
   imageMeta: ImageMeta;
   onClose: () => void;
 
+  // Kita cukup pakai satu fungsi ini untuk update semua field (altText & isFeatured)
   setImageMetaField: (
     tempId: string | number,
     patch: Partial<ImageMeta>
   ) => void;
 
-  setFeaturedImage: (tempId: string | number, isFeatured: boolean) => void;
+  // Prop setFeaturedImage tidak wajib dipakai di sini jika kita gabung logicnya
+  setFeaturedImage?: (tempId: string | number, isFeatured: boolean) => void;
 }
 
 export const ImageDetailModalCore = ({
@@ -31,52 +33,48 @@ export const ImageDetailModalCore = ({
   tempId,
   onClose,
   setImageMetaField,
-  setFeaturedImage,
 }: ImageDetailModalProps) => {
-  // State lokal untuk form
+  // 1. BUAT STATE LOKAL UNTUK isFeatured JUGA
   const [altText, setAltText] = useState(imageMeta.altText || "");
+  const [isFeatured, setIsFeatured] = useState(imageMeta.isFeatured || false);
 
+  // 2. UPDATE HANDLE SAVE (Kirim kedua state lokal ke parent)
   const handleSaveAndClose = useCallback(() => {
-    setImageMetaField(tempId, { altText });
+    setImageMetaField(tempId, {
+      altText,
+      isFeatured, // Kirim status featured yang baru saat tombol save ditekan
+    });
     onClose();
-  }, [altText, onClose, setImageMetaField, tempId]);
-
-  const handleSetFeatured = (checked: boolean) => {
-    setFeaturedImage(tempId, checked);
-  };
+  }, [altText, isFeatured, onClose, setImageMetaField, tempId]);
 
   // Menangani penutupan modal dengan tombol Esc
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        handleSaveAndClose();
+        onClose(); // Kalau escape sebaiknya cancel (close tanpa save) atau save, tergantung UX
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handleSaveAndClose]);
+  }, [onClose]);
 
   return (
-    // ... (JSX Modal Anda yang tidak berubah)
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      {/* Modal Container */}
       <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col md:flex-row">
-        {/* Tombol Close Absolute */}
+        {/* Tombol Close (X) - Tanpa Save */}
         <button
-          onClick={handleSaveAndClose}
+          onClick={onClose}
           className="absolute top-3 right-3 p-1 rounded-full bg-black/10 hover:bg-black/20 text-gray-700 transition z-10"
-          title="Save Changes & Close"
+          title="Close without saving"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* --- KOLOM KIRI: PREVIEW GAMBAR --- */}
         <div className="w-full md:w-1/2 bg-gray-100 flex items-center justify-center p-6 relative min-h-[300px]">
-          {/* Tampilkan gambar */}
           {imageMeta.url ? (
             <img
               src={imageMeta.url}
-              // Menggunakan altText dari state lokal untuk preview
               alt={altText || "Preview"}
               className="max-w-full max-h-[300px] object-contain shadow-md rounded-md"
             />
@@ -84,8 +82,8 @@ export const ImageDetailModalCore = ({
             <div className="text-gray-400 text-sm">No Image</div>
           )}
 
-          {/* Badge Status di atas gambar */}
-          {imageMeta.isFeatured && ( // Gunakan isFeatured dari prop (yang sudah di-sync dari parent)
+          {/* Gunakan State Lokal untuk Badge Preview */}
+          {isFeatured && (
             <Badge className="absolute top-4 left-4 bg-indigo-600 hover:bg-indigo-700 gap-1 pl-1 pr-2">
               <Star className="w-3 h-3 fill-white" /> Featured Image
             </Badge>
@@ -100,7 +98,6 @@ export const ImageDetailModalCore = ({
         {/* --- KOLOM KANAN: FORM EDIT --- */}
         <div className="w-full md:w-1/2 p-6 flex flex-col justify-between">
           <div className="space-y-6">
-            {/* ... (Header) ... */}
             <div>
               <h3 className="text-xl font-bold text-gray-900">Image Details</h3>
               <p className="text-sm text-gray-500">
@@ -117,7 +114,7 @@ export const ImageDetailModalCore = ({
               </Label>
               <label
                 className={`flex items-center justify-between p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                  imageMeta.isFeatured // Gunakan isFeatured dari prop
+                  isFeatured // Gunakan State Lokal
                     ? "border-indigo-600 bg-indigo-50"
                     : "border-gray-200 hover:border-gray-300"
                 }`}
@@ -125,28 +122,28 @@ export const ImageDetailModalCore = ({
                 <div className="flex items-center gap-3">
                   <div
                     className={`w-5 h-5 rounded-full flex items-center justify-center border ${
-                      imageMeta.isFeatured // Gunakan isFeatured dari prop
+                      isFeatured // Gunakan State Lokal
                         ? "bg-indigo-600 border-indigo-600"
                         : "border-gray-400"
                     }`}
                   >
-                    {imageMeta.isFeatured && (
-                      <Check className="w-3 h-3 text-white" />
-                    )}
+                    {isFeatured && <Check className="w-3 h-3 text-white" />}
                   </div>
                   <span
                     className={`text-sm font-medium ${
-                      imageMeta.isFeatured ? "text-indigo-700" : "text-gray-600"
+                      isFeatured ? "text-indigo-700" : "text-gray-600"
                     }`}
                   >
                     Set as Featured Image
                   </span>
                 </div>
+
+                {/* 3. INPUT CHECKBOX MENGUBAH STATE LOKAL */}
                 <input
                   type="checkbox"
                   className="hidden"
-                  checked={!!imageMeta.isFeatured} // Gunakan isFeatured dari prop
-                  onChange={(e) => handleSetFeatured(e.target.checked)}
+                  checked={isFeatured} // Bind ke State Lokal
+                  onChange={(e) => setIsFeatured(e.target.checked)} // Update State Lokal saja
                 />
               </label>
               <p className="text-xs text-gray-400 px-1">
@@ -164,10 +161,10 @@ export const ImageDetailModalCore = ({
               </Label>
               <Textarea
                 id="alt-text"
-                placeholder="Describe the image, e.g. 'Men's Black Cotton T-Shirt Front View'"
+                placeholder="Describe the image..."
                 className="resize-none min-h-[100px] focus-visible:ring-indigo-500"
-                value={altText ?? ""}
-                onChange={(e) => setAltText(e.target.value)}
+                value={altText} // Bind ke State Lokal
+                onChange={(e) => setAltText(e.target.value)} // Update State Lokal
               />
             </div>
           </div>

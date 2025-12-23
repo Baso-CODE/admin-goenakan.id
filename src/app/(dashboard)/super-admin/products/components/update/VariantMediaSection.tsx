@@ -34,7 +34,6 @@ interface FormUpdateProductMediaProps {
   onUpdateVideoMetadata: (mediaId: string, updates: any) => Promise<void>;
 }
 
-// Sub-komponen untuk menampilkan media yang sudah ada dengan tombol hapus
 function ExistingMediaDisplay({
   media,
   type,
@@ -49,53 +48,63 @@ function ExistingMediaDisplay({
   isSubmitting: boolean;
 }) {
   return (
-    <div className="flex flex-wrap gap-3 p-2 border rounded-md min-h-20">
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-4 border rounded-lg bg-gray-50/50 min-h-[120px]">
       {media.map((m) => (
         <div
           key={m.id}
-          className="relative w-24 h-24 rounded-md overflow-hidden border"
+          // PERBAIKAN 1: Tambahkan 'group' di sini
+          className="group relative aspect-square rounded-lg overflow-hidden border bg-white shadow-sm hover:shadow-md transition-all"
         >
           {type === "image" ? (
             <Image src={m.url} alt="img" fill className="object-cover" />
           ) : (
-            <video src={m.url} className="w-full h-full object-cover" />
+            // PERBAIKAN 3: Video tanpa controls agar overlay hover bekerja
+            <video
+              src={m.url}
+              className="w-full h-full object-cover"
+              muted
+              playsInline
+            />
           )}
 
-          {type === "image" && m.isFeatured && (
-            <div className="absolute top-0 left-0 bg-indigo-600 p-1 rounded-br-md z-10">
-              <Star className="h-3 w-3 fill-white text-white" />
+          {m.isFeatured && (
+            <div className="absolute top-0 left-0 bg-yellow-500 p-1.5 rounded-br-lg z-20 shadow-sm">
+              <Star className="h-3.5 w-3.5 fill-white text-white" />
             </div>
           )}
 
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-30">
             <Button
               type="button"
               size="icon"
               variant="secondary"
-              className="h-7 w-7 bg-white text-gray-800"
+              className="h-8 w-8 rounded-full bg-white hover:bg-gray-100 text-gray-700 shadow-md"
               onClick={() => onEdit(m)}
               disabled={isSubmitting}
+              title="Edit Detail SEO"
             >
-              <Pencil className="h-3 w-3" />
+              <Pencil className="h-4 w-4" />
             </Button>
 
             <Button
               type="button"
               size="icon"
               variant="destructive"
-              className="h-7 w-7"
+              className="h-8 w-8 rounded-full shadow-md"
               onClick={() => onDelete(m.id)}
               disabled={isSubmitting}
+              title="Hapus Media"
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
       ))}
+
       {media.length === 0 && (
-        <p className="text-sm text-muted-foreground self-center p-2">
-          Belum ada {type} produk yang diunggah.
-        </p>
+        <div className="col-span-full flex flex-col items-center justify-center h-full text-muted-foreground italic text-sm">
+          <p>Belum ada {type === "image" ? "gambar" : "video"} produk.</p>
+        </div>
       )}
     </div>
   );
@@ -158,7 +167,7 @@ export default function FormUpdateProductMedia({
   const handleFileChange = async (
     e: ChangeEvent<HTMLInputElement>,
     handler: (file: File) => Promise<void>,
-    ref: React.RefObject<HTMLInputElement>
+    ref: React.RefObject<HTMLInputElement | null>
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;

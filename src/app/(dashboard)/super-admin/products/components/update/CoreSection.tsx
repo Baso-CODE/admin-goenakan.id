@@ -38,6 +38,11 @@ const FormCoreSchema = z.object({
   isCustom: z.boolean().optional(),
   materialType: z.string().optional(),
   categoryId: z.string().min(1, "Kategori wajib dipilih"),
+
+  weight: z.preprocess((v) => Number(v), z.number().min(0).optional()),
+  length: z.preprocess((v) => Number(v), z.number().min(0).optional()),
+  width: z.preprocess((v) => Number(v), z.number().min(0).optional()),
+  height: z.preprocess((v) => Number(v), z.number().min(0).optional()),
 });
 
 export type ProductCoreFormValues = z.infer<typeof FormCoreSchema>;
@@ -69,6 +74,10 @@ export default function FormProductCore({
       isCustom: false,
       materialType: "",
       categoryId: "",
+      weight: 0,
+      length: 0,
+      width: 0,
+      height: 0,
     },
   });
 
@@ -82,9 +91,13 @@ export default function FormProductCore({
         isCustom: initialData.isCustom ?? false,
         materialType: initialData.materialType ?? "",
         categoryId: initialData.categoryId ?? "",
+        weight: initialData.weight ?? 0,
+        length: initialData.length ?? 0,
+        width: initialData.width ?? 0,
+        height: initialData.height ?? 0,
       });
     }
-  }, [initialData, categories]);
+  }, [initialData, categories, form]);
 
   // Fetch kategori
   useEffect(() => {
@@ -233,6 +246,61 @@ export default function FormProductCore({
                   onCheckedChange={(v) => field.onChange(Boolean(v))}
                 />
                 <FormLabel>Produk Custom?</FormLabel>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4">
+          <FormField
+            control={form.control}
+            name="weight"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Berat (gram)</FormLabel>
+                <FormControl>
+                  <Input type="number" min={0} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="length"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Panjang (cm)</FormLabel>
+                <FormControl>
+                  <Input type="number" min={0} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="width"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Lebar (cm)</FormLabel>
+                <FormControl>
+                  <Input type="number" min={0} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="height"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tinggi (cm)</FormLabel>
+                <FormControl>
+                  <Input type="number" min={0} {...field} />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

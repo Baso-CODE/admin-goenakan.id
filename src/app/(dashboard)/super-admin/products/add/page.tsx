@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import ProductFormV2, { ProductFormValues } from "../components/FormProductV2";
 
 type FileUploads = {
-  images: FileList | null;
-  videos: FileList | null;
+  images: File[] | null;
+  videos: File[] | null;
   variantImages: File[][];
 };
 
@@ -26,16 +26,12 @@ export default function AddProductPage() {
 
       // 1️⃣ Append images
       if (files.images) {
-        Array.from(files.images).forEach((file) =>
-          formData.append("images", file)
-        );
+        files.images.forEach((file) => formData.append("images", file));
       }
 
       // 2️⃣ Append videos
       if (files.videos) {
-        Array.from(files.videos).forEach((file) =>
-          formData.append("videos", file)
-        );
+        files.videos.forEach((file) => formData.append("videos", file));
       }
 
       if (files.variantImages && files.variantImages.length > 0) {

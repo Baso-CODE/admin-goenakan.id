@@ -30,6 +30,7 @@ import { AttributeSelector } from "./AttributeSelector";
 import { UploadImages } from "./upload-images";
 import { UploadVideos } from "./upload-videos";
 import { VariantList } from "./VariantList";
+import { PriceTiers } from "./PriceTiers";
 
 // === Tipe Data (Asumsi dari Kategori) ===
 type Category = {
@@ -37,9 +38,16 @@ type Category = {
   name: string;
 };
 
-// -----------------------------
-// Zod schema (frontend validation)
-// -----------------------------
+export const priceTierSchema = z.object({
+  minQuantity: z.number().min(1, "Min qty wajib diisi"),
+  maxQuantity: z.number().min(1).nullable().optional(),
+  price: z
+    .string()
+    .or(z.number())
+    .transform((val) => String(val))
+    .refine((val) => val.length > 0, "Harga wajib diisi"),
+});
+
 const attributeSelectionSchema = z.object({
   attributeId: z.string().min(1, "Attribute required"),
   valueIds: z.array(z.string()).min(1, "Choose at least one value"),
@@ -69,10 +77,10 @@ const productSchema = z.object({
   width: z.number().min(0, "Width must be >= 0").optional(),
   height: z.number().min(0, "Height must be >= 0").optional(),
   length: z.number().min(0, "Length must be >= 0").optional(),
+  priceTiers: z.array(priceTierSchema).optional(),
 
   // === OPSIONAL ===
   attributes: z.array(attributeSelectionSchema).optional(),
-  priceTiers: z.array(z.any()).optional(),
   imagesMetadata: z
     .array(
       z.object({
@@ -151,7 +159,7 @@ export default function ProductFormV2({
   }, []);
 
   const form = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema),
+    resolver: zodResolver(productSchema) as any,
     defaultValues: {
       name: "",
       sku: "",
@@ -169,12 +177,12 @@ export default function ProductFormV2({
       imagesMetadata: [],
       videosMetadata: [],
       variantImagesMetadata: [],
-    },
+    } as ProductFormValues,
   });
 
   const [attributeSelections, setAttributeSelections] = useState<
     { attributeId: string; valueIds: string[] }[]
-  >(form.getValues("attributes") ?? []); // generated combination list: each entry { label, valueIds[] }
+  >(form.getValues("attributes") ?? []);
 
   const [combinations, setCombinations] = useState<
     { label: string; valueIds: string[] }[]
@@ -400,6 +408,10 @@ export default function ProductFormV2({
                   </FormItem>
                 )}
               />
+            </div>
+
+            <div className="mt-6">
+              <PriceTiers />
             </div>
             {/* Grid untuk Dimensi Produk */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4 mt-4">
