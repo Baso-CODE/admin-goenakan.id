@@ -1,26 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { cn } from "@/lib/utils";
-import { useParams, useRouter } from "next/navigation"; // Hook routing
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-  FormDescription,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Command,
   CommandEmpty,
@@ -30,24 +11,42 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
-  PlusCircle,
-  Trash2,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  ArrowLeft,
   Check,
   ChevronsUpDown,
-  Settings2,
   Loader2,
-  ArrowLeft,
+  PlusCircle,
   RefreshCcw,
+  Trash2,
 } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { OrderFormValues, orderSchema } from "../../order-schema";
 import {
@@ -58,13 +57,29 @@ import {
 } from "../../order-service";
 
 // === TYPES ===
-// (Samakan dengan CreateOrderForm)
+type PIC = {
+  id: string;
+  name: string;
+  position?: string;
+  phone?: string;
+};
+
+type PurchaseChannel = {
+  id: string;
+  name: string;
+};
+
 type Client = {
   id: string;
   name: string;
   phone: string;
   address: string;
+  custCode?: string;
+  type?: "B2B" | "B2C";
+  pics?: PIC[];
+  purchaseChannelId?: string;
 };
+
 type Sales = { id: string; name: string; phone: string };
 type Vendor = { id: string; companyName: string };
 type ProductVariant = { id: string; variantName: string; price: number };
@@ -81,16 +96,17 @@ type Product = {
 export default function EditOrderForm() {
   const params = useParams();
   const router = useRouter();
-  const orderId = params.id as string; // Ambil ID dari URL
+  const orderId = params.id as string;
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderSchema),
     defaultValues: {
-      // Default kosong, nanti di-reset setelah data load
       dateOrder: "",
       salesCategory: "SALES",
       poNumber: "",
       clientId: "",
+      clientB2BPICId: "", // Default value
+      purchaseChannelId: "", // Default value
       phone: "",
       shippingAddress: "",
       salesId: "",
@@ -99,7 +115,7 @@ export default function EditOrderForm() {
     },
   });
 
-  const { control, handleSubmit, watch, setValue, reset } = form;
+  const { control, handleSubmit, watch, setValue, reset, getValues } = form;
   const { fields, append, remove } = useFieldArray({
     control,
     name: "products",
@@ -110,8 +126,11 @@ export default function EditOrderForm() {
   const [sales, setSales] = useState<Sales[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
+    []
+  ); // State untuk channel
 
-  const [loading, setLoading] = useState(true); // Loading awal true
+  const [loading, setLoading] = useState(true);
   const [generatingPo, setGeneratingPo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
@@ -124,32 +143,48 @@ export default function EditOrderForm() {
       try {
         setLoading(true);
 
-        // 1. Load Master Data + Order Data Paralel
-        const [c, s, v, p, orderData] = await Promise.all([
+        const [c, s, v, p, pc, orderData] = await Promise.all([
           fetchWithToken("http://localhost:8000/clients/order"),
           fetchWithToken("http://localhost:8000/sales/order"),
           fetchWithToken("http://localhost:8000/vendors/order/add"),
           fetchWithToken("http://localhost:8000/products/order"),
-          fetchOrderById(orderId), // Fetch order detail
+          // Load Master Purchase Channel
+          fetchWithToken("http://localhost:8000/purchase-channels/list"),
+          fetchOrderById(orderId),
         ]);
 
         setClients(c);
         setSales(s);
         setVendors(v);
         setProducts(p);
+        setPurchaseChannels(pc);
 
-        // 2. Format Data Order untuk Form
+        // Populate Form
         if (orderData) {
-          // Hanya perlu cari phone client karena API update tidak return phone
           const currentClient = c.find(
             (cli: Client) => cli.id === orderData.clientId
           );
 
-      
+          // Backend service Anda sudah return 'formValues' yang rapi (vendorIds sudah array string)
+          // Jadi kita tinggal masukkan ke reset()
           reset({
             ...orderData,
+            // Pastikan field PIC dan Channel di-set (fallback ke empty string)
+            clientB2BPICId: orderData.clientB2BPICId || "",
+            purchaseChannelId: orderData.purchaseChannelId || "",
+            // Phone logic
             phone: currentClient?.phone || "",
           });
+
+          // Logic tambahan: Jika ada PIC yang tersimpan, update no HP ke HP PIC
+          if (orderData.clientB2BPICId && currentClient?.type === "B2B") {
+            const selectedPic = currentClient.pics?.find(
+              (p: PIC) => p.id === orderData.clientB2BPICId
+            );
+            if (selectedPic?.phone) {
+              setValue("phone", selectedPic.phone);
+            }
+          }
         }
       } catch (error) {
         console.error("Error loading data:", error);
@@ -162,7 +197,24 @@ export default function EditOrderForm() {
     if (orderId) {
       loadData();
     }
-  }, [orderId, reset]);
+  }, [orderId, reset, setValue]);
+
+  // === LOGIC CLIENT & PIC ===
+  const selectedClientData = clients.find((c) => c.id === selectedClientId);
+  const isB2B = selectedClientData?.type === "B2B";
+  const availablePics = selectedClientData?.pics || [];
+
+  // Effect: Update Phone saat PIC dipilih (User interaction)
+  const selectedPicId = watch("clientB2BPICId");
+  useEffect(() => {
+    // Jalankan hanya jika loading selesai agar tidak bentrok saat initial render
+    if (!loading && isB2B && selectedPicId) {
+      const pic = availablePics.find((p) => p.id === selectedPicId);
+      if (pic && (pic as any).phone) {
+        setValue("phone", (pic as any).phone);
+      }
+    }
+  }, [selectedPicId, isB2B, availablePics, setValue, loading]);
 
   // Handler: Generate PO Number
   const handleGeneratePO = async () => {
@@ -183,11 +235,14 @@ export default function EditOrderForm() {
       setSubmitting(true);
       const { phone, ...payload } = data;
 
-      // Panggil API Update
+      // Bersihkan string kosong agar Prisma disconnect (optional, backend sudah handle)
+      if (!payload.clientB2BPICId) delete payload.clientB2BPICId;
+      if (!payload.purchaseChannelId) delete payload.purchaseChannelId;
+
       await updateOrder(orderId, payload);
 
       toast.success("Order updated successfully");
-      router.push("/orders");
+      router.push("/super-admin/orders");
     } catch {
       toast.error("Failed to update order");
     } finally {
@@ -211,13 +266,18 @@ export default function EditOrderForm() {
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <CardTitle className="text-2xl font-semibold">
-          Edit Order #{form.getValues("poNumber")}
+          Edit Order #{getValues("poNumber")}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+            {/* === SECTION 1: ORDER DETAILS === */}
             <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
+              <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
+                Order Details
+              </h3>
+              {/* ... (Date, SalesCategory, PONumber SAMA SEPERTI SEBELUMNYA) ... */}
               <FormField
                 control={control}
                 name="dateOrder"
@@ -267,8 +327,7 @@ export default function EditOrderForm() {
                         type="button"
                         variant="outline"
                         onClick={handleGeneratePO}
-                        disabled={generatingPo}
-                      >
+                        disabled={generatingPo}>
                         {generatingPo ? (
                           <RefreshCcw className="w-4 h-4 animate-spin" />
                         ) : (
@@ -276,22 +335,19 @@ export default function EditOrderForm() {
                         )}
                       </Button>
                     </div>
-                    <FormDescription>
-                      Click Generate if you don't have a PO Number.
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
-            {/* === SECTION 2: CUSTOMER & LOGISTICS === */}
+            {/* === SECTION 2: CUSTOMER & LOGISTICS (UPDATED) === */}
             <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
               <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
                 Customer & Logistics
               </h3>
 
-              {/* Filtering Client Order (Combobox) */}
+              {/* CLIENT SELECT */}
               <FormField
                 control={control}
                 name="clientId"
@@ -307,8 +363,7 @@ export default function EditOrderForm() {
                             className={cn(
                               "w-full justify-between",
                               !field.value && "text-muted-foreground"
-                            )}
-                          >
+                            )}>
                             {field.value
                               ? clients.find(
                                   (client) => client.id === field.value
@@ -326,13 +381,25 @@ export default function EditOrderForm() {
                             <CommandGroup>
                               {clients.map((client) => (
                                 <CommandItem
-                                  value={client.name}
+                                  value={`${client.name}-${client.id}`} // Unique
                                   key={client.id}
                                   onSelect={() => {
                                     form.setValue("clientId", client.id);
+                                    // Reset Logic saat Ganti Client (Manual Change)
+                                    form.setValue("clientB2BPICId", "");
+
+                                    // Auto Select Channel
+                                    if (client.purchaseChannelId) {
+                                      form.setValue(
+                                        "purchaseChannelId",
+                                        client.purchaseChannelId
+                                      );
+                                    } else {
+                                      form.setValue("purchaseChannelId", "");
+                                    }
+
                                     setClientOpen(false);
-                                  }}
-                                >
+                                  }}>
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
@@ -354,7 +421,46 @@ export default function EditOrderForm() {
                 )}
               />
 
-              {/* Read Only Phone Number */}
+              {/* PIC SELECT (HANYA MUNCUL JIKA B2B) */}
+              {isB2B && (
+                <FormField
+                  control={control}
+                  name="clientB2BPICId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Select PIC</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select PIC from company" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {availablePics.length > 0 ? (
+                            availablePics.map((pic) => (
+                              <SelectItem key={pic.id} value={pic.id}>
+                                {pic.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="p-2 text-sm text-muted-foreground text-center">
+                              No PIC available
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Who is responsible for this invoice?
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* PHONE */}
               <FormField
                 control={control}
                 name="phone"
@@ -362,21 +468,42 @@ export default function EditOrderForm() {
                   <FormItem>
                     <FormLabel>Phone Number</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        readOnly
-                        className="bg-gray-100"
-                        placeholder="Auto-filled from client"
-                      />
+                      <Input {...field} readOnly className="bg-gray-100" />
                     </FormControl>
-                    <FormDescription>
-                      This info comes from the selected client.
-                    </FormDescription>
                   </FormItem>
                 )}
               />
 
-              {/* Shipping Address (Auto-filled but editable) */}
+              {/* PURCHASE CHANNEL (ADDED) */}
+              <FormField
+                control={control}
+                name="purchaseChannelId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Purchase Channel</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select channel" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {purchaseChannels.map((pc) => (
+                          <SelectItem key={pc.id} value={pc.id}>
+                            {pc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>Source of this order.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* SHIPPING ADDRESS */}
               <FormField
                 control={control}
                 name="shippingAddress"
@@ -384,11 +511,7 @@ export default function EditOrderForm() {
                   <FormItem className="md:col-span-2">
                     <FormLabel>Shipping Address</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Shipping address"
-                        {...field}
-                        rows={3}
-                      />
+                      <Textarea {...field} rows={3} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -397,11 +520,12 @@ export default function EditOrderForm() {
             </div>
 
             {/* === SECTION 3: SALES & VENDOR === */}
+            {/* ... Bagian ini sama seperti sebelumnya, biarkan vendorIds apa adanya ... */}
             <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
               <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
                 Internal & Vendor
               </h3>
-
+              {/* SalesId Field ... */}
               <FormField
                 control={control}
                 name="salesId"
@@ -427,6 +551,7 @@ export default function EditOrderForm() {
                 )}
               />
 
+              {/* VendorIds Field */}
               <FormField
                 control={control}
                 name="vendorIds"
@@ -435,13 +560,11 @@ export default function EditOrderForm() {
                     <FormLabel>Vendors (Multiple)</FormLabel>
                     <Select
                       onValueChange={(val) => {
-                        // Avoid duplicates
                         const current = field.value || [];
                         if (!current.includes(val)) {
                           field.onChange([...current, val]);
                         }
-                      }}
-                    >
+                      }}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Add a vendor..." />
@@ -455,8 +578,6 @@ export default function EditOrderForm() {
                         ))}
                       </SelectContent>
                     </Select>
-
-                    {/* Selected Vendor Chips */}
                     <div className="flex flex-wrap gap-2 mt-3">
                       {field.value?.map((id) => {
                         const vendor = vendors.find((v) => v.id === id);
@@ -464,8 +585,7 @@ export default function EditOrderForm() {
                         return (
                           <div
                             key={id}
-                            className="flex items-center gap-2 bg-white border px-3 py-1 rounded-full text-sm shadow-sm"
-                          >
+                            className="flex items-center gap-2 bg-white border px-3 py-1 rounded-full text-sm shadow-sm">
                             <span>{vendor.companyName}</span>
                             <button
                               type="button"
@@ -474,18 +594,12 @@ export default function EditOrderForm() {
                                   field.value.filter((vId) => vId !== id)
                                 )
                               }
-                              className="text-red-500 hover:text-red-700 rounded-full p-0.5"
-                            >
+                              className="text-red-500 hover:text-red-700 rounded-full p-0.5">
                               <XIcon className="w-3 h-3" />
                             </button>
                           </div>
                         );
                       })}
-                      {field.value?.length === 0 && (
-                        <p className="text-sm text-gray-400 italic">
-                          No vendors selected.
-                        </p>
-                      )}
                     </div>
                     <FormMessage />
                   </FormItem>
@@ -494,6 +608,7 @@ export default function EditOrderForm() {
             </div>
 
             {/* === SECTION 4: PRODUCTS === */}
+            {/* ... Bagian Product sama persis dengan Create, copy paste saja ... */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold text-xl text-gray-800">
@@ -513,13 +628,12 @@ export default function EditOrderForm() {
                       remarks: "",
                     })
                   }
-                  className="border-dashed border-gray-400 hover:border-gray-600 hover:bg-gray-50"
-                >
+                  className="border-dashed border-gray-400 hover:border-gray-600 hover:bg-gray-50">
                   <PlusCircle className="w-4 h-4 mr-2" /> Add Product
                 </Button>
               </div>
 
-              {/* Header Kolom (Hanya muncul di Desktop md ke atas) */}
+              {/* Product List Header */}
               {fields.length > 0 && (
                 <div className="hidden md:grid md:grid-cols-12 gap-4 px-4 py-2 bg-[#975a3e] rounded-t-lg font-medium text-sm text-gray-100">
                   <div className="col-span-4">Product Details</div>
@@ -537,8 +651,6 @@ export default function EditOrderForm() {
                     (p) => p.id === currentProductId
                   );
                   const isCustomProduct = selectedProduct?.isCustom;
-
-                  // Hitung subtotal baris ini
                   const subtotal =
                     (watch(`products.${index}.price`) || 0) *
                     (watch(`products.${index}.quantity`) || 0);
@@ -546,21 +658,15 @@ export default function EditOrderForm() {
                   return (
                     <div
                       key={field.id}
-                      className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
-                    >
-                      {/* === BARIS UTAMA (Product, Qty, Price) === */}
+                      className="border rounded-lg bg-white shadow-sm">
                       <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                        {/* 1. Product & Variant Selection */}
+                        {/* 1. Product & Variant */}
                         <div className="md:col-span-4 space-y-3">
-                          {/* Product Select */}
                           <FormField
                             control={control}
                             name={`products.${index}.productId`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="md:hidden">
-                                  Product
-                                </FormLabel>
                                 <Select
                                   onValueChange={(val) => {
                                     field.onChange(val);
@@ -568,26 +674,22 @@ export default function EditOrderForm() {
                                       `products.${index}.variantId`,
                                       ""
                                     );
-
                                     const prod = products.find(
                                       (p) => p.id === val
                                     );
-                                    if (prod) {
-                                      if (!prod.isCustom) {
-                                        form.setValue(
-                                          `products.${index}.price`,
-                                          prod.basePrice
-                                        );
-                                      } else {
-                                        form.setValue(
-                                          `products.${index}.price`,
-                                          0
-                                        );
-                                      }
+                                    if (prod && !prod.isCustom) {
+                                      form.setValue(
+                                        `products.${index}.price`,
+                                        prod.basePrice
+                                      );
+                                    } else {
+                                      form.setValue(
+                                        `products.${index}.price`,
+                                        0
+                                      );
                                     }
                                   }}
-                                  value={field.value}
-                                >
+                                  value={field.value}>
                                   <FormControl>
                                     <SelectTrigger className="h-10">
                                       <SelectValue placeholder="Select Product" />
@@ -597,32 +699,23 @@ export default function EditOrderForm() {
                                     {products.map((p) => (
                                       <SelectItem key={p.id} value={p.id}>
                                         <div className="flex items-center justify-between w-full gap-4 min-w-[200px]">
-                                          {/* Nama Produk */}
-                                          <span className="font-medium truncate text-gray-700">
+                                          <span className="truncate">
                                             {p.name}
                                           </span>
-
-                                          {/* Badge Custom dengan Lucide React */}
                                           {p.isCustom && (
-                                            <div className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
-                                              {/* Ikon Lucide */}
-                                              <Settings2 className="w-3 h-3" />
-                                              <span className="text-[10px] font-bold tracking-wide">
-                                                CUSTOM
-                                              </span>
-                                            </div>
+                                            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-100">
+                                              CUSTOM
+                                            </span>
                                           )}
                                         </div>
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
-                                <FormMessage />
                               </FormItem>
                             )}
                           />
-
-                          {/* Variant Select (Conditionally Rendered) */}
+                          {/* Variant Select */}
                           {isCustomProduct && (
                             <FormField
                               control={control}
@@ -632,18 +725,17 @@ export default function EditOrderForm() {
                                   <Select
                                     onValueChange={(val) => {
                                       field.onChange(val);
-                                      const variant = selectedProduct?.productVariants.find(
-                                        (v) => v.id === val
-                                      );
-                                      if (variant) {
+                                      const variant =
+                                        selectedProduct?.productVariants.find(
+                                          (v) => v.id === val
+                                        );
+                                      if (variant)
                                         form.setValue(
                                           `products.${index}.price`,
                                           Number(variant.price)
                                         );
-                                      }
                                     }}
-                                    value={field.value}
-                                  >
+                                    value={field.value}>
                                     <FormControl>
                                       <SelectTrigger className="h-9 text-sm bg-gray-50 border-dashed">
                                         <SelectValue placeholder="Select Variant" />
@@ -659,114 +751,63 @@ export default function EditOrderForm() {
                                       )}
                                     </SelectContent>
                                   </Select>
-                                  <FormMessage />
                                 </FormItem>
                               )}
                             />
                           )}
                         </div>
 
-                        {/* 2. Quantity Input */}
+                        {/* 2. Quantity */}
                         <div className="md:col-span-2">
                           <FormField
                             control={control}
                             name={`products.${index}.quantity`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="md:hidden">
-                                  Quantity
-                                </FormLabel>
                                 <FormControl>
-                                  <div className="relative">
-                                    <Input
-                                      type="number"
-                                      min={1}
-                                      {...field}
-                                      onChange={(e) => {
-                                        const val =
-                                          parseInt(e.target.value) || 0;
-                                        field.onChange(val);
-
-                                        // Logic Price Tiers (Sama seperti sebelumnya)
-                                        if (
-                                          selectedProduct &&
-                                          !selectedProduct.isCustom &&
-                                          selectedProduct.priceTiers?.length > 0
-                                        ) {
-                                          const tiers = [
-                                            ...selectedProduct.priceTiers,
-                                          ].sort(
-                                            (a, b) =>
-                                              b.minQuantity - a.minQuantity
-                                          );
-                                          const applicableTier = tiers.find(
-                                            (tier) => val >= tier.minQuantity
-                                          );
-
-                                          if (applicableTier) {
-                                            form.setValue(
-                                              `products.${index}.price`,
-                                              Number(applicableTier.price)
-                                            );
-                                            toast.info(
-                                              `Price updated to tier ≥${applicableTier.minQuantity}`
-                                            );
-                                          } else {
-                                            form.setValue(
-                                              `products.${index}.price`,
-                                              selectedProduct.basePrice
-                                            );
-                                          }
-                                        }
-                                      }}
-                                      className="text-center h-10"
-                                    />
-                                    <span className="absolute right-3 top-2.5 text-xs text-gray-400 pointer-events-none">
-                                      pcs
-                                    </span>
-                                  </div>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    {...field}
+                                    onChange={(e) => {
+                                      const val = parseInt(e.target.value) || 0;
+                                      field.onChange(val);
+                                    }}
+                                    className="text-center"
+                                  />
                                 </FormControl>
-                                <FormMessage />
                               </FormItem>
                             )}
                           />
                         </div>
 
-                        {/* 3. Unit Price Input */}
+                        {/* 3. Unit Price */}
                         <div className="md:col-span-3">
                           <FormField
                             control={control}
                             name={`products.${index}.price`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="md:hidden">
-                                  Unit Price
-                                </FormLabel>
                                 <FormControl>
                                   <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-xs text-gray-500 font-medium">
+                                    <span className="absolute left-3 top-2.5 text-xs text-gray-500">
                                       Rp
                                     </span>
                                     <Input
                                       type="number"
-                                      min={0}
                                       {...field}
-                                      className="pl-9 h-10 text-right font-mono"
+                                      className="pl-9 text-right"
                                     />
                                   </div>
                                 </FormControl>
-                                <FormMessage />
                               </FormItem>
                             )}
                           />
                         </div>
 
-                        {/* 4. Subtotal Display */}
-                        <div className="md:col-span-2 flex flex-col justify-center items-end h-10 pt-8 md:pt-0">
-                          <span className="md:hidden text-xs text-gray-500 mb-1">
-                            Subtotal
-                          </span>
-                          <span className="font-semibold text-gray-900 font-mono">
+                        {/* 4. Subtotal */}
+                        <div className="md:col-span-2 flex flex-col justify-center items-end h-10">
+                          <span className="font-semibold text-gray-900">
                             {subtotal.toLocaleString("id-ID", {
                               style: "currency",
                               currency: "IDR",
@@ -774,56 +815,32 @@ export default function EditOrderForm() {
                           </span>
                         </div>
 
-                        {/* 5. Delete Action */}
-                        <div className="md:col-span-1 flex justify-center pt-8 md:pt-0">
-                          {fields.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => remove(index)}
-                              className="text-gray-400 hover:text-red-600 hover:bg-red-50"
-                              title="Remove Item"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </Button>
-                          )}
+                        {/* 5. Delete */}
+                        <div className="md:col-span-1 flex justify-center">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => remove(index)}>
+                            <Trash2 className="w-5 h-5 text-gray-400 hover:text-red-600" />
+                          </Button>
                         </div>
                       </div>
 
-                      {/* === BARIS TAMBAHAN (Customization & Remarks) === */}
-                      <div className="bg-gray-50/50 p-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4 rounded-b-lg">
+                      {/* Remarks & Customization */}
+                      <div className="bg-gray-50/50 p-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                           control={control}
                           name={`products.${index}.customization`}
                           render={({ field }) => (
                             <FormItem>
                               <FormControl>
-                                <div className="relative">
-                                  <Input
-                                    placeholder="Add Customization details..."
-                                    {...field}
-                                    className="text-sm border-gray-200 focus:border-blue-300 pl-8 bg-white"
-                                  />
-                                  <span className="absolute left-2.5 top-2.5 text-gray-400">
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      width="16"
-                                      height="16"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    >
-                                      <path d="M12 20h9" />
-                                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                                    </svg>
-                                  </span>
-                                </div>
+                                <Input
+                                  placeholder="Customization details..."
+                                  {...field}
+                                  className="text-sm bg-white"
+                                />
                               </FormControl>
-                              <FormMessage />
                             </FormItem>
                           )}
                         />
@@ -833,34 +850,12 @@ export default function EditOrderForm() {
                           render={({ field }) => (
                             <FormItem>
                               <FormControl>
-                                <div className="relative">
-                                  <Input
-                                    placeholder="Internal remarks (optional)..."
-                                    {...field}
-                                    className="text-sm border-gray-200 focus:border-blue-300 pl-8 bg-white"
-                                  />
-                                  <span className="absolute left-2.5 top-2.5 text-gray-400">
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      width="16"
-                                      height="16"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    >
-                                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                      <polyline points="14 2 14 8 20 8" />
-                                      <line x1="16" y1="13" x2="8" y2="13" />
-                                      <line x1="16" y1="17" x2="8" y2="17" />
-                                      <polyline points="10 9 9 9 8 9" />
-                                    </svg>
-                                  </span>
-                                </div>
+                                <Input
+                                  placeholder="Remarks..."
+                                  {...field}
+                                  className="text-sm bg-white"
+                                />
                               </FormControl>
-                              <FormMessage />
                             </FormItem>
                           )}
                         />
@@ -870,12 +865,12 @@ export default function EditOrderForm() {
                 })}
               </div>
             </div>
+
             <div className="flex justify-end gap-4">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.back()}
-              >
+                onClick={() => router.back()}>
                 Cancel
               </Button>
               <Button type="submit" disabled={submitting}>
@@ -892,7 +887,6 @@ export default function EditOrderForm() {
   );
 }
 
-// Icon Helper
 function XIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -903,8 +897,7 @@ function XIcon({ className }: { className?: string }) {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={className}
-    >
+      className={className}>
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
     </svg>

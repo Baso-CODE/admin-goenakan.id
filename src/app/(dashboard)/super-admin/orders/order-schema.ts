@@ -5,6 +5,8 @@ export const orderSchema = z.object({
   salesCategory: z.enum(["SALES", "SAMPLE"]),
   poNumber: z.string().min(1, "PO Number is required"),
   clientId: z.string().min(1, "Client is required"),
+  clientB2BPICId: z.string().optional(),
+  purchaseChannelId: z.string().optional(),
 
   phone: z.string().optional(),
   shippingAddress: z.string().min(1, "Shipping address required"),

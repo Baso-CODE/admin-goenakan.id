@@ -1,3 +1,5 @@
+import { getSession } from "next-auth/react";
+
 export async function getToken() {
   const res = await fetch("/api/auth/token");
   if (!res.ok) throw new Error("Failed to fetch token");
@@ -12,6 +14,49 @@ export async function fetchWithToken(url: string) {
   });
   if (!res.ok) throw new Error(`Failed to fetch ${url}`);
   return res.json();
+}
+
+async function getAuthToken() {
+  const session = await getSession();
+  console.log("ini adlah console.log", session);
+
+  return session?.expires ? session.user : null;
+}
+
+export async function fetchWithTokenNew(
+  url: string,
+  options: RequestInit = {}
+) {
+  try {
+    const token = await getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found. Please login.");
+    }
+
+    // Gabungkan headers bawaan dengan Authorization header
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...options.headers,
+    };
+
+    const res = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (!res.ok) {
+      // Coba baca pesan error dari backend jika ada
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || `API Error: ${res.statusText}`);
+    }
+
+    return res.json();
+  } catch (error) {
+    console.error("Fetch Error:", error);
+    throw error; // Re-throw agar bisa ditangkap di komponen
+  }
 }
 
 export async function postOrder(data: any) {

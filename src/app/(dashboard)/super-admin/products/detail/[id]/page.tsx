@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ProductSeoForm } from "../../components/productSeoForm";
 
 interface ProductDetail {
   id: string;
@@ -453,12 +454,17 @@ export default function ProductDetailPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* META */}
       <p className="text-xs text-muted-foreground text-right">
         Dibuat: {new Date(product.createdAt).toLocaleString("id-ID")} —
         Diperbarui: {new Date(product.updatedAt).toLocaleString("id-ID")}
       </p>
+      {product && (
+        <>
+          <Separator className="my-8" />
+          <ProductSeoForm productId={product.id} />
+        </>
+      )}
     </div>
   );
 }

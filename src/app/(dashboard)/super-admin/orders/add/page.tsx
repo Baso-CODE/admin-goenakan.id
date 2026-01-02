@@ -50,8 +50,16 @@ import { toast } from "sonner";
 import { OrderFormValues, orderSchema } from "../order-schema";
 import { fetchWithToken, generatePoNumber, postOrder } from "../order-service";
 
-// Types
-// Di dalam file OrderForm.tsx atau types terpisah
+type PIC = {
+  id: string;
+  name: string;
+  position?: string;
+};
+
+type PurchaseChannel = {
+  id: string;
+  name: string;
+};
 
 type Client = {
   id: string;
@@ -60,6 +68,8 @@ type Client = {
   address: string;
   custCode?: string;
   type?: "B2B" | "B2C";
+  pics?: PIC[];
+  purchaseChannelId?: string;
 };
 type Sales = { id: string; name: string; phone: string };
 type Vendor = { id: string; companyName: string };
@@ -87,10 +97,12 @@ export default function OrderForm() {
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderSchema),
     defaultValues: {
-      dateOrder: new Date().toISOString().split("T")[0], // Default to today
+      dateOrder: new Date().toISOString().split("T")[0],
       salesCategory: "SALES",
       poNumber: "",
       clientId: "",
+      purchaseChannelId: "",
+      clientB2BPICId: "",
       phone: "",
       shippingAddress: "",
       salesId: "",
@@ -118,6 +130,9 @@ export default function OrderForm() {
   const [sales, setSales] = useState<Sales[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
+    []
+  );
   const [loading, setLoading] = useState(false);
   const [generatingPo, setGeneratingPo] = useState(false);
 
@@ -132,18 +147,20 @@ export default function OrderForm() {
     async function load() {
       try {
         setLoading(true);
-        const [c, s, v, p] = await Promise.all([
+        const [c, s, v, p, pc] = await Promise.all([
           fetchWithToken("http://localhost:8000/clients/order"),
           fetchWithToken("http://localhost:8000/sales/order"),
           fetchWithToken("http://localhost:8000/vendors/order/add"),
           fetchWithToken("http://localhost:8000/products/order"),
+          fetchWithToken("http://localhost:8000/purchase-channels/list"),
         ]);
-        console.log("ini adalah data", v);
+        console.log("ini adalah data", pc);
 
         setClients(c);
         setSales(s);
         setVendors(v);
         setProducts(p);
+        setPurchaseChannels(pc);
       } catch {
         toast.error("Failed to load master data");
       } finally {
@@ -153,18 +170,41 @@ export default function OrderForm() {
     load();
   }, []);
 
-  // Effect: Update Shipping Address & Phone when Client changes
-  useEffect(() => {
-    if (selectedClientId) {
-      const client = clients.find((c) => c.id === selectedClientId);
-      console.log("ini adalah data select client", client);
+  // === NEW LOGIC: Tentukan Client Terpilih & PIC ===
+  const selectedClientData = clients.find((c) => c.id === selectedClientId);
+  const isB2B = selectedClientData?.type === "B2B";
+  const availablePics = selectedClientData?.pics || [];
 
-      if (client) {
-        setValue("shippingAddress", client.address);
-        setValue("phone", client.phone);
+  // Effect: Update Address, Phone, & Purchase Channel saat Client berubah
+  useEffect(() => {
+    if (selectedClientData) {
+      // 1. Set Address & Phone (Existing)
+      setValue("shippingAddress", selectedClientData.address);
+
+      if (selectedClientData.type === "B2C") {
+        setValue("phone", selectedClientData.phone);
+      } else {
+        setValue("phone", "");
+        setValue("clientB2BPICId", "");
+      }
+      if (selectedClientData.purchaseChannelId) {
+        setValue("purchaseChannelId", selectedClientData.purchaseChannelId);
+      } else {
+        setValue("purchaseChannelId", ""); // Reset jika client tidak punya channel
       }
     }
-  }, [selectedClientId, clients, setValue]);
+  }, [selectedClientId, selectedClientData, setValue]);
+
+  const selectedPicId = watch("clientB2BPICId");
+  useEffect(() => {
+    if (isB2B && selectedPicId) {
+      const pic = availablePics.find((p) => p.id === selectedPicId);
+      // Asumsi data PIC dari backend ada field 'phone'
+      if (pic && (pic as any).phone) {
+        setValue("phone", (pic as any).phone);
+      }
+    }
+  }, [selectedPicId, isB2B, availablePics, setValue]);
 
   // Handler: Generate PO Number
   const handleGeneratePO = async () => {
@@ -339,10 +379,13 @@ export default function OrderForm() {
                             <CommandGroup>
                               {clients.map((client) => (
                                 <CommandItem
-                                  value={client.name}
+                                  value={`${client.name}-${client.id}`}
                                   key={client.id}
                                   onSelect={() => {
                                     form.setValue("clientId", client.id);
+                                    if (client.type === "B2B") {
+                                      form.setValue("clientB2BPICId", "");
+                                    }
                                     setClientOpen(false);
                                   }}
                                 >
@@ -366,6 +409,44 @@ export default function OrderForm() {
                   </FormItem>
                 )}
               />
+              {isB2B && (
+                <FormField
+                  control={control}
+                  name="clientB2BPICId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Select PIC (Person In Charge)</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select PIC from company" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {availablePics.length > 0 ? (
+                            availablePics.map((pic) => (
+                              <SelectItem key={pic.id} value={pic.id}>
+                                {pic.name} {/* Tampilkan Nama PIC */}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="p-2 text-sm text-muted-foreground text-center">
+                              No PIC data available for this company.
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Who is ordering or responsible for this invoice?
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               {/* Read Only Phone Number */}
               <FormField
@@ -385,6 +466,35 @@ export default function OrderForm() {
                     <FormDescription>
                       This info comes from the selected client.
                     </FormDescription>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="purchaseChannelId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Purchase Channel</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select channel" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {/* Loop data dari master purchaseChannels */}
+                        {purchaseChannels.map((pc) => (
+                          <SelectItem key={pc.id} value={pc.id}>
+                            {pc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Source of this order (Auto-filled from Client).
+                    </FormDescription>
+                    <FormMessage />
                   </FormItem>
                 )}
               />

@@ -137,6 +137,7 @@ export default function SidebarRole({ ...props }) {
         icon: ListOrdered,
         items: [
           { title: "All Order", url: "/super-admin/orders" },
+          { title: "Cashflow", url: "/super-admin/cashflow" },
           { title: "Order Analyst", url: "/super-admin/orders/add" },
         ],
       },
