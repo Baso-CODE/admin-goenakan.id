@@ -1,31 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
+import { Eye, FileText, Filter, Search } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import {
-  Search,
-  FileText,
-  Eye,
-  Loader2,
-  Calendar as CalendarIcon,
-  Filter,
-} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -34,6 +19,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useDebounce } from "@/helper/debounce"; // Pastikan path ini benar
 
 // === TYPES (Sesuai Response Service getAllInvoices) ===
@@ -187,7 +180,7 @@ export default function InvoicesPage() {
             </div>
 
             {/* Filter Status */}
-            <div className="flex flex-col gap-1.5 w-full sm:w-[160px]">
+            <div className="flex flex-col gap-1.5 w-full sm:w-40">
               <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider ml-1">
                 Status
               </span>
@@ -196,8 +189,7 @@ export default function InvoicesPage() {
                 onValueChange={(val) => {
                   setStatusFilter(val);
                   setPage(1);
-                }}
-              >
+                }}>
                 <SelectTrigger className="h-9 text-xs bg-white">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
@@ -221,8 +213,7 @@ export default function InvoicesPage() {
                 onValueChange={(val) => {
                   setCategoryFilter(val);
                   setPage(1);
-                }}
-              >
+                }}>
                 <SelectTrigger className="h-9 text-xs bg-white">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
@@ -341,8 +332,7 @@ export default function InvoicesPage() {
                   <TableRow>
                     <TableCell
                       colSpan={7}
-                      className="h-32 text-center text-muted-foreground"
-                    >
+                      className="h-32 text-center text-muted-foreground">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <FileText className="h-8 w-8 text-gray-300" />
                         <p>Tidak ada invoice yang ditemukan.</p>
@@ -378,8 +368,7 @@ export default function InvoicesPage() {
                       <TableCell>
                         <Badge
                           variant="outline"
-                          className="text-[10px] font-normal"
-                        >
+                          className="text-[10px] font-normal">
                           {inv.category.replace("_", " ")}
                         </Badge>
                       </TableCell>
@@ -389,18 +378,16 @@ export default function InvoicesPage() {
                       <TableCell className="text-center">
                         <Badge
                           variant={getStatusBadgeVariant(inv.status) as any}
-                          className="text-[10px] h-5 px-2 capitalize"
-                        >
+                          className="text-[10px] h-5 px-2 capitalize">
                           {inv.status.toLowerCase()}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Link href={`/super-admin/invoices/detail/${inv.id}`}>
+                        <Link href={`/admin-invoice/invoices/${inv.id}`}>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-blue-600 hover:bg-blue-50"
-                          >
+                            className="h-8 w-8 text-blue-600 hover:bg-blue-50">
                             <Eye className="h-4 w-4" />
                           </Button>
                         </Link>
@@ -428,8 +415,7 @@ export default function InvoicesPage() {
               size="sm"
               disabled={!meta.hasPrevious}
               onClick={() => setPage((p) => p - 1)}
-              className="h-8 text-xs"
-            >
+              className="h-8 text-xs">
               Previous
             </Button>
             <Button
@@ -437,8 +423,7 @@ export default function InvoicesPage() {
               size="sm"
               disabled={!meta.hasNext}
               onClick={() => setPage((p) => p + 1)}
-              className="h-8 text-xs"
-            >
+              className="h-8 text-xs">
               Next
             </Button>
           </div>
