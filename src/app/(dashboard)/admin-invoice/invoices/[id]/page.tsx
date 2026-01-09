@@ -1,24 +1,54 @@
 "use client";
 
 import { format } from "date-fns";
+import { id as idLocale } from "date-fns/locale";
 import html2canvas from "html2canvas-pro";
 import jsPDF from "jspdf";
-import { ArrowLeft, Download, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle,
+  Download,
+  ExternalLink,
+  Loader2,
+} from "lucide-react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 // Sesuaikan path import ini
 import { fetchWithToken } from "@/app/(dashboard)/super-admin/orders/order-service";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 // === TYPES ===
 type InvoiceDetail = {
-  id: string;
+  id: string; // atau number, sesuaikan dengan backend (sekarang Int)
+  invoiceNumber: string; // Tambahan field baru
+  orderId: string;
   category: "DP" | "FULL_PAYMENT" | "INSTALLMENT" | "REMAINING_BALANCE";
-  status: string;
+  status: "UNPAID" | "PAID" | "OVERDUE" | "CANCELLED" | "DRAFT";
   createdAt: string;
+  dueDate: string | null;
   totalAmount: number;
+  method?: string;
   order: { poNumber: string };
   client: {
     type: "B2B" | "B2C";
@@ -34,11 +64,15 @@ type InvoiceDetail = {
       phone: string;
     };
   };
+  // UPDATE ITEM TYPE
   items: {
     id: string;
     quantity: number;
     price: number;
-    product: { name: string; description?: string };
+    remarks?: string; // Tambahan
+    customization?: any; // Tambahan (JSON)
+    product: { name: string; sku: string };
+    variant?: { variantName: string; sku: string }; // Tambahan
   }[];
 };
 
@@ -59,23 +93,31 @@ export default function InvoiceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // Ref untuk element yang akan di-capture jadi PDF
+  // State untuk Payment Modal
+  const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<string>("BANK_TRANSFER");
+  const [paymentDate, setPaymentDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
+
   const invoiceRef = useRef<HTMLDivElement>(null);
 
+  // === LOAD DATA ===
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const res = await fetchWithToken(`http://localhost:8000/invoices/${id}`);
+      setInvoice(res);
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal memuat data invoice");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const res = await fetchWithToken(
-          `http://localhost:8000/invoices/${id}`
-        );
-        setInvoice(res);
-      } catch (error) {
-        console.error(error);
-        toast.error("Gagal memuat data invoice");
-      } finally {
-        setLoading(false);
-      }
-    };
     loadData();
   }, [id]);
 
@@ -86,7 +128,6 @@ export default function InvoiceDetailPage() {
 
     setIsDownloading(true);
     try {
-      // Tunggu gambar load
       const images = element.querySelectorAll("img");
       const promises = Array.from(images).map((img) => {
         if (img.complete) return Promise.resolve();
@@ -97,41 +138,70 @@ export default function InvoiceDetailPage() {
       });
       await Promise.all(promises);
 
-      // 1. Convert HTML ke Canvas
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
         logging: true,
         backgroundColor: "#ffffff",
-        // Opsi ini membantu membersihkan style aneh saat cloning
         onclone: (clonedDoc) => {
           const clonedElement = clonedDoc.getElementById("invoice-content");
           if (clonedElement) {
-            // Paksa hapus shadow di elemen clone jika masih menempel
             clonedElement.style.boxShadow = "none";
           }
         },
       });
 
       const imgData = canvas.toDataURL("image/jpeg", 1.0);
-
-      // 2. Setup PDF (A4)
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      // 3. Masukkan Gambar ke PDF
       pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-
-      // 4. Download
-      const fileName = `Invoice-${invoice?.order.poNumber || "doc"}.pdf`;
+      const fileName = `Invoice-${invoice?.invoiceNumber || invoice?.id}.pdf`;
       pdf.save(fileName);
       toast.success("Berhasil download PDF");
     } catch (error) {
       console.error("Failed to download PDF", error);
-      toast.error("Gagal mendownload PDF (Cek Console)");
+      toast.error("Gagal mendownload PDF");
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  // === HANDLER MARK AS PAID ===
+  const handleMarkAsPaid = async () => {
+    if (!invoice) return;
+    setIsPaying(true);
+
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const res = await fetch(
+        `http://localhost:8000/invoices/${invoice.id}/pay`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            method: paymentMethod,
+            paymentDate: new Date(paymentDate).toISOString(),
+          }),
+        }
+      );
+
+      if (!res.ok) throw new Error("Gagal memproses pembayaran");
+
+      toast.success("Invoice berhasil ditandai LUNAS");
+      setIsPayDialogOpen(false);
+      loadData();
+    } catch (error) {
+      console.error(error);
+      toast.error("Terjadi kesalahan saat update pembayaran");
+    } finally {
+      setIsPaying(false);
     }
   };
 
@@ -160,66 +230,96 @@ export default function InvoiceDetailPage() {
   const departmentName = isB2B ? invoice.client.b2b?.department?.name : null;
 
   const invoiceDate = new Date(invoice.createdAt);
-  const monthRoman = [
-    "I",
-    "II",
-    "III",
-    "IV",
-    "V",
-    "VI",
-    "VII",
-    "VIII",
-    "IX",
-    "X",
-    "XI",
-    "XII",
-  ][invoiceDate.getMonth()];
-  const invoiceNo = `INV/${invoice.id
-    .substring(0, 5)
-    .toUpperCase()}/B0034/${monthRoman}/${invoiceDate.getFullYear()}`;
+
+  // Gunakan invoiceNumber dari database jika ada, jika tidak generate format fallback
+  const displayInvoiceNo = invoice.invoiceNumber || `INV/${invoice.id}`;
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "PAID":
+        return "bg-green-600 hover:bg-green-700";
+      case "UNPAID":
+        return "bg-gray-500 hover:bg-gray-600";
+      case "OVERDUE":
+        return "bg-red-600 hover:bg-red-700";
+      default:
+        return "bg-blue-600";
+    }
+  };
 
   return (
-    <div className="bg-gray-100 min-h-screen py-8">
-      {/* HEADER ACTIONS */}
-      <div className="max-w-[210mm] mx-auto mb-6 flex justify-between items-center px-4">
-        <Button variant="outline" onClick={() => router.back()}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-        </Button>
-        <Button
-          onClick={handleDownloadPDF}
-          disabled={isDownloading}
-          className="bg-slate-900 hover:bg-slate-800 text-white">
-          {isDownloading ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="mr-2 h-4 w-4" />
-          )}
-          Download PDF
-        </Button>
+    <div className="bg-gray-50 min-h-screen pb-20">
+      {/* === TOP NAVIGATION BAR === */}
+      <div className="sticky top-0 z-10 bg-white border-b shadow-sm px-6 py-4 mb-8">
+        <div className=" mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => router.back()}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-xl font-bold flex items-center gap-2">
+                Invoice Detail
+                <Badge className={getStatusColor(invoice.status)}>
+                  {invoice.status}
+                </Badge>
+              </h1>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                <span>{displayInvoiceNo}</span>
+                <span>•</span>
+                <Link
+                  href={`/super-admin/orders/detail/${invoice.orderId}`}
+                  className="flex items-center gap-1 text-blue-600 hover:underline font-medium">
+                  Lihat Order #{invoice.order.poNumber}
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={handleDownloadPDF}
+              disabled={isDownloading}>
+              {isDownloading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              Download PDF
+            </Button>
+
+            {invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
+              <Button
+                onClick={() => setIsPayDialogOpen(true)}
+                className="bg-green-600 hover:bg-green-700 text-white shadow-md">
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Mark as Paid
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* === KERTAS A4 (TARGET REF) === */}
-      <div className="flex justify-center overflow-auto">
+      {/* === KERTAS A4 PREVIEW === */}
+      <div className="flex justify-center overflow-auto px-4 pb-10">
         <div
           id="invoice-content"
           ref={invoiceRef}
-          // HAPUS shadow-xl DI SINI.
-          // shadow-xl sering menggunakan variable --tw-shadow-color yang berisi "oklch"
-          className="w-[210mm] h-[297mm] bg-[#ffffff] text-[#1e293b] p-10 flex flex-col font-sans text-[13px] leading-relaxed relative box-border"
+          className="w-[210mm] h-[297mm] bg-[#ffffff] text-[#1e293b] p-10 flex flex-col font-sans text-[13px] leading-relaxed relative box-border transform scale-90 md:scale-100 origin-top"
           style={{
             width: "210mm",
             height: "297mm",
             minWidth: "210mm",
             minHeight: "297mm",
-            // Jika ingin bayangan di layar tapi tidak error di PDF:
-            boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+            boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+            borderColor: "#e2e8f0",
           }}>
-          {/* BAGIAN ATAS (Header & Content) */}
           <div className="flex-1">
-            {/* 1. HEADER (GAMBAR) */}
+            {/* 1. HEADER */}
             <div className="w-full mb-10">
               <img
-                src="/images/invoice.png"
+                src="/images/invoice.png" // Pastikan gambar ada di public/images
                 alt="Goenakan Indonesia Header"
                 className="w-full h-auto object-contain max-h-30"
                 crossOrigin="anonymous"
@@ -228,7 +328,7 @@ export default function InvoiceDetailPage() {
 
             {/* 2. CONTACT INFO & INVOICE META */}
             <div className="mb-8">
-              <table className="text-right">
+              <table className="text-right ml-auto">
                 <tbody>
                   <tr>
                     <td className="w-25 font-medium pr-2 text-left">Phone</td>
@@ -244,25 +344,53 @@ export default function InvoiceDetailPage() {
                   <tr>
                     <td className="font-medium pr-2 text-left">Invoice Date</td>
                     <td className="text-left">
-                      : {format(invoiceDate, "dd MMMM yyyy")}
+                      :{" "}
+                      {format(invoiceDate, "dd MMMM yyyy", {
+                        locale: idLocale,
+                      })}
                     </td>
                   </tr>
+                  {invoice.dueDate && (
+                    <tr>
+                      <td className="font-medium pr-2 text-left text-red-600">
+                        Due Date
+                      </td>
+                      <td className="text-left text-red-600 font-medium">
+                        :{" "}
+                        {format(new Date(invoice.dueDate), "dd MMMM yyyy", {
+                          locale: idLocale,
+                        })}
+                      </td>
+                    </tr>
+                  )}
                   <tr>
                     <td className="font-medium pr-2 text-left">Invoice No.</td>
-                    <td className="text-left uppercase">: {invoiceNo}</td>
+                    <td className="text-left uppercase font-bold">
+                      : {displayInvoiceNo}
+                    </td>
                   </tr>
                   <tr>
                     <td className="font-medium pr-2 text-left">Currency</td>
                     <td className="text-left">: IDR</td>
                   </tr>
+                  {invoice.status === "PAID" && invoice.method && (
+                    <tr>
+                      <td className="font-medium pr-2 text-left text-green-600">
+                        Paid Via
+                      </td>
+                      <td className="text-left text-green-600 font-bold uppercase">
+                        : {invoice.method.replace("_", " ")}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
 
             {/* 3. CUSTOMER DETAILS */}
             <div className="mb-8">
-              <div className="font-bold mb-2 text-sm uppercase tracking-wide">
-                Customer
+              <div className="font-bold mb-2 text-sm uppercase tracking-wide border-b pb-1 border-[#e2e8f0]">
+                Bill To (Customer)
               </div>
               <table className="w-full max-w-[85%]">
                 <tbody>
@@ -297,16 +425,16 @@ export default function InvoiceDetailPage() {
               </table>
             </div>
 
-            {/* 4. PRODUCT TABLE */}
+            {/* 4. PRODUCT TABLE (UPDATED) */}
             <div className="mb-4">
               <table className="w-full border-collapse border border-[#94a3b8]">
                 <thead>
                   <tr className="bg-[#f3f4f6] text-center font-bold">
                     <th className="border border-[#94a3b8] py-2 w-10">No</th>
-                    <th className="border border-[#94a3b8] py-2">Product</th>
-                    <th className="border border-[#94a3b8] py-2 w-20">
-                      Qty (pcs)
+                    <th className="border border-[#94a3b8] py-2">
+                      Product Description
                     </th>
+                    <th className="border border-[#94a3b8] py-2 w-20">Qty</th>
                     <th className="border border-[#94a3b8] py-2 w-32.5">
                       Unit Price
                     </th>
@@ -332,8 +460,29 @@ export default function InvoiceDetailPage() {
                           <div className="font-bold mb-1">
                             {item.product.name}
                           </div>
-                          <div className="text-[#475569] text-[11px]">
-                            Capacity: 30 ml
+
+                          {/* SHOW VARIANT & REMARKS */}
+                          <div className="text-[#475569] text-[11px] space-y-1">
+                            {item.product.sku && (
+                              <div>SKU: {item.product.sku}</div>
+                            )}
+
+                            {item.variant && (
+                              <div>Variant: {item.variant.variantName}</div>
+                            )}
+
+                            {/* Parsing Customization JSON jika ada */}
+                            {item.customization && (
+                              <div className="italic">
+                                Custom: {JSON.stringify(item.customization)}
+                              </div>
+                            )}
+
+                            {item.remarks && (
+                              <div className="italic text-gray-500">
+                                Note: {item.remarks}
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="border border-[#94a3b8] py-2">
@@ -346,12 +495,15 @@ export default function InvoiceDetailPage() {
                           {formatCurrency(Number(item.price) * item.quantity)}
                         </td>
 
-                        {/* Kolom Total Order */}
+                        {/* Kolom Total Order (Rowspan) */}
                         {isFirst && (
                           <td
                             className="border border-[#94a3b8] py-2 text-right px-2 font-bold align-top pt-4 bg-[#f9fafb]"
                             rowSpan={rowCount}>
                             {formatCurrency(Number(invoice.totalAmount))}
+                            <div className="mt-2 text-[10px] font-normal text-[#64748b] uppercase border p-1 rounded border-[#cbd5e1]">
+                              {invoice.category.replace("_", " ")}
+                            </div>
                           </td>
                         )}
                       </tr>
@@ -363,10 +515,9 @@ export default function InvoiceDetailPage() {
           </div>
           {/* End Flex-1 */}
 
-          {/* BAGIAN BAWAH */}
+          {/* BAGIAN BAWAH (Bank & TTD) */}
           <div className="mt-auto">
             <div className="flex justify-between items-end">
-              {/* Bank Accounts */}
               <div className="text-[12px] leading-tight">
                 <div className="font-bold mb-2 underline">Bank Account:</div>
                 <div className="space-y-1">
@@ -389,12 +540,11 @@ export default function InvoiceDetailPage() {
                 </div>
               </div>
 
-              {/* Signature */}
               <div className="text-center mr-6">
                 <div className="mb-4 font-bold text-sm">Best Regards,</div>
                 <div className="relative h-20 w-37.5 flex items-center justify-center">
                   <img
-                    src="/images/ttd.png"
+                    src="/images/ttd.png" // Pastikan gambar ada
                     alt="Signature"
                     className="h-full w-auto object-contain"
                     crossOrigin="anonymous"
@@ -409,8 +559,69 @@ export default function InvoiceDetailPage() {
               </div>
             </div>
           </div>
+
+          {/* STAMP LUNAS */}
+          {invoice.status === "PAID" && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 border-4 border-green-600 text-green-600 text-6xl font-black p-4 rotate-[-15deg] opacity-30 select-none pointer-events-none rounded-lg">
+              LUNAS
+            </div>
+          )}
         </div>
       </div>
+
+      {/* === PAYMENT MODAL DIALOG (SAMA) === */}
+      <Dialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
+        <DialogContent className="sm:max-w-106.25">
+          <DialogHeader>
+            <DialogTitle>Konfirmasi Pembayaran</DialogTitle>
+            <DialogDescription>
+              Tandai invoice ini sebagai LUNAS (PAID). Pastikan dana sudah
+              masuk.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="date">Tanggal Pembayaran</Label>
+              <Input
+                id="date"
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="method">Metode Pembayaran</Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Pilih Metode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                  <SelectItem value="CASH">Tunai (Cash)</SelectItem>
+                  <SelectItem value="CREDIT_CARD">Kartu Kredit</SelectItem>
+                  <SelectItem value="QRIS">QRIS</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPayDialogOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              onClick={handleMarkAsPaid}
+              disabled={isPaying}
+              className="bg-green-600 hover:bg-green-700">
+              {isPaying ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle className="mr-2 h-4 w-4" />
+              )}
+              Konfirmasi Lunas
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

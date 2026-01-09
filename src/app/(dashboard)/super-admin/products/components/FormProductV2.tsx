@@ -27,12 +27,12 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { AttributeSelector } from "./AttributeSelector";
+import { PriceTiers } from "./PriceTiers";
 import { UploadImages } from "./upload-images";
 import { UploadVideos } from "./upload-videos";
 import { VariantList } from "./VariantList";
-import { PriceTiers } from "./PriceTiers";
 
-// === Tipe Data (Asumsi dari Kategori) ===
+// === Tipe Data ===
 type Category = {
   id: string;
   name: string;
@@ -53,9 +53,11 @@ const attributeSelectionSchema = z.object({
   valueIds: z.array(z.string()).min(1, "Choose at least one value"),
 });
 
+// Update Schema: Price
 const variantMetaSchema = z.object({
   variantIndex: z.number(),
   isFeatured: z.boolean().optional(),
+  price: z.number().min(0, "Price must be >= 0"),
   altText: z.string().optional(),
 });
 
@@ -78,8 +80,6 @@ const productSchema = z.object({
   height: z.number().min(0, "Height must be >= 0").optional(),
   length: z.number().min(0, "Length must be >= 0").optional(),
   priceTiers: z.array(priceTierSchema).optional(),
-
-  // === OPSIONAL ===
   attributes: z.array(attributeSelectionSchema).optional(),
   imagesMetadata: z
     .array(
@@ -93,15 +93,11 @@ const productSchema = z.object({
   variantImagesMetadata: z.array(variantMetaSchema).optional(),
 });
 
-// Tipe untuk data FORM
 export type ProductFormValues = z.infer<typeof productSchema> & {
   variantImagesMetadata?: z.infer<typeof variantMetaSchema>[];
   videosMetadata?: z.infer<typeof videoMetaSchema>[];
 };
 
-// -----------------------------
-// Helper: cartesian product
-// -----------------------------
 function cartesianProduct<T>(arr: T[][]): T[][] {
   return arr.reduce(
     (acc, curr) => acc.flatMap((a) => curr.map((b) => [...a, b])),
@@ -109,20 +105,12 @@ function cartesianProduct<T>(arr: T[][]): T[][] {
   );
 }
 
-// -----------------------------
-// MAIN ProductFormV2 component
-// -----------------------------
+// === COMPONENT: ProductFormV2 (Create Only) ===
 export default function ProductFormV2({
-  initialData,
   onSubmit,
   isLoading = false,
   isSubmitting = false,
 }: {
-  initialData?: Partial<ProductFormValues> & {
-    basePrice?: number;
-    images?: any[];
-    videos?: any[];
-  };
   onSubmit: (
     data: ProductFormValues,
     files: {
@@ -190,11 +178,17 @@ export default function ProductFormV2({
 
   const [attributesList, setAttributesList] = useState<any[]>([]);
 
+  // State Meta (Price, dll)
   const [variantMetas, setVariantMetas] = useState<
-    { variantIndex: number; isFeatured?: boolean; altText?: string }[]
+    {
+      variantIndex: number;
+      price: number;
+      isFeatured?: boolean;
+      altText?: string;
+    }[]
   >([]);
-  const [variantFilesMap, setVariantFilesMap] = useState<File[][]>([]);
 
+  const [variantFilesMap, setVariantFilesMap] = useState<File[][]>([]);
   const [productImagesFiles, setProductImagesFiles] = useState<File[]>([]);
   const [productVideosFiles, setProductVideosFiles] = useState<File[]>([]);
 
@@ -204,6 +198,7 @@ export default function ProductFormV2({
     form.register("videosMetadata");
   }, [form]);
 
+  // Handler Generate Varian
   const handleGenerateVariants = () => {
     if (!attributeSelections || attributeSelections.length === 0) {
       toast.error("Tambahkan minimal 1 attribute sebelum generate variant.");
@@ -216,10 +211,8 @@ export default function ProductFormV2({
       return;
     }
 
-    // generate cartesian product
     const combos = cartesianProduct(groups);
 
-    // jika tidak ada kombinasi, return kosong
     if (combos.length === 0) {
       setCombinations([]);
       setVariantMetas([]);
@@ -241,23 +234,41 @@ export default function ProductFormV2({
 
     setCombinations(comboObjects);
 
+    // [PENTING] Set Default Price = Base Price
+    const currentBasePrice = Number(form.getValues("basePrice")) || 0;
+
     const newVariantMetas = comboObjects.map((_, idx) => ({
       variantIndex: idx,
+      price: currentBasePrice,
       isFeatured: false,
       altText: "",
     }));
 
     setVariantMetas(newVariantMetas);
     form.setValue("variantImagesMetadata", newVariantMetas);
+
+    // Reset file map sesuai jumlah varian
     setVariantFilesMap(comboObjects.map(() => []));
   };
 
-  const handleVariantMetaChange = (
-    metas: { variantIndex: number; isFeatured?: boolean; altText?: string }[],
-    filesMap: File[][]
+  // [CALLBACK] Update Metadata (Price) dari Child
+  const handleUpdateVariantMeta = (
+    index: number,
+    field: string,
+    value: any
   ) => {
-    setVariantMetas(metas);
-    form.setValue("variantImagesMetadata", metas);
+    const updatedMetas = variantMetas.map((meta) => {
+      if (meta.variantIndex === index) {
+        return { ...meta, [field]: value };
+      }
+      return meta;
+    });
+    setVariantMetas(updatedMetas);
+    form.setValue("variantImagesMetadata", updatedMetas);
+  };
+
+  // [CALLBACK] Update Files dari Child
+  const handleVariantImagesChange = (filesMap: File[][]) => {
     setVariantFilesMap(filesMap);
   };
 
@@ -279,9 +290,8 @@ export default function ProductFormV2({
         videosMetadata: form.getValues("videosMetadata")?.length
           ? form.getValues("videosMetadata")
           : undefined,
-        variantImagesMetadata: form.getValues("variantImagesMetadata")?.length
-          ? form.getValues("variantImagesMetadata")
-          : undefined,
+        // Pastikan meta dari state dikirim
+        variantImagesMetadata: variantMetas,
       };
 
       const filesToSubmit = {
@@ -303,12 +313,10 @@ export default function ProductFormV2({
   };
 
   return (
-    // ... (JSX tidak diubah, tetap gunakan form.handleSubmit(submit))
     <Card className="w-full">
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(submit)} className="space-y-6">
-            {/* Core fields */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
               <FormField
                 control={form.control}
@@ -343,8 +351,7 @@ export default function ProductFormV2({
                     <FormLabel>Kategori</FormLabel>
                     <Select
                       onValueChange={field.onChange}
-                      value={field.value ?? ""}
-                    >
+                      value={field.value ?? ""}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Pilih kategori..." />
@@ -371,7 +378,7 @@ export default function ProductFormV2({
                       <Input
                         type="number"
                         {...field}
-                        value={field.value} // pastikan terikat dengan state
+                        value={field.value}
                         onChange={(e) => field.onChange(e.target.valueAsNumber)}
                         min={0}
                       />
@@ -380,7 +387,6 @@ export default function ProductFormV2({
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="materialType"
@@ -413,7 +419,7 @@ export default function ProductFormV2({
             <div className="mt-6">
               <PriceTiers />
             </div>
-            {/* Grid untuk Dimensi Produk */}
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4 mt-4">
               <FormField
                 control={form.control}
@@ -484,6 +490,7 @@ export default function ProductFormV2({
                 )}
               />
             </div>
+
             <FormField
               control={form.control}
               name="description"
@@ -497,14 +504,12 @@ export default function ProductFormV2({
               )}
             />
 
-            <div className="space-y-6 rounded-xl border border-gray-200 p-6  shadow-sm">
+            <div className="space-y-6 rounded-xl border border-gray-200 p-6 shadow-sm">
               <h3 className="text-xl font-bold tracking-tight text-gray-800 border-b pb-3 mb-3">
                 📸 Media Produk
               </h3>
-
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Kolom 1: Gambar */}
-                <div className="border border-gray-100 p-4 rounded-lg  shadow-sm">
+                <div className="border border-gray-100 p-4 rounded-lg shadow-sm">
                   <UploadImages
                     form={form}
                     metadataName="imagesMetadata"
@@ -516,9 +521,7 @@ export default function ProductFormV2({
                     }}
                   />
                 </div>
-
-                {/* Kolom 2: Video */}
-                <div className="border border-gray-100 p-4 rounded-lg  shadow-sm">
+                <div className="border border-gray-100 p-4 rounded-lg shadow-sm">
                   <UploadVideos
                     form={form}
                     metadataName="videosMetadata"
@@ -532,7 +535,7 @@ export default function ProductFormV2({
                 </div>
               </div>
             </div>
-            {/* Attribute selector */}
+
             <div className="border rounded p-4">
               <AttributeSelector
                 value={attributeSelections}
@@ -543,28 +546,30 @@ export default function ProductFormV2({
                   <Button
                     variant="secondary"
                     type="button"
-                    onClick={handleGenerateVariants}
-                  >
+                    onClick={handleGenerateVariants}>
                     Generate Variants
                   </Button>
                 </div>
               </div>
             </div>
+
             {combinations.length > 0 && (
               <div className="border rounded p-4">
                 <VariantList
                   combinations={combinations}
-                  onChangeMeta={handleVariantMetaChange}
+                  variantMetas={variantMetas}
+                  onUpdateVariantMeta={handleUpdateVariantMeta}
+                  onChangeMeta={handleVariantImagesChange}
                 />
               </div>
             )}
-            {/* Submit */}
+
             <div className="flex justify-end">
               <Button type="submit" disabled={isSubmitting || isLoading}>
                 {isSubmitting ? (
                   <Loader2 className="animate-spin h-4 w-4 mr-2" />
                 ) : null}
-                {initialData ? "Update Product" : "Create Product"}
+                Create Product
               </Button>
             </div>
           </form>

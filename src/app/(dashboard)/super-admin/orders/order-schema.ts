@@ -18,8 +18,8 @@ export const orderSchema = z.object({
       z.object({
         productId: z.string().min(1, "Product required"),
         variantId: z.string().optional(),
-        quantity: z.coerce.number().min(1, "Quantity must be > 0"),
-        price: z.coerce.number().min(0, "Price must be ≥ 0"),
+        quantity: z.number().min(1, "Qty must be at least 1"),
+        price: z.number().min(0, "Price cannot be negative"),
         customization: z.string().optional(),
         remarks: z.string().optional(),
       })

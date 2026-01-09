@@ -1,26 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-  FormDescription,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Command,
   CommandEmpty,
@@ -30,26 +11,47 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
-  PlusCircle,
-  Trash2,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
   Check,
   ChevronsUpDown,
+  PlusCircle,
   RefreshCcw,
   Settings2,
+  Trash2,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
+
+// Import Schema & Type dari file schema kamu
 import { OrderFormValues, orderSchema } from "../order-schema";
 import { fetchWithToken, generatePoNumber, postOrder } from "../order-service";
 
+// --- TYPES (Updated IDs to String) ---
 type PIC = {
   id: string;
   name: string;
@@ -71,8 +73,11 @@ type Client = {
   pics?: PIC[];
   purchaseChannelId?: string;
 };
+
 type Sales = { id: string; name: string; phone: string };
 type Vendor = { id: string; companyName: string };
+
+// ID Product & Variant harus STRING (UUID)
 type ProductVariant = {
   id: string;
   variantName: string;
@@ -85,12 +90,12 @@ type PriceTier = {
 };
 
 type Product = {
-  id: string;
+  id: string; // Updated to String
   name: string;
   basePrice: number;
-  isCustom: boolean; // Penting untuk logika UI
-  productVariants: ProductVariant[]; // Relasi varian
-  priceTiers: PriceTier[]; // Relasi harga bertingkat
+  isCustom: boolean;
+  productVariants: ProductVariant[];
+  priceTiers: PriceTier[];
 };
 
 export default function OrderForm() {
@@ -109,9 +114,10 @@ export default function OrderForm() {
       vendorIds: [],
       products: [
         {
-          productId: "",
-          quantity: 1,
-          price: 0,
+          productId: "", // String kosong (sesuai tipe string)
+          variantId: "", // String kosong
+          quantity: 1, // Number (sesuai tipe number)
+          price: 0, // Number
           customization: "",
           remarks: "",
         },
@@ -119,7 +125,7 @@ export default function OrderForm() {
     },
   });
 
-  const { control, handleSubmit, watch, setValue, getValues } = form;
+  const { control, handleSubmit, watch, setValue } = form;
   const { fields, append, remove } = useFieldArray({
     control,
     name: "products",
@@ -154,7 +160,6 @@ export default function OrderForm() {
           fetchWithToken("http://localhost:8000/products/order"),
           fetchWithToken("http://localhost:8000/purchase-channels/list"),
         ]);
-        console.log("ini adalah data", pc);
 
         setClients(c);
         setSales(s);
@@ -170,7 +175,7 @@ export default function OrderForm() {
     load();
   }, []);
 
-  // === NEW LOGIC: Tentukan Client Terpilih & PIC ===
+  // === LOGIC: Tentukan Client Terpilih & PIC ===
   const selectedClientData = clients.find((c) => c.id === selectedClientId);
   const isB2B = selectedClientData?.type === "B2B";
   const availablePics = selectedClientData?.pics || [];
@@ -178,7 +183,6 @@ export default function OrderForm() {
   // Effect: Update Address, Phone, & Purchase Channel saat Client berubah
   useEffect(() => {
     if (selectedClientData) {
-      // 1. Set Address & Phone (Existing)
       setValue("shippingAddress", selectedClientData.address);
 
       if (selectedClientData.type === "B2C") {
@@ -187,10 +191,11 @@ export default function OrderForm() {
         setValue("phone", "");
         setValue("clientB2BPICId", "");
       }
+
       if (selectedClientData.purchaseChannelId) {
         setValue("purchaseChannelId", selectedClientData.purchaseChannelId);
       } else {
-        setValue("purchaseChannelId", ""); // Reset jika client tidak punya channel
+        setValue("purchaseChannelId", "");
       }
     }
   }, [selectedClientId, selectedClientData, setValue]);
@@ -199,7 +204,6 @@ export default function OrderForm() {
   useEffect(() => {
     if (isB2B && selectedPicId) {
       const pic = availablePics.find((p) => p.id === selectedPicId);
-      // Asumsi data PIC dari backend ada field 'phone'
       if (pic && (pic as any).phone) {
         setValue("phone", (pic as any).phone);
       }
@@ -223,11 +227,13 @@ export default function OrderForm() {
   const onSubmit = async (data: OrderFormValues) => {
     try {
       setLoading(true);
-      // Remove phone from payload as it's not in Order model
+      // Remove phone from payload
       const { phone, ...payload } = data;
 
       await postOrder(payload);
       toast.success("Order created successfully");
+
+      // Reset form
       form.reset({
         dateOrder: new Date().toISOString().split("T")[0],
         salesCategory: "SALES",
@@ -320,8 +326,7 @@ export default function OrderForm() {
                         type="button"
                         variant="outline"
                         onClick={handleGeneratePO}
-                        disabled={generatingPo}
-                      >
+                        disabled={generatingPo}>
                         {generatingPo ? (
                           <RefreshCcw className="w-4 h-4 animate-spin" />
                         ) : (
@@ -344,7 +349,6 @@ export default function OrderForm() {
                 Customer & Logistics
               </h3>
 
-              {/* Filtering Client Order (Combobox) */}
               <FormField
                 control={control}
                 name="clientId"
@@ -360,8 +364,7 @@ export default function OrderForm() {
                             className={cn(
                               "w-full justify-between",
                               !field.value && "text-muted-foreground"
-                            )}
-                          >
+                            )}>
                             {field.value
                               ? clients.find(
                                   (client) => client.id === field.value
@@ -371,7 +374,7 @@ export default function OrderForm() {
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[300px] p-0">
+                      <PopoverContent className="w-75 p-0">
                         <Command>
                           <CommandInput placeholder="Search client name..." />
                           <CommandList>
@@ -387,8 +390,7 @@ export default function OrderForm() {
                                       form.setValue("clientB2BPICId", "");
                                     }
                                     setClientOpen(false);
-                                  }}
-                                >
+                                  }}>
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
@@ -409,6 +411,7 @@ export default function OrderForm() {
                   </FormItem>
                 )}
               />
+
               {isB2B && (
                 <FormField
                   control={control}
@@ -418,8 +421,7 @@ export default function OrderForm() {
                       <FormLabel>Select PIC (Person In Charge)</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value}
-                      >
+                        value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select PIC from company" />
@@ -429,26 +431,22 @@ export default function OrderForm() {
                           {availablePics.length > 0 ? (
                             availablePics.map((pic) => (
                               <SelectItem key={pic.id} value={pic.id}>
-                                {pic.name} {/* Tampilkan Nama PIC */}
+                                {pic.name}
                               </SelectItem>
                             ))
                           ) : (
                             <div className="p-2 text-sm text-muted-foreground text-center">
-                              No PIC data available for this company.
+                              No PIC data available.
                             </div>
                           )}
                         </SelectContent>
                       </Select>
-                      <FormDescription>
-                        Who is ordering or responsible for this invoice?
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               )}
 
-              {/* Read Only Phone Number */}
               <FormField
                 control={control}
                 name="phone"
@@ -483,7 +481,6 @@ export default function OrderForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {/* Loop data dari master purchaseChannels */}
                         {purchaseChannels.map((pc) => (
                           <SelectItem key={pc.id} value={pc.id}>
                             {pc.name}
@@ -491,15 +488,11 @@ export default function OrderForm() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormDescription>
-                      Source of this order (Auto-filled from Client).
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* Shipping Address (Auto-filled but editable) */}
               <FormField
                 control={control}
                 name="shippingAddress"
@@ -558,13 +551,11 @@ export default function OrderForm() {
                     <FormLabel>Vendors (Multiple)</FormLabel>
                     <Select
                       onValueChange={(val) => {
-                        // Avoid duplicates
                         const current = field.value || [];
                         if (!current.includes(val)) {
                           field.onChange([...current, val]);
                         }
-                      }}
-                    >
+                      }}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Add a vendor..." />
@@ -579,7 +570,6 @@ export default function OrderForm() {
                       </SelectContent>
                     </Select>
 
-                    {/* Selected Vendor Chips */}
                     <div className="flex flex-wrap gap-2 mt-3">
                       {field.value?.map((id) => {
                         const vendor = vendors.find((v) => v.id === id);
@@ -587,8 +577,7 @@ export default function OrderForm() {
                         return (
                           <div
                             key={id}
-                            className="flex items-center gap-2 bg-white border px-3 py-1 rounded-full text-sm shadow-sm"
-                          >
+                            className="flex items-center gap-2 bg-white border px-3 py-1 rounded-full text-sm shadow-sm">
                             <span>{vendor.companyName}</span>
                             <button
                               type="button"
@@ -597,8 +586,7 @@ export default function OrderForm() {
                                   field.value.filter((vId) => vId !== id)
                                 )
                               }
-                              className="text-red-500 hover:text-red-700 rounded-full p-0.5"
-                            >
+                              className="text-red-500 hover:text-red-700 rounded-full p-0.5">
                               <XIcon className="w-3 h-3" />
                             </button>
                           </div>
@@ -636,13 +624,11 @@ export default function OrderForm() {
                       remarks: "",
                     })
                   }
-                  className="border-dashed border-gray-400 hover:border-gray-600 hover:bg-gray-50"
-                >
+                  className="border-dashed border-gray-400 hover:border-gray-600 hover:bg-gray-50">
                   <PlusCircle className="w-4 h-4 mr-2" /> Add Product
                 </Button>
               </div>
 
-              {/* Header Kolom (Hanya muncul di Desktop md ke atas) */}
               {fields.length > 0 && (
                 <div className="hidden md:grid md:grid-cols-12 gap-4 px-4 py-2 bg-[#975a3e] rounded-t-lg font-medium text-sm text-gray-100">
                   <div className="col-span-4">Product Details</div>
@@ -661,7 +647,6 @@ export default function OrderForm() {
                   );
                   const isCustomProduct = selectedProduct?.isCustom;
 
-                  // Hitung subtotal baris ini
                   const subtotal =
                     (watch(`products.${index}.price`) || 0) *
                     (watch(`products.${index}.quantity`) || 0);
@@ -669,13 +654,11 @@ export default function OrderForm() {
                   return (
                     <div
                       key={field.id}
-                      className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
-                    >
+                      className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
                       {/* === BARIS UTAMA (Product, Qty, Price) === */}
                       <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                         {/* 1. Product & Variant Selection */}
                         <div className="md:col-span-4 space-y-3">
-                          {/* Product Select */}
                           <FormField
                             control={control}
                             name={`products.${index}.productId`}
@@ -685,16 +668,22 @@ export default function OrderForm() {
                                   Product
                                 </FormLabel>
                                 <Select
+                                  // VALUE STRING: Langsung pakai field.value karena tipe sudah string
+                                  value={field.value}
                                   onValueChange={(val) => {
-                                    field.onChange(val);
+                                    field.onChange(val); // Save as String
+
+                                    // Reset Variant (as string empty)
                                     form.setValue(
                                       `products.${index}.variantId`,
                                       ""
                                     );
 
+                                    // Find product by string ID
                                     const prod = products.find(
                                       (p) => p.id === val
                                     );
+
                                     if (prod) {
                                       if (!prod.isCustom) {
                                         form.setValue(
@@ -708,9 +697,7 @@ export default function OrderForm() {
                                         );
                                       }
                                     }
-                                  }}
-                                  value={field.value}
-                                >
+                                  }}>
                                   <FormControl>
                                     <SelectTrigger className="h-10">
                                       <SelectValue placeholder="Select Product" />
@@ -718,17 +705,14 @@ export default function OrderForm() {
                                   </FormControl>
                                   <SelectContent>
                                     {products.map((p) => (
+                                      // Value Select adalah string (p.id sudah string)
                                       <SelectItem key={p.id} value={p.id}>
-                                        <div className="flex items-center justify-between w-full gap-4 min-w-[200px]">
-                                          {/* Nama Produk */}
+                                        <div className="flex items-center justify-between w-full gap-4 min-w-50">
                                           <span className="font-medium truncate text-gray-700">
                                             {p.name}
                                           </span>
-
-                                          {/* Badge Custom dengan Lucide React */}
                                           {p.isCustom && (
                                             <div className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
-                                              {/* Ikon Lucide */}
                                               <Settings2 className="w-3 h-3" />
                                               <span className="text-[10px] font-bold tracking-wide">
                                                 CUSTOM
@@ -745,7 +729,6 @@ export default function OrderForm() {
                             )}
                           />
 
-                          {/* Variant Select (Conditionally Rendered) */}
                           {isCustomProduct && (
                             <FormField
                               control={control}
@@ -753,20 +736,22 @@ export default function OrderForm() {
                               render={({ field }) => (
                                 <FormItem>
                                   <Select
+                                    // VALUE STRING
+                                    value={field.value}
                                     onValueChange={(val) => {
-                                      field.onChange(val);
-                                      const variant = selectedProduct?.productVariants.find(
-                                        (v) => v.id === val
-                                      );
+                                      field.onChange(val); // Save as String
+
+                                      const variant =
+                                        selectedProduct?.productVariants.find(
+                                          (v) => v.id === val
+                                        );
                                       if (variant) {
                                         form.setValue(
                                           `products.${index}.price`,
                                           Number(variant.price)
                                         );
                                       }
-                                    }}
-                                    value={field.value}
-                                  >
+                                    }}>
                                     <FormControl>
                                       <SelectTrigger className="h-9 text-sm bg-gray-50 border-dashed">
                                         <SelectValue placeholder="Select Variant" />
@@ -775,6 +760,7 @@ export default function OrderForm() {
                                     <SelectContent>
                                       {selectedProduct?.productVariants.map(
                                         (v) => (
+                                          // v.id sudah string
                                           <SelectItem key={v.id} value={v.id}>
                                             {v.variantName}
                                           </SelectItem>
@@ -789,7 +775,7 @@ export default function OrderForm() {
                           )}
                         </div>
 
-                        {/* 2. Quantity Input */}
+                        {/* 2. Quantity Input (HANDLED AS NUMBER) */}
                         <div className="md:col-span-2">
                           <FormField
                             control={control}
@@ -805,12 +791,12 @@ export default function OrderForm() {
                                       type="number"
                                       min={1}
                                       {...field}
+                                      // PENTING: Paksa valueAsNumber agar state TS tetap number
                                       onChange={(e) => {
-                                        const val =
-                                          parseInt(e.target.value) || 0;
-                                        field.onChange(val);
+                                        const val = e.target.valueAsNumber;
+                                        field.onChange(isNaN(val) ? 0 : val);
 
-                                        // Logic Price Tiers (Sama seperti sebelumnya)
+                                        // Logic Price Tiers
                                         if (
                                           selectedProduct &&
                                           !selectedProduct.isCustom &&
@@ -855,7 +841,7 @@ export default function OrderForm() {
                           />
                         </div>
 
-                        {/* 3. Unit Price Input */}
+                        {/* 3. Unit Price Input (HANDLED AS NUMBER) */}
                         <div className="md:col-span-3">
                           <FormField
                             control={control}
@@ -874,6 +860,11 @@ export default function OrderForm() {
                                       type="number"
                                       min={0}
                                       {...field}
+                                      // PENTING: Paksa valueAsNumber
+                                      onChange={(e) => {
+                                        const val = e.target.valueAsNumber;
+                                        field.onChange(isNaN(val) ? 0 : val);
+                                      }}
                                       className="pl-9 h-10 text-right font-mono"
                                     />
                                   </div>
@@ -884,7 +875,7 @@ export default function OrderForm() {
                           />
                         </div>
 
-                        {/* 4. Subtotal Display */}
+                        {/* 4. Subtotal */}
                         <div className="md:col-span-2 flex flex-col justify-center items-end h-10 pt-8 md:pt-0">
                           <span className="md:hidden text-xs text-gray-500 mb-1">
                             Subtotal
@@ -906,15 +897,14 @@ export default function OrderForm() {
                               size="icon"
                               onClick={() => remove(index)}
                               className="text-gray-400 hover:text-red-600 hover:bg-red-50"
-                              title="Remove Item"
-                            >
+                              title="Remove Item">
                               <Trash2 className="w-5 h-5" />
                             </Button>
                           )}
                         </div>
                       </div>
 
-                      {/* === BARIS TAMBAHAN (Customization & Remarks) === */}
+                      {/* Customization & Remarks */}
                       <div className="bg-gray-50/50 p-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4 rounded-b-lg">
                         <FormField
                           control={control}
@@ -929,20 +919,7 @@ export default function OrderForm() {
                                     className="text-sm border-gray-200 focus:border-blue-300 pl-8 bg-white"
                                   />
                                   <span className="absolute left-2.5 top-2.5 text-gray-400">
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      width="16"
-                                      height="16"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    >
-                                      <path d="M12 20h9" />
-                                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                                    </svg>
+                                    <Settings2 className="w-4 h-4" />
                                   </span>
                                 </div>
                               </FormControl>
@@ -972,8 +949,7 @@ export default function OrderForm() {
                                       stroke="currentColor"
                                       strokeWidth="2"
                                       strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    >
+                                      strokeLinejoin="round">
                                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                                       <polyline points="14 2 14 8 20 8" />
                                       <line x1="16" y1="13" x2="8" y2="13" />
@@ -1014,8 +990,7 @@ function XIcon({ className }: { className?: string }) {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={className}
-    >
+      className={className}>
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
     </svg>

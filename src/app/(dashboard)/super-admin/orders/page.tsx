@@ -1,34 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
-import { toast } from "sonner";
 import {
+  Calendar as CalendarIcon,
+  Eye,
+  FileDown,
+  Loader2,
+  Pencil,
   Search,
   ShoppingCart,
-  Eye,
-  Pencil,
-  Trash2,
-  Loader2,
-  FileDown,
-  Calendar as CalendarIcon,
-  ReceiptText,
 } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -37,18 +27,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // Custom Hook Debounce (Pastikan file ini ada)
 import { useDebounce } from "@/helper/debounce";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 
 // === TYPES ===
 type Order = {
@@ -101,24 +90,6 @@ export default function OrdersPage() {
   const [salesCategory, setSalesCategory] = useState<string>("ALL");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-
-  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
-  const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<
-    string | null
-  >(null);
-  const [invoiceCategory, setInvoiceCategory] = useState<string>(
-    "FULL_PAYMENT"
-  );
-  const [invoiceDP, setInvoiceDP] = useState<number>(30); // Default DP 30%
-  const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
-
-  // Handler Buka Modal
-  const handleOpenInvoiceDialog = (orderId: string) => {
-    setSelectedOrderForInvoice(orderId);
-    setInvoiceCategory("FULL_PAYMENT");
-    setInvoiceDP(30);
-    setInvoiceDialogOpen(true);
-  };
 
   // === FETCH ORDERS ===
   const fetchOrders = async () => {
@@ -217,58 +188,9 @@ export default function OrdersPage() {
     }
   };
 
-  const handleCreateInvoice = async () => {
-    if (!selectedOrderForInvoice) return;
-
-    setIsCreatingInvoice(true);
-    try {
-      // 1. Get Token
-      // (Gunakan helper fetchWithTokenNew atau getSession logic yang sudah diperbaiki)
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // 2. Siapkan Payload
-      const payload: any = {
-        orderId: selectedOrderForInvoice,
-        category: invoiceCategory,
-        status: "UNPAID",
-      };
-
-      if (invoiceCategory === "DP") {
-        payload.dpPercentage = Number(invoiceDP);
-      }
-
-      // 3. Call API
-      const res = await fetch("http://localhost:8000/invoices", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || "Gagal membuat invoice");
-      }
-
-      toast.success("Invoice berhasil dibuat!");
-      setInvoiceDialogOpen(false);
-
-      // Opsional: Redirect ke halaman detail invoice atau refresh list order
-      // router.push("/super-admin/invoices");
-    } catch (error) {
-      console.error(error);
-      toast.error(error instanceof Error ? error.message : "Terjadi kesalahan");
-    } finally {
-      setIsCreatingInvoice(false);
-    }
-  };
-
   // === RENDER ===
   return (
-    <div className="space-y-6 w-full max-w-[1600px] mx-auto pb-10">
+    <div className="space-y-6 w-full mx-auto pb-10">
       {/* Header Card */}
       <Card className="border-l-4 border-l-primary shadow-sm">
         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -288,7 +210,7 @@ export default function OrdersPage() {
 
           <div className="flex flex-wrap gap-2 items-center">
             {/* Filter: Search */}
-            <div className="relative w-full md:w-[250px]">
+            <div className="relative w-full md:w-62.5">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search PO / Client..."
@@ -317,7 +239,7 @@ export default function OrdersPage() {
           {/* Filter Group */}
           <div className="flex flex-wrap gap-3 w-full lg:w-auto">
             {/* Filter Sales Category */}
-            <div className="flex flex-col gap-1.5 w-full sm:w-[180px]">
+            <div className="flex flex-col gap-1.5 w-full sm:w-45">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Category
               </span>
@@ -326,8 +248,7 @@ export default function OrdersPage() {
                 onValueChange={(val) => {
                   setSalesCategory(val);
                   setPage(1);
-                }}
-              >
+                }}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
@@ -341,7 +262,7 @@ export default function OrdersPage() {
 
             {/* Filter Date Range */}
             <div className="flex gap-2 w-full sm:w-auto">
-              <div className="flex flex-col gap-1.5 w-full sm:w-[140px]">
+              <div className="flex flex-col gap-1.5 w-full sm:w-35">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Start Date
                 </span>
@@ -357,7 +278,7 @@ export default function OrdersPage() {
                   />
                 </div>
               </div>
-              <div className="flex flex-col gap-1.5 w-full sm:w-[140px]">
+              <div className="flex flex-col gap-1.5 w-full sm:w-35">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   End Date
                 </span>
@@ -381,8 +302,7 @@ export default function OrdersPage() {
             variant="outline"
             className="w-full lg:w-auto border-green-600 text-green-700 hover:bg-green-50 hover:text-green-800 gap-2"
             onClick={handleExport}
-            disabled={exporting}
-          >
+            disabled={exporting}>
             {exporting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -400,18 +320,16 @@ export default function OrdersPage() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="w-[180px]">PO Number</TableHead>
-                  <TableHead className="w-[150px]">Date</TableHead>
-                  <TableHead className="w-[200px]">Client</TableHead>
-                  <TableHead className="w-[150px]">Sales Rep</TableHead>
-                  <TableHead className="text-center w-[100px]">Type</TableHead>
-                  <TableHead className="text-center w-[100px]">Items</TableHead>
-                  <TableHead className="text-right w-[180px]">
+                  <TableHead className="w-45">PO Number</TableHead>
+                  <TableHead className="w-37.5">Date</TableHead>
+                  <TableHead className="w-50">Client</TableHead>
+                  <TableHead className="w-37.5">Sales Rep</TableHead>
+                  <TableHead className="text-center w-25">Type</TableHead>
+                  <TableHead className="text-center w-25">Items</TableHead>
+                  <TableHead className="text-right w-45">
                     Total Amount
                   </TableHead>
-                  <TableHead className="text-center w-[150px]">
-                    Actions
-                  </TableHead>
+                  <TableHead className="text-center w-37.5">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -449,8 +367,7 @@ export default function OrdersPage() {
                   <TableRow>
                     <TableCell
                       colSpan={8}
-                      className="h-24 text-center text-muted-foreground"
-                    >
+                      className="h-24 text-center text-muted-foreground">
                       No orders found matching your filters.
                     </TableCell>
                   </TableRow>
@@ -481,8 +398,7 @@ export default function OrdersPage() {
                               ? "secondary"
                               : "default"
                           }
-                          className="text-[10px] h-5 px-2"
-                        >
+                          className="text-[10px] h-5 px-2">
                           {order.salesCategory}
                         </Badge>
                       </TableCell>
@@ -498,8 +414,7 @@ export default function OrdersPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                            >
+                              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
                               <Eye className="h-4 w-4" />
                             </Button>
                           </Link>
@@ -507,8 +422,7 @@ export default function OrdersPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                            >
+                              className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50">
                               <Pencil className="h-4 w-4" />
                             </Button>
                           </Link>
@@ -516,15 +430,6 @@ export default function OrdersPage() {
                           {/* <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50">
                             <Trash2 className="h-4 w-4" />
                           </Button> */}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
-                            title="Create Invoice"
-                            onClick={() => handleOpenInvoiceDialog(order.id)}
-                          >
-                            <ReceiptText className="h-4 w-4" />
-                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -549,99 +454,19 @@ export default function OrdersPage() {
               variant="outline"
               size="sm"
               disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => p - 1)}
-            >
+              onClick={() => setPage((p) => p - 1)}>
               Previous
             </Button>
             <Button
               variant="outline"
               size="sm"
               disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
+              onClick={() => setPage((p) => p + 1)}>
               Next
             </Button>
           </div>
         </div>
       )}
-
-      {/* === MODAL CREATE INVOICE === */}
-      <Dialog open={invoiceDialogOpen} onOpenChange={setInvoiceDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Generate Invoice</DialogTitle>
-            <DialogDescription>
-              Buat invoice baru berdasarkan Order ini. Pilih jenis tagihan.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-4 py-4">
-            {/* Pilihan Kategori */}
-            <div className="flex flex-col gap-2">
-              <Label>Jenis Tagihan</Label>
-              <Select
-                value={invoiceCategory}
-                onValueChange={setInvoiceCategory}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih Jenis" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="FULL_PAYMENT">
-                    Full Payment (Lunas)
-                  </SelectItem>
-                  <SelectItem value="DP">Down Payment (DP)</SelectItem>
-                  <SelectItem value="INSTALLMENT">Cicilan (Termin)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Input Khusus DP */}
-            {invoiceCategory === "DP" && (
-              <div className="flex flex-col gap-2 animate-in fade-in zoom-in duration-300">
-                <Label>Persentase DP (%)</Label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={invoiceDP}
-                    onChange={(e) => setInvoiceDP(Number(e.target.value))}
-                    className="pr-8"
-                  />
-                  <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">
-                    %
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Nominal akan dihitung otomatis dari total order.
-                </p>
-              </div>
-            )}
-
-            {/* Input Khusus Cicilan (Jika mau manual input nominal) */}
-            {/* Anda bisa tambahkan input 'customAmount' disini jika category === 'INSTALLMENT' */}
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setInvoiceDialogOpen(false)}
-            >
-              Batal
-            </Button>
-            <Button onClick={handleCreateInvoice} disabled={isCreatingInvoice}>
-              {isCreatingInvoice ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Proses...
-                </>
-              ) : (
-                "Buat Invoice"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
