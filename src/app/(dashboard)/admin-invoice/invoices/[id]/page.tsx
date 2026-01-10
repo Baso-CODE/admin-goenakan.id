@@ -15,7 +15,6 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-// Sesuaikan path import ini
 import { fetchWithToken } from "@/app/(dashboard)/super-admin/orders/order-service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,12 +35,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { renderCustomization } from "@/helper/renderCustomizationProduct";
 import { toast } from "sonner";
 
-// === TYPES ===
+// === TYPES UPDATE ===
 type InvoiceDetail = {
-  id: string; // atau number, sesuaikan dengan backend (sekarang Int)
-  invoiceNumber: string; // Tambahan field baru
+  id: number; // Sesuaikan dengan schema Prisma (Int)
+  invoiceNumber: string | null;
   orderId: string;
   category: "DP" | "FULL_PAYMENT" | "INSTALLMENT" | "REMAINING_BALANCE";
   status: "UNPAID" | "PAID" | "OVERDUE" | "CANCELLED" | "DRAFT";
@@ -49,7 +49,20 @@ type InvoiceDetail = {
   dueDate: string | null;
   totalAmount: number;
   method?: string;
-  order: { poNumber: string };
+  order: {
+    poNumber: string;
+    // [UPDATE] Tambahkan Type Sales di sini
+    sales: {
+      name: string;
+      phone: string;
+      signatureUrl: string | null;
+      bankAccounts: {
+        bankName: string;
+        accountNumber: string;
+        accountHolderName: string;
+      }[];
+    };
+  };
   client: {
     type: "B2B" | "B2C";
     b2b?: {
@@ -64,15 +77,14 @@ type InvoiceDetail = {
       phone: string;
     };
   };
-  // UPDATE ITEM TYPE
   items: {
-    id: string;
+    id: number;
     quantity: number;
     price: number;
-    remarks?: string; // Tambahan
-    customization?: any; // Tambahan (JSON)
+    remarks?: string;
+    customization?: any;
     product: { name: string; sku: string };
-    variant?: { variantName: string; sku: string }; // Tambahan
+    variant?: { variantName: string; sku: string };
   }[];
 };
 
@@ -90,10 +102,10 @@ export default function InvoiceDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // State untuk Payment Modal
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("BANK_TRANSFER");
@@ -103,7 +115,6 @@ export default function InvoiceDetailPage() {
 
   const invoiceRef = useRef<HTMLDivElement>(null);
 
-  // === LOAD DATA ===
   const loadData = async () => {
     try {
       setLoading(true);
@@ -121,7 +132,6 @@ export default function InvoiceDetailPage() {
     loadData();
   }, [id]);
 
-  // === HANDLER DOWNLOAD PDF ===
   const handleDownloadPDF = async () => {
     const element = invoiceRef.current;
     if (!element) return;
@@ -168,7 +178,6 @@ export default function InvoiceDetailPage() {
     }
   };
 
-  // === HANDLER MARK AS PAID ===
   const handleMarkAsPaid = async () => {
     if (!invoice) return;
     setIsPaying(true);
@@ -213,7 +222,6 @@ export default function InvoiceDetailPage() {
     );
   if (!invoice) return <div>Invoice not found</div>;
 
-  // --- LOGIC DATA PREPARATION ---
   const isB2B = invoice.client.type === "B2B";
   const clientName = isB2B
     ? invoice.client.b2b?.companyName
@@ -228,10 +236,7 @@ export default function InvoiceDetailPage() {
       : null;
 
   const departmentName = isB2B ? invoice.client.b2b?.department?.name : null;
-
   const invoiceDate = new Date(invoice.createdAt);
-
-  // Gunakan invoiceNumber dari database jika ada, jika tidak generate format fallback
   const displayInvoiceNo = invoice.invoiceNumber || `INV/${invoice.id}`;
 
   const getStatusColor = (status: string) => {
@@ -247,9 +252,12 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  // [UPDATE] Logic Data Sales
+  const salesData = invoice.order.sales;
+
   return (
     <div className="bg-gray-50 min-h-screen pb-20">
-      {/* === TOP NAVIGATION BAR === */}
+      {/* ... (TOP BAR SAMA SEPERTI SEBELUMNYA) ... */}
       <div className="sticky top-0 z-10 bg-white border-b shadow-sm px-6 py-4 mb-8">
         <div className=" mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -301,7 +309,6 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
-      {/* === KERTAS A4 PREVIEW === */}
       <div className="flex justify-center overflow-auto px-4 pb-10">
         <div
           id="invoice-content"
@@ -319,28 +326,33 @@ export default function InvoiceDetailPage() {
             {/* 1. HEADER */}
             <div className="w-full mb-10">
               <img
-                src="/images/invoice.png" // Pastikan gambar ada di public/images
+                src="/images/invoice.png"
                 alt="Goenakan Indonesia Header"
                 className="w-full h-auto object-contain max-h-30"
                 crossOrigin="anonymous"
               />
             </div>
 
-            {/* 2. CONTACT INFO & INVOICE META */}
+            {/* 2. CONTACT INFO & INVOICE META (DYNAMIC SALES INFO) */}
             <div className="mb-8">
-              <table className="text-right ml-auto">
+              <table className="">
                 <tbody>
+                  {/* [UPDATE] Phone dari Sales */}
                   <tr>
                     <td className="w-25 font-medium pr-2 text-left">Phone</td>
-                    <td className="text-left">: +62 888-0370-1081 (Nadya)</td>
+                    <td className="text-left">
+                      : {salesData.phone} ({salesData.name.split(" ")[0]})
+                    </td>
                   </tr>
                   <tr>
                     <td className="font-medium pr-2 text-left">E-mail</td>
+                    {/* Email tetap hardcode perusahaan, atau ambil dari user jika ada */}
                     <td className="text-left">: goenakan.id@gmail.com</td>
                   </tr>
                   <tr>
                     <td className="h-2"></td>
                   </tr>
+                  {/* ... (Date & Invoice Number Sama) ... */}
                   <tr>
                     <td className="font-medium pr-2 text-left">Invoice Date</td>
                     <td className="text-left">
@@ -387,7 +399,7 @@ export default function InvoiceDetailPage() {
               </table>
             </div>
 
-            {/* 3. CUSTOMER DETAILS */}
+            {/* ... (SECTION CUSTOMER SAMA) ... */}
             <div className="mb-8">
               <div className="font-bold mb-2 text-sm uppercase tracking-wide border-b pb-1 border-[#e2e8f0]">
                 Bill To (Customer)
@@ -425,7 +437,7 @@ export default function InvoiceDetailPage() {
               </table>
             </div>
 
-            {/* 4. PRODUCT TABLE (UPDATED) */}
+            {/* ... (SECTION TABLE SAMA, PAKAI renderCustomization) ... */}
             <div className="mb-4">
               <table className="w-full border-collapse border border-[#94a3b8]">
                 <thead>
@@ -450,7 +462,6 @@ export default function InvoiceDetailPage() {
                   {invoice.items.map((item, index) => {
                     const isFirst = index === 0;
                     const rowCount = invoice.items.length;
-
                     return (
                       <tr key={item.id} className="text-center align-top h-15">
                         <td className="border border-[#94a3b8] py-2">
@@ -460,24 +471,15 @@ export default function InvoiceDetailPage() {
                           <div className="font-bold mb-1">
                             {item.product.name}
                           </div>
-
-                          {/* SHOW VARIANT & REMARKS */}
                           <div className="text-[#475569] text-[11px] space-y-1">
                             {item.product.sku && (
                               <div>SKU: {item.product.sku}</div>
                             )}
-
                             {item.variant && (
                               <div>Variant: {item.variant.variantName}</div>
                             )}
-
-                            {/* Parsing Customization JSON jika ada */}
-                            {item.customization && (
-                              <div className="italic">
-                                Custom: {JSON.stringify(item.customization)}
-                              </div>
-                            )}
-
+                            {item.customization &&
+                              renderCustomization(item.customization)}
                             {item.remarks && (
                               <div className="italic text-gray-500">
                                 Note: {item.remarks}
@@ -494,8 +496,6 @@ export default function InvoiceDetailPage() {
                         <td className="border border-[#94a3b8] py-2 text-right px-2 font-medium">
                           {formatCurrency(Number(item.price) * item.quantity)}
                         </td>
-
-                        {/* Kolom Total Order (Rowspan) */}
                         {isFirst && (
                           <td
                             className="border border-[#94a3b8] py-2 text-right px-2 font-bold align-top pt-4 bg-[#f9fafb]"
@@ -513,45 +513,54 @@ export default function InvoiceDetailPage() {
               </table>
             </div>
           </div>
-          {/* End Flex-1 */}
 
-          {/* BAGIAN BAWAH (Bank & TTD) */}
+          {/* BAGIAN BAWAH (Bank & TTD) - DYNAMIC SALES */}
           <div className="mt-auto">
             <div className="flex justify-between items-end">
               <div className="text-[12px] leading-tight">
                 <div className="font-bold mb-2 underline">Bank Account:</div>
                 <div className="space-y-1">
-                  <div className="flex gap-2">
-                    <span className="w-22.5 font-semibold">BTPN (Jenius)</span>
-                    <span>
-                      : 900-137-56-327 a/n Nadya Yuniar Desi Prameswari
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <span className="w-22.5 font-semibold">BCA</span>
-                    <span>: 5550243611 a/n Nadya Yuniar Desi Prameswari</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <span className="w-22.5 font-semibold">Mandiri</span>
-                    <span>
-                      : 1400016940257 a/n Nadya Yuniar Desi Prameswari
-                    </span>
-                  </div>
+                  {/* [UPDATE] Looping Bank Account Sales */}
+                  {salesData.bankAccounts &&
+                  salesData.bankAccounts.length > 0 ? (
+                    salesData.bankAccounts.map((bank, i) => (
+                      <div key={i} className="flex gap-2">
+                        <span className="w-24 font-semibold">
+                          {bank.bankName}
+                        </span>
+                        <span>
+                          : {bank.accountNumber} a/n {bank.accountHolderName}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="italic text-gray-500">
+                      No bank account details available.
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="text-center mr-6">
                 <div className="mb-4 font-bold text-sm">Best Regards,</div>
                 <div className="relative h-20 w-37.5 flex items-center justify-center">
-                  <img
-                    src="/images/ttd.png" // Pastikan gambar ada
-                    alt="Signature"
-                    className="h-full w-auto object-contain"
-                    crossOrigin="anonymous"
-                  />
+                  {/* [UPDATE] Tanda Tangan Sales */}
+                  {salesData.signatureUrl ? (
+                    <img
+                      src={salesData.signatureUrl}
+                      alt="Signature"
+                      className="h-full w-auto object-contain"
+                      crossOrigin="anonymous"
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-gray-300 text-xs italic border border-dashed rounded">
+                      (No Signature)
+                    </div>
+                  )}
                 </div>
+                {/* [UPDATE] Nama Sales */}
                 <div className="font-bold underline text-sm mt-1">
-                  Nadya Y. D. Prameswari
+                  {salesData.name}
                 </div>
                 <div className="text-[11px] font-bold text-[#475569]">
                   Goenakan Indonesia
@@ -569,8 +578,9 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
-      {/* === PAYMENT MODAL DIALOG (SAMA) === */}
+      {/* ... (PAYMENT MODAL SAMA) ... */}
       <Dialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
+        {/* ... code payment modal ... */}
         <DialogContent className="sm:max-w-106.25">
           <DialogHeader>
             <DialogTitle>Konfirmasi Pembayaran</DialogTitle>

@@ -33,6 +33,7 @@ import { useDebounce } from "@/helper/debounce"; // Pastikan path ini benar
 type Invoice = {
   id: string;
   invoiceDate: string;
+  invoiceNumber: string;
   dueDate: string | null;
   poNumber: string;
   clientName: string;
@@ -134,7 +135,7 @@ export default function InvoicesPage() {
 
   // === RENDER ===
   return (
-    <div className="space-y-6 w-full max-w-[1600px] mx-auto pb-10">
+    <div className="space-y-6 w-full  mx-auto pb-10">
       {/* Header */}
       <Card className="border-l-4 border-l-blue-600 shadow-sm">
         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -152,7 +153,7 @@ export default function InvoicesPage() {
 
           <div className="flex flex-wrap gap-2 items-center">
             {/* Search Bar */}
-            <div className="relative w-full md:w-[280px]">
+            <div className="relative w-full md:w-70">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Cari No Invoice / Client / PO..."
@@ -204,7 +205,7 @@ export default function InvoicesPage() {
             </div>
 
             {/* Filter Kategori */}
-            <div className="flex flex-col gap-1.5 w-full sm:w-[180px]">
+            <div className="flex flex-col gap-1.5 w-full sm:w-45">
               <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider ml-1">
                 Kategori
               </span>
@@ -235,7 +236,7 @@ export default function InvoicesPage() {
                 </span>
                 <input
                   type="date"
-                  className="text-xs font-medium focus:outline-none bg-transparent h-5 w-[110px]"
+                  className="text-xs font-medium focus:outline-none bg-transparent h-5 w-27.5"
                   value={startDate}
                   onChange={(e) => {
                     setStartDate(e.target.value);
@@ -250,7 +251,7 @@ export default function InvoicesPage() {
                 </span>
                 <input
                   type="date"
-                  className="text-xs font-medium focus:outline-none bg-transparent h-5 w-[110px]"
+                  className="text-xs font-medium focus:outline-none bg-transparent h-5 w-27.5"
                   value={endDate}
                   onChange={(e) => {
                     setEndDate(e.target.value);
@@ -285,19 +286,16 @@ export default function InvoicesPage() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="w-[120px]">Tanggal</TableHead>
-                  <TableHead className="w-[150px]">PO Number</TableHead>
-                  <TableHead className="w-[200px]">Client</TableHead>
-                  <TableHead className="w-[120px]">Kategori</TableHead>
-                  <TableHead className="text-right w-[150px]">
+                  <TableHead className="w-30">Tanggal</TableHead>
+                  <TableHead className="w-30">Inovoice No</TableHead>
+                  <TableHead className="w-37.5">PO Number</TableHead>
+                  <TableHead className="w-50">Client</TableHead>
+                  <TableHead className="w-30">Kategori</TableHead>
+                  <TableHead className="text-right w-37.5">
                     Total Tagihan
                   </TableHead>
-                  <TableHead className="text-center w-[100px]">
-                    Status
-                  </TableHead>
-                  <TableHead className="text-center w-[100px]">
-                    Action
-                  </TableHead>
+                  <TableHead className="text-center w-25">Status</TableHead>
+                  <TableHead className="text-center w-25">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -305,6 +303,9 @@ export default function InvoicesPage() {
                   // Skeleton Rows
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
+                      <TableCell>
+                        <Skeleton className="h-4 w-20" />
+                      </TableCell>
                       <TableCell>
                         <Skeleton className="h-4 w-20" />
                       </TableCell>
@@ -358,6 +359,9 @@ export default function InvoicesPage() {
                             </span>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm text-muted-foreground">
+                        {inv.invoiceNumber}
                       </TableCell>
                       <TableCell className="font-mono text-sm text-muted-foreground">
                         {inv.poNumber}

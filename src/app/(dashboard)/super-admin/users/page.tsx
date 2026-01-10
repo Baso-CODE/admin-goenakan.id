@@ -90,7 +90,7 @@ const UserManagementTable: React.FC = () => {
   };
 
   return (
-    <div className="space-y-5 w-full max-w-6xl mx-auto">
+    <div className="space-y-5 w-full  mx-auto">
       {/* === HEADER CARD & SEARCH === */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -112,8 +112,7 @@ const UserManagementTable: React.FC = () => {
         <Link href="/super-admin/users/add">
           <Button
             size="sm"
-            className="gap-2 bg-blue-600 hover:bg-blue-700 transition duration-200"
-          >
+            className="gap-2 bg-blue-600 hover:bg-blue-700 transition duration-200">
             <UserPlus className="h-4 w-4" />
             Add New User
           </Button>
@@ -126,10 +125,10 @@ const UserManagementTable: React.FC = () => {
             <Table>
               <TableHeader className="bg-gray-50 dark:bg-gray-800">
                 <TableRow>
-                  <TableHead className="min-w-[180px] font-semibold text-gray-700 dark:text-gray-300">
+                  <TableHead className="min-w-45 font-semibold text-gray-700 dark:text-gray-300">
                     Name
                   </TableHead>
-                  <TableHead className="min-w-[250px] font-semibold text-gray-700 dark:text-gray-300">
+                  <TableHead className="min-w-62.5 font-semibold text-gray-700 dark:text-gray-300">
                     Email
                   </TableHead>
                   <TableHead className="font-semibold text-gray-700 dark:text-gray-300">
@@ -141,7 +140,7 @@ const UserManagementTable: React.FC = () => {
                   <TableHead className="font-semibold text-gray-700 dark:text-gray-300">
                     Join Date
                   </TableHead>
-                  <TableHead className="text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[150px]">
+                  <TableHead className="text-right font-semibold text-gray-700 dark:text-gray-300 min-w-37.5">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -151,8 +150,7 @@ const UserManagementTable: React.FC = () => {
                   filteredData.map((user) => (
                     <TableRow
                       key={user.id}
-                      className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50"
-                    >
+                      className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50">
                       <TableCell className="font-medium text-gray-900 dark:text-gray-100">
                         {user.name}
                       </TableCell>
@@ -168,8 +166,7 @@ const UserManagementTable: React.FC = () => {
                               : user.role === "ADMIN_INVOICE"
                               ? "bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-300"
                               : "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-300"
-                          }
-                        >
+                          }>
                           {formatRole(user.role)}
                         </Badge>
                       </TableCell>
@@ -177,15 +174,13 @@ const UserManagementTable: React.FC = () => {
                         {user.isActive ? (
                           <Badge
                             variant="default"
-                            className="bg-green-500/10 text-green-700 border-green-500/20 dark:bg-green-900/20 dark:text-green-400"
-                          >
+                            className="bg-green-500/10 text-green-700 border-green-500/20 dark:bg-green-900/20 dark:text-green-400">
                             Active
                           </Badge>
                         ) : (
                           <Badge
                             variant="destructive"
-                            className="bg-red-500/10 text-red-700 border-red-500/20 dark:bg-red-900/20 dark:text-red-400"
-                          >
+                            className="bg-red-500/10 text-red-700 border-red-500/20 dark:bg-red-900/20 dark:text-red-400">
                             Inactive
                           </Badge>
                         )}
@@ -197,8 +192,7 @@ const UserManagementTable: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => toggleUserStatus(user.id)}
-                        >
+                          onClick={() => toggleUserStatus(user.id)}>
                           {user.isActive ? "Deactivate" : "Activate"}
                         </Button>
                         <Link href={`/super-admin/users/edit/${user.id}`}>
@@ -213,8 +207,7 @@ const UserManagementTable: React.FC = () => {
                   <TableRow>
                     <TableCell
                       colSpan={6}
-                      className="text-center py-10 text-muted-foreground"
-                    >
+                      className="text-center py-10 text-muted-foreground">
                       No users found matching your search criteria.
                     </TableCell>
                   </TableRow>
