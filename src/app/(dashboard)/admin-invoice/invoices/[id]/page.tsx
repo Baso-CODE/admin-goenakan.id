@@ -40,7 +40,7 @@ import { toast } from "sonner";
 
 // === TYPES UPDATE ===
 type InvoiceDetail = {
-  id: number; // Sesuaikan dengan schema Prisma (Int)
+  id: number;
   invoiceNumber: string | null;
   orderId: string;
   category: "DP" | "FULL_PAYMENT" | "INSTALLMENT" | "REMAINING_BALANCE";
@@ -51,7 +51,6 @@ type InvoiceDetail = {
   method?: string;
   order: {
     poNumber: string;
-    // [UPDATE] Tambahkan Type Sales di sini
     sales: {
       name: string;
       phone: string;
@@ -86,6 +85,12 @@ type InvoiceDetail = {
     product: { name: string; sku: string };
     variant?: { variantName: string; sku: string };
   }[];
+  // [UPDATE] Notes Field
+  notes: {
+    id: string;
+    content: string;
+    category: { name: string };
+  }[];
 };
 
 const formatCurrency = (amount: number) => {
@@ -102,7 +107,6 @@ export default function InvoiceDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
-
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -252,12 +256,11 @@ export default function InvoiceDetailPage() {
     }
   };
 
-  // [UPDATE] Logic Data Sales
   const salesData = invoice.order.sales;
 
   return (
     <div className="bg-gray-50 min-h-screen pb-20">
-      {/* ... (TOP BAR SAMA SEPERTI SEBELUMNYA) ... */}
+      {/* TOP BAR */}
       <div className="sticky top-0 z-10 bg-white border-b shadow-sm px-6 py-4 mb-8">
         <div className=" mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -309,6 +312,7 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
+      {/* A4 PAPER CONTAINER */}
       <div className="flex justify-center overflow-auto px-4 pb-10">
         <div
           id="invoice-content"
@@ -316,11 +320,11 @@ export default function InvoiceDetailPage() {
           className="w-[210mm] h-[297mm] bg-[#ffffff] text-[#1e293b] p-10 flex flex-col font-sans text-[13px] leading-relaxed relative box-border transform scale-90 md:scale-100 origin-top"
           style={{
             width: "210mm",
-            height: "297mm",
-            minWidth: "210mm",
-            minHeight: "297mm",
-            boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
-            borderColor: "#e2e8f0",
+            minHeight: "297mm", // Gunakan minHeight agar bisa memanjang jika konten banyak (opsional, untuk print html2canvas lebih aman fix height)
+            height: "auto", // Auto agar fleksibel saat preview, tapi saat print PDF nanti diatur
+            padding: "40px",
+            display: "flex",
+            flexDirection: "column",
           }}>
           <div className="flex-1">
             {/* 1. HEADER */}
@@ -333,11 +337,10 @@ export default function InvoiceDetailPage() {
               />
             </div>
 
-            {/* 2. CONTACT INFO & INVOICE META (DYNAMIC SALES INFO) */}
+            {/* 2. CONTACT INFO & INVOICE META */}
             <div className="mb-8">
               <table className="">
                 <tbody>
-                  {/* [UPDATE] Phone dari Sales */}
                   <tr>
                     <td className="w-25 font-medium pr-2 text-left">Phone</td>
                     <td className="text-left">
@@ -346,13 +349,11 @@ export default function InvoiceDetailPage() {
                   </tr>
                   <tr>
                     <td className="font-medium pr-2 text-left">E-mail</td>
-                    {/* Email tetap hardcode perusahaan, atau ambil dari user jika ada */}
                     <td className="text-left">: goenakan.id@gmail.com</td>
                   </tr>
                   <tr>
                     <td className="h-2"></td>
                   </tr>
-                  {/* ... (Date & Invoice Number Sama) ... */}
                   <tr>
                     <td className="font-medium pr-2 text-left">Invoice Date</td>
                     <td className="text-left">
@@ -399,7 +400,7 @@ export default function InvoiceDetailPage() {
               </table>
             </div>
 
-            {/* ... (SECTION CUSTOMER SAMA) ... */}
+            {/* 3. CUSTOMER INFO */}
             <div className="mb-8">
               <div className="font-bold mb-2 text-sm uppercase tracking-wide border-b pb-1 border-[#e2e8f0]">
                 Bill To (Customer)
@@ -437,7 +438,7 @@ export default function InvoiceDetailPage() {
               </table>
             </div>
 
-            {/* ... (SECTION TABLE SAMA, PAKAI renderCustomization) ... */}
+            {/* 4. PRODUCT TABLE */}
             <div className="mb-4">
               <table className="w-full border-collapse border border-[#94a3b8]">
                 <thead>
@@ -512,15 +513,35 @@ export default function InvoiceDetailPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* 5. [NEW] INVOICE NOTES SECTION */}
+            {invoice.notes && invoice.notes.length > 0 && (
+              <div className="mb-8 mt-6">
+                <div className="font-bold mb-2 text-sm uppercase tracking-wide border-b pb-1 border-[#e2e8f0]">
+                  Notes & Instructions
+                </div>
+                <div className="grid grid-cols-1 gap-3 text-[11px] text-[#475569]">
+                  {invoice.notes.map((note) => (
+                    <div key={note.id} className="flex flex-col gap-1">
+                      <span className="font-bold text-black uppercase text-[10px]">
+                        {note.category.name}:
+                      </span>
+                      <p className="whitespace-pre-wrap leading-relaxed">
+                        {note.content}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* BAGIAN BAWAH (Bank & TTD) - DYNAMIC SALES */}
-          <div className="mt-auto">
+          {/* BAGIAN BAWAH (Bank & TTD) */}
+          <div className="mt-auto border-t-2 border-gray-100 break-inside-avoid">
             <div className="flex justify-between items-end">
               <div className="text-[12px] leading-tight">
                 <div className="font-bold mb-2 underline">Bank Account:</div>
                 <div className="space-y-1">
-                  {/* [UPDATE] Looping Bank Account Sales */}
                   {salesData.bankAccounts &&
                   salesData.bankAccounts.length > 0 ? (
                     salesData.bankAccounts.map((bank, i) => (
@@ -544,7 +565,6 @@ export default function InvoiceDetailPage() {
               <div className="text-center mr-6">
                 <div className="mb-4 font-bold text-sm">Best Regards,</div>
                 <div className="relative h-20 w-37.5 flex items-center justify-center">
-                  {/* [UPDATE] Tanda Tangan Sales */}
                   {salesData.signatureUrl ? (
                     <img
                       src={salesData.signatureUrl}
@@ -558,7 +578,6 @@ export default function InvoiceDetailPage() {
                     </div>
                   )}
                 </div>
-                {/* [UPDATE] Nama Sales */}
                 <div className="font-bold underline text-sm mt-1">
                   {salesData.name}
                 </div>
@@ -578,9 +597,8 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
-      {/* ... (PAYMENT MODAL SAMA) ... */}
+      {/* PAYMENT MODAL */}
       <Dialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
-        {/* ... code payment modal ... */}
         <DialogContent className="sm:max-w-106.25">
           <DialogHeader>
             <DialogTitle>Konfirmasi Pembayaran</DialogTitle>

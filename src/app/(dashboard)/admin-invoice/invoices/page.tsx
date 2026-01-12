@@ -79,6 +79,7 @@ const getStatusBadgeVariant = (status: string) => {
 export default function InvoicesPage() {
   // === STATE ===
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
 

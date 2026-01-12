@@ -94,6 +94,7 @@ export default function SidebarRole({ ...props }) {
         icon: FileSpreadsheet,
         items: [
           { title: "Invoices", url: "/admin-invoice/invoices" },
+          { title: "Notes", url: "/admin-invoice/notes" },
           { title: "Payments", url: "/admin-invoice/payments" },
         ],
       },

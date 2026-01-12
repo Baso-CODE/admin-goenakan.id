@@ -153,6 +153,16 @@ export default function OrderDetailPage() {
   const [selectedItems, setSelectedItems] = useState<
     { productId: string; quantity: number; maxQty: number; price: number }[]
   >([]);
+
+  // === NOTES STATES ===
+  const [noteCategories, setNoteCategories] = useState<any[]>([]);
+  console.log("note categories", noteCategories);
+
+  const [selectedNoteTemplate, setSelectedNoteTemplate] = useState<string>("");
+  const [invoiceNotes, setInvoiceNotes] = useState<
+    { categoryId: string; content: string }[]
+  >([]);
+
   // === FETCH ORDER ===
   const loadOrder = async () => {
     if (!id) return;
@@ -172,6 +182,28 @@ export default function OrderDetailPage() {
   useEffect(() => {
     loadOrder();
   }, [id]);
+
+  // === FETCH NOTES MASTER DATA ===
+  useEffect(() => {
+    const fetchNoteCategories = async () => {
+      try {
+        const tokenRes = await fetch("/api/auth/token");
+        const { token } = await tokenRes.json();
+
+        const res = await fetch(
+          "http://localhost:8000/invoice-notes/categories/list",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const data = await res.json();
+        setNoteCategories(data || []);
+      } catch (e) {
+        console.error("Failed to load note categories");
+      }
+    };
+    fetchNoteCategories();
+  }, []);
 
   // === FINANCIAL CALCULATIONS ===
   // Hitung data keuangan untuk Summary Card
@@ -200,32 +232,32 @@ export default function OrderDetailPage() {
   const isFirstInvoice = order ? order.invoices.length === 0 : true;
 
   // === HANDLER SPLIT ITEM SELECTION ===
-  const toggleItemSelection = (
-    checked: boolean,
-    product: OrderDetail["products"][0]
-  ) => {
-    if (checked) {
-      // Add item with default max quantity
-      setSelectedItems((prev) => [
-        ...prev,
-        {
-          // Disini kita perlu ID Product Asli (Master) bukan ID OrderProduct
-          // Pastikan backend kirim 'productId' di object products
-          productId: product.productId || product.id, // Fallback logic
-          quantity: product.quantity,
-          maxQty: product.quantity,
-          price: product.unitPrice,
-        },
-      ]);
-    } else {
-      // Remove item
-      setSelectedItems((prev) =>
-        prev.filter(
-          (item) => item.productId !== (product.productId || product.id)
-        )
-      );
-    }
-  };
+  // const toggleItemSelection = (
+  //   checked: boolean,
+  //   product: OrderDetail["products"][0]
+  // ) => {
+  //   if (checked) {
+  //     // Add item with default max quantity
+  //     setSelectedItems((prev) => [
+  //       ...prev,
+  //       {
+  //         // Disini kita perlu ID Product Asli (Master) bukan ID OrderProduct
+  //         // Pastikan backend kirim 'productId' di object products
+  //         productId: product.productId || product.id, // Fallback logic
+  //         quantity: product.quantity,
+  //         maxQty: product.quantity,
+  //         price: product.unitPrice,
+  //       },
+  //     ]);
+  //   } else {
+  //     // Remove item
+  //     setSelectedItems((prev) =>
+  //       prev.filter(
+  //         (item) => item.productId !== (product.productId || product.id)
+  //       )
+  //     );
+  //   }
+  // };
 
   const updateItemQty = (productId: string, newQty: number) => {
     setSelectedItems((prev) =>
@@ -283,10 +315,11 @@ export default function OrderDetailPage() {
 
       const payload = {
         orderId: order.id,
-        category: isSplitMode ? "FULL_PAYMENT" : invoiceCategory, // Split item biasanya dianggap tagihan item (Full)
+        category: isSplitMode ? "FULL_PAYMENT" : invoiceCategory,
         dpPercentage: finalDpPercentage,
         customAmount: finalCustomAmount,
-        selectedItems: payloadSelectedItems, // Kirim ke backend
+        selectedItems: payloadSelectedItems,
+        notes: invoiceNotes.filter((n) => n.content.trim() !== ""),
       };
 
       const res = await fetch("http://localhost:8000/invoices", {
@@ -319,6 +352,22 @@ export default function OrderDetailPage() {
     }
   };
 
+  const handleNoteChange = (categoryId: string, content: string) => {
+    setInvoiceNotes((prev) => {
+      const existing = prev.find((n) => n.categoryId === categoryId);
+      if (existing) {
+        // Jika konten kosong, hapus dari state (opsional, tergantung UX)
+        if (!content.trim())
+          return prev.filter((n) => n.categoryId !== categoryId);
+        // Update konten
+        return prev.map((n) =>
+          n.categoryId === categoryId ? { ...n, content } : n
+        );
+      }
+      // Tambah baru
+      return [...prev, { categoryId, content }];
+    });
+  };
   if (loading) return <DetailPageSkeleton />;
 
   if (!order) {
@@ -1089,6 +1138,67 @@ export default function OrderDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* --- SECTION: INVOICE NOTES --- */}
+            <div className="space-y-4 pt-4 border-t">
+              <Label className="text-base font-semibold">
+                Catatan Invoice (Opsional)
+              </Label>
+              <div className="grid gap-4 max-h-75 overflow-y-auto pr-2">
+                {noteCategories.map((cat) => (
+                  <div
+                    key={cat.id}
+                    className="space-y-2 bg-gray-50 p-3 rounded-md border">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-sm font-medium text-gray-700">
+                        {cat.name}
+                      </Label>
+                      {/* Dropdown Template Helper */}
+                      <Select
+                        onValueChange={(val) => {
+                          const selectedTemplate = cat.templates?.find(
+                            (t: any) => t.id === val
+                          );
+                          if (selectedTemplate) {
+                            handleNoteChange(cat.id, selectedTemplate.content);
+                          }
+                        }}>
+                        <SelectTrigger className="h-7 text-xs w-45 bg-white">
+                          <SelectValue placeholder="Pilih Template..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {cat.templates && cat.templates.length > 0 ? (
+                            cat.templates.map((t: any) => (
+                              <SelectItem
+                                key={t.id}
+                                value={t.id}
+                                className="text-xs">
+                                {t.title}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="p-2 text-xs text-muted-foreground">
+                              No templates
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Text Area untuk Edit Manual */}
+                    <textarea
+                      className="flex w-full rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 min-h-20"
+                      placeholder={`Tulis catatan untuk ${cat.name}...`}
+                      value={
+                        invoiceNotes.find((n) => n.categoryId === cat.id)
+                          ?.content || ""
+                      }
+                      onChange={(e) => handleNoteChange(cat.id, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           <DialogFooter>

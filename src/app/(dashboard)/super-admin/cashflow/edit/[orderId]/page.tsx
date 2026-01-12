@@ -237,7 +237,6 @@ export default function EditCashflowPage() {
       if (!res.ok) throw new Error("Failed to save cashflow");
 
       toast.success("Cashflow berhasil disimpan!");
-      router.push("/super-admin/cashflow"); // Redirect back to list
       router.refresh();
     } catch (error) {
       console.error(error);
@@ -257,7 +256,7 @@ export default function EditCashflowPage() {
   }
 
   return (
-    <div className="space-y-6 w-full max-w-[1600px] mx-auto pb-20">
+    <div className="space-y-6 w-full  mx-auto pb-20">
       {/* Header & Navigation */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
