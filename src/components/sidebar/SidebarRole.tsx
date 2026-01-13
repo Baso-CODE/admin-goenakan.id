@@ -27,6 +27,7 @@ import {
   Settings,
   Store,
   Tags,
+  Truck,
   UserCircle,
   Users,
 } from "lucide-react";
@@ -39,7 +40,6 @@ import { TeamSwitcher } from "./team-switcher";
 export default function SidebarRole({ ...props }) {
   const { data: session } = useSession();
 
-  // Jika tidak ada session atau user tidak punya role, redirect atau kosongkan sidebar
   const role = session?.user?.role as
     | "SUPER_ADMIN"
     | "ADMIN_INVOICE"
@@ -141,6 +141,12 @@ export default function SidebarRole({ ...props }) {
           { title: "Cashflow", url: "/super-admin/cashflow" },
           { title: "Order Analyst", url: "/super-admin/orders/add" },
         ],
+      },
+      {
+        title: "Logistics & Tracking",
+        url: "#",
+        icon: Truck,
+        items: [{ title: "Tracking Dashboard", url: "/super-admin/logistics" }],
       },
       { title: "Settings", url: "/super-admin/settings", icon: Settings },
     ],
