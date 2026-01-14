@@ -132,7 +132,7 @@ const PurchaseChannelsPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[250px]">Name</TableHead>
+                <TableHead className="w-62.5">Name</TableHead>
                 <TableHead>Slug</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
@@ -158,8 +158,8 @@ const PurchaseChannelsPage = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
-                        <Skeleton className="h-8 w-[50px]" />
-                        <Skeleton className="h-8 w-[60px]" />
+                        <Skeleton className="h-8 w-12.5" />
+                        <Skeleton className="h-8 w-15" />
                       </div>
                     </TableCell>
                   </TableRow>

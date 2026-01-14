@@ -300,8 +300,8 @@ export default function ProductAttributesPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
-                        <Skeleton className="h-8 w-[50px]" />
-                        <Skeleton className="h-8 w-[60px]" />
+                        <Skeleton className="h-8 w-12.5" />
+                        <Skeleton className="h-8 w-15" />
                       </div>
                     </TableCell>
                   </TableRow>

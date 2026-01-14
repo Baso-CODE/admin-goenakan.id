@@ -321,7 +321,7 @@ const VendorItems = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[280px]">Item Name</TableHead>
-                  <TableHead className="min-w-[250px]">Description</TableHead>
+                  <TableHead className="min-w-62.5">Description</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
@@ -333,13 +333,13 @@ const VendorItems = () => {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      {/* Kolom 1: Item Name (w-[250px]) */}
-                      <TableCell className="h-12 w-[250px]">
+                      {/* Kolom 1: Item Name (w-62.5) */}
+                      <TableCell className="h-12 w-62.5">
                         <Skeleton className="h-4 w-50" />
                       </TableCell>
-                      {/* Kolom 2: Description (min-w-[250px]) */}
-                      <TableCell className="h-12 min-w-[250px]">
-                        <Skeleton className="h-4 w-[250px]" />
+                      {/* Kolom 2: Description (min-w-62.5) */}
+                      <TableCell className="h-12 min-w-62.5">
+                        <Skeleton className="h-4 w-62.5" />
                       </TableCell>
                       {/* Kolom 3: Category */}
                       <TableCell className="h-12">
@@ -356,9 +356,9 @@ const VendorItems = () => {
                       {/* Kolom 6: Actions (text-right) */}
                       <TableCell className="h-12 text-right">
                         <div className="flex justify-end space-x-2">
-                          <Skeleton className="h-8 w-[50px]" />
+                          <Skeleton className="h-8 w-12.5" />
                           {/* Edit Button */}
-                          <Skeleton className="h-8 w-[60px]" />
+                          <Skeleton className="h-8 w-15" />
                           {/* Delete Button */}
                         </div>
                       </TableCell>

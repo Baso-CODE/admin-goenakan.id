@@ -211,7 +211,7 @@ const Vendors = () => {
           <Select
             value={exportIsActiveFilter}
             onValueChange={setExportIsActiveFilter}>
-            <SelectTrigger className="w-[120px]">
+            <SelectTrigger className="w-30">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -297,19 +297,19 @@ const Vendors = () => {
                         <Skeleton className="h-4 w-37.5" />
                       </TableCell>
                       <TableCell>
-                        <Skeleton className="h-4 w-[120px]" />
+                        <Skeleton className="h-4 w-30" />
                       </TableCell>
                       <TableCell>
                         <Skeleton className="h-4 w-20" />
                       </TableCell>
                       <TableCell>
-                        <Skeleton className="h-4 w-[60px]" />
+                        <Skeleton className="h-4 w-15" />
                       </TableCell>
                       <TableCell>
                         <Skeleton className="h-4 w-25" />
                       </TableCell>
                       <TableCell className="text-right">
-                        <Skeleton className="h-8 w-[120px]" />
+                        <Skeleton className="h-8 w-30" />
                       </TableCell>
                     </TableRow>
                   ))

@@ -292,7 +292,7 @@ const Products = () => {
                 placeholder="Search name or SKU..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 w-[250px]"
+                className="pl-8 w-62.5"
               />
             </div>
           </div>
@@ -409,7 +409,7 @@ const Products = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[300px]">Product Name</TableHead>
-                  <TableHead className="w-[120px]">SKU</TableHead>
+                  <TableHead className="w-30">SKU</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Base Price</TableHead>
                   <TableHead className="text-center">Type</TableHead>
@@ -452,8 +452,8 @@ const Products = () => {
                       {/* 7. Actions */}
                       <TableCell className="text-center">
                         <div className="flex justify-center space-x-2">
-                          <Skeleton className="h-8 w-[50px]" />
-                          <Skeleton className="h-8 w-[60px]" />
+                          <Skeleton className="h-8 w-12.5" />
+                          <Skeleton className="h-8 w-15" />
                         </div>
                       </TableCell>
                     </TableRow>

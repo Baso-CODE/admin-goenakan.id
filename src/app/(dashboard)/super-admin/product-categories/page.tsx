@@ -250,7 +250,7 @@ const ProductCategoriesPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[250px]">Category Name</TableHead>
+                <TableHead className="w-62.5">Category Name</TableHead>
                 <TableHead>Slug</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="">Actions</TableHead>
@@ -273,8 +273,8 @@ const ProductCategoriesPage = () => {
                     </TableCell>
                     <TableCell className="h-12 w-[20%] ">
                       <div className="flex space-x-2">
-                        <Skeleton className="h-8 w-[50px]" />
-                        <Skeleton className="h-8 w-[60px]" />
+                        <Skeleton className="h-8 w-12.5" />
+                        <Skeleton className="h-8 w-15" />
                       </div>
                     </TableCell>
                   </TableRow>

@@ -136,7 +136,7 @@ export default function FormUpdatePriceTiers({
                         <TableHead className="w-[30px]"></TableHead>
                         <TableHead className="w-45">Max Qty</TableHead>
                         <TableHead>Harga Satuan (Rp)</TableHead>
-                        <TableHead className="w-[50px]"></TableHead>
+                        <TableHead className="w-12.5"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>

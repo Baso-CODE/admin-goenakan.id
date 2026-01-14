@@ -209,7 +209,7 @@ const VendorCategories = () => {
 
           {/* Filter Status Aktif */}
           <Select value={isActiveFilter} onValueChange={setIsActiveFilter}>
-            <SelectTrigger className="w-[120px]">
+            <SelectTrigger className="w-30">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -275,7 +275,7 @@ const VendorCategories = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[250px]">Category Name</TableHead>
+                <TableHead className="w-62.5">Category Name</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
@@ -289,13 +289,13 @@ const VendorCategories = () => {
                 /* Penanganan Loading menggunakan Skeleton */
                 Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={index}>
-                    {/* Kolom 1: Category Name (w-[250px]) */}
-                    <TableCell className="h-12 w-[250px]">
+                    {/* Kolom 1: Category Name (w-62.5) */}
+                    <TableCell className="h-12 w-62.5">
                       <Skeleton className="h-4 w-50" />
                     </TableCell>
                     {/* Kolom 2: Description */}
                     <TableCell className="h-12">
-                      <Skeleton className="h-4 w-[250px]" />
+                      <Skeleton className="h-4 w-62.5" />
                     </TableCell>
                     {/* Kolom 3: Type */}
                     <TableCell className="h-12">
@@ -303,7 +303,7 @@ const VendorCategories = () => {
                     </TableCell>
                     {/* Kolom 4: Status */}
                     <TableCell className="h-12">
-                      <Skeleton className="h-4 w-[60px]" />
+                      <Skeleton className="h-4 w-15" />
                     </TableCell>
                     {/* Kolom 5: Created */}
                     <TableCell className="h-12">
@@ -312,9 +312,9 @@ const VendorCategories = () => {
                     {/* Kolom 6: Actions (text-right) */}
                     <TableCell className="h-12 text-right">
                       <div className="flex justify-end space-x-2">
-                        <Skeleton className="h-8 w-[50px]" />
+                        <Skeleton className="h-8 w-12.5" />
                         {/* Edit Button */}
-                        <Skeleton className="h-8 w-[60px]" />
+                        <Skeleton className="h-8 w-15" />
                         {/* Delete Button */}
                       </div>
                     </TableCell>

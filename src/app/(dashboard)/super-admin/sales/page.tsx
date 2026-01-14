@@ -239,7 +239,7 @@ const Sales = () => {
               Status (Export)
             </label>
             <Select value={exportIsActive} onValueChange={setExportIsActive}>
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="w-30">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -306,7 +306,7 @@ const Sales = () => {
             <Table className="min-w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[250px]">Prefix & Name</TableHead>
+                  <TableHead className="w-62.5">Prefix & Name</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
@@ -317,23 +317,23 @@ const Sales = () => {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      <TableCell className="h-12 w-[250px]">
+                      <TableCell className="h-12 w-62.5">
                         <Skeleton className="h-4 w-50" />
                       </TableCell>
                       <TableCell className="h-12">
-                        <Skeleton className="h-4 w-[120px]" />
+                        <Skeleton className="h-4 w-30" />
                       </TableCell>
                       <TableCell className="h-12">
-                        <Skeleton className="h-4 w-[60px]" />
+                        <Skeleton className="h-4 w-15" />
                       </TableCell>
                       <TableCell className="h-12">
                         <Skeleton className="h-4 w-25" />
                       </TableCell>
                       <TableCell className="h-12 text-center">
                         <div className="flex justify-end space-x-2">
-                          <Skeleton className="h-8 w-[50px]" />
-                          <Skeleton className="h-8 w-[60px]" />
-                          <Skeleton className="h-8 w-[60px]" />
+                          <Skeleton className="h-8 w-12.5" />
+                          <Skeleton className="h-8 w-15" />
+                          <Skeleton className="h-8 w-15" />
                         </div>
                       </TableCell>
                     </TableRow>
