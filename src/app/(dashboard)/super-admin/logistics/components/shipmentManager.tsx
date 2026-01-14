@@ -2,7 +2,16 @@
 
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
-import { CheckCircle, MapPin, Plus, Truck } from "lucide-react";
+import {
+  CheckCircle,
+  ExternalLink,
+  FileText, // Icon untuk Surat Jalan
+  MapPin,
+  MessageSquare,
+  Plus,
+  Truck,
+} from "lucide-react";
+import Link from "next/link"; // Import Link Next.js
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -15,7 +24,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"; // Pastikan path ini benar
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -69,25 +78,26 @@ export default function ShipmentManager({
   couriers,
   onUpdate,
 }: ShipmentManagerProps) {
+  // === STATE MANAGEMENT ===
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // State untuk Dialog Konfirmasi Arrive
   const [confirmArriveId, setConfirmArriveId] = useState<string | null>(null);
   const [arriving, setArriving] = useState(false);
 
   // Form States
   const [vendorId, setVendorId] = useState("");
   const [trackingNo, setTrackingNo] = useState("");
+  const [courierLink, setCourierLink] = useState("");
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [method, setMethod] = useState("LAND");
+  const [remarks, setRemarks] = useState("");
   const [selectedItems, setSelectedItems] = useState<
     { id: string; qty: number }[]
   >([]);
 
-  // === CALCULATE REMAINING QTY ===
+  // === HELPER FUNCTIONS ===
   const getRemainingQty = (productId: string, totalOrderQty: number) => {
     let shippedCount = 0;
     shipments.forEach((ship) => {
@@ -123,13 +133,12 @@ export default function ShipmentManager({
     );
   };
 
-  // === SUBMIT CREATE SHIPMENT ===
+  // === API ACTIONS ===
   const handleSubmit = async () => {
     if (selectedItems.length === 0) {
       toast.error("Pilih minimal 1 item untuk dikirim");
       return;
     }
-
     try {
       setLoading(true);
       const tokenRes = await fetch("/api/auth/token");
@@ -138,15 +147,17 @@ export default function ShipmentManager({
       const payload = {
         orderId,
         type,
-        vendorId,
-        trackingNumber: trackingNo,
-        origin,
-        destination,
+        vendorId: vendorId || undefined,
+        trackingNumber: trackingNo || null,
+        courierLink: courierLink || null,
+        origin: origin || null,
+        destination: destination || null,
         method,
         departureDate: new Date(date).toISOString(),
+        remarks: remarks || null,
         items: selectedItems.map((i) => ({
           orderProductId: i.id,
-          quantity: i.qty,
+          quantity: Number(i.qty),
         })),
       };
 
@@ -164,7 +175,15 @@ export default function ShipmentManager({
       toast.success("Pengiriman berhasil dibuat!");
       setIsOpen(false);
       onUpdate();
+
+      // Reset Form
       setSelectedItems([]);
+      setVendorId("");
+      setTrackingNo("");
+      setCourierLink("");
+      setOrigin("");
+      setDestination("");
+      setRemarks("");
     } catch (e) {
       toast.error("Gagal membuat pengiriman");
     } finally {
@@ -172,15 +191,12 @@ export default function ShipmentManager({
     }
   };
 
-  // === MARK AS ARRIVED ACTION ===
   const handleConfirmArrive = async () => {
     if (!confirmArriveId) return;
-
     setArriving(true);
     try {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
-
       await fetch(
         `http://localhost:8000/logistics/shipments/${confirmArriveId}/arrive`,
         {
@@ -195,12 +211,11 @@ export default function ShipmentManager({
           }),
         }
       );
-
-      toast.success("Status berhasil diupdate: Arrived ✅");
+      toast.success("Status updated: Arrived");
       onUpdate();
-      setConfirmArriveId(null); // Tutup dialog
+      setConfirmArriveId(null);
     } catch (e) {
-      toast.error("Gagal mengupdate status");
+      toast.error("Failed to update");
     } finally {
       setArriving(false);
     }
@@ -234,7 +249,6 @@ export default function ShipmentManager({
           </Button>
         </CardHeader>
         <CardContent>
-          {/* HISTORY LIST */}
           <div className="space-y-4">
             {shipments.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground bg-muted/20 rounded-lg border border-dashed flex flex-col items-center justify-center">
@@ -246,7 +260,9 @@ export default function ShipmentManager({
                 <div
                   key={ship.id}
                   className="border rounded-lg p-5 bg-card hover:shadow-md transition-shadow">
+                  {/* HEADER CARD */}
                   <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
+                    {/* INFO KIRI: Tracking & Lokasi */}
                     <div className="space-y-1">
                       <div className="flex items-center gap-3">
                         <Badge
@@ -254,13 +270,28 @@ export default function ShipmentManager({
                           className="font-mono text-xs px-2 py-0.5">
                           {ship.method}
                         </Badge>
-                        <span className="font-bold text-lg tracking-tight">
-                          {ship.trackingNumber || "No Resi"}
-                        </span>
+
+                        {/* Tracking No + Link */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-lg tracking-tight">
+                            {ship.trackingNumber || "No Resi"}
+                          </span>
+                          {ship.courierLink && (
+                            <Link
+                              href={
+                                ship.courierLink.startsWith("http")
+                                  ? ship.courierLink
+                                  : `https://${ship.courierLink}`
+                              }
+                              target="_blank"
+                              className="text-blue-500 hover:text-blue-700 transition-colors p-1 rounded-full hover:bg-blue-50"
+                              title="Lacak Resi">
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Link>
+                          )}
+                        </div>
+
                         <Badge
-                          variant={
-                            ship.status === "ARRIVED" ? "default" : "secondary"
-                          }
                           className={
                             ship.status === "ARRIVED"
                               ? "bg-green-600 hover:bg-green-700"
@@ -269,6 +300,7 @@ export default function ShipmentManager({
                           {ship.status}
                         </Badge>
                       </div>
+
                       <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1">
                         <Truck className="h-4 w-4" />
                         <span className="font-medium">
@@ -276,25 +308,42 @@ export default function ShipmentManager({
                         </span>
                         <span className="text-muted-foreground/30">|</span>
                         <MapPin className="h-4 w-4" />
-                        <span>{ship.origin}</span>
+                        <span>{ship.origin || "-"}</span>
                         <span className="text-muted-foreground/50">➝</span>
-                        <span>{ship.destination}</span>
+                        <span>{ship.destination || "-"}</span>
                       </div>
                     </div>
 
-                    {ship.status === "DISPATCHED" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-green-200 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 transition-colors"
-                        onClick={() => setConfirmArriveId(ship.id)}>
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Mark Arrived
-                      </Button>
-                    )}
+                    {/* ACTION BUTTONS (KANAN) */}
+                    <div className="flex gap-2">
+                      {/* TOMBOL PRINT SURAT JALAN / MANIFEST */}
+                      <Link
+                        href={`/super-admin/logistics/print/${ship.id}`} // Pastikan route ini sesuai dengan file page print yang Anda buat
+                        target="_blank">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-2 border-gray-300 hover:bg-gray-100 text-gray-700">
+                          <FileText className="h-3.5 w-3.5" />
+                          {type === "OUTBOUND" ? "Surat Jalan" : "Manifest"}
+                        </Button>
+                      </Link>
+
+                      {/* TOMBOL MARK ARRIVED (Hanya jika belum arrived) */}
+                      {ship.status === "DISPATCHED" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-green-200 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 transition-colors gap-2"
+                          onClick={() => setConfirmArriveId(ship.id)}>
+                          <CheckCircle className="h-3.5 w-3.5" />
+                          Mark Arrived
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* ITEM DETAIL */}
+                  {/* ITEM LIST & REMARKS */}
                   <div className="bg-muted/30 p-3 rounded-md border text-sm">
                     <p className="font-semibold mb-2 text-[10px] uppercase text-muted-foreground tracking-wider">
                       Items in this shipment:
@@ -312,8 +361,27 @@ export default function ShipmentManager({
                         </li>
                       ))}
                     </ul>
+
+                    {/* Display Remarks if Exists */}
+                    {ship.remarks && (
+                      <>
+                        <Separator className="my-3 bg-muted-foreground/10" />
+                        <div className="flex gap-2 items-start text-muted-foreground">
+                          <MessageSquare className="h-4 w-4 mt-0.5 shrink-0 text-gray-400" />
+                          <div>
+                            <span className="text-[10px] font-bold uppercase mr-1">
+                              Note:
+                            </span>
+                            <span className="text-xs italic">
+                              {ship.remarks}
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
 
+                  {/* FOOTER DATE */}
                   <div className="mt-3 flex items-center text-xs text-muted-foreground font-medium">
                     <span>
                       Berangkat:{" "}
@@ -340,9 +408,9 @@ export default function ShipmentManager({
         </CardContent>
       </Card>
 
-      {/* === CREATE SHIPMENT DIALOG (Modal Input) === */}
+      {/* === CREATE DIALOG (Sama seperti sebelumnya) === */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Buat Pengiriman Baru ({type})</DialogTitle>
           </DialogHeader>
@@ -350,7 +418,7 @@ export default function ShipmentManager({
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Ekspedisi</Label>
-                <Select onValueChange={setVendorId}>
+                <Select value={vendorId} onValueChange={setVendorId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih Kurir" />
                   </SelectTrigger>
@@ -372,21 +440,29 @@ export default function ShipmentManager({
                 />
               </div>
             </div>
+
+            <div className="grid gap-2">
+              <Label>Link Tracking (Opsional)</Label>
+              <Input
+                value={courierLink}
+                onChange={(e) => setCourierLink(e.target.value)}
+                placeholder="https://..."
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Asal (Origin)</Label>
+                <Label>Asal</Label>
                 <Input
                   value={origin}
                   onChange={(e) => setOrigin(e.target.value)}
-                  placeholder="Misal: Gudang China"
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Tujuan (Destination)</Label>
+                <Label>Tujuan</Label>
                 <Input
                   value={destination}
                   onChange={(e) => setDestination(e.target.value)}
-                  placeholder="Misal: Gudang Jakarta"
                 />
               </div>
             </div>
@@ -399,14 +475,14 @@ export default function ShipmentManager({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="LAND">Darat (Land)</SelectItem>
-                    <SelectItem value="SEA">Laut (Sea)</SelectItem>
-                    <SelectItem value="AIR">Udara (Air)</SelectItem>
+                    <SelectItem value="LAND">Darat</SelectItem>
+                    <SelectItem value="SEA">Laut</SelectItem>
+                    <SelectItem value="AIR">Udara</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>Tanggal Berangkat</Label>
+                <Label>Tanggal</Label>
                 <Input
                   type="date"
                   value={date}
@@ -415,19 +491,27 @@ export default function ShipmentManager({
               </div>
             </div>
 
+            <div className="grid gap-2">
+              <Label>Catatan (Remarks)</Label>
+              <Input
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="Catatan tambahan..."
+              />
+            </div>
+
             <Separator className="my-2" />
 
-            {/* PARTIAL SHIPMENT SELECTOR */}
             <div>
-              <Label className="mb-2 block">Pilih Barang yang Dikirim:</Label>
+              <Label className="mb-2 block font-semibold">Pilih Barang:</Label>
               <div className="border rounded-md max-h-48 overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Produk</TableHead>
-                      <TableHead>Sisa (Belum Kirim)</TableHead>
-                      <TableHead>Kirim Qty</TableHead>
+                      <TableHead>Sisa</TableHead>
+                      <TableHead>Kirim</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -439,9 +523,7 @@ export default function ShipmentManager({
                       const isSelected = selectedItems.find(
                         (i) => i.id === p.id
                       );
-
                       if (remaining === 0 && !isSelected) return null;
-
                       return (
                         <TableRow key={p.id}>
                           <TableCell>
@@ -451,10 +533,10 @@ export default function ShipmentManager({
                               disabled={remaining === 0}
                             />
                           </TableCell>
+                          <TableCell>{p.productName}</TableCell>
                           <TableCell>
-                            {p.productName || p.product?.name}
+                            <Badge variant="outline">{remaining}</Badge>
                           </TableCell>
-                          <TableCell>{remaining} pcs</TableCell>
                           <TableCell>
                             {isSelected ? (
                               <Input
@@ -462,6 +544,7 @@ export default function ShipmentManager({
                                 className="h-8 w-20"
                                 value={isSelected.qty}
                                 max={remaining}
+                                min={1}
                                 onChange={(e) =>
                                   handleQtyChange(
                                     p.id,
@@ -493,7 +576,7 @@ export default function ShipmentManager({
         </DialogContent>
       </Dialog>
 
-      {/* === MARK ARRIVED CONFIRMATION DIALOG === */}
+      {/* === CONFIRM DIALOG === */}
       <AlertDialog
         open={!!confirmArriveId}
         onOpenChange={() => setConfirmArriveId(null)}>
@@ -501,9 +584,7 @@ export default function ShipmentManager({
           <AlertDialogHeader>
             <AlertDialogTitle>Konfirmasi Barang Sampai?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tindakan ini akan menandai status pengiriman menjadi{" "}
-              <strong>ARRIVED</strong> (Sampai). Waktu kedatangan akan dicatat
-              sesuai waktu saat ini.
+              Status akan berubah menjadi <strong>ARRIVED</strong>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -512,7 +593,7 @@ export default function ShipmentManager({
               onClick={handleConfirmArrive}
               disabled={arriving}
               className="bg-green-600 hover:bg-green-700">
-              {arriving ? "Updating..." : "Ya, Barang Sampai"}
+              Ya, Sampai
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
