@@ -380,7 +380,7 @@ const VendorItems = () => {
                       <TableCell className="font-medium wrap-break-word whitespace-pre-wrap">
                         {data.name}
                       </TableCell>
-                      <TableCell className="wrap-break-word whitespace-pre-wrap max-w-[300px]">
+                      <TableCell className="wrap-break-word whitespace-pre-wrap max-w-75">
                         {data.description}
                       </TableCell>
                       <TableCell>{data.category?.name || "—"}</TableCell>

@@ -373,7 +373,7 @@ export default function EditOrderForm() {
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[300px] p-0">
+                      <PopoverContent className="w-75 p-0">
                         <Command>
                           <CommandInput placeholder="Search client name..." />
                           <CommandList>

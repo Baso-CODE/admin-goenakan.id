@@ -408,7 +408,7 @@ const Products = () => {
             <Table className="min-w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[300px]">Product Name</TableHead>
+                  <TableHead className="w-75">Product Name</TableHead>
                   <TableHead className="w-30">SKU</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Base Price</TableHead>
