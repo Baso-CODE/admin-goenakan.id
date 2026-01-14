@@ -1,7 +1,13 @@
+import { Metadata } from "next";
 import { DashboardStats } from "./components/dashboardStats";
 import { RecentSales } from "./components/recentSales";
-import { RevenueChart } from "./components/revenueChart"; // Pastikan path benar
+import { RevenueChart } from "./components/revenueChart";
 
+export const metadata: Metadata = {
+  title: "Business Overview",
+  description:
+    "Pantau statistik pendapatan, order klien terbaru, dan status tracking pengiriman secara real-time.",
+};
 export default async function SuperAdminDashboard() {
   return (
     <div className="space-y-6 p-8 pt-6">
