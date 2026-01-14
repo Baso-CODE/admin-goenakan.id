@@ -225,8 +225,8 @@ export default function LogisticsPage() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="w-[180px]">PO Number</TableHead>
-                  <TableHead className="w-[200px]">Client</TableHead>
+                  <TableHead className="w-45">PO Number</TableHead>
+                  <TableHead className="w-50">Client</TableHead>
                   <TableHead className="w-[250px]">Current Status</TableHead>
 
                   {/* Kolom Waktu dengan Icon */}

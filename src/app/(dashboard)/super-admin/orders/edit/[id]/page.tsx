@@ -698,7 +698,7 @@ export default function EditOrderForm() {
                                   <SelectContent>
                                     {products.map((p) => (
                                       <SelectItem key={p.id} value={p.id}>
-                                        <div className="flex items-center justify-between w-full gap-4 min-w-[200px]">
+                                        <div className="flex items-center justify-between w-full gap-4 min-w-50">
                                           <span className="truncate">
                                             {p.name}
                                           </span>

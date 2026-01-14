@@ -14,12 +14,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { Search, FileDown, Loader2 } from "lucide-react";
+import { useDebounce } from "@/helper/debounce";
+import { formatDate } from "@/utils/formatDate";
+import { FileDown, Loader2, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useDebounce } from "@/helper/debounce";
-import { formatDate } from "@/utils/formatDate";
 
 // === Type definitions ===
 type AttributeValue = {
@@ -217,7 +217,7 @@ export default function ProductAttributesPage() {
               placeholder="Search by name/slug..."
               value={exportSearch}
               onChange={(e) => setExportSearch(e.target.value)}
-              className="w-[200px]"
+              className="w-50"
             />
           </div>
 
@@ -230,7 +230,7 @@ export default function ProductAttributesPage() {
               type="date"
               value={exportStartDate}
               onChange={(e) => setExportStartDate(e.target.value)}
-              className="w-[150px]"
+              className="w-37.5"
             />
           </div>
 
@@ -243,7 +243,7 @@ export default function ProductAttributesPage() {
               type="date"
               value={exportEndDate}
               onChange={(e) => setExportEndDate(e.target.value)}
-              className="w-[150px]"
+              className="w-37.5"
             />
           </div>
 
@@ -259,8 +259,7 @@ export default function ProductAttributesPage() {
             size="sm"
             className="gap-2 bg-green-600 hover:bg-green-700" // Warna kustom untuk Attributes
             onClick={handleExportAttributes}
-            disabled={exporting}
-          >
+            disabled={exporting}>
             {exporting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -278,7 +277,7 @@ export default function ProductAttributesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">Attribute Name</TableHead>
+                <TableHead className="w-50">Attribute Name</TableHead>
                 <TableHead>Values</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Actions</TableHead>
@@ -294,10 +293,10 @@ export default function ProductAttributesPage() {
                       <Skeleton className="h-4 w-[140px]" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-4 w-[200px]" />
+                      <Skeleton className="h-4 w-50" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-4 w-[100px]" />
+                      <Skeleton className="h-4 w-25" />
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
@@ -311,8 +310,7 @@ export default function ProductAttributesPage() {
                 <TableRow>
                   <TableCell
                     colSpan={4}
-                    className="text-center text-red-500 py-6"
-                  >
+                    className="text-center text-red-500 py-6">
                     Error loading attributes.
                   </TableCell>
                 </TableRow>
@@ -346,8 +344,7 @@ export default function ProductAttributesPage() {
                     {/* ACTIONS */}
                     <TableCell className="space-x-2">
                       <Link
-                        href={`/super-admin/product-attributes/edit/${attr.id}`}
-                      >
+                        href={`/super-admin/product-attributes/edit/${attr.id}`}>
                         <Button variant="outline" size="sm">
                           Edit
                         </Button>
@@ -363,8 +360,7 @@ export default function ProductAttributesPage() {
                 <TableRow>
                   <TableCell
                     colSpan={4}
-                    className="text-center py-6 text-muted-foreground"
-                  >
+                    className="text-center py-6 text-muted-foreground">
                     No attributes found.
                   </TableCell>
                 </TableRow>
@@ -386,8 +382,7 @@ export default function ProductAttributesPage() {
               variant="outline"
               size="sm"
               disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
+              onClick={() => setPage((p) => Math.max(1, p - 1))}>
               Previous
             </Button>
 
@@ -395,8 +390,7 @@ export default function ProductAttributesPage() {
               variant="outline"
               size="sm"
               disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
+              onClick={() => setPage((p) => p + 1)}>
               Next
             </Button>
           </div>

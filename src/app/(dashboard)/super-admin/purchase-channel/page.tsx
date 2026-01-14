@@ -145,16 +145,16 @@ const PurchaseChannelsPage = () => {
                 Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={index}>
                     <TableCell>
-                      <Skeleton className="h-4 w-[150px]" />
+                      <Skeleton className="h-4 w-37.5" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-4 w-[200px]" />
+                      <Skeleton className="h-4 w-50" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-4 w-20" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-4 w-[100px]" />
+                      <Skeleton className="h-4 w-25" />
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
@@ -168,8 +168,7 @@ const PurchaseChannelsPage = () => {
                 <TableRow>
                   <TableCell
                     colSpan={5}
-                    className="text-center text-red-500 py-6"
-                  >
+                    className="text-center text-red-500 py-6">
                     Error: Failed to load purchase channels.
                   </TableCell>
                 </TableRow>
@@ -190,13 +189,11 @@ const PurchaseChannelsPage = () => {
                     </TableCell>
                     <TableCell className=" space-x-2">
                       <Link
-                        href={`/super-admin/purchase-channel/edit/${data.slug}`}
-                      >
+                        href={`/super-admin/purchase-channel/edit/${data.slug}`}>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="cursor-pointer"
-                        >
+                          className="cursor-pointer">
                           Edit
                         </Button>
                       </Link>
@@ -204,8 +201,7 @@ const PurchaseChannelsPage = () => {
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="text-xs cursor-pointer"
-                      >
+                        className="text-xs cursor-pointer">
                         Delete
                       </Button>
                     </TableCell>
@@ -215,8 +211,7 @@ const PurchaseChannelsPage = () => {
                 <TableRow>
                   <TableCell
                     colSpan={5}
-                    className="text-center py-6 text-muted-foreground"
-                  >
+                    className="text-center py-6 text-muted-foreground">
                     No purchase channels found.
                   </TableCell>
                 </TableRow>
@@ -238,8 +233,7 @@ const PurchaseChannelsPage = () => {
               size="sm"
               variant="outline"
               disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
+              onClick={() => setPage((p) => Math.max(1, p - 1))}>
               Previous
             </Button>
 
@@ -247,8 +241,7 @@ const PurchaseChannelsPage = () => {
               size="sm"
               variant="outline"
               disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
+              onClick={() => setPage((p) => p + 1)}>
               Next
             </Button>
           </div>

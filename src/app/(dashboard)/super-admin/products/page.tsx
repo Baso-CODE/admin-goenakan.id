@@ -1,22 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { toast } from "sonner";
-import {
-  Search,
-  Package,
-  Pencil,
-  Trash2,
-  EyeClosedIcon,
-  ScanEye,
-  Loader2,
-  FileDown,
-} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -26,17 +20,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  FileDown,
+  Loader2,
+  Package,
+  Pencil,
+  ScanEye,
+  Search,
+  Trash2,
+} from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 // Asumsi Anda memiliki utilitas ini di proyek Anda
-import { formatDate } from "@/utils/formatDate";
-import { useDebounce } from "@/helper/debounce";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDebounce } from "@/helper/debounce";
 import { formatCurrency } from "@/utils/formatCurrency";
+import { formatDate } from "@/utils/formatDate";
 
 // === Type definitions for Product (Berdasarkan Skema Baru) ===
 type Product = {
@@ -92,9 +91,8 @@ const Products = () => {
   const [exportStartDate, setExportStartDate] = useState<string>("");
   const [exportEndDate, setExportEndDate] = useState<string>("");
   const [exportCategoryId, setExportCategoryId] = useState<string>("ALL");
-  const [exportIsCustomFilter, setExportIsCustomFilter] = useState<string>(
-    "ALL"
-  );
+  const [exportIsCustomFilter, setExportIsCustomFilter] =
+    useState<string>("ALL");
   const [exportSearch, setExportSearch] = useState<string>("");
   const debouncedSearch = useDebounce(search, 500);
 
@@ -255,9 +253,8 @@ const Products = () => {
               onValueChange={(val) => {
                 setIsCustomFilter(val);
                 setPage(1);
-              }}
-            >
-              <SelectTrigger className="w-[150px]">
+              }}>
+              <SelectTrigger className="w-37.5">
                 <SelectValue placeholder="Filter Type" />
               </SelectTrigger>
               <SelectContent>
@@ -273,9 +270,8 @@ const Products = () => {
               onValueChange={(val) => {
                 setCategoryFilter(val);
                 setPage(1);
-              }}
-            >
-              <SelectTrigger className="w-[200px]">
+              }}>
+              <SelectTrigger className="w-50">
                 <SelectValue placeholder="Filter Category" />
               </SelectTrigger>
               <SelectContent>
@@ -315,9 +311,8 @@ const Products = () => {
           {/* Filter Type untuk Export */}
           <Select
             value={exportIsCustomFilter}
-            onValueChange={setExportIsCustomFilter}
-          >
-            <SelectTrigger className="w-[150px]">
+            onValueChange={setExportIsCustomFilter}>
+            <SelectTrigger className="w-37.5">
               <SelectValue placeholder="Export Type" />
             </SelectTrigger>
             <SelectContent>
@@ -329,7 +324,7 @@ const Products = () => {
 
           {/* Filter Category ID untuk Export */}
           <Select value={exportCategoryId} onValueChange={setExportCategoryId}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-50">
               <SelectValue placeholder="Export Category" />
             </SelectTrigger>
             <SelectContent>
@@ -351,7 +346,7 @@ const Products = () => {
               type="date"
               value={exportStartDate}
               onChange={(e) => setExportStartDate(e.target.value)}
-              className="w-[150px]"
+              className="w-37.5"
             />
           </div>
 
@@ -364,7 +359,7 @@ const Products = () => {
               type="date"
               value={exportEndDate}
               onChange={(e) => setExportEndDate(e.target.value)}
-              className="w-[150px]"
+              className="w-37.5"
             />
           </div>
 
@@ -378,7 +373,7 @@ const Products = () => {
               placeholder="Uses current search"
               value={exportSearch} // Tampilkan nilai debounced
               onChange={(e) => setExportSearch(e.target.value)}
-              className="w-[200px]"
+              className="w-50"
             />
           </div>
 
@@ -387,8 +382,7 @@ const Products = () => {
             size="sm"
             className="gap-2 bg-green-600 hover:bg-green-700 ml-auto"
             onClick={handleExport}
-            disabled={exporting}
-          >
+            disabled={exporting}>
             {exporting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -420,9 +414,7 @@ const Products = () => {
                   <TableHead className="text-right">Base Price</TableHead>
                   <TableHead className="text-center">Type</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead className="text-center w-[150px]">
-                    Actions
-                  </TableHead>
+                  <TableHead className="text-center w-37.5">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -434,12 +426,12 @@ const Products = () => {
                       <TableCell className="h-14">
                         <div className="flex items-center gap-2">
                           <Skeleton className="h-10 w-10 rounded" />
-                          <Skeleton className="h-4 w-[180px]" />
+                          <Skeleton className="h-4 w-45" />
                         </div>
                       </TableCell>
                       {/* 2. SKU */}
                       <TableCell>
-                        <Skeleton className="h-4 w-[100px]" />
+                        <Skeleton className="h-4 w-25" />
                       </TableCell>
                       {/* 3. Category */}
                       <TableCell>
@@ -447,7 +439,7 @@ const Products = () => {
                       </TableCell>
                       {/* 4. Price */}
                       <TableCell className="text-right">
-                        <Skeleton className="h-4 w-[100px] ml-auto" />
+                        <Skeleton className="h-4 w-25 ml-auto" />
                       </TableCell>
                       {/* 5. Type */}
                       <TableCell className="text-center">
@@ -455,7 +447,7 @@ const Products = () => {
                       </TableCell>
                       {/* 6. Created */}
                       <TableCell>
-                        <Skeleton className="h-4 w-[100px]" />
+                        <Skeleton className="h-4 w-25" />
                       </TableCell>
                       {/* 7. Actions */}
                       <TableCell className="text-center">
@@ -471,8 +463,7 @@ const Products = () => {
                   <TableRow>
                     <TableCell
                       colSpan={7} // Sesuaikan colSpan
-                      className="text-center text-red-500 py-6"
-                    >
+                      className="text-center text-red-500 py-6">
                       Error: {error || "Failed to load products."}
                     </TableCell>
                   </TableRow>
@@ -523,24 +514,20 @@ const Products = () => {
                         </TableCell>
                         <TableCell className="text-center space-x-2">
                           <Link
-                            href={`/super-admin/products/detail/${product.id}`}
-                          >
+                            href={`/super-admin/products/detail/${product.id}`}>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="cursor-pointer"
-                            >
+                              className="cursor-pointer">
                               <ScanEye className="h-3 w-3 mr-1" /> Detail
                             </Button>
                           </Link>
                           <Link
-                            href={`/super-admin/products/update/${product.id}`}
-                          >
+                            href={`/super-admin/products/update/${product.id}`}>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="cursor-pointer"
-                            >
+                              className="cursor-pointer">
                               <Pencil className="h-3 w-3 mr-1" /> Edit
                             </Button>
                           </Link>
@@ -561,8 +548,7 @@ const Products = () => {
                   <TableRow>
                     <TableCell
                       colSpan={7} // Sesuaikan colSpan
-                      className="text-center py-6 text-muted-foreground"
-                    >
+                      className="text-center py-6 text-muted-foreground">
                       No products found.
                     </TableCell>
                   </TableRow>
@@ -584,16 +570,14 @@ const Products = () => {
               size="sm"
               variant="outline"
               disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
+              onClick={() => setPage((p) => Math.max(1, p - 1))}>
               Previous
             </Button>
             <Button
               size="sm"
               variant="outline"
               disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
+              onClick={() => setPage((p) => p + 1)}>
               Next
             </Button>
           </div>

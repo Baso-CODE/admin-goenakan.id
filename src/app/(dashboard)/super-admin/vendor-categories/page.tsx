@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -13,19 +20,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, Loader2, Search } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { formatDate } from "@/utils/formatDate";
 import { useDebounce } from "@/helper/debounce";
-import { Skeleton } from "@/components/ui/skeleton";
+import { formatDate } from "@/utils/formatDate";
+import { FileDown, Loader2, Search } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 type VendorCategory = {
   id: string;
@@ -186,9 +186,8 @@ const VendorCategories = () => {
             {/* FILTER TYPE */}
             <Select
               value={typeFilter}
-              onValueChange={(val) => setTypeFilter(val)}
-            >
-              <SelectTrigger className="w-[150px]">
+              onValueChange={(val) => setTypeFilter(val)}>
+              <SelectTrigger className="w-37.5">
                 <SelectValue placeholder="Filter type" />
               </SelectTrigger>
               <SelectContent>
@@ -229,7 +228,7 @@ const VendorCategories = () => {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-[150px]"
+              className="w-37.5"
             />
           </div>
 
@@ -242,7 +241,7 @@ const VendorCategories = () => {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-[150px]"
+              className="w-37.5"
             />
           </div>
 
@@ -251,8 +250,7 @@ const VendorCategories = () => {
             size="sm"
             className="gap-2 bg-green-600 hover:bg-green-700 ml-auto"
             onClick={handleExport}
-            disabled={exporting}
-          >
+            disabled={exporting}>
             {exporting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -293,7 +291,7 @@ const VendorCategories = () => {
                   <TableRow key={index}>
                     {/* Kolom 1: Category Name (w-[250px]) */}
                     <TableCell className="h-12 w-[250px]">
-                      <Skeleton className="h-4 w-[200px]" />
+                      <Skeleton className="h-4 w-50" />
                     </TableCell>
                     {/* Kolom 2: Description */}
                     <TableCell className="h-12">
@@ -309,7 +307,7 @@ const VendorCategories = () => {
                     </TableCell>
                     {/* Kolom 5: Created */}
                     <TableCell className="h-12">
-                      <Skeleton className="h-4 w-[100px]" />
+                      <Skeleton className="h-4 w-25" />
                     </TableCell>
                     {/* Kolom 6: Actions (text-right) */}
                     <TableCell className="h-12 text-right">
@@ -327,8 +325,7 @@ const VendorCategories = () => {
                 <TableRow>
                   <TableCell
                     colSpan={6}
-                    className="text-center text-red-500 py-6"
-                  >
+                    className="text-center text-red-500 py-6">
                     Error: {error || "Failed to load categories."}
                   </TableCell>
                 </TableRow>
@@ -347,8 +344,7 @@ const VendorCategories = () => {
                       ) : (
                         <Badge
                           variant="destructive"
-                          className="bg-red-500/10 text-red-600 border-red-500/20"
-                        >
+                          className="bg-red-500/10 text-red-600 border-red-500/20">
                           Inactive
                         </Badge>
                       )}
@@ -358,8 +354,7 @@ const VendorCategories = () => {
                     </TableCell>
                     <TableCell className="text-right space-x-2">
                       <Link
-                        href={`/super-admin/vendor-categories/edit/${data.id}`}
-                      >
+                        href={`/super-admin/vendor-categories/edit/${data.id}`}>
                         <Button variant="outline" size="sm">
                           Edit
                         </Button>
@@ -367,8 +362,7 @@ const VendorCategories = () => {
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="text-xs"
-                      >
+                        className="text-xs">
                         Delete
                       </Button>
                     </TableCell>
@@ -379,8 +373,7 @@ const VendorCategories = () => {
                 <TableRow>
                   <TableCell
                     colSpan={6} // Jumlah kolom di TableHead
-                    className="text-center py-6 text-muted-foreground"
-                  >
+                    className="text-center py-6 text-muted-foreground">
                     No categories found.
                   </TableCell>
                 </TableRow>
@@ -401,16 +394,14 @@ const VendorCategories = () => {
               size="sm"
               variant="outline"
               disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
+              onClick={() => setPage((p) => Math.max(1, p - 1))}>
               Previous
             </Button>
             <Button
               size="sm"
               variant="outline"
               disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
+              onClick={() => setPage((p) => p + 1)}>
               Next
             </Button>
           </div>

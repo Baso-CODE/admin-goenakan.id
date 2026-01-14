@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { toast } from "sonner";
-import { Search } from "lucide-react";
-import * as LucideIcons from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -17,16 +20,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { formatDate } from "@/utils/formatDate";
 import { useDebounce } from "@/helper/debounce";
-import { Skeleton } from "@/components/ui/skeleton";
+import { formatDate } from "@/utils/formatDate";
+import * as LucideIcons from "lucide-react";
+import { Search } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 type Vendor = {
   id: string;
@@ -69,9 +69,8 @@ const Vendors = () => {
   const [exporting, setExporting] = useState(false);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [exportIsActiveFilter, setExportIsActiveFilter] = useState<string>(
-    "ALL"
-  );
+  const [exportIsActiveFilter, setExportIsActiveFilter] =
+    useState<string>("ALL");
   const fetchVendors = async () => {
     setLoading(true);
     setError(null);
@@ -171,7 +170,7 @@ const Vendors = () => {
           </CardTitle>
 
           <div className="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64 min-w-[200px]">
+            <div className="relative flex-1 md:w-64 min-w-50">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
@@ -184,9 +183,8 @@ const Vendors = () => {
 
             <Select
               value={statusFilter}
-              onValueChange={(val) => setStatusFilter(val)}
-            >
-              <SelectTrigger className="w-[150px]">
+              onValueChange={(val) => setStatusFilter(val)}>
+              <SelectTrigger className="w-37.5">
                 <SelectValue placeholder="Filter status" />
               </SelectTrigger>
               <SelectContent>
@@ -212,8 +210,7 @@ const Vendors = () => {
           {/* Filter Status Aktif Export */}
           <Select
             value={exportIsActiveFilter}
-            onValueChange={setExportIsActiveFilter}
-          >
+            onValueChange={setExportIsActiveFilter}>
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -233,7 +230,7 @@ const Vendors = () => {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-[150px]"
+              className="w-37.5"
             />
           </div>
 
@@ -246,7 +243,7 @@ const Vendors = () => {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-[150px]"
+              className="w-37.5"
             />
           </div>
 
@@ -255,8 +252,7 @@ const Vendors = () => {
             size="sm"
             className="gap-2 bg-green-600 hover:bg-green-700 ml-auto"
             onClick={handleExport}
-            disabled={exporting}
-          >
+            disabled={exporting}>
             {exporting ? (
               <LucideIcons.Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -281,7 +277,7 @@ const Vendors = () => {
             <Table className="min-w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[200px]">Company Name</TableHead>
+                  <TableHead className="w-50">Company Name</TableHead>
                   <TableHead>PIC Name</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Country</TableHead>
@@ -295,10 +291,10 @@ const Vendors = () => {
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
                       <TableCell>
-                        <Skeleton className="h-4 w-[180px]" />
+                        <Skeleton className="h-4 w-45" />
                       </TableCell>
                       <TableCell>
-                        <Skeleton className="h-4 w-[150px]" />
+                        <Skeleton className="h-4 w-37.5" />
                       </TableCell>
                       <TableCell>
                         <Skeleton className="h-4 w-[120px]" />
@@ -310,7 +306,7 @@ const Vendors = () => {
                         <Skeleton className="h-4 w-[60px]" />
                       </TableCell>
                       <TableCell>
-                        <Skeleton className="h-4 w-[100px]" />
+                        <Skeleton className="h-4 w-25" />
                       </TableCell>
                       <TableCell className="text-right">
                         <Skeleton className="h-8 w-[120px]" />
@@ -321,8 +317,7 @@ const Vendors = () => {
                   <TableRow>
                     <TableCell
                       colSpan={7}
-                      className="text-center text-red-500 py-6"
-                    >
+                      className="text-center text-red-500 py-6">
                       {error}
                     </TableCell>
                   </TableRow>
@@ -344,8 +339,7 @@ const Vendors = () => {
                                 key={c.id}
                                 href={c.contactId}
                                 target="_blank"
-                                className="text-muted-foreground hover:text-primary transition flex items-center gap-1.5"
-                              >
+                                className="text-muted-foreground hover:text-primary transition flex items-center gap-1.5">
                                 <Icon className="h-4 w-4" /> {c.platform.name}
                               </Link>
                             );
@@ -385,8 +379,7 @@ const Vendors = () => {
                   <TableRow>
                     <TableCell
                       colSpan={7}
-                      className="text-center py-6 text-muted-foreground"
-                    >
+                      className="text-center py-6 text-muted-foreground">
                       No vendors found.
                     </TableCell>
                   </TableRow>
@@ -407,16 +400,14 @@ const Vendors = () => {
               size="sm"
               variant="outline"
               disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
+              onClick={() => setPage((p) => Math.max(1, p - 1))}>
               Previous
             </Button>
             <Button
               size="sm"
               variant="outline"
               disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
+              onClick={() => setPage((p) => p + 1)}>
               Next
             </Button>
           </div>

@@ -24,7 +24,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 import { ArrowRight, Layers, PlusCircle, Trash2 } from "lucide-react";
 import { useFieldArray, useFormContext } from "react-hook-form";
 
@@ -55,8 +54,7 @@ export function PriceTiers() {
             onClick={() =>
               append({ minQuantity: 1, maxQuantity: null, price: 0 })
             }
-            className="border-dashed"
-          >
+            className="border-dashed">
             <PlusCircle className="h-4 w-4 mr-2" />
             Tambah Tier
           </Button>
@@ -76,9 +74,9 @@ export function PriceTiers() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="w-[180px]">Min Qty</TableHead>
+                    <TableHead className="w-45">Min Qty</TableHead>
                     <TableHead className="w-[30px]"></TableHead>
-                    <TableHead className="w-[180px]">Max Qty</TableHead>
+                    <TableHead className="w-45">Max Qty</TableHead>
                     <TableHead>Harga Satuan (Rp)</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
@@ -175,8 +173,7 @@ export function PriceTiers() {
                           size="icon"
                           type="button"
                           onClick={() => remove(index)}
-                          className="text-muted-foreground hover:text-destructive"
-                        >
+                          className="text-muted-foreground hover:text-destructive">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -191,15 +188,13 @@ export function PriceTiers() {
               {fields.map((field, index) => (
                 <div
                   key={field.id}
-                  className="bg-card border rounded-lg p-4 space-y-3 relative shadow-sm"
-                >
+                  className="bg-card border rounded-lg p-4 space-y-3 relative shadow-sm">
                   <Button
                     variant="ghost"
                     size="icon"
                     type="button"
                     onClick={() => remove(index)}
-                    className="absolute top-2 right-2 text-muted-foreground hover:text-destructive h-8 w-8"
-                  >
+                    className="absolute top-2 right-2 text-muted-foreground hover:text-destructive h-8 w-8">
                     <Trash2 className="h-4 w-4" />
                   </Button>
 

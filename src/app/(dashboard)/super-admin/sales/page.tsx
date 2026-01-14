@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { toast } from "sonner";
-import { Search, FileDown, Loader2 } from "lucide-react"; // Import FileDown dan Loader2
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -16,16 +20,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { formatDate } from "@/utils/formatDate";
 import { useDebounce } from "@/helper/debounce";
-import { Skeleton } from "@/components/ui/skeleton";
+import { formatDate } from "@/utils/formatDate";
+import { FileDown, Loader2, Search } from "lucide-react"; // Import FileDown dan Loader2
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 // === Type definitions ===
 type SalesPerson = {
@@ -195,7 +195,7 @@ const Sales = () => {
 
           <div className="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
             {/* Search */}
-            <div className="relative flex-1 md:w-64 min-w-[200px]">
+            <div className="relative flex-1 md:w-64 min-w-50">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
@@ -212,9 +212,8 @@ const Sales = () => {
               onValueChange={(val) => {
                 setStatusFilter(val);
                 setPage(1); // Reset page saat filter tabel berubah
-              }}
-            >
-              <SelectTrigger className="w-[150px] min-w-[150px]">
+              }}>
+              <SelectTrigger className="w-37.5 min-w-37.5">
                 <SelectValue placeholder="Filter status" />
               </SelectTrigger>
               <SelectContent>
@@ -260,7 +259,7 @@ const Sales = () => {
               type="date"
               value={exportStartDate}
               onChange={(e) => setExportStartDate(e.target.value)}
-              className="w-[150px]"
+              className="w-37.5"
             />
           </div>
 
@@ -273,7 +272,7 @@ const Sales = () => {
               type="date"
               value={exportEndDate}
               onChange={(e) => setExportEndDate(e.target.value)}
-              className="w-[150px]"
+              className="w-37.5"
             />
           </div>
 
@@ -289,8 +288,7 @@ const Sales = () => {
             size="sm"
             className="gap-2 bg-green-600 hover:bg-green-700"
             onClick={handleExportSales}
-            disabled={exporting}
-          >
+            disabled={exporting}>
             {exporting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -320,7 +318,7 @@ const Sales = () => {
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
                       <TableCell className="h-12 w-[250px]">
-                        <Skeleton className="h-4 w-[200px]" />
+                        <Skeleton className="h-4 w-50" />
                       </TableCell>
                       <TableCell className="h-12">
                         <Skeleton className="h-4 w-[120px]" />
@@ -329,7 +327,7 @@ const Sales = () => {
                         <Skeleton className="h-4 w-[60px]" />
                       </TableCell>
                       <TableCell className="h-12">
-                        <Skeleton className="h-4 w-[100px]" />
+                        <Skeleton className="h-4 w-25" />
                       </TableCell>
                       <TableCell className="h-12 text-center">
                         <div className="flex justify-end space-x-2">
@@ -344,8 +342,7 @@ const Sales = () => {
                   <TableRow>
                     <TableCell
                       colSpan={5}
-                      className="text-center text-red-500 py-6"
-                    >
+                      className="text-center text-red-500 py-6">
                       Error: {error || "Failed to load sales data."}
                     </TableCell>
                   </TableRow>
@@ -365,8 +362,7 @@ const Sales = () => {
                         ) : (
                           <Badge
                             variant="destructive"
-                            className="bg-red-500/10 text-red-600 border-red-500/20"
-                          >
+                            className="bg-red-500/10 text-red-600 border-red-500/20">
                             Inactive
                           </Badge>
                         )}
@@ -379,8 +375,7 @@ const Sales = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="cursor-pointer"
-                          >
+                            className="cursor-pointer">
                             Edit
                           </Button>
                         </Link>
@@ -388,8 +383,7 @@ const Sales = () => {
                           <Button
                             variant="secondary"
                             size="sm"
-                            className="text-xs cursor-pointer"
-                          >
+                            className="text-xs cursor-pointer">
                             Detail
                           </Button>
                         </Link>
@@ -408,8 +402,7 @@ const Sales = () => {
                   <TableRow>
                     <TableCell
                       colSpan={5}
-                      className="text-center py-6 text-muted-foreground"
-                    >
+                      className="text-center py-6 text-muted-foreground">
                       No sales found.
                     </TableCell>
                   </TableRow>
@@ -431,16 +424,14 @@ const Sales = () => {
               size="sm"
               variant="outline"
               disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
+              onClick={() => setPage((p) => Math.max(1, p - 1))}>
               Previous
             </Button>
             <Button
               size="sm"
               variant="outline"
               disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
+              onClick={() => setPage((p) => p + 1)}>
               Next
             </Button>
           </div>

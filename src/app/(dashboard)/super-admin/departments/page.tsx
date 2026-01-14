@@ -233,7 +233,7 @@ const DepartmentPage = () => {
               type="date"
               value={exportStartDate}
               onChange={(e) => setExportStartDate(e.target.value)}
-              className="w-[150px]"
+              className="w-37.5"
             />
           </div>
 
@@ -246,7 +246,7 @@ const DepartmentPage = () => {
               type="date"
               value={exportEndDate}
               onChange={(e) => setExportEndDate(e.target.value)}
-              className="w-[150px]"
+              className="w-37.5"
             />
           </div>
 
@@ -262,8 +262,7 @@ const DepartmentPage = () => {
             size="sm"
             className="gap-2 bg-green-600 hover:bg-green-700"
             onClick={handleExportDepartment}
-            disabled={exporting}
-          >
+            disabled={exporting}>
             {exporting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -293,16 +292,16 @@ const DepartmentPage = () => {
                 Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={index}>
                     <TableCell>
-                      <Skeleton className="h-4 w-[150px]" />
+                      <Skeleton className="h-4 w-37.5" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-4 w-[200px]" />
+                      <Skeleton className="h-4 w-50" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-4 w-20" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-4 w-[100px]" />
+                      <Skeleton className="h-4 w-25" />
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
@@ -316,8 +315,7 @@ const DepartmentPage = () => {
                 <TableRow>
                   <TableCell
                     colSpan={5}
-                    className="text-center text-red-500 py-6"
-                  >
+                    className="text-center text-red-500 py-6">
                     Error: Failed to load department.
                   </TableCell>
                 </TableRow>
@@ -341,8 +339,7 @@ const DepartmentPage = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="cursor-pointer"
-                        >
+                          className="cursor-pointer">
                           Edit
                         </Button>
                       </Link>
@@ -350,8 +347,7 @@ const DepartmentPage = () => {
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="text-xs cursor-pointer"
-                      >
+                        className="text-xs cursor-pointer">
                         Delete
                       </Button>
                     </TableCell>
@@ -361,8 +357,7 @@ const DepartmentPage = () => {
                 <TableRow>
                   <TableCell
                     colSpan={5}
-                    className="text-center py-6 text-muted-foreground"
-                  >
+                    className="text-center py-6 text-muted-foreground">
                     No department found.
                   </TableCell>
                 </TableRow>
@@ -384,8 +379,7 @@ const DepartmentPage = () => {
               size="sm"
               variant="outline"
               disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
+              onClick={() => setPage((p) => Math.max(1, p - 1))}>
               Previous
             </Button>
 
@@ -393,8 +387,7 @@ const DepartmentPage = () => {
               size="sm"
               variant="outline"
               disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
+              onClick={() => setPage((p) => p + 1)}>
               Next
             </Button>
           </div>
