@@ -1,10 +1,9 @@
-# Gunakan image resmi Bun (sudah berbasis Debian, jadi support apt-get)
+# Gunakan image Bun resmi
 FROM oven/bun:latest
 
 WORKDIR /app
 
-# 1. Install Library C++ & Python (Wajib untuk Argon2 di NextAuth)
-# Sama persis seperti di backend agar tidak error "libstdc++"
+# 1. Install Library C++ (Wajib untuk Argon2/NextAuth)
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
@@ -12,22 +11,24 @@ RUN apt-get update && apt-get install -y \
     openssl \
     libstdc++-12-dev
 
-# 2. Copy dependency definition
-# Pastikan nama file lock kamu 'bun.lock' (sesuai backend tadi)
-COPY package.json bun.lock ./
+# 2. Copy dependency files
+COPY package.json bun.lock* ./
 
-# 3. Install dependencies (Jauh lebih cepat pakai Bun)
+# 3. Install dependencies
 RUN bun install
 
-# 4. Copy seluruh kode source
+# 4. Copy sisa kode
 COPY . .
 
-# 5. Build Next.js untuk production
-# Ini akan menjalankan perintah "next build" via Bun
+# 5. Build Next.js
+# Pastikan environment variable production terbaca saat build
+ARG NEXT_PUBLIC_BASE_URL_API
+ARG NEXT_PUBLIC_BASE_URL_WEB
+ENV NEXT_PUBLIC_BASE_URL_API=$NEXT_PUBLIC_BASE_URL_API
+ENV NEXT_PUBLIC_BASE_URL_WEB=$NEXT_PUBLIC_BASE_URL_WEB
+
 RUN bun run build
 
-# 6. Expose Port (Next.js default 3000)
+# 6. Expose port & Start
 EXPOSE 3000
-
-# 7. Jalankan Aplikasi
 CMD ["bun", "run", "start"]
