@@ -20,20 +20,17 @@ RUN bun install
 # 4. Copy seluruh kode source (Termasuk folder prisma/)
 COPY . .
 
-# === PERBAIKAN UTAMA DI SINI ===
-# 5. Generate Prisma Client
-# Ini wajib dijalankan sebelum "bun run build" agar Next.js mengenali Prisma
+# 5. Generate Prisma Client (Solusi error Prisma)
 RUN bunx prisma generate
-# ===============================
 
 # 6. Build Next.js
-# Pastikan environment variable production terbaca saat build
+# (Solusi agar env variable terbaca & tidak localhost)
 ARG NEXT_PUBLIC_BASE_URL_API
 ARG NEXT_PUBLIC_BASE_URL_WEB
 ENV NEXT_PUBLIC_BASE_URL_API=$NEXT_PUBLIC_BASE_URL_API
 ENV NEXT_PUBLIC_BASE_URL_WEB=$NEXT_PUBLIC_BASE_URL_WEB
 
-# (Opsional) Matikan telemetry Next.js agar log lebih bersih
+# (Opsional) Matikan telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN bun run build
