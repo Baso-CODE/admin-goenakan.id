@@ -44,16 +44,36 @@ const formatCurrency = (amount: number) => {
 };
 
 // === SCHEMA VALIDATION ===
+// === HELPER AGAR TIDAK REPETITIF ===
+// Terima apa saja (any), ubah jadi number. Kalau gagal/kosong jadi 0.
+const anyToNumber = z.any().transform((val) => {
+  const parsed = Number(val);
+  return isNaN(parsed) ? 0 : parsed;
+});
+
+// Terima apa saja (any), ubah jadi number. Default 1 (untuk Qty/Rate).
+const anyToNumberDefaultOne = z.any().transform((val) => {
+  const parsed = Number(val);
+  return isNaN(parsed) || parsed === 0 ? 1 : parsed;
+});
+
+// === SCHEMA VALIDATION ===
 const cashflowSchema = z.object({
   poNumber: z.string(),
   revenueItems: z.array(
     z.object({
       description: z.string().min(1, "Description required"),
-      productId: z.string().optional(), // Optional karena bisa input manual custom revenue
-      unitPrice: z.number().min(0),
-      quantity: z.number().min(1),
+      productId: z.string().optional(),
+
+      // PAKAI z.any() AGAR TYPESCRIPT TIDAK PROTES INPUT STRING
+      unitPrice: anyToNumber,
+      quantity: anyToNumberDefaultOne,
+
       currency: z.string().optional(),
-      exchangeRate: z.number().optional(),
+
+      // Exchange rate: Terima any, return number (default 1)
+      exchangeRate: anyToNumberDefaultOne,
+
       total: z.number(), // Calculated field
     })
   ),
@@ -61,10 +81,14 @@ const cashflowSchema = z.object({
     z.object({
       description: z.string().min(1, "Description required"),
       vendorId: z.string().min(1, "Vendor required"),
-      costPerUnit: z.number().min(0),
-      quantity: z.number().min(1),
+
+      // PAKAI HELPER YANG SAMA
+      costPerUnit: anyToNumber,
+      quantity: anyToNumberDefaultOne,
+
       currency: z.string().optional(),
-      exchangeRate: z.number().optional(),
+      exchangeRate: anyToNumberDefaultOne,
+
       total: z.number(),
     })
   ),
@@ -719,7 +743,13 @@ export default function EditCashflowClient() {
                     <Button
                       className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
                       size="lg"
-                      onClick={form.handleSubmit(onSubmit)}
+                      // Tambahkan parameter kedua untuk melihat error di console
+                      onClick={form.handleSubmit(onSubmit, (errors) => {
+                        console.log("VALIDASI GAGAL:", errors);
+                        toast.error(
+                          "Cek kembali isian form, ada yang belum lengkap/valid."
+                        );
+                      })}
                       disabled={submitting}>
                       {submitting ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

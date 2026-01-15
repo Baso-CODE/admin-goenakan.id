@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  Building2,
-  PackageSearch,
-  FileText,
-  CreditCard,
   BarChart3,
-  Settings,
+  Building2,
+  CreditCard,
+  FileText,
   MoreHorizontal,
+  PackageSearch,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
@@ -25,6 +25,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import Link from "next/link";
 
 export function NavDashboards({
   projects,
@@ -44,10 +45,10 @@ export function NavDashboards({
           <SidebarMenuItem key={item.name}>
             {/* === MENU ITEM === */}
             <SidebarMenuButton asChild>
-              <a href={item.url} className="flex items-center gap-2">
+              <Link href={item.url} className="flex items-center gap-2">
                 <item.icon className="h-4 w-4" />
                 <span className="font-medium">{item.name}</span>
-              </a>
+              </Link>
             </SidebarMenuButton>
 
             {/* === ACTION DROPDOWN === */}
@@ -62,8 +63,7 @@ export function NavDashboards({
               <DropdownMenuContent
                 className="w-56 rounded-lg"
                 side={isMobile ? "bottom" : "right"}
-                align={isMobile ? "end" : "start"}
-              >
+                align={isMobile ? "end" : "start"}>
                 <DropdownMenuItem>
                   <Building2 className="text-muted-foreground h-4 w-4" />
                   <span>Vendors</span>

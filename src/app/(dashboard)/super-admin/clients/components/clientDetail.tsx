@@ -111,12 +111,12 @@ const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
         <div className="grid grid-cols-3">
           <span className="text-muted-foreground font-medium">Website</span>
           <span className="col-span-2">
-            <a
+            <Link
               className="text-blue-600 font-medium hover:underline"
               href={data.website}
               target="_blank">
               {data.website}
-            </a>
+            </Link>
           </span>
         </div>
 
