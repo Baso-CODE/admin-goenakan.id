@@ -15,6 +15,8 @@ import FormUpdateVariants, {
   VariantFormValues,
 } from "../../components/update/VariantsSection";
 
+const CLOUDINARY_CLOUD_NAME = "do9sfnf5k";
+const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 export default function EditProductPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -374,34 +376,63 @@ export default function EditProductPage() {
   };
 
   const handleAddVideo = async (file: File): Promise<void> => {
+    setIsSubmitting(true); // Opsional: block UI saat upload
     try {
+      // A. DIRECT UPLOAD KE CLOUDINARY (Frontend)
+      const cloudinaryFormData = new FormData();
+      cloudinaryFormData.append("file", file);
+      cloudinaryFormData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+      cloudinaryFormData.append("resource_type", "video");
+
+      const uploadRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`,
+        {
+          method: "POST",
+          body: cloudinaryFormData,
+        }
+      );
+
+      if (!uploadRes.ok) throw new Error("Gagal upload ke Cloudinary");
+      const uploadData = await uploadRes.json();
+
+      // B. KIRIM URL KE BACKEND UNTUK DISIMPAN
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const formData = new FormData();
-      formData.append("video", file);
+      // Payload JSON (Bukan FormData lagi)
+      const payload = {
+        url: uploadData.secure_url,
+        publicId: uploadData.public_id,
+        title: file.name,
+        altText: file.name,
+        isFeatured: false,
+      };
 
       const res = await fetch(`${apiUrl}/products/${id}/video`, {
         method: "POST",
         headers: {
+          "Content-Type": "application/json", // Header JSON
           Authorization: `Bearer ${token}`,
         },
-        body: formData,
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to add video");
+        throw new Error(errorData.message || "Failed to save video data");
       }
 
+      // C. Update UI
       const updatedProduct = await res.json();
       setProductData(updatedProduct);
-      toast.success("Video berhasil diunggah!");
+      toast.success("Video berhasil ditambahkan!");
     } catch (err) {
       console.error("Error adding video:", err);
       toast.error(
         err instanceof Error ? err.message : "Gagal menambahkan video"
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

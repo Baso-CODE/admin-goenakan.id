@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef, ChangeEvent } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Loader2, Pencil, Plus, Star, X } from "lucide-react";
 import Image from "next/image";
-import { X, Plus, Star, Pencil } from "lucide-react";
+import { ChangeEvent, useRef, useState } from "react";
 import { ImageDetailModalCore } from "../imageDetailCore";
 import { VideoDetailModalCore } from "../videoDetailCore";
 
@@ -48,13 +48,12 @@ function ExistingMediaDisplay({
   isSubmitting: boolean;
 }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-4 border rounded-lg bg-gray-50/50 min-h-[120px]">
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-4 border rounded-lg bg-gray-50/50 min-h-30">
       {media.map((m) => (
         <div
           key={m.id}
           // PERBAIKAN 1: Tambahkan 'group' di sini
-          className="group relative aspect-square rounded-lg overflow-hidden border bg-white shadow-sm hover:shadow-md transition-all"
-        >
+          className="group relative aspect-square rounded-lg overflow-hidden border bg-white shadow-sm hover:shadow-md transition-all">
           {type === "image" ? (
             <Image src={m.url} alt="img" fill className="object-cover" />
           ) : (
@@ -81,8 +80,7 @@ function ExistingMediaDisplay({
               className="h-8 w-8 rounded-full bg-white hover:bg-gray-100 text-gray-700 shadow-md"
               onClick={() => onEdit(m)}
               disabled={isSubmitting}
-              title="Edit Detail SEO"
-            >
+              title="Edit Detail SEO">
               <Pencil className="h-4 w-4" />
             </Button>
 
@@ -93,8 +91,7 @@ function ExistingMediaDisplay({
               className="h-8 w-8 rounded-full shadow-md"
               onClick={() => onDelete(m.id)}
               disabled={isSubmitting}
-              title="Hapus Media"
-            >
+              title="Hapus Media">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -216,8 +213,7 @@ export default function FormUpdateProductMedia({
                 variant="outline"
                 size="sm"
                 onClick={() => imageInputRef.current?.click()}
-                disabled={isSubmitting || isUploading}
-              >
+                disabled={isSubmitting || isUploading}>
                 <Plus className="h-4 w-4 mr-2" />
                 {isUploading ? "Uploading..." : "Tambah Gambar"}
               </Button>
@@ -248,10 +244,20 @@ export default function FormUpdateProductMedia({
                 variant="outline"
                 size="sm"
                 onClick={() => videoInputRef.current?.click()}
-                disabled={isSubmitting || isUploading}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                {isUploading ? "Uploading..." : "Tambah Video"}
+                disabled={isSubmitting || isUploading}>
+                {/* Tambahkan Icon Loader jika uploading */}
+                {isUploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Uploading (
+                    {/* Anda bisa menambah % progress disini jika mau */})...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Tambah Video
+                  </>
+                )}
               </Button>
             </div>
           </div>

@@ -18,7 +18,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, ClipboardList, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronsUpDown,
+  ClipboardList,
+  Trash2,
+} from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -26,8 +32,22 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { apiUrl } from "@/helper/apiurl";
 import { countries } from "@/lib/countries";
+import { cn } from "@/lib/utils";
 
 const clientSchema = z.object({
   type: z.enum(["B2B", "B2C"]),
@@ -184,6 +204,8 @@ export default function ClientAddForm() {
   );
   const [departments, setDepartments] = useState<Departement[]>([]);
 
+  const [openB2BCountry, setOpenB2BCountry] = useState(false);
+  const [openB2CCountry, setOpenB2CCountry] = useState(false);
   const { data: session } = useSession();
   const router = useRouter();
 
@@ -572,34 +594,79 @@ export default function ClientAddForm() {
                 {/* === ADDRESS SECTION === */}
                 <div className="grid grid-cols-3 gap-4">
                   {/* === COUNTRY === */}
-                  <div className="space-y-2">
+                  {/* === COUNTRY (SEARCHABLE COMBOBOX) === */}
+                  <div className="space-y-2 flex flex-col">
                     <Label>Negara</Label>
-                    <Select
-                      value={formData.b2b_country}
-                      onValueChange={(value) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          b2b_country: value,
-                          b2b_province: "",
-                          b2b_city: "",
-                          b2b_district: "",
-                          b2b_subDistrict: "",
-                          b2b_postalCode: "",
-                        }))
-                      }>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih Negara" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-64">
-                        {countries.map((c) => (
-                          <SelectItem key={c.code} value={c.name}>
-                            <span className="flex items-center gap-2">
-                              <span>{c.flag}</span> {c.name}
+                    <Popover
+                      open={openB2BCountry}
+                      onOpenChange={setOpenB2BCountry}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={openB2BCountry}
+                          className={cn(
+                            "w-full justify-between pl-3 font-normal",
+                            !formData.b2b_country && "text-muted-foreground"
+                          )}>
+                          {formData.b2b_country ? (
+                            <span className="flex items-center gap-2 truncate">
+                              {/* Mencari flag berdasarkan negara yang dipilih */}
+                              <span>
+                                {
+                                  countries.find(
+                                    (c) => c.name === formData.b2b_country
+                                  )?.flag
+                                }
+                              </span>
+                              {formData.b2b_country}
                             </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          ) : (
+                            "Pilih Negara"
+                          )}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-75 p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Cari negara..." />
+                          <CommandList>
+                            <CommandEmpty>Negara tidak ditemukan.</CommandEmpty>
+                            <CommandGroup>
+                              {countries.map((c) => (
+                                <CommandItem
+                                  key={c.code}
+                                  value={c.name}
+                                  onSelect={(currentValue) => {
+                                    // Logic update state (sama seperti sebelumnya)
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      b2b_country: c.name, // Gunakan nama asli dari data countries
+                                      b2b_province: "",
+                                      b2b_city: "",
+                                      b2b_district: "",
+                                      b2b_subDistrict: "",
+                                      b2b_postalCode: "",
+                                    }));
+                                    setOpenB2BCountry(false);
+                                  }}>
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      formData.b2b_country === c.name
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  <span className="mr-2">{c.flag}</span>
+                                  {c.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   {/* === PROVINCE === */}

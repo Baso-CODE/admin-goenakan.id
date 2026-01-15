@@ -54,7 +54,6 @@ const attributeSelectionSchema = z.object({
   valueIds: z.array(z.string()).min(1, "Choose at least one value"),
 });
 
-// Update Schema: Price
 const variantMetaSchema = z.object({
   variantIndex: z.number(),
   isFeatured: z.boolean().optional(),
@@ -62,7 +61,10 @@ const variantMetaSchema = z.object({
   altText: z.string().optional(),
 });
 
+// Video meta schema tetap sama
 const videoMetaSchema = z.object({
+  url: z.string().optional(), // Tambahkan URL karena sekarang kita simpan URL
+  publicId: z.string().optional(),
   title: z.string().optional(),
   altText: z.string().optional(),
   isFeatured: z.boolean().optional(),
@@ -176,7 +178,6 @@ export default function ProductFormV2({
 
   const [attributesList, setAttributesList] = useState<any[]>([]);
 
-  // State Meta (Price, dll)
   const [variantMetas, setVariantMetas] = useState<
     {
       variantIndex: number;
@@ -188,7 +189,9 @@ export default function ProductFormV2({
 
   const [variantFilesMap, setVariantFilesMap] = useState<File[][]>([]);
   const [productImagesFiles, setProductImagesFiles] = useState<File[]>([]);
-  const [productVideosFiles, setProductVideosFiles] = useState<File[]>([]);
+
+  // ❌ [DIHAPUS] State productVideosFiles tidak lagi diperlukan
+  // const [productVideosFiles, setProductVideosFiles] = useState<File[]>([]);
 
   useEffect(() => {
     form.register("attributes");
@@ -196,7 +199,7 @@ export default function ProductFormV2({
     form.register("videosMetadata");
   }, [form]);
 
-  // Handler Generate Varian
+  // Handler Generate Varian (Sama seperti sebelumnya)
   const handleGenerateVariants = () => {
     if (!attributeSelections || attributeSelections.length === 0) {
       toast.error("Tambahkan minimal 1 attribute sebelum generate variant.");
@@ -231,8 +234,6 @@ export default function ProductFormV2({
     });
 
     setCombinations(comboObjects);
-
-    // [PENTING] Set Default Price = Base Price
     const currentBasePrice = Number(form.getValues("basePrice")) || 0;
 
     const newVariantMetas = comboObjects.map((_, idx) => ({
@@ -244,12 +245,9 @@ export default function ProductFormV2({
 
     setVariantMetas(newVariantMetas);
     form.setValue("variantImagesMetadata", newVariantMetas);
-
-    // Reset file map sesuai jumlah varian
     setVariantFilesMap(comboObjects.map(() => []));
   };
 
-  // [CALLBACK] Update Metadata (Price) dari Child
   const handleUpdateVariantMeta = (
     index: number,
     field: string,
@@ -265,7 +263,6 @@ export default function ProductFormV2({
     form.setValue("variantImagesMetadata", updatedMetas);
   };
 
-  // [CALLBACK] Update Files dari Child
   const handleVariantImagesChange = (filesMap: File[][]) => {
     setVariantFilesMap(filesMap);
   };
@@ -285,16 +282,19 @@ export default function ProductFormV2({
         imagesMetadata: values.imagesMetadata?.length
           ? values.imagesMetadata
           : undefined,
-        videosMetadata: form.getValues("videosMetadata")?.length
-          ? form.getValues("videosMetadata")
-          : undefined,
-        // Pastikan meta dari state dikirim
+
+        // ✅ Videos metadata sudah otomatis terisi URL dari UploadVideos
+        videosMetadata: values.videosMetadata,
+
         variantImagesMetadata: variantMetas,
       };
 
       const filesToSubmit = {
         images: productImagesFiles.length > 0 ? productImagesFiles : null,
-        videos: productVideosFiles.length > 0 ? productVideosFiles : null,
+
+        // ✅ [PENTING] Set null agar backend tahu tidak ada file video yang perlu diupload
+        videos: null,
+
         variantImages: variantFilesMap,
       };
       await onSubmit(payload, filesToSubmit);
@@ -523,12 +523,8 @@ export default function ProductFormV2({
                   <UploadVideos
                     form={form}
                     metadataName="videosMetadata"
-                    name="videoFiles"
                     label="Video Promosi Produk"
                     max={3}
-                    onFilesChange={(files) => {
-                      setProductVideosFiles(files);
-                    }}
                   />
                 </div>
               </div>

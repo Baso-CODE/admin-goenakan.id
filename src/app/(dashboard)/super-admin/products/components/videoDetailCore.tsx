@@ -1,15 +1,16 @@
 // components/upload-media/videoDetailCore.tsx
 "use client";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Check, Star, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 export interface VideoMeta {
   url: string;
+  publicId: string;
   title?: string;
   altText?: string;
   isFeatured?: boolean;
@@ -69,18 +70,17 @@ export const VideoDetailModalCore = ({
         <button
           onClick={onClose}
           className="absolute top-3 right-3 p-1 rounded-full bg-black/10 hover:bg-black/20 text-gray-700 transition z-10"
-          title="Close without saving"
-        >
+          title="Close without saving">
           <X className="w-5 h-5" />
         </button>
 
         {/* --- KOLOM KIRI: PREVIEW VIDEO --- */}
-        <div className="w-full md:w-1/2 bg-gray-100 flex items-center justify-center p-6 relative min-h-[300px]">
+        <div className="w-full md:w-1/2 bg-gray-100 flex items-center justify-center p-6 relative min-h-75">
           {videoMeta.url ? (
             <video
               src={videoMeta.url}
               controls
-              className="max-w-full max-h-[300px] object-contain shadow-md rounded-md"
+              className="max-w-full max-h-75 object-contain shadow-md rounded-md"
             />
           ) : (
             <div className="text-gray-400 text-sm">No Video</div>
@@ -120,23 +120,20 @@ export const VideoDetailModalCore = ({
                   isFeatured // Gunakan State Lokal
                     ? "border-indigo-600 bg-indigo-50"
                     : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
+                }`}>
                 <div className="flex items-center gap-3">
                   <div
                     className={`w-5 h-5 rounded-full flex items-center justify-center border ${
                       isFeatured // Gunakan State Lokal
                         ? "bg-indigo-600 border-indigo-600"
                         : "border-gray-400"
-                    }`}
-                  >
+                    }`}>
                     {isFeatured && <Check className="w-3 h-3 text-white" />}
                   </div>
                   <span
                     className={`text-sm font-medium ${
                       isFeatured ? "text-indigo-700" : "text-gray-600"
-                    }`}
-                  >
+                    }`}>
                     Set as Featured Video
                   </span>
                 </div>
@@ -154,8 +151,7 @@ export const VideoDetailModalCore = ({
             <div className="space-y-2">
               <Label
                 htmlFor="title"
-                className="text-sm font-semibold text-gray-700"
-              >
+                className="text-sm font-semibold text-gray-700">
                 Video Title
               </Label>
               <Input
@@ -171,8 +167,7 @@ export const VideoDetailModalCore = ({
             <div className="space-y-2">
               <Label
                 htmlFor="alt-text"
-                className="text-sm font-semibold text-gray-700"
-              >
+                className="text-sm font-semibold text-gray-700">
                 Alt Text (SEO Description)
               </Label>
               <Textarea
@@ -189,8 +184,7 @@ export const VideoDetailModalCore = ({
           <div className="pt-6 mt-4">
             <Button
               onClick={handleSaveAndClose}
-              className="w-full bg-gray-900 hover:bg-gray-800"
-            >
+              className="w-full bg-gray-900 hover:bg-gray-800">
               Save Changes & Close
             </Button>
           </div>
