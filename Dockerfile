@@ -27,8 +27,8 @@ RUN bunx prisma generate
 # (Solusi agar env variable terbaca & tidak localhost)
 ARG NEXT_PUBLIC_BASE_URL_API
 ARG NEXT_PUBLIC_BASE_URL_WEB
-ENV NEXT_PUBLIC_BASE_URL_API=$NEXT_PUBLIC_BASE_URL_API
-ENV NEXT_PUBLIC_BASE_URL_WEB=$NEXT_PUBLIC_BASE_URL_WEB
+ENV NEXT_PUBLIC_BASE_URL_API="https://api.edumatrixindonesia.cloud"
+ENV NEXT_PUBLIC_BASE_URL_WEB="https://admin.edumatrixindonesia.cloud"
 
 # (Opsional) Matikan telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
