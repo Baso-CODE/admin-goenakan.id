@@ -33,6 +33,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 // Asumsi Anda memiliki utilitas ini di proyek Anda
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { formatDate } from "@/utils/formatDate";
@@ -102,7 +103,7 @@ const Products = () => {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch("http://localhost:8000/product-categories/list", {
+      const res = await fetch(`${apiUrl}/product-categories/list`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -136,7 +137,7 @@ const Products = () => {
       }
 
       // Ganti endpoint ke /products
-      const res = await fetch(`http://localhost:8000/products?${params}`, {
+      const res = await fetch(`${apiUrl}/products?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -194,7 +195,7 @@ const Products = () => {
 
       // PASTIKAN URL INI SESUAI DENGAN ROUTE BACKEND ANDA!
       // Endpoint: /products/export/excel
-      const exportUrl = `http://localhost:8000/products/export/excel?${queryString}`;
+      const exportUrl = `${apiUrl}/products/export/excel?${queryString}`;
 
       const response = await fetch(exportUrl, {
         method: "GET",

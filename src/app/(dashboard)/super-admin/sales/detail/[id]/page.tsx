@@ -24,7 +24,6 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import SalesBankForm from "../../components/SalesBankForm";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +31,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { apiUrl } from "@/helper/apiurl";
+import SalesBankForm from "../../components/SalesBankForm";
 
 // Definisi Tipe Data Sales (sesuai respons backend)
 interface SalesBank {
@@ -71,7 +72,7 @@ export default function SalesDetailPage() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch(`http://localhost:8000/sales/${id}`, {
+      const res = await fetch(`${apiUrl}/sales/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -130,8 +131,7 @@ export default function SalesDetailPage() {
         <Button
           onClick={() => window.history.back()}
           variant="outline"
-          className="cursor-pointer"
-        >
+          className="cursor-pointer">
           <ArrowLeft className="h-4 w-4 mr-2" /> Back to List
         </Button>
       </div>
@@ -165,8 +165,7 @@ export default function SalesDetailPage() {
 
               <Badge
                 variant={salesData.isActive ? "default" : "secondary"}
-                className="mt-1"
-              >
+                className="mt-1">
                 {salesData.isActive ? "Active" : "Inactive"}
               </Badge>
             </div>
@@ -181,8 +180,7 @@ export default function SalesDetailPage() {
                   {/* Container yang bisa diklik */}
                   <div
                     className="border rounded-md p-1 max-w-[10rem] cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => setIsDialogOpen(true)}
-                  >
+                    onClick={() => setIsDialogOpen(true)}>
                     <img
                       src={salesData.signatureUrl}
                       alt={`Signature of ${salesData.name}`}
@@ -259,8 +257,7 @@ const DetailItem = ({ icon: Icon, label, value, isLink = false }: any) => (
         href={value}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-sm text-primary hover:underline"
-      >
+        className="text-sm text-primary hover:underline">
         {value}
       </a>
     ) : (

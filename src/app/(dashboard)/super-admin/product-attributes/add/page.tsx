@@ -1,7 +1,8 @@
 "use client";
 
-import { toast } from "sonner";
+import { apiUrl } from "@/helper/apiurl";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import AttributeForm, {
   AttributeFormValues,
 } from "../components/FormAttributes";
@@ -21,7 +22,7 @@ export default function AddAttributePage() {
         values: data.values.map((v) => ({ value: v.value })),
       };
 
-      const res = await fetch("http://localhost:8000/product-attributes", {
+      const res = await fetch(`${apiUrl}/product-attributes`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

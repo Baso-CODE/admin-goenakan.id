@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
 import { FileDown, Loader2, Search } from "lucide-react"; // Import FileDown dan Loader2
@@ -92,7 +93,7 @@ const Sales = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(`http://localhost:8000/sales?${params}`, {
+      const res = await fetch(`${apiUrl}/sales?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -137,7 +138,7 @@ const Sales = () => {
       ).toString();
 
       // URL untuk export (Sesuaikan dengan endpoint backend Anda)
-      const exportUrl = `http://localhost:8000/sales/export/excel?${queryString}`;
+      const exportUrl = `${apiUrl}/sales/export/excel?${queryString}`;
 
       const response = await fetch(exportUrl, {
         method: "GET",

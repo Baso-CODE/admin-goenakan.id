@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
 import * as LucideIcons from "lucide-react";
@@ -90,14 +91,11 @@ export default function ContactPlatformsManagement() {
       // if (startDate) params.append("startDate", startDate);
       // if (endDate) params.append("endDate", endDate);
 
-      const res = await fetch(
-        `http://localhost:8000/contact-platforms?${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await fetch(`${apiUrl}/contact-platforms?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       const result = await res.json();
       if (!res.ok) {
@@ -145,7 +143,7 @@ export default function ContactPlatformsManagement() {
 
       const queryString = new URLSearchParams(exportFilters).toString();
 
-      const exportUrl = `http://localhost:8000/contact-platforms/export/excel?${queryString}`;
+      const exportUrl = `${apiUrl}/contact-platforms/export/excel?${queryString}`;
 
       const response = await fetch(exportUrl, {
         method: "GET",

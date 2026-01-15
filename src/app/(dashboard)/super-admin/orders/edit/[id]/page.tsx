@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { apiUrl } from "@/helper/apiurl";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -144,12 +145,12 @@ export default function EditOrderForm() {
         setLoading(true);
 
         const [c, s, v, p, pc, orderData] = await Promise.all([
-          fetchWithToken("http://localhost:8000/clients/order"),
-          fetchWithToken("http://localhost:8000/sales/order"),
-          fetchWithToken("http://localhost:8000/vendors/order/add"),
-          fetchWithToken("http://localhost:8000/products/order"),
+          fetchWithToken(`${apiUrl}/clients/order`),
+          fetchWithToken(`${apiUrl}/sales/order`),
+          fetchWithToken(`${apiUrl}/vendors/order/add`),
+          fetchWithToken(`${apiUrl}/products/order`),
           // Load Master Purchase Channel
-          fetchWithToken("http://localhost:8000/purchase-channels/list"),
+          fetchWithToken(`${apiUrl}/purchase-channels/list`),
           fetchOrderById(orderId),
         ]);
 

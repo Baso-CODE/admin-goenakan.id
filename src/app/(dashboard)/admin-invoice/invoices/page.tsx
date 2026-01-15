@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce"; // Pastikan path ini benar
 
 // === TYPES (Sesuai Response Service getAllInvoices) ===
@@ -113,7 +114,7 @@ export default function InvoicesPage() {
       if (endDate) params.append("endDate", endDate);
 
       // 3. Fetch API
-      const res = await fetch(`http://localhost:8000/invoices?${params}`, {
+      const res = await fetch(`${apiUrl}/invoices?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

@@ -1,8 +1,9 @@
 "use client";
 
+import { apiUrl } from "@/helper/apiurl";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import ProductFormV2, { ProductFormValues } from "../components/FormProductV2";
 
 type FileUploads = {
@@ -48,7 +49,7 @@ export default function AddProductPage() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch("http://localhost:8000/products", {
+      const res = await fetch(`${apiUrl}/products`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData,

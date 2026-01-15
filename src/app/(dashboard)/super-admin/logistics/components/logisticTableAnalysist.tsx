@@ -30,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce"; // Pastikan path ini benar
 
 // === TYPES ===
@@ -84,7 +85,7 @@ export default function LogisticTableAnalysist() {
 
       // Endpoint sesuai Controller Analytics
       const res = await fetch(
-        `http://localhost:8000/logistics/analytics/summary?${params}`,
+        `${apiUrl}/logistics/analytics/summary?${params}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }

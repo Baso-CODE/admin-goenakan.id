@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { apiUrl } from "@/helper/apiurl";
 import {
   Building,
   LaptopMinimalCheck,
@@ -389,7 +390,7 @@ export default function ClientDetail() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const res = await fetch(`http://localhost:8000/clients/${clientId}`, {
+        const res = await fetch(`${apiUrl}/clients/${clientId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -413,7 +414,7 @@ export default function ClientDetail() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch(`http://localhost:8000/clients/${clientId}`, {
+      const res = await fetch(`${apiUrl}/clients/${clientId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

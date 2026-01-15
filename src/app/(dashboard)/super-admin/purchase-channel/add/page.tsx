@@ -1,9 +1,9 @@
 "use client";
 
-import React from "react";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
+import { apiUrl } from "@/helper/apiurl";
 import PurchaseChannelForm, {
   PurchaseChannelFormValues,
 } from "../components/formPurchaseChannel";
@@ -20,7 +20,7 @@ const AddPurchaseChannel = () => {
       if (!token) throw new Error("No token found");
 
       // === POST TO BACKEND ===
-      const res = await fetch("http://localhost:8000/purchase-channels", {
+      const res = await fetch(`${apiUrl}/purchase-channels`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

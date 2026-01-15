@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
 import { FileDown, Loader2, Search } from "lucide-react";
@@ -76,14 +77,11 @@ const VendorCategories = () => {
       if (debouncedSearch.trim()) {
         params.append("search", debouncedSearch.trim());
       }
-      const res = await fetch(
-        `http://localhost:8000/vendor-categories?${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await fetch(`${apiUrl}/vendor-categories?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       const result = await res.json();
       setCategories(result.data || []);
@@ -120,7 +118,7 @@ const VendorCategories = () => {
 
       const queryString = new URLSearchParams(exportFilters).toString();
 
-      const exportUrl = `http://localhost:8000/vendor-categories/export/excel?${queryString}`;
+      const exportUrl = `${apiUrl}/vendor-categories/export/excel?${queryString}`;
 
       const response = await fetch(exportUrl, {
         method: "GET",

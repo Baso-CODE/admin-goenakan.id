@@ -33,9 +33,9 @@ import { z } from "zod";
 
 // Schema validasi untuk Price Tier
 const priceTierSchema = z.object({
-  minQuantity: z.coerce.number().min(1, "Min qty wajib diisi"),
-  maxQuantity: z.coerce.number().min(1).nullable().optional(),
-  price: z.coerce.number().min(0, "Harga tidak boleh negatif"),
+  minQuantity: z.number().min(1, "Min qty wajib diisi"),
+  maxQuantity: z.number().min(1).nullable().optional(),
+  price: z.number().min(0, "Harga tidak boleh negatif"),
 });
 
 const formSchema = z.object({
@@ -133,7 +133,7 @@ export default function FormUpdatePriceTiers({
                     <TableHeader>
                       <TableRow className="bg-muted/50 hover:bg-muted/50">
                         <TableHead className="w-45">Min Qty</TableHead>
-                        <TableHead className="w-[30px]"></TableHead>
+                        <TableHead className="w-7.5"></TableHead>
                         <TableHead className="w-45">Max Qty</TableHead>
                         <TableHead>Harga Satuan (Rp)</TableHead>
                         <TableHead className="w-12.5"></TableHead>

@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/helper/apiurl";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -25,7 +26,7 @@ const EditItemVendor = () => {
         if (!tokenRes.ok) throw new Error("Failed to get token");
         const { token } = await tokenRes.json();
 
-        const res = await fetch(`http://localhost:8000/vendor-items/${id}`, {
+        const res = await fetch(`${apiUrl}/vendor-items/${id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -59,7 +60,7 @@ const EditItemVendor = () => {
 
       if (!token) throw new Error("No token found");
 
-      const res = await fetch(`http://localhost:8000/vendor-items/${id}`, {
+      const res = await fetch(`${apiUrl}/vendor-items/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

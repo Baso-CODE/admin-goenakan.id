@@ -48,6 +48,7 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 // Import Schema & Type dari file schema kamu
+import { apiUrl } from "@/helper/apiurl";
 import { OrderFormValues, orderSchema } from "../order-schema";
 import { fetchWithToken, generatePoNumber, postOrder } from "../order-service";
 
@@ -154,11 +155,11 @@ export default function AddOrderForm() {
       try {
         setLoading(true);
         const [c, s, v, p, pc] = await Promise.all([
-          fetchWithToken("http://localhost:8000/clients/order"),
-          fetchWithToken("http://localhost:8000/sales/order"),
-          fetchWithToken("http://localhost:8000/vendors/order/add"),
-          fetchWithToken("http://localhost:8000/products/order"),
-          fetchWithToken("http://localhost:8000/purchase-channels/list"),
+          fetchWithToken(`${apiUrl}/clients/order`),
+          fetchWithToken(`${apiUrl}/sales/order`),
+          fetchWithToken(`${apiUrl}/vendors/order/add`),
+          fetchWithToken(`${apiUrl}/products/order`),
+          fetchWithToken(`${apiUrl}/purchase-channels/list`),
         ]);
 
         setClients(c);

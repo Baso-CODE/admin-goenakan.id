@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { apiUrl } from "@/helper/apiurl";
 import { renderCustomization } from "@/helper/renderCustomizationProduct";
 import { toast } from "sonner";
 
@@ -122,7 +123,7 @@ export default function InvoiceDetailPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const res = await fetchWithToken(`http://localhost:8000/invoices/${id}`);
+      const res = await fetchWithToken(`${apiUrl}/invoices/${id}`);
       setInvoice(res);
     } catch (error) {
       console.error(error);
@@ -190,20 +191,17 @@ export default function InvoiceDetailPage() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch(
-        `http://localhost:8000/invoices/${invoice.id}/pay`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            method: paymentMethod,
-            paymentDate: new Date(paymentDate).toISOString(),
-          }),
-        }
-      );
+      const res = await fetch(`${apiUrl}/invoices/${invoice.id}/pay`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          method: paymentMethod,
+          paymentDate: new Date(paymentDate).toISOString(),
+        }),
+      });
 
       if (!res.ok) throw new Error("Gagal memproses pembayaran");
 

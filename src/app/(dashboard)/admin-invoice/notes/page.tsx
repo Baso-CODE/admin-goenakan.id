@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 import Link from "next/link";
 
@@ -122,12 +123,9 @@ function CategoriesTable() {
       if (debouncedSearch) params.append("search", debouncedSearch);
 
       // Ganti URL sesuai endpoint router backend
-      const res = await fetch(
-        `http://localhost:8000/invoice-notes/categories?${params}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await fetch(`${apiUrl}/invoice-notes/categories?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (!res.ok) throw new Error("Failed to fetch categories");
       const result = await res.json();
@@ -312,12 +310,9 @@ function TemplatesTable() {
       if (debouncedSearch) params.append("search", debouncedSearch);
 
       // Ganti URL sesuai endpoint router backend
-      const res = await fetch(
-        `http://localhost:8000/invoice-notes/templates?${params}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await fetch(`${apiUrl}/invoice-notes/templates?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (!res.ok) throw new Error("Failed to fetch templates");
       const result = await res.json();

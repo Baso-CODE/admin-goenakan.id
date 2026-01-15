@@ -173,8 +173,7 @@ export default function FormUpdateVariants({
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-6 border p-6 rounded-xl bg-white shadow-sm"
-        >
+          className="space-y-6 border p-6 rounded-xl bg-white shadow-sm">
           <h3 className="text-xl font-bold tracking-tight text-gray-800">
             📦 Product Variants Configuration
           </h3>
@@ -189,8 +188,7 @@ export default function FormUpdateVariants({
               variant="secondary"
               type="button"
               onClick={onGenerateClick}
-              className="space-x-2"
-            >
+              className="space-x-2">
               <Plus className="h-4 w-4" />
               <span>Generate Variants from Attributes</span>
             </Button>
@@ -210,8 +208,7 @@ export default function FormUpdateVariants({
                 return (
                   <div
                     key={field.id}
-                    className="border border-red-300 p-3 rounded-lg bg-red-50 text-sm text-red-600 italic"
-                  >
+                    className="border border-red-300 p-3 rounded-lg bg-red-50 text-sm text-red-600 italic">
                     🗑️ Variant **
                     {form.getValues(`variants.${index}.variantName`)}** marked
                     for deletion — will be removed on save.
@@ -222,8 +219,7 @@ export default function FormUpdateVariants({
               return (
                 <div
                   key={field.id}
-                  className="border p-6 rounded-xl bg-gray-50 space-y-6"
-                >
+                  className="border p-6 rounded-xl bg-gray-50 space-y-6">
                   <div className="flex justify-between items-center border-b pb-2">
                     <h4 className="font-semibold">
                       Variant #{index + 1}:{" "}
@@ -234,8 +230,7 @@ export default function FormUpdateVariants({
                       type="button"
                       variant="destructive"
                       size="sm"
-                      onClick={() => handleRemoveVariant(index)}
-                    >
+                      onClick={() => handleRemoveVariant(index)}>
                       <Trash2 className="h-4 w-4 mr-2" />
                       Remove
                     </Button>
@@ -285,7 +280,7 @@ export default function FormUpdateVariants({
                               type="number"
                               min="0"
                               placeholder="0"
-                              {...field}
+                              value={(field.value as number) ?? ""}
                               onChange={(e) => {
                                 const val =
                                   e.target.value === ""
@@ -293,6 +288,9 @@ export default function FormUpdateVariants({
                                     : parseFloat(e.target.value);
                                 field.onChange(val);
                               }}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              ref={field.ref}
                             />
                           </FormControl>
                           <FormMessage />
@@ -331,8 +329,7 @@ export default function FormUpdateVariants({
                         return (
                           <div
                             key={imgIndex}
-                            className="aspect-square border rounded-lg overflow-hidden relative shadow-sm hover:shadow-md transition-shadow group"
-                          >
+                            className="aspect-square border rounded-lg overflow-hidden relative shadow-sm hover:shadow-md transition-shadow group">
                             <img
                               src={img.url}
                               alt={img.altText || "Variant Image"}
@@ -359,8 +356,7 @@ export default function FormUpdateVariants({
                                     variantIndex: index,
                                     imageIndex: imgIndex,
                                   })
-                                }
-                              >
+                                }>
                                 <Edit className="h-4 w-4" />
                               </Button>
                               {/* Delete Button */}
@@ -371,8 +367,7 @@ export default function FormUpdateVariants({
                                 className="h-8 w-8"
                                 onClick={() =>
                                   handleDeleteImage(index, imgIndex)
-                                }
-                              >
+                                }>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>

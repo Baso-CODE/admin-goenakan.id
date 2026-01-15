@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { apiUrl } from "@/helper/apiurl";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -130,12 +131,9 @@ export default function ProductFormV2({
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const catRes = await fetch(
-          "http://localhost:8000/product-categories/list",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const catRes = await fetch(`${apiUrl}/product-categories/list`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (!catRes.ok) throw new Error("Failed to fetch categories");
         const data = await catRes.json();
         setCategories(data);

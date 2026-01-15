@@ -65,6 +65,7 @@ import Link from "next/link";
 
 // Service
 import { Checkbox } from "@/components/ui/checkbox";
+import { apiUrl } from "@/helper/apiurl";
 import { fetchWithToken } from "../order-service";
 
 // --- Types ---
@@ -169,7 +170,7 @@ export default function OrderDetail() {
     try {
       setLoading(true);
       // Pastikan endpoint backend meng-include 'invoices'
-      const data = await fetchWithToken(`http://localhost:8000/orders/${id}`);
+      const data = await fetchWithToken(`${apiUrl}/orders/${id}`);
       setOrder(data);
     } catch (error) {
       console.error(error);
@@ -190,12 +191,9 @@ export default function OrderDetail() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const res = await fetch(
-          "http://localhost:8000/invoice-notes/categories/list",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await fetch(`${apiUrl}/invoice-notes/categories/list`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const data = await res.json();
         setNoteCategories(data || []);
       } catch (e) {
@@ -322,7 +320,7 @@ export default function OrderDetail() {
         notes: invoiceNotes.filter((n) => n.content.trim() !== ""),
       };
 
-      const res = await fetch("http://localhost:8000/invoices", {
+      const res = await fetch(`${apiUrl}/invoices`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

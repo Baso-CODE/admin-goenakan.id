@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/chart";
 import { Loader2 } from "lucide-react";
 
+import { apiUrl } from "@/helper/apiurl";
 import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 import { fetchWithToken } from "../super-admin/orders/order-service";
@@ -56,7 +57,7 @@ export function RevenueChart() {
         // 2. Tidak perlu .json() lagi (sudah dihandle fetchWithToken)
 
         const data = await fetchWithToken(
-          `http://localhost:8000/invoices/chart?month=${month}&year=${year}`
+          `${apiUrl}/invoices/chart?month=${month}&year=${year}`
         );
 
         // Langsung set data karena 'data' sudah berupa array JSON dari backend

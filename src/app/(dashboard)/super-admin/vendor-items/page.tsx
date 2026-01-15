@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
 import { FileDown, Loader2, Search } from "lucide-react";
@@ -81,7 +82,7 @@ const VendorItems = () => {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
       const res = await fetch(
-        `http://localhost:8000/vendor-categories?take=1000&isActive=true`,
+        `${apiUrl}/vendor-categories?take=1000&isActive=true`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -114,7 +115,7 @@ const VendorItems = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(`http://localhost:8000/vendor-items?${params}`, {
+      const res = await fetch(`${apiUrl}/vendor-items?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -161,7 +162,7 @@ const VendorItems = () => {
       ).toString();
 
       // PASTIKAN URL INI SESUAI DENGAN ROUTE BACKEND ANDA!
-      const exportUrl = `http://localhost:8000/vendor-items/export/excel?${queryString}`;
+      const exportUrl = `${apiUrl}/vendor-items/export/excel?${queryString}`;
 
       const response = await fetch(exportUrl, {
         method: "GET",

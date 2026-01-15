@@ -2,8 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -11,7 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, GripVertical, Loader2, ListChecks } from "lucide-react"; // Menambahkan ikon baru
+import { apiUrl } from "@/helper/apiurl";
+import { GripVertical, ListChecks, Loader2, Plus, Trash2 } from "lucide-react"; // Menambahkan ikon baru
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -60,12 +61,9 @@ export function AttributeSelector({
       try {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
-        const res = await fetch(
-          "http://localhost:8000/product-attributes/list",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await fetch(`${apiUrl}/product-attributes/list`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (!res.ok) throw new Error();
         const data = await res.json();
         setAvailable(data);
@@ -164,8 +162,7 @@ export function AttributeSelector({
           return (
             <Card
               key={idx}
-              className="border-2 shadow-sm hover:border-indigo-300 transition-colors"
-            >
+              className="border-2 shadow-sm hover:border-indigo-300 transition-colors">
               <CardContent className="p-4 space-y-4">
                 {/* BAGIAN ATAS: SELECTOR & DELETE */}
                 <div className="flex items-start justify-between gap-4">
@@ -180,8 +177,7 @@ export function AttributeSelector({
                       <Select
                         value={row.attributeId}
                         onValueChange={(val) => setAttributeId(idx, val)}
-                        disabled={loading}
-                      >
+                        disabled={loading}>
                         <SelectTrigger className="mt-1 w-full font-medium">
                           <SelectValue placeholder="Pilih jenis attribute (e.g., Warna, Ukuran)..." />
                         </SelectTrigger>
@@ -208,8 +204,7 @@ export function AttributeSelector({
                     variant="destructive"
                     size="icon"
                     className="mt-6 shrink-0"
-                    onClick={() => remove(idx)}
-                  >
+                    onClick={() => remove(idx)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -234,8 +229,7 @@ export function AttributeSelector({
                               borderColor: row.valueIds.includes(val.id)
                                 ? "#4f46e5"
                                 : "#e5e7eb", // Warna border jika dipilih
-                            }}
-                          >
+                            }}>
                             <Checkbox
                               id={`attr-val-${val.id}`}
                               checked={row.valueIds.includes(val.id)}

@@ -1,8 +1,9 @@
 "use client";
 
+import { apiUrl } from "@/helper/apiurl";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import SalesForm, { SalesFormValues } from "../components/FormSales";
 
 export default function AddSalesPage() {
@@ -25,7 +26,7 @@ export default function AddSalesPage() {
     try {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
-      const res = await fetch("http://localhost:8000/sales", {
+      const res = await fetch(`${apiUrl}/sales`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

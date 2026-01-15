@@ -20,12 +20,13 @@ import { Input } from "@/components/ui/input";
 
 import { Check, ClipboardList, Loader2, Tag } from "lucide-react";
 
-// Schema Validasi
+// === PERBAIKAN 1: SCHEMA ===
+// Hapus .default(true) agar tipe datanya menjadi strict boolean
 const noteCategorySchema = z.object({
   name: z.string().min(2, {
     message: "Category name must be at least 2 characters.",
   }),
-  isActive: z.boolean().default(true),
+  isActive: z.boolean(),
 });
 
 export type NoteCategoryFormValues = z.infer<typeof noteCategorySchema>;
@@ -36,23 +37,30 @@ export default function NoteCategoryForm({
   isLoading = false,
   isSubmitting = false,
 }: {
-  initialData?: NoteCategoryFormValues;
+  // Kita buat partial di sini jaga-jaga jika data dari API ada yg kosong
+  initialData?: Partial<NoteCategoryFormValues>;
   onSubmit: (data: NoteCategoryFormValues) => void;
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
+  // === PERBAIKAN 2: DEFAULT VALUES ===
+  // Kita set default value di sini secara manual
   const form = useForm<NoteCategoryFormValues>({
     resolver: zodResolver(noteCategorySchema),
-    defaultValues: initialData || {
-      name: "",
-      isActive: true,
+    defaultValues: {
+      name: initialData?.name || "",
+      // Jika initialData ada isinya pakai itu, jika tidak ada/undefined pakai true
+      isActive: initialData?.isActive ?? true,
     },
   });
 
-  // Reset form saat initialData berubah (penting untuk mode Edit)
+  // Reset form saat initialData berubah
   useEffect(() => {
     if (initialData) {
-      form.reset(initialData);
+      form.reset({
+        name: initialData.name || "",
+        isActive: initialData.isActive ?? true,
+      });
     }
   }, [initialData, form]);
 

@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/table";
 
 // Custom Hook Debounce (Pastikan file ini ada)
+import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 
 // === TYPES ===
@@ -113,7 +114,7 @@ export default function OrdersPage() {
 
       // 3. Fetch API
       // Endpoint ini mengarah ke OrderController.getAllOrders
-      const res = await fetch(`http://localhost:8000/orders/all?${params}`, {
+      const res = await fetch(`${apiUrl}/orders/all?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -155,7 +156,7 @@ export default function OrdersPage() {
 
       // Endpoint ini mengarah ke OrderController.exportOrders
       const response = await fetch(
-        `http://localhost:8000/orders/export/excel?${queryString}`,
+        `${apiUrl}/orders/export/excel?${queryString}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }

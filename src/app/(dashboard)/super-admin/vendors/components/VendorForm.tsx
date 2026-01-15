@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { apiUrl } from "@/helper/apiurl";
 import { cn } from "@/lib/utils";
 import {
   AtSign,
@@ -48,7 +49,6 @@ import {
   CheckCircle2,
   ChevronsUpDown,
   ClipboardList,
-  Globe2,
   Layers,
   Loader2,
   MapPin,
@@ -58,7 +58,6 @@ import {
   User,
 } from "lucide-react";
 import { useVendorFormFilter } from "../hooks/useVendorFormFilter";
-import { countries } from "@/lib/countries";
 import VendorAddressField from "./VendorAddressField";
 
 // === ZOD SCHEMA ===
@@ -236,12 +235,9 @@ export default function VendorForm({
       try {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
-        const res = await fetch(
-          "http://localhost:8000/contact-platforms/active",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await fetch(`${apiUrl}/contact-platforms/active`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const data = await res.json();
 
         setContactPlatforms(data);
@@ -258,12 +254,9 @@ export default function VendorForm({
       try {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
-        const res = await fetch(
-          "http://localhost:8000/vendor-categories/active",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await fetch(`${apiUrl}/vendor-categories/active`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         const data = await res.json();
         setVendorCategories(data);
@@ -281,7 +274,7 @@ export default function VendorForm({
       try {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
-        const res = await fetch("http://localhost:8000/vendor-items/active", {
+        const res = await fetch(`${apiUrl}/vendor-items/active`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("Failed to fetch vendor items");
@@ -320,8 +313,7 @@ export default function VendorForm({
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(handleSubmit)}
-            className="space-y-6"
-          >
+            className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               {/* Company Name */}
               <FormField
@@ -379,8 +371,7 @@ export default function VendorForm({
                     <Select
                       onValueChange={field.onChange}
                       value={field.value}
-                      disabled={isLoading || isSubmitting}
-                    >
+                      disabled={isLoading || isSubmitting}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select platform" />
@@ -477,8 +468,7 @@ export default function VendorForm({
                     <Select
                       onValueChange={field.onChange}
                       value={field.value}
-                      disabled={isLoading || isSubmitting}
-                    >
+                      disabled={isLoading || isSubmitting}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select type" />
@@ -516,8 +506,7 @@ export default function VendorForm({
                     <Select
                       onValueChange={field.onChange}
                       value={field.value}
-                      disabled={!form.watch("type") || loadingCategories}
-                    >
+                      disabled={!form.watch("type") || loadingCategories}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue
@@ -560,8 +549,7 @@ export default function VendorForm({
                     </FormLabel>
                     <Popover
                       open={isComboboxOpen}
-                      onOpenChange={setIsComboboxOpen}
-                    >
+                      onOpenChange={setIsComboboxOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
@@ -569,8 +557,7 @@ export default function VendorForm({
                             role="combobox"
                             aria-expanded={isComboboxOpen}
                             className="w-full justify-between"
-                            disabled={isLoading || isSubmitting}
-                          >
+                            disabled={isLoading || isSubmitting}>
                             {(field.value ?? []).length > 0
                               ? `${(field.value ?? []).length} item dipilih`
                               : "Pilih item yang ditawarkan..."}
@@ -599,8 +586,7 @@ export default function VendorForm({
                                           )
                                         : [...(field.value ?? []), item.id];
                                       field.onChange(newIds);
-                                    }}
-                                  >
+                                    }}>
                                     <Check
                                       className={cn(
                                         "mr-2 h-4 w-4",
@@ -629,8 +615,7 @@ export default function VendorForm({
                               field.onChange(
                                 (field.value ?? []).filter((v) => v !== id)
                               )
-                            }
-                          >
+                            }>
                             {item.name} ✕
                           </Badge>
                         );
@@ -670,8 +655,7 @@ export default function VendorForm({
               <Button
                 type="submit"
                 disabled={isLoading || isSubmitting}
-                className="cursor-pointer"
-              >
+                className="cursor-pointer">
                 {isSubmitting ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (

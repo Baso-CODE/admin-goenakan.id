@@ -1,13 +1,11 @@
 "use client";
 
+import { Globe, Loader2, Save, Search, Share2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { Save, Search, Share2, Globe, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -24,8 +22,11 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { apiBaseUrl } from "next-auth/client/_utils";
 
 // Tipe Data untuk Form (Sesuai DTO Backend)
 interface SeoFormValues {
@@ -67,12 +68,9 @@ export function ProductSeoForm({ productId }: ProductSeoFormProps) {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const res = await fetch(
-          `http://localhost:8000/products/${productId}/seo`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await fetch(`${apiBaseUrl}/products/${productId}/seo`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         if (res.ok) {
           const data = await res.json();
@@ -109,17 +107,14 @@ export function ProductSeoForm({ productId }: ProductSeoFormProps) {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch(
-        `http://localhost:8000/products/${productId}/seo`,
-        {
-          method: "PUT", // Kita pakai PUT sesuai endpoint backend
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(values),
-        }
-      );
+      const res = await fetch(`${apiBaseUrl}/products/${productId}/seo`, {
+        method: "PUT", // Kita pakai PUT sesuai endpoint backend
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(values),
+      });
 
       if (!res.ok) {
         throw new Error("Failed to save SEO data");
@@ -196,8 +191,7 @@ export function ProductSeoForm({ productId }: ProductSeoFormProps) {
                             field.value.length > 70
                               ? "text-red-500"
                               : "text-green-600"
-                          }
-                        >
+                          }>
                           Panjang saat ini: {field.value.length} karakter.
                         </span>
                       </FormDescription>
@@ -228,8 +222,7 @@ export function ProductSeoForm({ productId }: ProductSeoFormProps) {
                             field.value.length > 160
                               ? "text-red-500"
                               : "text-green-600"
-                          }
-                        >
+                          }>
                           Panjang saat ini: {field.value.length} karakter.
                         </span>
                       </FormDescription>
@@ -375,8 +368,7 @@ export function ProductSeoForm({ productId }: ProductSeoFormProps) {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
+                className="bg-blue-600 hover:bg-blue-700">
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...

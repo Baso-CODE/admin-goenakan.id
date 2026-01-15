@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Button } from "@/components/ui/button";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import {
   Form,
@@ -21,11 +21,12 @@ import {
 
 import {
   Select,
-  SelectTrigger,
   SelectContent,
   SelectItem,
+  SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { apiUrl } from "@/helper/apiurl";
 
 const FormCoreSchema = z.object({
   name: z.string().min(1, "Nama produk wajib diisi"),
@@ -107,12 +108,9 @@ export default function FormProductCore({
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const catRes = await fetch(
-          "http://localhost:8000/product-categories/list",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const catRes = await fetch(`${apiUrl}/product-categories/list`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (!catRes.ok) throw new Error("Failed to fetch categories");
         const data = await catRes.json();
 
@@ -131,8 +129,7 @@ export default function FormProductCore({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="space-y-6 border p-4 rounded-md"
-      >
+        className="space-y-6 border p-4 rounded-md">
         <h3 className="text-lg font-semibold tracking-tight">
           Core Product Data
         </h3>
@@ -178,8 +175,7 @@ export default function FormProductCore({
                   <Select
                     value={field.value}
                     onValueChange={field.onChange}
-                    disabled={loadingCategories}
-                  >
+                    disabled={loadingCategories}>
                     <SelectTrigger>
                       <SelectValue
                         placeholder={

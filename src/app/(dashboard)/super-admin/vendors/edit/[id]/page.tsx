@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/helper/apiurl";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -20,7 +21,7 @@ export default function EditVendorPage() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const res = await fetch(`http://localhost:8000/vendors/${id}`, {
+        const res = await fetch(`${apiUrl}/vendors/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -81,7 +82,7 @@ export default function EditVendorPage() {
         ],
       };
 
-      const res = await fetch(`http://localhost:8000/vendors/${id}`, {
+      const res = await fetch(`${apiUrl}/vendors/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

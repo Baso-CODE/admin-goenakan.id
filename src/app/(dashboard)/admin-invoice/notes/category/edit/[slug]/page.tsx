@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { apiUrl } from "@/helper/apiurl";
 import { ArrowLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -35,12 +36,9 @@ const EditNoteCategoryPage = () => {
         const { token } = await tokenRes.json();
 
         // Fetch by SLUG
-        const res = await fetch(
-          `http://localhost:8000/invoice-notes/categories/${slug}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await fetch(`${apiUrl}/invoice-notes/categories/${slug}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         if (!res.ok) throw new Error("Failed to fetch category data");
 
@@ -78,17 +76,14 @@ const EditNoteCategoryPage = () => {
       const { token } = await tokenRes.json();
 
       // Update by SLUG
-      const res = await fetch(
-        `http://localhost:8000/invoice-notes/categories/${slug}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(formValues),
-        }
-      );
+      const res = await fetch(`${apiUrl}/invoice-notes/categories/${slug}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(formValues),
+      });
 
       if (!res.ok) {
         const errJson = await res.json();

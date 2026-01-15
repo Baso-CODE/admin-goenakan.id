@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/helper/apiurl";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -31,14 +32,11 @@ const EditPurchaseChannel = () => {
 
         const { token } = await tokenRes.json();
 
-        const res = await fetch(
-          `http://localhost:8000/purchase-channels/${slug}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const res = await fetch(`${apiUrl}/purchase-channels/${slug}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!res.ok) throw new Error("Failed to fetch purchase channel data");
 
@@ -74,17 +72,14 @@ const EditPurchaseChannel = () => {
 
       if (!token) throw new Error("No token found");
 
-      const res = await fetch(
-        `http://localhost:8000/purchase-channels/${slug}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(formValues),
-        }
-      );
+      const res = await fetch(`${apiUrl}/purchase-channels/${slug}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(formValues),
+      });
 
       if (!res.ok) {
         const errText = await res.text();

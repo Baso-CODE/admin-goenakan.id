@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { apiUrl } from "@/helper/apiurl";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -19,17 +20,14 @@ const AddNoteCategoryPage = () => {
 
       if (!token) throw new Error("No token found");
 
-      const res = await fetch(
-        "http://localhost:8000/invoice-notes/categories",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(data),
-        }
-      );
+      const res = await fetch(`${apiUrl}/invoice-notes/categories`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
 
       if (!res.ok) {
         const errJson = await res.json();

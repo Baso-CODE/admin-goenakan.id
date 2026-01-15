@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
 import { FileDown, Loader2, Search } from "lucide-react"; // Import ikon baru
@@ -73,14 +74,11 @@ const ProductCategoriesPage = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(
-        `http://localhost:8000/product-categories?${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await fetch(`${apiUrl}/product-categories?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
 
       const result = await res.json();
@@ -112,7 +110,7 @@ const ProductCategoriesPage = () => {
         exportFilters as Record<string, string>
       ).toString();
 
-      const exportUrl = `http://localhost:8000/product-categories/export/excel?${queryString}`;
+      const exportUrl = `${apiUrl}/product-categories/export/excel?${queryString}`;
 
       const response = await fetch(exportUrl, {
         method: "GET",

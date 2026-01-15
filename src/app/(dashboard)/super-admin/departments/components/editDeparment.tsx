@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/helper/apiurl";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -29,7 +30,7 @@ export default function EditDepartment() {
 
         const { token } = await tokenRes.json();
 
-        const res = await fetch(`http://localhost:8000/departments/${slug}`, {
+        const res = await fetch(`${apiUrl}/departments/${slug}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -67,7 +68,7 @@ export default function EditDepartment() {
 
       if (!token) throw new Error("No token found");
 
-      const res = await fetch(`http://localhost:8000/departments/${slug}`, {
+      const res = await fetch(`${apiUrl}/departments/${slug}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

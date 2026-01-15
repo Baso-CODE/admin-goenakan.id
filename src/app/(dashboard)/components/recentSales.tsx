@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { apiUrl } from "@/helper/apiurl";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -31,7 +32,7 @@ export function RecentSales() {
         // Ambil 5 invoice terakhir yang statusnya PAID
         // Asumsi kamu punya endpoint getAllInvoices, kita filter di backend atau ambil page 1
         const res = await fetchWithToken(
-          "http://localhost:8000/invoices?take=5&status=PAID"
+          `${apiUrl}/invoices?take=5&status=PAID`
         );
         setSales(res.data || []);
       } catch (error) {

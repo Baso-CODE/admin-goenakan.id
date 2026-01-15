@@ -1,11 +1,11 @@
 "use client";
 
-import React from "react";
+import { apiUrl } from "@/helper/apiurl";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import VendorItemForm, {
   VendorItemFormValues,
 } from "../components/formItemVendor";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 
 const AddItemVendor = () => {
   const router = useRouter();
@@ -19,7 +19,7 @@ const AddItemVendor = () => {
       if (!token) throw new Error("No token found");
 
       // Kirim data ke backend Express
-      const res = await fetch("http://localhost:8000/vendor-items", {
+      const res = await fetch(`${apiUrl}/vendor-items`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

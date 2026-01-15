@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { apiUrl } from "@/helper/apiurl";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -22,12 +23,9 @@ export default function AddNoteTemplatePage() {
         const { token } = await tokenRes.json();
 
         // Gunakan endpoint LIST yang ringan (tanpa pagination)
-        const res = await fetch(
-          "http://localhost:8000/invoice-notes/categories/list",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await fetch(`${apiUrl}/invoice-notes/categories/list`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const data = await res.json();
         setCategories(data);
       } catch (error) {
@@ -45,7 +43,7 @@ export default function AddNoteTemplatePage() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch("http://localhost:8000/invoice-notes/templates", {
+      const res = await fetch(`${apiUrl}/invoice-notes/templates`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

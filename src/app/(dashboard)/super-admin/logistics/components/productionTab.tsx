@@ -34,6 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 
 // --- TYPES (Sesuaikan dengan response API Order Detail Anda) ---
 type ProductionTracker = {
@@ -103,17 +104,14 @@ export default function ProductionTab({
         remarks: "Started via Admin Dashboard",
       };
 
-      const res = await fetch(
-        "http://localhost:8000/logistics/production/start",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const res = await fetch(`${apiUrl}/logistics/production/start`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
       if (!res.ok) throw new Error("Gagal memulai produksi");
 
@@ -146,7 +144,7 @@ export default function ProductionTab({
       };
 
       const res = await fetch(
-        `http://localhost:8000/logistics/production/${activeTrackerId}/complete`,
+        `${apiUrl}/logistics/production/${activeTrackerId}/complete`,
         {
           method: "PATCH",
           headers: {

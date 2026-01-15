@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
@@ -83,14 +84,11 @@ export default function ProductAttributesPage() {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(
-        `http://localhost:8000/product-attributes?${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await fetch(`${apiUrl}/product-attributes?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
 
@@ -126,7 +124,7 @@ export default function ProductAttributesPage() {
       ).toString();
 
       // Endpoint untuk export (Sesuaikan dengan endpoint backend Anda: /product-attributes/export/excel)
-      const exportUrl = `http://localhost:8000/product-attributes/export/excel?${queryString}`;
+      const exportUrl = `${apiUrl}/product-attributes/export/excel?${queryString}`;
 
       const response = await fetch(exportUrl, {
         method: "GET",

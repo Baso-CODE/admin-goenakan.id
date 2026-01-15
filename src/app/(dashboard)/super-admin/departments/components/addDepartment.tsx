@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/helper/apiurl";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import DepartmentForm, {
@@ -18,7 +19,7 @@ export default function AddDepartment() {
       if (!token) throw new Error("No token found");
 
       // === POST TO BACKEND ===
-      const res = await fetch("http://localhost:8000/departments", {
+      const res = await fetch(`${apiUrl}/departments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/helper/apiurl";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import ContactPlatformForm, {
@@ -15,7 +16,7 @@ export default function AddContactPlatform() {
       const { token } = await tokenRes.json();
       if (!token) throw new Error("No token found");
 
-      const res = await fetch("http://localhost:8000/contact-platforms", {
+      const res = await fetch(`${apiUrl}/contact-platforms`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

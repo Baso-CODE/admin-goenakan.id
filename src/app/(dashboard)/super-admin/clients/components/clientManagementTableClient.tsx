@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
 
@@ -120,7 +121,7 @@ export default function ClientManagementTable() {
           params.append("search", debouncedSearch.trim());
         }
 
-        const res = await fetch(`http://localhost:8000/clients?${params}`, {
+        const res = await fetch(`${apiUrl}/clients?${params}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -174,7 +175,7 @@ export default function ClientManagementTable() {
       ).toString();
 
       // URL untuk export
-      const exportUrl = `http://localhost:8000/clients/export/excel?${queryString}`;
+      const exportUrl = `${apiUrl}/clients/export/excel?${queryString}`;
 
       const response = await fetch(exportUrl, {
         method: "GET",

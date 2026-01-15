@@ -4,20 +4,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { apiUrl } from "@/helper/apiurl";
+import * as LucideIcons from "lucide-react";
 import {
   Building,
-  MapPin,
-  User,
-  Wrench,
-  PackageSearch,
-  Loader2,
   Contact,
   Globe,
+  Loader2,
+  MapPin,
+  PackageSearch,
   Star,
+  User,
+  Wrench,
 } from "lucide-react";
-import * as LucideIcons from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -74,12 +75,9 @@ const DetailPageVendor: React.FC = () => {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const res = await fetch(
-          `http://localhost:8000/vendors/detail/${vendorId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await fetch(`${apiUrl}/vendors/detail/${vendorId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         if (!res.ok) throw new Error("Gagal mengambil data vendor");
         const data = await res.json();
@@ -129,8 +127,7 @@ const DetailPageVendor: React.FC = () => {
                 vendor.isActive
                   ? "bg-green-100 text-green-700"
                   : "bg-gray-200 text-gray-600"
-              }`}
-            >
+              }`}>
               {vendor.isActive ? "Active" : "Inactive"}
             </Badge>
           </h1>
@@ -204,8 +201,7 @@ const DetailPageVendor: React.FC = () => {
                     return (
                       <div
                         key={contact.id}
-                        className="border rounded-lg p-3 bg-white hover:bg-gray-50 transition flex flex-col gap-1"
-                      >
+                        className="border rounded-lg p-3 bg-white hover:bg-gray-50 transition flex flex-col gap-1">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Icon className="w-4 h-4 text-primary" />
@@ -217,8 +213,7 @@ const DetailPageVendor: React.FC = () => {
                           {contact.isPrimary && (
                             <Badge
                               variant="outline"
-                              className="text-xs text-green-600 border-green-300 flex items-center gap-1"
-                            >
+                              className="text-xs text-green-600 border-green-300 flex items-center gap-1">
                               <Star className="w-3 h-3" /> Primary
                             </Badge>
                           )}
@@ -227,8 +222,7 @@ const DetailPageVendor: React.FC = () => {
                         <Link
                           href={formatContactLink(contact.contactId)}
                           target="_blank"
-                          className="text-sm text-blue-600 hover:underline break-all"
-                        >
+                          className="text-sm text-blue-600 hover:underline break-all">
                           {contact.contactId}
                         </Link>
                       </div>
@@ -255,14 +249,12 @@ const DetailPageVendor: React.FC = () => {
             {vendor.items.map((item) => (
               <Card
                 key={item.id}
-                className="shadow-sm hover:shadow-md transition"
-              >
+                className="shadow-sm hover:shadow-md transition">
                 <CardHeader className="pb-2">
                   {item.category && (
                     <Badge
                       variant="outline"
-                      className="text-xs text-indigo-700 border-indigo-200"
-                    >
+                      className="text-xs text-indigo-700 border-indigo-200">
                       {item.category.name}
                     </Badge>
                   )}

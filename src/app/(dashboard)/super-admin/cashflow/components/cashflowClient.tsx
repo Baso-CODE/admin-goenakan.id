@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 import { cn } from "@/lib/utils";
 
@@ -87,7 +88,7 @@ export default function CashflowClient() {
       if (endDate) params.append("endDate", endDate);
 
       // Endpoint Service Cashflow
-      const res = await fetch(`http://localhost:8000/cashflows?${params}`, {
+      const res = await fetch(`${apiUrl}/cashflows?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

@@ -1,8 +1,8 @@
 "use client";
-import React from "react";
 
-import { toast } from "sonner";
+import { apiUrl } from "@/helper/apiurl";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import ProductCategoryForm, {
   ProductCategoryFormValues,
 } from "../components/formCategoryProduct";
@@ -17,7 +17,7 @@ const AddCategoryProduct = () => {
 
       if (!token) throw new Error("No token found");
 
-      const res = await fetch("http://localhost:8000/product-categories", {
+      const res = await fetch(`${apiUrl}/product-categories`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { apiUrl } from "@/helper/apiurl";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import ProductCategoryForm, {
@@ -25,14 +26,11 @@ const EditCategoryVendor = () => {
         const tokenRes = await fetch("/api/auth/token");
         if (!tokenRes.ok) throw new Error("Failed to get token");
         const { token } = await tokenRes.json();
-        const res = await fetch(
-          `http://localhost:8000/product-categories/${id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const res = await fetch(`${apiUrl}/product-categories/${id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
         if (!res.ok) throw new Error("Failed to fetch category data");
         const data = await res.json();
         setCategoryData({
@@ -59,7 +57,7 @@ const EditCategoryVendor = () => {
 
       if (!token) throw new Error("No token found");
 
-      const res = await fetch(`http://localhost:8000/vendor-categories/${id}`, {
+      const res = await fetch(`${apiUrl}/vendor-categories/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

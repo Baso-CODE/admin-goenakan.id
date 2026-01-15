@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { apiUrl } from "@/helper/apiurl";
 
 export default function DeliveryNotePrint() {
   const { shipmentId } = useParams();
@@ -26,12 +27,9 @@ export default function DeliveryNotePrint() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const res = await fetch(
-          `http://localhost:8000/logistics/shipments/${shipmentId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await fetch(`${apiUrl}/logistics/shipments/${shipmentId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         if (!res.ok) throw new Error("Gagal mengambil data surat jalan");
         const result = await res.json();

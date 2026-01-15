@@ -4,15 +4,16 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { apiUrl } from "@/helper/apiurl";
 import FormUpdateAttributes from "../../components/update/AttributesSection";
 import FormProductCore, {
   ProductCoreFormValues,
 } from "../../components/update/CoreSection";
+import FormUpdatePriceTiers from "../../components/update/FormUpdatePriceTier";
 import FormUpdateProductMedia from "../../components/update/VariantMediaSection";
 import FormUpdateVariants, {
   VariantFormValues,
 } from "../../components/update/VariantsSection";
-import FormUpdatePriceTiers from "../../components/update/FormUpdatePriceTier";
 
 export default function EditProductPage() {
   const { id } = useParams();
@@ -32,7 +33,7 @@ export default function EditProductPage() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const res = await fetch(`http://localhost:8000/products/${id}`, {
+        const res = await fetch(`${apiUrl}/products/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -61,7 +62,7 @@ export default function EditProductPage() {
       const { token } = await tokenRes.json();
 
       // 1. Update core product
-      const coreRes = await fetch(`http://localhost:8000/products/${id}`, {
+      const coreRes = await fetch(`${apiUrl}/products/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -91,17 +92,14 @@ export default function EditProductPage() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch(
-        `http://localhost:8000/products/${id}/attributes`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const res = await fetch(`${apiUrl}/products/${id}/attributes`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
       if (!res.ok) throw new Error("Failed to update attributes");
 
@@ -181,7 +179,7 @@ export default function EditProductPage() {
       });
 
       // 5. Kirim Request PUT
-      const res = await fetch(`http://localhost:8000/products/${id}/variants`, {
+      const res = await fetch(`${apiUrl}/products/${id}/variants`, {
         method: "PUT",
 
         headers: {
@@ -226,17 +224,14 @@ export default function EditProductPage() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch(
-        `http://localhost:8000/products/image/${mediaId}/seo`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(updates),
-        }
-      );
+      const res = await fetch(`${apiUrl}/products/image/${mediaId}/seo`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updates),
+      });
 
       if (!res.ok) {
         const errorData = await res.json();
@@ -292,17 +287,14 @@ export default function EditProductPage() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch(
-        `http://localhost:8000/products/video/${mediaId}/seo`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(updates),
-        }
-      );
+      const res = await fetch(`${apiUrl}/products/video/${mediaId}/seo`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updates),
+      });
 
       if (!res.ok) {
         const errorData = await res.json();
@@ -357,7 +349,7 @@ export default function EditProductPage() {
 
       formData.append("image", file);
 
-      const res = await fetch(`http://localhost:8000/products/${id}/image`, {
+      const res = await fetch(`${apiUrl}/products/${id}/image`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -389,7 +381,7 @@ export default function EditProductPage() {
       const formData = new FormData();
       formData.append("video", file);
 
-      const res = await fetch(`http://localhost:8000/products/${id}/video`, {
+      const res = await fetch(`${apiUrl}/products/${id}/video`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -419,15 +411,12 @@ export default function EditProductPage() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch(
-        `http://localhost:8000/products/image/${mediaId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await fetch(`${apiUrl}/products/image/${mediaId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!res.ok) {
         const errorData = await res.json();
@@ -453,15 +442,12 @@ export default function EditProductPage() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch(
-        `http://localhost:8000/products/video/${mediaId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await fetch(`${apiUrl}/products/video/${mediaId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!res.ok) {
         const errorData = await res.json();
@@ -629,7 +615,7 @@ export default function EditProductPage() {
       const { token } = await tokenRes.json();
 
       const res = await fetch(
-        `http://localhost:8000/products/${id}/price-tiers`, // Endpoint update (sesuaikan jika beda)
+        `${apiUrl}/products/${id}/price-tiers`, // Endpoint update (sesuaikan jika beda)
         {
           method: "PUT",
           headers: {
@@ -648,12 +634,9 @@ export default function EditProductPage() {
       toast.success("Price tiers updated successfully");
 
       // Refresh data agar UI terupdate
-      const updatedProductRes = await fetch(
-        `http://localhost:8000/products/${id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const updatedProductRes = await fetch(`${apiUrl}/products/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const updatedProduct = await updatedProductRes.json();
       setProductData(updatedProduct);
     } catch (err) {

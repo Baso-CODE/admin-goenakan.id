@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/helper/apiurl";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -24,12 +25,9 @@ export default function EditContactPlatform() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const res = await fetch(
-          `http://localhost:8000/contact-platforms/${id}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await fetch(`${apiUrl}/contact-platforms/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         if (!res.ok) throw new Error("Failed to fetch platform data");
 
@@ -58,7 +56,7 @@ export default function EditContactPlatform() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch(`http://localhost:8000/contact-platforms/${id}`, {
+      const res = await fetch(`${apiUrl}/contact-platforms/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

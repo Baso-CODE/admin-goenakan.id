@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea"; // Pastikan install: npx shadcn-ui@latest add textarea
+import { Textarea } from "@/components/ui/textarea";
 
 import {
   Check,
@@ -35,14 +35,15 @@ import {
   Tag,
 } from "lucide-react";
 
-// Schema Validasi
+// === PERBAIKAN 1: SCHEMA ===
+// Hapus .default(true) agar tipe datanya menjadi strict boolean
 const noteTemplateSchema = z.object({
   categoryId: z.string().min(1, { message: "Please select a category." }),
   title: z.string().min(3, { message: "Title must be at least 3 characters." }),
   content: z
     .string()
     .min(10, { message: "Content is too short (min 10 chars)." }),
-  isActive: z.boolean().default(true),
+  isActive: z.boolean(),
 });
 
 export type NoteTemplateFormValues = z.infer<typeof noteTemplateSchema>;
@@ -55,30 +56,41 @@ type CategoryOption = {
 
 export default function NoteTemplateForm({
   initialData,
-  categories, // List Kategori dilempar dari Parent
+  categories,
   onSubmit,
   isLoading = false,
   isSubmitting = false,
 }: {
-  initialData?: NoteTemplateFormValues;
+  // Gunakan Partial agar aman jika data dari server tidak lengkap
+  initialData?: Partial<NoteTemplateFormValues>;
   categories: CategoryOption[];
   onSubmit: (data: NoteTemplateFormValues) => void;
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
+  // === PERBAIKAN 2: DEFAULT VALUES ===
+  // Handle default value di sini (level React Hook Form)
   const form = useForm<NoteTemplateFormValues>({
     resolver: zodResolver(noteTemplateSchema),
-    defaultValues: initialData || {
-      categoryId: "",
-      title: "",
-      content: "",
-      isActive: true,
+    defaultValues: {
+      categoryId: initialData?.categoryId || "",
+      title: initialData?.title || "",
+      content: initialData?.content || "",
+      // Jika initialData.isActive undefined, gunakan true sebagai default
+      isActive: initialData?.isActive ?? true,
     },
   });
 
+  // === PERBAIKAN 3: RESET ===
+  // Pastikan saat reset juga mengikuti logika yang sama
   useEffect(() => {
     if (initialData) {
-      form.reset(initialData);
+      form.reset({
+        categoryId: initialData.categoryId || "",
+        title: initialData.title || "",
+        content: initialData.content || "",
+        isActive: initialData.isActive ?? true,
+      });
     }
   }, [initialData, form]);
 
@@ -113,8 +125,7 @@ export default function NoteTemplateForm({
                     <Select
                       disabled={isLoading || isSubmitting}
                       onValueChange={field.onChange}
-                      value={field.value} // Penting untuk Edit Mode
-                    >
+                      value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Choose a category..." />
@@ -168,7 +179,7 @@ export default function NoteTemplateForm({
                     <FormControl>
                       <Textarea
                         placeholder="Write the full note content here..."
-                        className="min-h-[120px]"
+                        className="min-h-30"
                         {...field}
                         disabled={isLoading || isSubmitting}
                       />

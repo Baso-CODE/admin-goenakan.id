@@ -59,7 +59,7 @@ export function useVendorFormFilter({
     );
     setFilteredItems(filtered);
 
-    const currentItemIds = form.getValues("itemIds");
+    const currentItemIds = form.getValues("itemIds") ?? [];
     const stillValidItemIds = currentItemIds.filter((id) =>
       vendorItems.some((item) => item.id === id)
     );

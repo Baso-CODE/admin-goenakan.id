@@ -1,10 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   Form,
   FormField,
@@ -13,9 +10,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { apiUrl } from "@/helper/apiurl";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Banknote, Loader2, Trash2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 
 // === SKEMA HANYA UNTUK BANK ACCOUNTS ===
 const bankAccountSchema = z.object({
@@ -91,7 +92,7 @@ export default function SalesBankForm({
       );
 
       // Endpoint yang sesuai dengan backend Anda
-      const res = await fetch(`http://localhost:8000/sales/${salesId}/banks`, {
+      const res = await fetch(`${apiUrl}/sales/${salesId}/banks`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -137,8 +138,7 @@ export default function SalesBankForm({
                   size="sm"
                   className="absolute top-2 right-2 h-6 w-6 p-0"
                   onClick={() => remove(index)}
-                  disabled={isSubmitting}
-                >
+                  disabled={isSubmitting}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
 
@@ -196,15 +196,13 @@ export default function SalesBankForm({
                   accountHolderName: "",
                 })
               }
-              disabled={isSubmitting}
-            >
+              disabled={isSubmitting}>
               + Add Bank Account
             </Button>
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="cursor-pointer"
-            >
+              className="cursor-pointer">
               {isSubmitting ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (

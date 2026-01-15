@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/helper/apiurl";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -21,7 +22,7 @@ export default function EditSalesPage() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const res = await fetch(`http://localhost:8000/sales/${id}`, {
+        const res = await fetch(`${apiUrl}/sales/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -62,7 +63,7 @@ export default function EditSalesPage() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch(`http://localhost:8000/sales/${id}`, {
+      const res = await fetch(`${apiUrl}/sales/${id}`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,

@@ -1,10 +1,12 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
 
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -13,9 +15,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { apiUrl } from "@/helper/apiurl";
 
 // --- ✅ ZOD VALIDATION SCHEMA ---
 const vendorItemSchema = z.object({
@@ -85,14 +86,11 @@ export default function VendorItemForm({
 
         if (!token) throw new Error("No token found");
 
-        const res = await fetch(
-          "http://localhost:8000/vendor-categories/active",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const res = await fetch(`${apiUrl}/vendor-categories/active`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!res.ok) throw new Error("Failed to fetch categories");
 
@@ -128,8 +126,7 @@ export default function VendorItemForm({
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(handleSubmit)}
-            className="space-y-6 w-full"
-          >
+            className="space-y-6 w-full">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               {/* Item Name */}
               <FormField
@@ -161,8 +158,7 @@ export default function VendorItemForm({
                     <Select
                       onValueChange={field.onChange}
                       value={field.value}
-                      disabled={loadingCategories}
-                    >
+                      disabled={loadingCategories}>
                       <FormControl className="w-full">
                         <SelectTrigger>
                           <SelectValue
@@ -233,8 +229,7 @@ export default function VendorItemForm({
                 type="submit"
                 className="w-full md:w-auto cursor-pointer"
                 variant={"default"}
-                disabled={isLoading || isSubmitting}
-              >
+                disabled={isLoading || isSubmitting}>
                 {isSubmitting ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (

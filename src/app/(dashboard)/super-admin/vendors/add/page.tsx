@@ -1,8 +1,9 @@
 "use client";
 
+import { apiUrl } from "@/helper/apiurl";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import VendorForm, { VendorFormValues } from "../components/VendorForm";
 
 export default function AddVendorPage() {
@@ -15,7 +16,7 @@ export default function AddVendorPage() {
       const tokenJson = await tokenRes.json();
       const token = tokenJson?.token;
 
-      const res = await fetch("http://localhost:8000/vendors", {
+      const res = await fetch(`${apiUrl}/vendors`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
 import * as LucideIcons from "lucide-react";
@@ -86,7 +87,7 @@ const Vendors = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(`http://localhost:8000/vendors?${params}`, {
+      const res = await fetch(`${apiUrl}/vendors?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const result = await res.json();
@@ -120,7 +121,7 @@ const Vendors = () => {
         exportFilters.isActive = exportIsActiveFilter;
 
       const queryString = new URLSearchParams(exportFilters).toString();
-      const exportUrl = `http://localhost:8000/vendors/export/excel?${queryString}`;
+      const exportUrl = `${apiUrl}/vendors/export/excel?${queryString}`;
 
       const response = await fetch(exportUrl, {
         method: "GET",

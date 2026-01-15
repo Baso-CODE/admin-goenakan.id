@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { apiUrl } from "@/helper/apiurl";
 import { countries } from "@/lib/countries";
 import {
   Barcode,
@@ -162,17 +163,14 @@ export default function ClientEditForm() {
         if (!token) throw new Error("No token found");
 
         // Fetch purchase channels
-        const pcRes = await fetch(
-          "http://localhost:8000/purchase-channels/list",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const pcRes = await fetch(`${apiUrl}/purchase-channels/list`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const pcData = await pcRes.json();
         setPurchaseChannels(pcData);
 
         // Fetch departments
-        const depRes = await fetch("http://localhost:8000/departments/list", {
+        const depRes = await fetch(`${apiUrl}/departments/list`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const depData = await depRes.json();
@@ -305,7 +303,7 @@ export default function ClientEditForm() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const res = await fetch(`http://localhost:8000/clients/${clientId}`, {
+        const res = await fetch(`${apiUrl}/clients/${clientId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         console.log("ini adalah data res", res);
@@ -483,7 +481,7 @@ export default function ClientEditForm() {
         };
       }
 
-      await fetch(`http://localhost:8000/clients/${clientId}`, {
+      await fetch(`${apiUrl}/clients/${clientId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

@@ -1,3 +1,4 @@
+import { apiUrl } from "@/helper/apiurl";
 import { getSession } from "next-auth/react";
 
 export async function getToken() {
@@ -61,7 +62,7 @@ export async function fetchWithTokenNew(
 
 export async function postOrder(data: any) {
   const token = await getToken();
-  const res = await fetch("http://localhost:8000/orders", {
+  const res = await fetch(`${apiUrl}/orders`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -75,7 +76,7 @@ export async function postOrder(data: any) {
 
 export async function generatePoNumber() {
   const token = await getToken();
-  const res = await fetch("http://localhost:8000/orders/generate-po", {
+  const res = await fetch(`${apiUrl}/orders/generate-po`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -94,12 +95,12 @@ export async function generatePoNumber() {
 }
 
 export async function fetchOrderById(id: string) {
-  return fetchWithToken(`http://localhost:8000/orders/${id}/edit-data`);
+  return fetchWithToken(`${apiUrl}/orders/${id}/edit-data`);
 }
 
 export async function updateOrder(id: string, data: any) {
   const token = await getToken();
-  const res = await fetch(`http://localhost:8000/orders/${id}`, {
+  const res = await fetch(`${apiUrl}/orders/${id}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",

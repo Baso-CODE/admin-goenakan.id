@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { apiUrl } from "@/helper/apiurl";
 import ProductionTab from "./productionTab";
 import ShipmentManager from "./shipmentManager";
 
@@ -32,24 +33,19 @@ export default function LogisticsTrackingDetail() {
       const { token } = await tokenRes.json();
       const headers = { Authorization: `Bearer ${token}` };
 
-      const orderRes = await fetch(
-        `http://localhost:8000/orders/${orderId}/tracking`,
-        {
-          headers,
-        }
-      );
+      const orderRes = await fetch(`${apiUrl}/orders/${orderId}/tracking`, {
+        headers,
+      });
       const result = await orderRes.json();
       setOrder(result.data);
 
       // 2. Fetch Vendor (Product = Pabrik, Service = Kurir)
-      const vProdRes = await fetch(
-        "http://localhost:8000/vendors?type=PRODUCT",
-        { headers }
-      );
-      const vServRes = await fetch(
-        "http://localhost:8000/vendors?type=SERVICE",
-        { headers }
-      );
+      const vProdRes = await fetch(`${apiUrl}/vendors?type=PRODUCT`, {
+        headers,
+      });
+      const vServRes = await fetch(`${apiUrl}/vendors?type=SERVICE`, {
+        headers,
+      });
 
       const vProd = await vProdRes.json();
       const vServ = await vServRes.json();

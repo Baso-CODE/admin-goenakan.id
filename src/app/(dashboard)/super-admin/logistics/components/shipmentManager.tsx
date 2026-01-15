@@ -60,6 +60,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 
 interface ShipmentManagerProps {
   type: "INBOUND" | "OUTBOUND";
@@ -161,7 +162,7 @@ export default function ShipmentManager({
         })),
       };
 
-      const res = await fetch("http://localhost:8000/logistics/shipments", {
+      const res = await fetch(`${apiUrl}/logistics/shipments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -197,20 +198,17 @@ export default function ShipmentManager({
     try {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
-      await fetch(
-        `http://localhost:8000/logistics/shipments/${confirmArriveId}/arrive`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            arrivalDate: new Date().toISOString(),
-            remarks: "Arrived confirmed by Admin",
-          }),
-        }
-      );
+      await fetch(`${apiUrl}/logistics/shipments/${confirmArriveId}/arrive`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          arrivalDate: new Date().toISOString(),
+          remarks: "Arrived confirmed by Admin",
+        }),
+      });
       toast.success("Status updated: Arrived");
       onUpdate();
       setConfirmArriveId(null);

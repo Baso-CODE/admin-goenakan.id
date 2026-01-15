@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
@@ -65,14 +66,11 @@ const PurchaseChannelsPage = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(
-        `http://localhost:8000/purchase-channels?${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await fetch(`${apiUrl}/purchase-channels?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
 

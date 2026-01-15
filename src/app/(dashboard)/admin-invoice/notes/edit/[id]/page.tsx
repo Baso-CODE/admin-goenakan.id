@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { apiUrl } from "@/helper/apiurl";
 import { ArrowLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -32,10 +33,10 @@ export default function EditNoteTemplatePage() {
 
         // Parallel Fetching agar lebih cepat
         const [templateRes, catRes] = await Promise.all([
-          fetch(`http://localhost:8000/invoice-notes/templates/${id}`, {
+          fetch(`${apiUrl}/invoice-notes/templates/${id}`, {
             headers,
           }),
-          fetch(`http://localhost:8000/invoice-notes/categories/list`, {
+          fetch(`${apiUrl}/invoice-notes/categories/list`, {
             headers,
           }),
         ]);
@@ -75,17 +76,14 @@ export default function EditNoteTemplatePage() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const res = await fetch(
-        `http://localhost:8000/invoice-notes/templates/${id}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(formValues),
-        }
-      );
+      const res = await fetch(`${apiUrl}/invoice-notes/templates/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(formValues),
+      });
 
       if (!res.ok) {
         const errJson = await res.json();

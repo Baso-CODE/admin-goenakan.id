@@ -31,14 +31,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { apiUrl } from "@/helper/apiurl";
 import { cn } from "@/lib/utils";
-import { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "Cashflow Management",
-  description:
-    "Monitor arus kas, pendapatan, pengeluaran, dan profit/loss per transaksi secara detail.",
-};
 
 // === UTILS ===
 const formatCurrency = (amount: number) => {
@@ -58,8 +52,8 @@ const cashflowSchema = z.object({
       productId: z.string().optional(), // Optional karena bisa input manual custom revenue
       unitPrice: z.number().min(0),
       quantity: z.number().min(1),
-      currency: z.string().default("IDR"),
-      exchangeRate: z.number().min(1).default(1),
+      currency: z.string().optional(),
+      exchangeRate: z.number().optional(),
       total: z.number(), // Calculated field
     })
   ),
@@ -69,9 +63,9 @@ const cashflowSchema = z.object({
       vendorId: z.string().min(1, "Vendor required"),
       costPerUnit: z.number().min(0),
       quantity: z.number().min(1),
-      currency: z.string().min(1, "Currency required"),
-      exchangeRate: z.number().min(1),
-      total: z.number(), // Calculated field (IDR)
+      currency: z.string().optional(),
+      exchangeRate: z.number().optional(),
+      total: z.number(),
     })
   ),
 });
@@ -171,10 +165,9 @@ export default function EditCashflowClient() {
         const headers = { Authorization: `Bearer ${token}` };
 
         // 2. Fetch Cashflow Detail
-        const detailRes = await fetch(
-          `http://localhost:8000/cashflows/${orderId}`,
-          { headers }
-        );
+        const detailRes = await fetch(`${apiUrl}/cashflows/${orderId}`, {
+          headers,
+        });
         if (!detailRes.ok) throw new Error("Failed to load cashflow data");
 
         const detailData = await detailRes.json();
@@ -224,15 +217,15 @@ export default function EditCashflowClient() {
         poNumber: data.poNumber,
         revenueItems: data.revenueItems.map((item) => ({
           ...item,
-          total: item.unitPrice * item.quantity * item.exchangeRate,
+          total: item.unitPrice * item.quantity * (item.exchangeRate || 1),
         })),
         costItems: data.costItems.map((item) => ({
           ...item,
-          total: item.costPerUnit * item.quantity * item.exchangeRate,
+          total: item.costPerUnit * item.quantity * (item.exchangeRate || 1),
         })),
       };
 
-      const res = await fetch(`http://localhost:8000/cashflows/${orderId}`, {
+      const res = await fetch(`${apiUrl}/cashflows/${orderId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

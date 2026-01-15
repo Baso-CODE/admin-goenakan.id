@@ -1,10 +1,10 @@
 "use client";
-import React from "react";
+import { apiUrl } from "@/helper/apiurl";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import VendorCategoryForm, {
   VendorCategoryFormValues,
 } from "../components/formCategoryVendor";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 
 const AddCategoryVendor = () => {
   const router = useRouter();
@@ -17,7 +17,7 @@ const AddCategoryVendor = () => {
       if (!token) throw new Error("No token found");
 
       // 2️⃣ Kirim data ke backend Express
-      const res = await fetch("http://localhost:8000/vendor-categories", {
+      const res = await fetch(`${apiUrl}/vendor-categories`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

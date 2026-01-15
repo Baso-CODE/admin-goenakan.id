@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
 
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
@@ -83,7 +84,7 @@ export default function DepartmentTable() {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(`http://localhost:8000/departments?${params}`, {
+      const res = await fetch(`${apiUrl}/departments?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -132,8 +133,8 @@ export default function DepartmentTable() {
         exportFilters as Record<string, string>
       ).toString();
 
-      // URL untuk export (Endpoint: http://localhost:8000/departments/export/excel)
-      const exportUrl = `http://localhost:8000/departments/export/excel?${queryString}`;
+      // URL untuk export (Endpoint: ${apiUrl}/departments/export/excel)
+      const exportUrl = `${apiUrl}/departments/export/excel?${queryString}`;
 
       const response = await fetch(exportUrl, {
         method: "GET",

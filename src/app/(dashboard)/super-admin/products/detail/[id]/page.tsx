@@ -10,12 +10,13 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiUrl } from "@/helper/apiurl";
 import {
+  Boxes,
   GalleryHorizontal,
   ImageIcon,
   InfoIcon,
   VideoIcon,
-  Boxes,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -90,7 +91,7 @@ export default function ProductDetailPage() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const res = await fetch(`http://localhost:8000/products/${id}`, {
+        const res = await fetch(`${apiUrl}/products/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
         });
@@ -229,8 +230,7 @@ export default function ProductDetailPage() {
             product.productVariants.map((variant, index) => (
               <div
                 key={variant.id}
-                className="border p-4 rounded-lg bg-card shadow-sm"
-              >
+                className="border p-4 rounded-lg bg-card shadow-sm">
                 {/* Title */}
                 <h4 className="font-bold text-lg mb-2 text-primary">
                   Varian #{index + 1}
@@ -277,8 +277,7 @@ export default function ProductDetailPage() {
                       <Badge
                         key={av.id}
                         variant="default"
-                        className="bg-blue-500 hover:bg-blue-600"
-                      >
+                        className="bg-blue-500 hover:bg-blue-600">
                         {av.attributeValue.attribute.name}:
                         {av.attributeValue.value}
                       </Badge>
