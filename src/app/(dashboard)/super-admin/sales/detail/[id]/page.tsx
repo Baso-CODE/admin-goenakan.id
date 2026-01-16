@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { apiUrl } from "@/helper/apiurl";
+import Link from "next/link";
 import SalesBankForm from "../../components/SalesBankForm";
 
 // Definisi Tipe Data Sales (sesuai respons backend)
@@ -179,7 +180,7 @@ export default function SalesDetailPage() {
                 <div className="mt-2">
                   {/* Container yang bisa diklik */}
                   <div
-                    className="border rounded-md p-1 max-w-[10rem] cursor-pointer hover:opacity-80 transition-opacity"
+                    className="border rounded-md p-1 max-w-40 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => setIsDialogOpen(true)}>
                     <img
                       src={salesData.signatureUrl}
@@ -253,13 +254,13 @@ const DetailItem = ({ icon: Icon, label, value, isLink = false }: any) => (
       {label}
     </p>
     {isLink ? (
-      <a
+      <Link
         href={value}
         target="_blank"
         rel="noopener noreferrer"
         className="text-sm text-primary hover:underline">
         {value}
-      </a>
+      </Link>
     ) : (
       <p className="text-sm text-muted-foreground">{value}</p>
     )}

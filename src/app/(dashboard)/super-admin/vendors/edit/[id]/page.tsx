@@ -11,6 +11,8 @@ export default function EditVendorPage() {
   const router = useRouter();
 
   const [vendorData, setVendorData] = useState<VendorFormValues | undefined>();
+  console.log("ini adalah data vendor", vendorData);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

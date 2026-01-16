@@ -19,7 +19,6 @@ export default function LogisticsTrackingDetail() {
   const router = useRouter();
 
   const [order, setOrder] = useState<any>(null);
-  console.log("ini adalah data order", order);
 
   const [vendors, setVendors] = useState<any[]>([]);
   const [couriers, setCouriers] = useState<any[]>([]);
@@ -124,7 +123,7 @@ export default function LogisticsTrackingDetail() {
             shipments={
               order.shipments?.filter((s: any) => s.type === "INBOUND") || []
             }
-            products={order.products} // Untuk logic partial shipment
+            products={order.products}
             couriers={couriers}
             onUpdate={loadData}
           />

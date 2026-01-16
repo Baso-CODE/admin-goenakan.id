@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Plus, Star, X } from "lucide-react";
+// 1. TAMBAHKAN IMPORT PENCIL
+import { Check, Pencil, Plus, Star, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 // --- TIPE DATA ---
@@ -32,12 +33,10 @@ interface VariantListProps {
     altText?: string;
   }[];
   onUpdateVariantMeta: (index: number, field: string, value: any) => void;
-
-  // Callback File
   onChangeMeta: (filesMap: File[][]) => void;
 }
 
-// --- MODAL (Sama seperti sebelumnya) ---
+// --- MODAL (TIDAK BERUBAH) ---
 interface ImageDetailModalProps {
   image: ImageMeta;
   onClose: () => void;
@@ -72,11 +71,11 @@ const ImageDetailModal = ({
           className="absolute top-3 right-3 p-1 rounded-full bg-black/10 hover:bg-black/20 text-gray-700 z-10">
           <X className="w-5 h-5" />
         </button>
-        <div className="w-full md:w-1/2 bg-gray-100 flex items-center justify-center p-6 relative min-h-[300px]">
+        <div className="w-full md:w-1/2 bg-gray-100 flex items-center justify-center p-6 relative mmin-h-75">
           <img
             src={image.url}
             alt="Preview"
-            className="max-w-full max-h-[300px] object-contain shadow-md rounded-md"
+            className="max-w-full max-h-75 object-contain shadow-md rounded-md"
           />
           {isFeatured && (
             <Badge className="absolute top-4 left-4 bg-indigo-600">
@@ -133,16 +132,13 @@ export function VariantList({
   onUpdateVariantMeta,
   onChangeMeta,
 }: VariantListProps) {
-  // State Gambar Lokal
   const [variantStates, setVariantStates] = useState<VariantState[]>(() =>
     combinations.map((_, idx) => ({ variantIndex: idx, images: [] }))
   );
 
-  // Re-init jika kombinasi berubah total (misal generate ulang)
   useEffect(() => {
     setVariantStates((prev) => {
       if (prev.length !== combinations.length) {
-        // Reset state jika jumlah varian berubah
         return combinations.map((_, idx) => ({
           variantIndex: idx,
           images: [],
@@ -158,14 +154,11 @@ export function VariantList({
     tempId: string;
   } | null>(null);
 
-  // [PERBAIKAN LOOP] Hapus useEffect sync onChangeMeta.
-  // Buat helper function untuk update parent manual.
   const syncToParent = (newStates: VariantState[]) => {
     const filesMap = newStates.map((v) => v.images.map((img) => img.file));
     onChangeMeta(filesMap);
   };
 
-  // Handler: Tambah File
   const handleAddFiles = (idx: number, files: FileList | null) => {
     if (!files) return;
     const newFiles = Array.from(files);
@@ -174,7 +167,6 @@ export function VariantList({
       const nextState = prev.map((v) => {
         if (v.variantIndex !== idx) return v;
         const newImages: ImageMeta[] = newFiles.map((file, i) => ({
-          // ID Unik Timestamp + Random string
           tempId: `v${idx}-${Date.now()}-${Math.random()
             .toString(36)
             .substr(2, 5)}-${i}`,
@@ -186,13 +178,11 @@ export function VariantList({
         }));
         return { ...v, images: [...v.images, ...newImages] };
       });
-
-      syncToParent(nextState); // Sync manual
+      syncToParent(nextState);
       return nextState;
     });
   };
 
-  // Handler: Hapus File
   const handleRemoveFile = (variantIdx: number, tempId: string) => {
     setVariantStates((prev) => {
       const nextState = prev.map((v) => {
@@ -206,12 +196,11 @@ export function VariantList({
         }
         return { ...v, images: filtered };
       });
-      syncToParent(nextState); // Sync manual
+      syncToParent(nextState);
       return nextState;
     });
   };
 
-  // Update Meta Gambar (Lokal saja, tidak perlu sync file ke parent karena file tidak berubah)
   const handleUpdateImageMeta = (
     variantIdx: number,
     tempId: string,
@@ -278,7 +267,6 @@ export function VariantList({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-              {/* Input Price */}
               <div className="md:col-span-1 bg-white p-4 rounded-lg border shadow-sm">
                 <div className="space-y-2">
                   <Label className="text-xs font-bold text-gray-500 uppercase">
@@ -300,7 +288,6 @@ export function VariantList({
                 </div>
               </div>
 
-              {/* Upload Gambar */}
               <div className="md:col-span-2 space-y-4">
                 <Button
                   type="button"
@@ -343,21 +330,38 @@ export function VariantList({
                         className="w-full h-full object-cover"
                       />
                       {img.isFeatured && (
-                        <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center">
+                        <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center z-10 shadow-sm">
                           <Star className="w-3 h-3 mr-1 fill-white" /> Main
                         </span>
                       )}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-start justify-end p-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveFile(idx, img.tempId);
-                          }}
-                          className="bg-white/80 hover:bg-red-500 hover:text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all">
-                          <X className="w-4 h-4" />
-                        </button>
+
+                      {/* === UPDATE HOVER OVERLAY DISINI === */}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300">
+                        {/* 1. Tombol Delete (Pojok Kanan Atas) */}
+                        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveFile(idx, img.tempId);
+                            }}
+                            className="bg-white/90 hover:bg-red-500 hover:text-white p-1.5 rounded-full shadow-sm transition-colors"
+                            title="Delete Image">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* 2. Ikon Pencil (Tengah - Penanda Edit) */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="bg-white/20 backdrop-blur-sm p-2 rounded-full border border-white/50 text-white mb-1">
+                            <Pencil className="w-5 h-5" />
+                          </div>
+                          <span className="text-white text-[10px] font-medium tracking-wide bg-black/30 px-2 py-0.5 rounded-full backdrop-blur-sm">
+                            Edit Info
+                          </span>
+                        </div>
                       </div>
+                      {/* === END OVERLAY === */}
                     </div>
                   ))}
                 </div>

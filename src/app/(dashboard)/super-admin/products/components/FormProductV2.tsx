@@ -22,7 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { apiUrl } from "@/helper/apiurl";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -63,7 +63,7 @@ const variantMetaSchema = z.object({
 
 // Video meta schema tetap sama
 const videoMetaSchema = z.object({
-  url: z.string().optional(), // Tambahkan URL karena sekarang kita simpan URL
+  url: z.string().optional(),
   publicId: z.string().optional(),
   title: z.string().optional(),
   altText: z.string().optional(),
@@ -126,6 +126,7 @@ export default function ProductFormV2({
   isSubmitting?: boolean;
 }) {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [isGeneratingSku, setIsGeneratingSku] = useState(false);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -168,6 +169,9 @@ export default function ProductFormV2({
     } as ProductFormValues,
   });
 
+  // ✅ LOGIC ADDED: Watch Status isCustom
+  const isCustomProduct = form.watch("isCustom");
+
   const [attributeSelections, setAttributeSelections] = useState<
     { attributeId: string; valueIds: string[] }[]
   >(form.getValues("attributes") ?? []);
@@ -190,16 +194,63 @@ export default function ProductFormV2({
   const [variantFilesMap, setVariantFilesMap] = useState<File[][]>([]);
   const [productImagesFiles, setProductImagesFiles] = useState<File[]>([]);
 
-  // ❌ [DIHAPUS] State productVideosFiles tidak lagi diperlukan
-  // const [productVideosFiles, setProductVideosFiles] = useState<File[]>([]);
-
   useEffect(() => {
     form.register("attributes");
     form.register("variantImagesMetadata");
     form.register("videosMetadata");
   }, [form]);
 
-  // Handler Generate Varian (Sama seperti sebelumnya)
+  useEffect(() => {
+    if (!isCustomProduct) {
+      // Jika Standard, kosongkan semua state attributes & variants
+      setAttributeSelections([]);
+      setCombinations([]);
+      setVariantMetas([]);
+      setVariantFilesMap([]);
+      form.setValue("attributes", []);
+      form.setValue("variantImagesMetadata", []);
+    }
+  }, [isCustomProduct, form]);
+
+  const handleGenerateSku = async () => {
+    const productName = form.getValues("name");
+
+    if (!productName || productName.length < 3) {
+      toast.error("Mohon isi Nama Produk minimal 3 karakter terlebih dahulu.");
+      return;
+    }
+
+    try {
+      setIsGeneratingSku(true);
+      // Ambil token auth (sesuaikan dengan logic auth Anda)
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      // Panggil API Backend yang baru kita buat
+      const res = await fetch(`${apiUrl}/products/generate-sku`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: productName }),
+      });
+
+      if (!res.ok) throw new Error("Gagal generate SKU");
+
+      const data = await res.json();
+
+      // Set value ke form
+      form.setValue("sku", data.sku);
+      toast.success(`SKU Generated: ${data.sku}`);
+    } catch (error) {
+      toast.error("Terjadi kesalahan saat generate SKU");
+    } finally {
+      setIsGeneratingSku(false);
+    }
+  };
+
+  // Handler Generate Varian
   const handleGenerateVariants = () => {
     if (!attributeSelections || attributeSelections.length === 0) {
       toast.error("Tambahkan minimal 1 attribute sebelum generate variant.");
@@ -269,6 +320,11 @@ export default function ProductFormV2({
 
   const submit = async (values: ProductFormValues) => {
     try {
+      // ✅ LOGIC ADDED: Paksa hapus attributes jika Standard saat submit (Double Safety)
+      const finalAttributes = isCustomProduct ? attributeSelections : undefined;
+      const finalVariantMetas = isCustomProduct ? variantMetas : [];
+      const finalVariantFiles = isCustomProduct ? variantFilesMap : [];
+
       const payload: ProductFormValues = {
         ...values,
         basePrice: Number(values.basePrice),
@@ -276,26 +332,22 @@ export default function ProductFormV2({
         width: Number(values.width || 0),
         height: Number(values.height || 0),
         length: Number(values.length || 0),
-        attributes:
-          attributeSelections.length > 0 ? attributeSelections : undefined,
+
+        attributes: finalAttributes?.length ? finalAttributes : undefined,
+
         priceTiers: values.priceTiers?.length ? values.priceTiers : undefined,
         imagesMetadata: values.imagesMetadata?.length
           ? values.imagesMetadata
           : undefined,
 
-        // ✅ Videos metadata sudah otomatis terisi URL dari UploadVideos
         videosMetadata: values.videosMetadata,
-
-        variantImagesMetadata: variantMetas,
+        variantImagesMetadata: finalVariantMetas,
       };
 
       const filesToSubmit = {
         images: productImagesFiles.length > 0 ? productImagesFiles : null,
-
-        // ✅ [PENTING] Set null agar backend tahu tidak ada file video yang perlu diupload
         videos: null,
-
-        variantImages: variantFilesMap,
+        variantImages: finalVariantFiles,
       };
       await onSubmit(payload, filesToSubmit);
     } catch (err) {
@@ -316,6 +368,7 @@ export default function ProductFormV2({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(submit)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+              {/* Nama, SKU, Kategori, Base Price, Material - TIDAK BERUBAH */}
               <FormField
                 control={form.control}
                 name="name"
@@ -335,9 +388,26 @@ export default function ProductFormV2({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>SKU</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <Input {...field} placeholder="Contoh: SG0001" />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={handleGenerateSku}
+                        disabled={isGeneratingSku}
+                        title="Auto Generate SKU dari Nama Produk"
+                        className="shrink-0">
+                        <RefreshCw
+                          className={`h-4 w-4 ${
+                            isGeneratingSku ? "animate-spin" : ""
+                          }`}
+                        />
+                      </Button>
+                    </div>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -397,6 +467,8 @@ export default function ProductFormV2({
                   </FormItem>
                 )}
               />
+
+              {/* SWITCH CUSTOM */}
               <FormField
                 control={form.control}
                 name="isCustom"
@@ -404,11 +476,38 @@ export default function ProductFormV2({
                   <FormItem>
                     <FormLabel>Tipe Produk</FormLabel>
                     <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
+                      <div className="flex items-center gap-3 h-10 border rounded-md px-3">
+                        <span
+                          className={`text-sm cursor-pointer transition-colors ${
+                            !field.value
+                              ? "font-bold text-black"
+                              : "text-gray-400"
+                          }`}
+                          onClick={() => field.onChange(false)}>
+                          Standard
+                        </span>
+
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+
+                        <span
+                          className={`text-sm cursor-pointer transition-colors ${
+                            field.value
+                              ? "font-bold text-black"
+                              : "text-gray-400"
+                          }`}
+                          onClick={() => field.onChange(true)}>
+                          Custom
+                        </span>
+                      </div>
                     </FormControl>
+                    <p className="text-[0.8rem] text-muted-foreground">
+                      {field.value
+                        ? "Produk memiliki varian & attribut (Warna, Ukuran, dll)."
+                        : "Produk standar tanpa variasi."}
+                    </p>
                   </FormItem>
                 )}
               />
@@ -418,7 +517,9 @@ export default function ProductFormV2({
               <PriceTiers />
             </div>
 
+            {/* DIMENSI & DESKRIPSI & MEDIA - TIDAK BERUBAH */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4 mt-4">
+              {/* ... (Input dimensi tidak berubah) ... */}
               <FormField
                 control={form.control}
                 name="weight"
@@ -530,31 +631,39 @@ export default function ProductFormV2({
               </div>
             </div>
 
-            <div className="border rounded p-4">
-              <AttributeSelector
-                value={attributeSelections}
-                onChange={handleAddAttributeToForm}
-              />
-              <div className="border-t mt-3 pt-3">
-                <div className="flex justify-end">
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={handleGenerateVariants}>
-                    Generate Variants
-                  </Button>
+            {/* ✅ LOGIC ADDED: Conditional Rendering (Hanya Tampil Jika Custom) */}
+            {isCustomProduct && (
+              <div className="animate-in fade-in zoom-in duration-300">
+                <div className="border rounded p-4 bg-gray-50/50">
+                  <h3 className="font-semibold mb-3 text-lg">
+                    Konfigurasi Varian
+                  </h3>
+                  <AttributeSelector
+                    value={attributeSelections}
+                    onChange={handleAddAttributeToForm}
+                  />
+                  <div className="border-t mt-3 pt-3">
+                    <div className="flex justify-end">
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        onClick={handleGenerateVariants}>
+                        Generate Variants
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            {combinations.length > 0 && (
-              <div className="border rounded p-4">
-                <VariantList
-                  combinations={combinations}
-                  variantMetas={variantMetas}
-                  onUpdateVariantMeta={handleUpdateVariantMeta}
-                  onChangeMeta={handleVariantImagesChange}
-                />
+                {combinations.length > 0 && (
+                  <div className="border rounded p-4 mt-4 bg-gray-50/50">
+                    <VariantList
+                      combinations={combinations}
+                      variantMetas={variantMetas}
+                      onUpdateVariantMeta={handleUpdateVariantMeta}
+                      onChangeMeta={handleVariantImagesChange}
+                    />
+                  </div>
+                )}
               </div>
             )}
 

@@ -170,11 +170,11 @@ const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
               <span className="text-muted-foreground font-medium">Email</span>
               <span className="col-span-2">
                 {pic.email ? (
-                  <a
+                  <Link
                     href={`mailto:${pic.email}`}
                     className="text-blue-600 hover:underline font-medium">
                     {pic.email}
-                  </a>
+                  </Link>
                 ) : (
                   <span className="text-muted-foreground">-</span>
                 )}

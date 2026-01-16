@@ -225,7 +225,7 @@ export default function OrdersPage() {
             </div>
 
             {/* Link to Create Order */}
-            <Link href="/super-admin/orders/create">
+            <Link href="/super-admin/orders/add">
               <Button className="w-full md:w-auto shadow-sm hover:shadow-md transition-all">
                 + Create Order
               </Button>
