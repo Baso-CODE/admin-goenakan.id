@@ -1,7 +1,5 @@
 "use client";
 
-import { ChevronRight, type LucideIcon } from "lucide-react";
-
 import {
   Collapsible,
   CollapsibleContent,
@@ -17,10 +15,12 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import { ChevronRight, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 export function NavMain({
   items,
+  label = "Platform", // Default label jika tidak diisi
 }: {
   items: {
     title: string;
@@ -32,10 +32,12 @@ export function NavMain({
       url: string;
     }[];
   }[];
+  label?: string; // Tambahkan prop label
 }) {
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Platform</SidebarGroupLabel>
+      {/* Gunakan prop label disini */}
+      <SidebarGroupLabel>{label}</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (
           <Collapsible

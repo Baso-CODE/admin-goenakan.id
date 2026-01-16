@@ -40,12 +40,16 @@ export default function LogisticsTrackingDetail() {
       setOrder(result.data);
 
       // 2. Fetch Vendor (Product = Pabrik, Service = Kurir)
-      const vProdRes = await fetch(`${apiUrl}/vendors?type=PRODUCT`, {
-        headers,
-      });
-      const vServRes = await fetch(`${apiUrl}/vendors?type=SERVICE`, {
-        headers,
-      });
+      const vProdRes = await fetch(
+        `${apiUrl}/vendors/by-order/${orderId}?type=PRODUCT`,
+        { headers }
+      );
+
+      // Ambil Vendor Kurir yg terkait order ini
+      const vServRes = await fetch(
+        `${apiUrl}/vendors/by-order/${orderId}?type=SERVICE`,
+        { headers }
+      );
 
       const vProd = await vProdRes.json();
       const vServ = await vServRes.json();

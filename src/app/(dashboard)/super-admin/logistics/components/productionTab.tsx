@@ -60,8 +60,8 @@ type Vendor = { id: string; companyName: string }; // Untuk dropdown pabrik
 interface ProductionTabProps {
   orderId: string;
   products: OrderProduct[];
-  vendors: Vendor[]; // List vendor tipe 'PRODUCT' (Pabrik)
-  onUpdate: () => void; // Fungsi refresh data setelah update
+  vendors: Vendor[];
+  onUpdate: () => void;
 }
 
 export default function ProductionTab({
@@ -70,10 +70,6 @@ export default function ProductionTab({
   vendors,
   onUpdate,
 }: ProductionTabProps) {
-  // Modal States
-
-  console.log(products, "ini adlaah data productg");
-
   const [isStartOpen, setIsStartOpen] = useState(false);
   const [isCompleteOpen, setIsCompleteOpen] = useState(false);
   const [loading, setLoading] = useState(false);

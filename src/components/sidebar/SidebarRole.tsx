@@ -19,11 +19,12 @@ import {
   Frame,
   GalleryVerticalEnd,
   HandshakeIcon,
+  LayoutTemplate,
   ListOrdered,
   LucideChartNetwork,
-  Map,
+  Megaphone,
+  MessageSquareQuote,
   Package,
-  PieChart,
   Settings,
   Store,
   Tags,
@@ -32,7 +33,6 @@ import {
   Users,
 } from "lucide-react";
 import { NavMain } from "./NavMain";
-import { NavDashboards } from "./nav-dashboard";
 import { NavProjects } from "./nav-project";
 import { NavUser } from "./nav-user";
 import { TeamSwitcher } from "./team-switcher";
@@ -58,7 +58,57 @@ export default function SidebarRole({ ...props }) {
       { name: "Invoice Dept", logo: AudioWaveform, plan: "Startup" },
       { name: "Article Dept", logo: Command, plan: "Free" },
     ],
-    navMain: [
+
+    // 1. ORDER MANAGEMENT SECTION
+    navOrder: [
+      {
+        title: "Orders & Dashboard",
+        url: "#",
+        icon: ListOrdered,
+        items: [
+          { title: "Dashboard Overview", url: "/" },
+          { title: "Order Form", url: "/super-admin/orders/add" },
+          { title: "All Orders List", url: "/super-admin/orders" },
+        ],
+      },
+      {
+        title: "Cashflow & Invoicing",
+        url: "#",
+        icon: FileSpreadsheet,
+        items: [
+          { title: "Invoices", url: "/admin-invoice/invoices" },
+          { title: "Cashflow", url: "/super-admin/cashflow" },
+          { title: "Payments", url: "/admin-invoice/payments" },
+        ],
+      },
+      {
+        title: "Logistic & Delivery",
+        url: "#",
+        icon: Truck,
+        items: [
+          { title: "Tracking Dashboard", url: "/super-admin/logistics" },
+          {
+            title: "Delivery Notes",
+            url: "/super-admin/logistics/delivery-notes",
+          },
+        ],
+      },
+      {
+        title: "Quotation & Follow Up",
+        url: "#",
+        icon: MessageSquareQuote,
+        items: [
+          { title: "Quotations", url: "/super-admin/quotations" },
+          {
+            title: "Follow Up Tracking",
+            url: "/super-admin/tracking/follow-up",
+          },
+        ],
+      },
+    ],
+
+    // 2. DATABASE SECTION
+    navDatabase: [
       {
         title: "Vendor Management",
         url: "#",
@@ -68,6 +118,16 @@ export default function SidebarRole({ ...props }) {
           { title: "Vendor Items", url: "/super-admin/vendor-items" },
           { title: "Vendor Categories", url: "/super-admin/vendor-categories" },
           { title: "Platform", url: "/super-admin/contact-platforms" },
+        ],
+      },
+      {
+        title: "Client Management",
+        url: "#",
+        icon: UserCircle,
+        items: [
+          { title: "All Client", url: "/super-admin/clients" },
+          { title: "Departments", url: "/super-admin/departments" },
+          { title: "Add Client", url: "/super-admin/clients/add" },
         ],
       },
       {
@@ -88,89 +148,83 @@ export default function SidebarRole({ ...props }) {
           },
         ],
       },
+    ],
+
+    // 3. USER MANAGEMENT SECTION
+    navUserManagement: [
       {
-        title: "Invoice Management",
+        title: "Sales Team",
         url: "#",
-        icon: FileSpreadsheet,
+        icon: HandshakeIcon,
         items: [
-          { title: "Invoices", url: "/admin-invoice/invoices" },
-          { title: "Notes", url: "/admin-invoice/notes" },
-          { title: "Payments", url: "/admin-invoice/payments" },
+          { title: "All Sales Team", url: "/super-admin/sales" },
+          { title: "Sales Performance", url: "/super-admin/sales/performance" },
         ],
       },
       {
-        title: "Client Management",
+        title: "Users",
         url: "#",
-        icon: UserCircle,
+        icon: Users,
         items: [
-          { title: "All Client", url: "/super-admin/clients" },
-          { title: "Departments", url: "/super-admin/departments" },
-          { title: "Add Client", url: "/super-admin/clients/add" },
+          { title: "All Users", url: "/super-admin/users" },
+          { title: "Roles & Permissions", url: "/super-admin/users/roles" },
         ],
       },
+    ],
+
+    // 4. MARKETING & CONTENT SECTION
+    navMarketing: [
       {
-        title: "Article Management",
+        title: "Articles / Blog",
         url: "#",
         icon: FileText,
         items: [
-          { title: "Articles", url: "/admin-article/articles" },
+          { title: "All Articles", url: "/admin-article/articles" },
           { title: "Categories", url: "/admin-article/categories" },
         ],
       },
       {
-        title: "User Management",
+        title: "Web Content",
         url: "#",
-        icon: Users,
-        items: [{ title: "All Users", url: "/super-admin/users" }],
-      },
-      {
-        title: "Sales Management",
-        url: "#",
-        icon: HandshakeIcon,
+        icon: LayoutTemplate,
         items: [
-          { title: "All Sales", url: "/super-admin/sales" },
-          { title: "All Account Bank Sales", url: "/super-admin/sales/bank" },
+          { title: "Landing Page", url: "/super-admin/content/landing-page" },
+          { title: "Hero Images", url: "/super-admin/content/hero" },
+          { title: "Banner Pop-Up", url: "/super-admin/content/popup" },
+          {
+            title: "Testimonials & Photos",
+            url: "/super-admin/content/testimonials",
+          },
         ],
       },
       {
-        title: "Order Management",
+        title: "Marketing Campaigns",
         url: "#",
-        icon: ListOrdered,
+        icon: Megaphone,
         items: [
-          { title: "All Order", url: "/super-admin/orders" },
-          { title: "Cashflow", url: "/super-admin/cashflow" },
-          { title: "Order Analyst", url: "/super-admin/orders/add" },
+          { title: "Campaigns", url: "/super-admin/marketing/campaigns" },
         ],
       },
-      {
-        title: "Logistics & Tracking",
-        url: "#",
-        icon: Truck,
-        items: [{ title: "Tracking Dashboard", url: "/super-admin/logistics" }],
-      },
-      { title: "Settings", url: "/super-admin/settings", icon: Settings },
     ],
+
+    // OTHER (PERBAIKAN DISINI)
     Etc: [
+      {
+        name: "Settings", // DULU 'title', SEKARANG 'name' AGAR SESUAI TIPE
+        url: "/super-admin/settings",
+        icon: Settings,
+      },
       {
         name: "Purchase Channel",
         url: "/super-admin/purchase-channel",
         icon: LucideChartNetwork,
       },
-      { name: "Sales & Marketing", url: "#", icon: PieChart },
-      { name: "Travel", url: "#", icon: Map },
     ],
-    dashboard: [{ name: "Dashboard Overview", url: "#", icon: Frame }],
+    dashboard: [{ name: "Main Dashboard", url: "/dashboard", icon: Frame }],
   };
 
-  // === FILTER NAV MAIN BY ROLE ===
-  const filteredNavMain = (() => {
-    if (role === "SUPER_ADMIN") return data.navMain;
-    if (role === "ADMIN_INVOICE")
-      return data.navMain.filter((m) => m.title.includes("Invoice"));
-    if (role === "ADMIN_ARTICLE")
-      return data.navMain.filter((m) => m.title.includes("Article"));
-    return [];
-  })();
+  // === ROLE VISIBILITY LOGIC ===
+  const isSuperAdmin = role === "SUPER_ADMIN";
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -179,9 +233,26 @@ export default function SidebarRole({ ...props }) {
       </SidebarHeader>
 
       <SidebarContent>
-        <NavDashboards projects={data.dashboard} />
-        <NavMain items={filteredNavMain} />
-        {role === "SUPER_ADMIN" && <NavProjects projects={data.Etc} />}
+        {/* -- SECTION 1: ORDER MANAGEMENT -- */}
+        {(isSuperAdmin || role === "ADMIN_INVOICE") && (
+          <NavMain label="Order Management" items={data.navOrder} />
+        )}
+
+        {/* -- SECTION 2: DATABASE -- */}
+        {isSuperAdmin && <NavMain label="Database" items={data.navDatabase} />}
+
+        {/* -- SECTION 3: USER MANAGEMENT -- */}
+        {isSuperAdmin && (
+          <NavMain label="User Management" items={data.navUserManagement} />
+        )}
+
+        {/* -- SECTION 4: MARKETING & CONTENT -- */}
+        {(isSuperAdmin || role === "ADMIN_ARTICLE") && (
+          <NavMain label="Marketing & Content" items={data.navMarketing} />
+        )}
+
+        {/* -- ETC -- */}
+        {isSuperAdmin && <NavProjects projects={data.Etc} />}
       </SidebarContent>
 
       <SidebarFooter>
