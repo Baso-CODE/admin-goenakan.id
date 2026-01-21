@@ -195,6 +195,10 @@ export default function SidebarRole({ ...props }) {
             title: "Testimonials & Photos",
             url: "/super-admin/content/testimonials",
           },
+          {
+            title: "Faqs",
+            url: "/super-admin/content/faqs",
+          },
         ],
       },
       {
