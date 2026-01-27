@@ -98,10 +98,10 @@ export default function SidebarRole({ ...props }) {
         url: "#",
         icon: MessageSquareQuote,
         items: [
-          { title: "Quotations", url: "/super-admin/quotations" },
+          { title: "Quotations", url: "/admin-invoice/quotations" },
           {
             title: "Follow Up Tracking",
-            url: "/super-admin/tracking/follow-up",
+            url: "/admin-invoice/follow-up",
           },
         ],
       },
