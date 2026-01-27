@@ -1,7 +1,9 @@
+import HeroTable from "./components/tableHero";
+
 export default function HeroContentPage() {
   return (
     <>
-      <h1>Content Page</h1>
+      <HeroTable />
     </>
   );
 }

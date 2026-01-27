@@ -306,7 +306,12 @@ export default function FaqTable() {
           </div>
 
           {/* Actions */}
-          <Link href="/super-admin/faqs/items/add" className="ml-auto">
+          <Link href="/super-admin/content/faqs/categories" className="ml-auto">
+            <Button size="sm" className="gap-2" variant={"secondary"}>
+              Category FAQ
+            </Button>
+          </Link>
+          <Link href="/super-admin/content/faqs/items/add" className="">
             <Button size="sm" className="gap-2">
               <Plus className="h-4 w-4" /> Add FAQ
             </Button>
@@ -333,7 +338,7 @@ export default function FaqTable() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px] text-center">Featured</TableHead>
+                <TableHead className="w-12.5 text-center">Featured</TableHead>
                 <TableHead>Question</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead className="text-center">Order</TableHead>
@@ -390,7 +395,7 @@ export default function FaqTable() {
                     </TableCell>
 
                     {/* Question (Main) */}
-                    <TableCell className="max-w-[300px]">
+                    <TableCell className="max-w-75">
                       <div
                         className="font-medium truncate"
                         title={faq.question}>
@@ -436,7 +441,8 @@ export default function FaqTable() {
 
                     {/* Actions */}
                     <TableCell className="text-right space-x-2 whitespace-nowrap">
-                      <Link href={`/super-admin/faqs/items/edit/${faq.id}`}>
+                      <Link
+                        href={`/super-admin/content/faqs/items/edit/${faq.id}`}>
                         <Button variant="outline" size="sm" className="h-8">
                           Edit
                         </Button>

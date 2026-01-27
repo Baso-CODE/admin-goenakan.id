@@ -307,8 +307,8 @@ export default function FaqCategoryTable() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px]">Order</TableHead>
-                <TableHead className="min-w-[200px]">Name / Slug</TableHead>
+                <TableHead className="w-12.5">Order</TableHead>
+                <TableHead className="min-w-50">Name / Slug</TableHead>
                 <TableHead className="hidden md:table-cell">
                   Description
                 </TableHead>
@@ -374,7 +374,7 @@ export default function FaqCategoryTable() {
 
                     {/* Description */}
                     <TableCell
-                      className="hidden md:table-cell max-w-[200px] truncate text-muted-foreground"
+                      className="hidden md:table-cell max-w-50 truncate text-muted-foreground"
                       title={cat.description}>
                       {cat.description || "-"}
                     </TableCell>

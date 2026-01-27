@@ -186,7 +186,7 @@ export default function FaqCategoryForm({
                   control={form.control}
                   name="isActive"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-center gap-3 p-3 border rounded-lg w-full h-[42px]">
+                    <FormItem className="flex flex-row items-center gap-3 p-3 border rounded-lg w-full h-10.5">
                       <FormControl>
                         <Checkbox
                           checked={field.value}
