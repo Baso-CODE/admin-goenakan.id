@@ -30,7 +30,7 @@ import {
 import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 
-// === TYPES ===
+// === 1. PERBAIKAN TYPE DEFINITION ===
 type Quotation = {
   id: string;
   quotationNumber: string;
@@ -44,13 +44,24 @@ type Quotation = {
     | "REJECTED"
     | "EXPIRED"
     | "CANCELLED";
-  totalAmount: number;
 
-  // Hybrid Client Logic
+  // Decimal di Prisma dikirim sebagai String di JSON
+  totalAmount: string | number;
+
+  // Struktur Client yang benar (Nested B2B/B2C)
   client?: {
-    name: string;
-    prefix?: string;
+    id: string;
+    type: "B2B" | "B2C";
+    custCode: string;
+    b2b?: {
+      companyName: string;
+    };
+    b2c?: {
+      name: string;
+      prefix?: string;
+    };
   } | null;
+
   manualClientName?: string | null;
   manualClientCompany?: string | null;
 };
@@ -65,35 +76,35 @@ type Meta = {
 };
 
 // === UTILS ===
-const formatCurrency = (amount: number) => {
+const formatCurrency = (amount: string | number) => {
+  // Pastikan dikonversi ke Number agar tidak error
+  const numericAmount = Number(amount) || 0;
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
     currency: "IDR",
     minimumFractionDigits: 0,
-  }).format(amount);
+  }).format(numericAmount);
 };
 
-// Helper untuk Warna Badge Status
 const getStatusBadgeVariant = (status: string) => {
   switch (status) {
     case "ACCEPTED":
-      return "default"; // Hitam/Primary (Deal)
+      return "default";
     case "SENT":
-      return "secondary"; // Abu-abu (Terkirim)
+      return "secondary";
     case "FOLLOW_UP":
-      return "outline"; // Putih/Outline (Proses)
+      return "outline";
     case "DRAFT":
-      return "secondary"; // Abu-abu muda
+      return "secondary";
     case "REJECTED":
     case "CANCELLED":
     case "EXPIRED":
-      return "destructive"; // Merah
+      return "destructive";
     default:
       return "outline";
   }
 };
 
-// Helper untuk Warna Text khusus Follow Up agar terlihat beda
 const getStatusClassName = (status: string) => {
   if (status === "FOLLOW_UP")
     return "text-orange-600 border-orange-200 bg-orange-50";
@@ -101,23 +112,45 @@ const getStatusClassName = (status: string) => {
   return "";
 };
 
+// === HELPER BARU: EXTRACT NAMA CLIENT ===
+const getClientName = (quo: Quotation) => {
+  // 1. Cek Input Manual dulu
+  if (quo.manualClientName) {
+    return quo.manualClientName;
+  }
+
+  // 2. Cek Client dari Database
+  if (quo.client) {
+    // Jika B2B, ambil companyName
+    if (quo.client.b2b) {
+      return quo.client.b2b.companyName;
+    }
+    // Jika B2C, ambil name (plus prefix jika ada)
+    if (quo.client.b2c) {
+      const prefix = quo.client.b2c.prefix ? `${quo.client.b2c.prefix}. ` : "";
+      return `${prefix}${quo.client.b2c.name}`;
+    }
+  }
+
+  return "Unknown Client";
+};
+
+const getClientSubInfo = (quo: Quotation) => {
+  if (quo.manualClientCompany) return quo.manualClientCompany;
+  if (quo.client?.b2b) return quo.client.custCode;
+  return "";
+};
+
 export default function QuotationsTable() {
-  // === STATE ===
   const [quotations, setQuotations] = useState<Quotation[]>([]);
-  console.log("ini adalah quatations", quotations);
-
   const [meta, setMeta] = useState<Meta | null>(null);
-  console.log("ini adalah data meta", meta);
-
   const [loading, setLoading] = useState(true);
 
-  // Filters State
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
-  // === FETCH DATA ===
   const fetchQuotations = async () => {
     setLoading(true);
     try {
@@ -153,7 +186,6 @@ export default function QuotationsTable() {
     fetchQuotations();
   }, [page, debouncedSearch, statusFilter]);
 
-  // === RENDER ===
   return (
     <div className="space-y-6 w-full mx-auto pb-10">
       {/* Header */}
@@ -172,7 +204,6 @@ export default function QuotationsTable() {
           </div>
 
           <div className="flex flex-wrap gap-2 items-center">
-            {/* Add Button */}
             <Link href="/admin-invoice/quotations/add">
               <Button className="h-9 gap-2 bg-orange-600 hover:bg-orange-700">
                 <Plus className="h-4 w-4" />
@@ -180,7 +211,6 @@ export default function QuotationsTable() {
               </Button>
             </Link>
 
-            {/* Search Bar */}
             <div className="relative w-full md:w-60">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -200,13 +230,11 @@ export default function QuotationsTable() {
       {/* Filter Bar */}
       <Card className="p-4 shadow-sm bg-gray-50/50 border-gray-100">
         <div className="flex flex-wrap gap-4 items-center">
-          {/* Label Filter */}
           <div className="hidden md:flex items-center gap-2 mr-1 h-9 bg-white px-3 border rounded-md shadow-sm text-muted-foreground">
             <Filter className="h-4 w-4" />
             <span className="text-xs font-medium">Filter</span>
           </div>
 
-          {/* Filter Status */}
           <div className="flex flex-col gap-1.5 w-full sm:w-48">
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider ml-1">
               Status Penawaran
@@ -241,21 +269,18 @@ export default function QuotationsTable() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="w-[140px]">Tanggal</TableHead>
-                  <TableHead className="w-[180px]">Quotation No</TableHead>
-                  <TableHead className="min-w-[200px]">Client</TableHead>
-                  <TableHead className="text-right w-[150px]">
+                  <TableHead className="w-35">Tanggal</TableHead>
+                  <TableHead className="w-45">Quotation No</TableHead>
+                  <TableHead className="min-w-50">Client</TableHead>
+                  <TableHead className="text-right w-37.5">
                     Total Nilai
                   </TableHead>
-                  <TableHead className="text-center w-[120px]">
-                    Status
-                  </TableHead>
-                  <TableHead className="text-center w-[80px]">Action</TableHead>
+                  <TableHead className="text-center w-30">Status</TableHead>
+                  <TableHead className="text-center w-20">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  // Skeleton Rows
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
                       <TableCell>
@@ -314,20 +339,15 @@ export default function QuotationsTable() {
                         {quo.quotationNumber}
                       </TableCell>
 
-                      {/* Client (Hybrid Logic) */}
+                      {/* Client (Hybrid Logic FIXED) */}
                       <TableCell className="text-sm">
                         <div className="flex flex-col">
                           <span className="font-semibold text-gray-800">
-                            {quo.client
-                              ? quo.client.name
-                              : quo.manualClientName || "Unknown Client"}
+                            {getClientName(quo)}
                           </span>
-                          {/* Jika manual company ada, atau client db prefix ada */}
-                          {(quo.manualClientCompany || quo.client?.prefix) && (
+                          {getClientSubInfo(quo) && (
                             <span className="text-[11px] text-muted-foreground">
-                              {quo.client
-                                ? quo.client.prefix
-                                : quo.manualClientCompany}
+                              {getClientSubInfo(quo)}
                             </span>
                           )}
                         </div>
@@ -349,7 +369,8 @@ export default function QuotationsTable() {
 
                       {/* Action */}
                       <TableCell className="text-center">
-                        <Link href={`/super-admin/quotations/detail/${quo.id}`}>
+                        <Link
+                          href={`/admin-invoice/quotations/detail/${quo.id}`}>
                           <Button
                             variant="ghost"
                             size="icon"
