@@ -6,7 +6,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Box,
-  Calendar,
+  CalendarIcon,
   Edit3,
   FileText,
   History,
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -45,6 +46,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -64,6 +70,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { apiUrl } from "@/helper/apiurl";
+import { cn } from "@/lib/utils";
 
 // === TYPES (Sesuai Schema Database) ===
 // === 1. Tambahkan Type Khusus Follow Up ===
@@ -121,6 +128,7 @@ export default function QuotationDetail() {
   const [data, setData] = useState<QuotationDetail | null>(null);
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
   const [followUpData, setFollowUpData] = useState({
+    date: new Date(),
     method: "WhatsApp",
     notes: "",
     nextAction: "",
@@ -196,7 +204,12 @@ export default function QuotationDetail() {
 
       toast.success("Follow up berhasil dicatat");
       setIsFollowUpOpen(false);
-      setFollowUpData({ method: "WhatsApp", notes: "", nextAction: "" });
+      setFollowUpData({
+        date: new Date(),
+        method: "WhatsApp",
+        notes: "",
+        nextAction: "",
+      });
       fetchDetail();
     } catch (error) {
       toast.error("Gagal mencatat follow up");
@@ -282,7 +295,7 @@ export default function QuotationDetail() {
                   {data.quotationNumber}
                 </CardTitle>
                 <div className="flex items-center text-sm text-muted-foreground">
-                  <Calendar className="mr-1 h-3 w-3" />
+                  <CalendarIcon className="mr-1 h-3 w-3" />
                   Dibuat pada{" "}
                   {format(new Date(data.date), "dd MMMM yyyy", {
                     locale: idLocale,
@@ -449,7 +462,7 @@ export default function QuotationDetail() {
         </div>
       </div>
       {/* Table Follow Up */}
-      {/* --- TIMELINE FOLLOW UP (Taruh di bawah Grid Utama atau di Kolom Kiri) --- */}
+
       <Card className="mt-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
@@ -472,6 +485,40 @@ export default function QuotationDetail() {
                 <DialogTitle>Catat Hasil Follow Up</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
+                {/* Date Picker */}
+                <div className="space-y-2 flex flex-col">
+                  <label className="text-sm font-medium">Tanggal</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !followUpData.date && "text-muted-foreground",
+                        )}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {followUpData.date ? (
+                          format(followUpData.date, "PPP", { locale: idLocale })
+                        ) : (
+                          <span>Pilih tanggal</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={followUpData.date}
+                        onSelect={(date) =>
+                          setFollowUpData({
+                            ...followUpData,
+                            date: date || new Date(),
+                          })
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Metode</label>
                   <Select

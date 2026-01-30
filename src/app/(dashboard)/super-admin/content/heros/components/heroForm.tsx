@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import {
@@ -61,7 +61,7 @@ export default function HeroForm({
   const [selectedFile, setSelectedFile] = useState<File | undefined>(undefined);
 
   const form = useForm<HeroFormValues>({
-    resolver: zodResolver(heroSchema),
+    resolver: zodResolver(heroSchema) as Resolver<HeroFormValues>,
     defaultValues: initialData ?? {
       title: "",
       altText: "",

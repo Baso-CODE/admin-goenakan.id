@@ -18,7 +18,7 @@ export default function AddQuotationPage() {
       const res = await fetch(`${apiUrl}/quotations`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json", // Pakai JSON karena strukturnya complex array
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(data),

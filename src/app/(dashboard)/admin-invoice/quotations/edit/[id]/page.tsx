@@ -1,6 +1,7 @@
 "use client";
 
 import { apiUrl } from "@/helper/apiurl";
+import { cleanQuotationPayload } from "@/helper/cleanQuotationPayload";
 import { Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -39,7 +40,7 @@ export default function EditQuotationPage() {
         const formattedData: QuotationFormValues = {
           date: new Date(data.date), // Convert string ISO ke Date
           validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
-
+          status: data.status,
           notes: data.notes || "",
           internalNotes: data.internalNotes || "",
 
@@ -84,7 +85,7 @@ export default function EditQuotationPage() {
     try {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
-
+      const payload = cleanQuotationPayload(data);
       // Gunakan method PATCH untuk update
       const res = await fetch(`${apiUrl}/quotations/${id}`, {
         method: "PATCH",
@@ -92,7 +93,7 @@ export default function EditQuotationPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -101,7 +102,7 @@ export default function EditQuotationPage() {
       }
 
       toast.success("Quotation updated successfully!");
-      router.push("/super-admin/quotations"); // Kembali ke list
+      router.push("/admin-invoice/quotations");
     } catch (error) {
       console.error(error);
       toast.error(

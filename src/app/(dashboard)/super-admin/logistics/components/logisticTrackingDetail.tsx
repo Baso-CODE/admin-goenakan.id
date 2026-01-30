@@ -19,6 +19,7 @@ export default function LogisticsTrackingDetail() {
   const router = useRouter();
 
   const [order, setOrder] = useState<any>(null);
+  console.log("ini adalah data ordxer", order);
 
   const [vendors, setVendors] = useState<any[]>([]);
   const [couriers, setCouriers] = useState<any[]>([]);
@@ -41,13 +42,13 @@ export default function LogisticsTrackingDetail() {
       // 2. Fetch Vendor (Product = Pabrik, Service = Kurir)
       const vProdRes = await fetch(
         `${apiUrl}/vendors/by-order/${orderId}?type=PRODUCT`,
-        { headers }
+        { headers },
       );
 
       // Ambil Vendor Kurir yg terkait order ini
       const vServRes = await fetch(
         `${apiUrl}/vendors/by-order/${orderId}?type=SERVICE`,
-        { headers }
+        { headers },
       );
 
       const vProd = await vProdRes.json();

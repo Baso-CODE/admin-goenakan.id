@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { Box, CalendarIcon, Loader2, Plus, Trash2, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { Resolver, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -35,7 +35,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { apiUrl } from "@/helper/apiurl"; // Pastikan helper ini ada
+import { apiUrl } from "@/helper/apiurl";
 import { cn } from "@/lib/utils";
 
 // === TYPES FOR API DATA ===
@@ -52,14 +52,27 @@ type ProductData = {
   name: string;
   sku: string;
   basePrice: number;
-  // Jika nanti butuh varian, bisa diakses di sini
   productVariants: { id: string; variantName: string; price: number }[];
 };
+
+// === CONSTANTS ===
+const QUOTATION_STATUSES = [
+  "DRAFT",
+  "SENT",
+  "FOLLOW_UP",
+  "ACCEPTED",
+  "REJECTED",
+  "EXPIRED",
+  "CANCELLED",
+] as const;
 
 // === SCHEMA ===
 const quotationSchema = z.object({
   date: z.date(),
   validUntil: z.date().optional(),
+
+  // 1. TAMBAHKAN FIELD STATUS DI SINI
+  status: z.enum(QUOTATION_STATUSES).default("DRAFT"),
 
   // Logic Hybrid Client
   isManualClient: z.boolean().default(false),
@@ -77,7 +90,6 @@ const quotationSchema = z.object({
   items: z
     .array(
       z.object({
-        // Logic Hybrid Product
         isManualProduct: z.boolean().default(false),
         productId: z.string().optional(),
         productName: z.string().min(1, "Product name is required"),
@@ -103,12 +115,11 @@ export default function QuotationForm({
   onSubmit,
   isLoading,
 }: QuotationFormProps) {
-  // === STATE FOR DATA ===
   const [clients, setClients] = useState<ClientData[]>([]);
   const [products, setProducts] = useState<ProductData[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // === FETCH DATA (CLIENTS & PRODUCTS) ===
+  // === FETCH DATA ===
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -116,17 +127,17 @@ export default function QuotationForm({
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const resClients = await fetch(`${apiUrl}/clients/order`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const [resClients, resProducts] = await Promise.all([
+          fetch(`${apiUrl}/clients/order`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${apiUrl}/products/order`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
 
-        const resProducts = await fetch(`${apiUrl}/products/order`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!resClients.ok || !resProducts.ok) {
+        if (!resClients.ok || !resProducts.ok)
           throw new Error("Failed to load master data");
-        }
 
         const clientData = await resClients.json();
         const productData = await resProducts.json();
@@ -149,9 +160,10 @@ export default function QuotationForm({
   }, []);
 
   const form = useForm<QuotationFormValues>({
-    resolver: zodResolver(quotationSchema),
+    resolver: zodResolver(quotationSchema) as Resolver<QuotationFormValues>,
     defaultValues: initialData || {
       date: new Date(),
+      status: "DRAFT", // 2. SET DEFAULT VALUE
       isManualClient: false,
       items: [
         {
@@ -165,19 +177,24 @@ export default function QuotationForm({
     },
   });
 
+  // Re-sync jika initialData berubah (untuk Edit Mode)
+  useEffect(() => {
+    if (initialData) {
+      form.reset(initialData);
+    }
+  }, [initialData, form]);
+
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items",
   });
 
-  // === WATCHERS ===
   const items = useWatch({ control: form.control, name: "items" });
   const isManualClient = useWatch({
     control: form.control,
     name: "isManualClient",
   });
 
-  // === CALCULATIONS ===
   const { subTotal, totalDiscount, grandTotal } = useMemo(() => {
     let sub = 0;
     let disc = 0;
@@ -185,27 +202,22 @@ export default function QuotationForm({
       const qty = Number(item.quantity) || 0;
       const price = Number(item.unitPrice) || 0;
       const itemDisc = Number(item.discount) || 0;
-
       sub += qty * price;
       disc += itemDisc;
     });
     return { subTotal: sub, totalDiscount: disc, grandTotal: sub - disc };
   }, [items]);
 
-  // === HANDLERS ===
   const handleProductSelect = (index: number, productId: string) => {
     const product = products.find((p) => p.id === productId);
     if (product) {
       form.setValue(`items.${index}.productName`, product.name);
-      // Menggunakan Base Price sebagai default unit price
       form.setValue(`items.${index}.unitPrice`, Number(product.basePrice));
     }
   };
 
   const handleClientSelect = (clientId: string) => {
-    // Opsional: Jika ingin auto-fill alamat client saat dipilih
-    const client = clients.find((c) => c.id === clientId);
-    // Anda bisa menambah logic disini jika quotation punya field 'shipTo' dsb.
+    // Logic auto-fill address if needed
   };
 
   const handleSubmit = (data: QuotationFormValues) => {
@@ -233,7 +245,48 @@ export default function QuotationForm({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Date Fields (Sama seperti sebelumnya) */}
+              {/* --- 3. FIELD STATUS --- */}
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {QUOTATION_STATUSES.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {/* Sedikit styling opsional agar lebih terbaca */}
+                            <span
+                              className={cn(
+                                "font-medium",
+                                status === "DRAFT" && "text-slate-500",
+                                status === "SENT" && "text-blue-600",
+                                status === "ACCEPTED" && "text-green-600",
+                                status === "REJECTED" && "text-red-600",
+                              )}>
+                              {status.replace("_", " ")}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Separator />
+
+              {/* Date Fields */}
               <FormField
                 control={form.control}
                 name="date"
@@ -313,7 +366,7 @@ export default function QuotationForm({
             </CardContent>
           </Card>
 
-          {/* Client Selection */}
+          {/* Client Selection (Sama seperti sebelumnya) */}
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -340,7 +393,6 @@ export default function QuotationForm({
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {!isManualClient ? (
-                // === SELECT FROM DB ===
                 <div className="col-span-2">
                   <FormField
                     control={form.control}
@@ -354,6 +406,7 @@ export default function QuotationForm({
                             handleClientSelect(val);
                           }}
                           defaultValue={field.value}
+                          value={field.value} // Add value prop for edit mode
                           disabled={loadingData}>
                           <FormControl>
                             <SelectTrigger>
@@ -378,14 +431,8 @@ export default function QuotationForm({
                       </FormItem>
                     )}
                   />
-                  {loadingData && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Loading database...
-                    </p>
-                  )}
                 </div>
               ) : (
-                // === MANUAL INPUT FIELDS (Sama seperti sebelumnya) ===
                 <>
                   <FormField
                     control={form.control}
@@ -462,7 +509,7 @@ export default function QuotationForm({
           </Card>
         </div>
 
-        {/* === ITEMS === */}
+        {/* === ITEMS (Sama seperti sebelumnya) === */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -495,7 +542,6 @@ export default function QuotationForm({
                   <div
                     key={field.id}
                     className="grid grid-cols-12 gap-3 items-start border p-3 rounded-lg bg-slate-50/50">
-                    {/* Toggle Manual/DB */}
                     <div className="col-span-12 md:col-span-1 flex items-center justify-center pt-3">
                       <FormField
                         control={form.control}
@@ -514,8 +560,6 @@ export default function QuotationForm({
                         )}
                       />
                     </div>
-
-                    {/* Product Selection */}
                     <div className="col-span-12 md:col-span-4">
                       {isManual ? (
                         <FormField
@@ -547,6 +591,7 @@ export default function QuotationForm({
                                   handleProductSelect(index, val);
                                 }}
                                 defaultValue={field.value}
+                                value={field.value}
                                 disabled={loadingData}>
                                 <FormControl>
                                   <SelectTrigger>
@@ -566,8 +611,6 @@ export default function QuotationForm({
                         />
                       )}
                     </div>
-
-                    {/* Quantity */}
                     <div className="col-span-4 md:col-span-2">
                       <FormField
                         control={form.control}
@@ -582,8 +625,6 @@ export default function QuotationForm({
                         )}
                       />
                     </div>
-
-                    {/* Price */}
                     <div className="col-span-4 md:col-span-2">
                       <FormField
                         control={form.control}
@@ -600,8 +641,6 @@ export default function QuotationForm({
                         )}
                       />
                     </div>
-
-                    {/* Discount */}
                     <div className="col-span-4 md:col-span-2">
                       <FormField
                         control={form.control}
@@ -616,8 +655,6 @@ export default function QuotationForm({
                         )}
                       />
                     </div>
-
-                    {/* Delete */}
                     <div className="col-span-12 md:col-span-1 flex items-center justify-center pt-8">
                       <Button
                         type="button"
@@ -636,7 +673,7 @@ export default function QuotationForm({
           </CardContent>
         </Card>
 
-        {/* === SUMMARY & NOTES === */}
+        {/* === SUMMARY & NOTES (Sama seperti sebelumnya) === */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>

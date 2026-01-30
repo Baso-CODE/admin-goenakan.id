@@ -79,6 +79,8 @@ export default function ShipmentManager({
   couriers,
   onUpdate,
 }: ShipmentManagerProps) {
+  console.log("ini adalah data shipments:", shipments);
+
   // === STATE MANAGEMENT ===
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -95,7 +97,7 @@ export default function ShipmentManager({
   const [vendorId, setVendorId] = useState("");
   const [trackingNo, setTrackingNo] = useState("");
 
-  // Field Origin, Destination, CourierLink DIHAPUS dari State (Disederhanakan)
+  // Field Origin, Destination, trackingUrl DIHAPUS dari State (Disederhanakan)
 
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [method, setMethod] = useState("LAND");
@@ -136,7 +138,7 @@ export default function ShipmentManager({
       return;
     }
     setSelectedItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, qty: newQty } : i))
+      prev.map((i) => (i.id === id ? { ...i, qty: newQty } : i)),
     );
   };
 
@@ -165,8 +167,6 @@ export default function ShipmentManager({
         type,
         vendorId,
         trackingNumber: trackingNo,
-        // Courier Link diambil otomatis di backend
-        // Origin & Destination dibuat null (optional)
         method,
         departureDate: date ? date.toISOString() : new Date().toISOString(),
         remarks: remarks || null,
@@ -294,12 +294,12 @@ export default function ShipmentManager({
                           <span className="font-bold text-lg tracking-tight">
                             {ship.trackingNumber || "No Resi"}
                           </span>
-                          {ship.courierLink && (
+                          {ship.vendor.trackingUrl && (
                             <Link
                               href={
-                                ship.courierLink.startsWith("http")
-                                  ? ship.courierLink
-                                  : `https://${ship.courierLink}`
+                                ship.vendor.trackingUrl.startsWith("http")
+                                  ? ship.vendor.trackingUrl
+                                  : `https://${ship.vendor.trackingUrl}`
                               }
                               target="_blank"
                               className="text-blue-500 hover:text-blue-700 transition-colors p-1 rounded-full hover:bg-blue-50"
@@ -495,7 +495,7 @@ export default function ShipmentManager({
                     variant={"outline"}
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !date && "text-muted-foreground"
+                      !date && "text-muted-foreground",
                     )}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {date ? (
@@ -546,10 +546,10 @@ export default function ShipmentManager({
                     {products.map((p) => {
                       const remaining = getRemainingQty(
                         p.productId,
-                        p.quantity
+                        p.quantity,
                       );
                       const isSelected = selectedItems.find(
-                        (i) => i.id === p.id
+                        (i) => i.id === p.id,
                       );
                       if (remaining === 0 && !isSelected) return null;
                       return (
@@ -579,7 +579,7 @@ export default function ShipmentManager({
                                   handleQtyChange(
                                     p.id,
                                     Number(e.target.value),
-                                    remaining
+                                    remaining,
                                   )
                                 }
                               />
@@ -629,7 +629,7 @@ export default function ShipmentManager({
                     variant={"outline"}
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !arriveDate && "text-muted-foreground"
+                      !arriveDate && "text-muted-foreground",
                     )}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {arriveDate ? (

@@ -188,9 +188,8 @@ export default function SidebarRole({ ...props }) {
         url: "#",
         icon: LayoutTemplate,
         items: [
-          { title: "Landing Page", url: "/super-admin/content/landing-page" },
-          { title: "Hero Images", url: "/super-admin/content/hero" },
-          { title: "Banner Pop-Up", url: "/super-admin/content/popup" },
+          { title: "Hero Images", url: "/super-admin/content/heros" },
+          { title: "Banner Pop-Up", url: "/super-admin/content/banner-popup" },
           {
             title: "Testimonials & Photos",
             url: "/super-admin/content/testimonials",
