@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { format } from "date-fns";
 import {
   CalendarClock,
   CalendarIcon,
@@ -349,7 +350,8 @@ export default function PopupBannerForm({
                                     !field.value && "text-muted-foreground",
                                   )}>
                                   {field.value ? (
-                                    (new Date(field.value), "PPP")
+                                    // PERBAIKAN DI SINI: Gunakan fungsi format()
+                                    format(new Date(field.value), "PPP")
                                   ) : (
                                     <span>Pick a date</span>
                                   )}
@@ -372,8 +374,8 @@ export default function PopupBannerForm({
                                     date ? date.toISOString() : "",
                                   );
                                 }}
-                                disabled={
-                                  (date) => date < new Date("1900-01-01") // Optional: Disable tanggal lampau
+                                disabled={(date) =>
+                                  date < new Date("1900-01-01")
                                 }
                                 initialFocus
                               />
@@ -402,7 +404,8 @@ export default function PopupBannerForm({
                                     !field.value && "text-muted-foreground",
                                   )}>
                                   {field.value ? (
-                                    (new Date(field.value), "PPP")
+                                    // PERBAIKAN DI SINI JUGA
+                                    format(new Date(field.value), "PPP")
                                   ) : (
                                     <span>Pick a date</span>
                                   )}
@@ -426,7 +429,6 @@ export default function PopupBannerForm({
                                   );
                                 }}
                                 disabled={(date) =>
-                                  // Optional: Disable tanggal sebelum Start Date
                                   form.getValues("startDate")
                                     ? date <
                                       new Date(form.getValues("startDate")!)

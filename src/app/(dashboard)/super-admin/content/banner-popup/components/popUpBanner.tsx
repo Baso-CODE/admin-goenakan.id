@@ -209,10 +209,8 @@ export default function PopupBannerTable() {
             <Table className="min-w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[180px]">Previews</TableHead>
-                  <TableHead className="min-w-[200px]">
-                    Title & Schedule
-                  </TableHead>
+                  <TableHead className="w-45">Previews</TableHead>
+                  <TableHead className="min-w-50">Title & Schedule</TableHead>
                   <TableHead>Link</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
@@ -316,7 +314,7 @@ export default function PopupBannerTable() {
                       </TableCell>
 
                       {/* Link */}
-                      <TableCell className="max-w-[150px]">
+                      <TableCell className="max-w-37.5">
                         {banner.linkUrl ? (
                           <a
                             href={banner.linkUrl}
@@ -351,7 +349,7 @@ export default function PopupBannerTable() {
                       {/* Actions */}
                       <TableCell className="text-right space-x-2 whitespace-nowrap">
                         <Link
-                          href={`/super-admin/content/popup-banner/edit/${banner.id}`}>
+                          href={`/super-admin/content/banner-popup/edit/${banner.id}`}>
                           <Button
                             variant="outline"
                             size="sm"
