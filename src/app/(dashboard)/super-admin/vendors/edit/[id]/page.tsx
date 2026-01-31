@@ -17,6 +17,8 @@ export default function EditVendorPage() {
     { id: string; name: string }[]
   >([]);
 
+  console.log("ini adlah date existing items edit page", existingItems);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -116,7 +118,7 @@ export default function EditVendorPage() {
     } catch (err) {
       console.error("❌ Error updating vendor:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to update vendor"
+        err instanceof Error ? err.message : "Failed to update vendor",
       );
     } finally {
       setIsSubmitting(false);
@@ -131,7 +133,7 @@ export default function EditVendorPage() {
       {!isLoading && vendorData ? (
         <VendorForm
           initialData={vendorData}
-          existingItems={existingItems} // ✅ KIRIM DATA ITEM KE FORM
+          existingItems={existingItems}
           onSubmit={handleUpdateVendor}
           isLoading={isLoading}
           isSubmitting={isSubmitting}

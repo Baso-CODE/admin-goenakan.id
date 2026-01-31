@@ -4,12 +4,15 @@ import { apiUrl } from "@/helper/apiurl";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import VendorForm, { VendorFormValues } from "../components/VendorForm";
+
+import AddVendorForm, {
+  AddVendorFormValues,
+} from "../components/vendorFormAdd";
 
 export default function AddVendorPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
-  const handleAddVendor = async (data: VendorFormValues) => {
+  const handleAddVendor = async (data: AddVendorFormValues) => {
     setIsSubmitting(true);
     try {
       const tokenRes = await fetch("/api/auth/token");
@@ -58,7 +61,7 @@ export default function AddVendorPage() {
       <h2 className="text-xl font-semibold tracking-tight uppercase">
         Add Vendor
       </h2>
-      <VendorForm onSubmit={handleAddVendor} isSubmitting={isSubmitting} />
+      <AddVendorForm onSubmit={handleAddVendor} isSubmitting={isSubmitting} />
     </div>
   );
 }

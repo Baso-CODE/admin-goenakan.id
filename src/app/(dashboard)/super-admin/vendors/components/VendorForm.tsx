@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -89,7 +89,7 @@ export default function VendorForm({
   onSubmit,
   isLoading = false,
   isSubmitting = false,
-  existingItems = [], // Data Existing dari Parent (Edit Page)
+  existingItems = [],
 }: {
   initialData?: VendorFormValues;
   onSubmit: (data: VendorFormValues) => void;
@@ -102,11 +102,14 @@ export default function VendorForm({
     { id: "PRODUCT", name: "Product" },
   ]);
 
+  const [hasCategoryChanged, setHasCategoryChanged] = useState(false);
+  const isFormReady = useRef(false);
+
   const [contactPlatforms, setContactPlatforms] = useState<any[]>([]);
   const [vendorCategories, setVendorCategories] = useState<any[]>([]);
 
-  // State Items dari API (Untuk Dropdown Pilihan Baru)
-  const [vendorItems, setVendorItems] = useState<
+  // 1. UBAH STATE INI HANYA UNTUK DATA MENTAH DARI API
+  const [apiVendorItems, setApiVendorItems] = useState<
     { id: string; name: string; categoryId: string }[]
   >([]);
 
@@ -115,10 +118,12 @@ export default function VendorForm({
 
   // === FORM INIT ===
   const form = useForm<VendorFormValues>({
+    // ... config form sama ...
     resolver: zodResolver(
-      initialData ? updateVendorSchema : createVendorSchema
+      initialData ? updateVendorSchema : createVendorSchema,
     ),
     defaultValues: initialData || {
+      // ... defaults ...
       companyName: "",
       picName: "",
       country: "",
@@ -138,13 +143,57 @@ export default function VendorForm({
     },
   });
 
+  // === 2. USE MEMO UNTUK MERGE DATA (SOLUSI INTI) ===
+  // Ini akan otomatis jalan setiap kali apiVendorItems (fetch selesai)
+  // ATAU existingItems (data parent masuk) berubah.
+  const allVendorItems = useMemo(() => {
+    // Mulai dengan data dari API
+    const combined = [...apiVendorItems];
+
+    // Masukkan item existing jika belum ada di data API
+    existingItems.forEach((existing) => {
+      const exists = combined.some((apiItem) => apiItem.id === existing.id);
+
+      if (!exists) {
+        combined.push({
+          id: existing.id,
+          name: existing.name,
+          // Hack: Kita set categoryId sama dengan initial data
+          // Supaya saat pertama load, item ini lolos filter kategori
+          categoryId: initialData?.categoryId || "mixed",
+        });
+      }
+    });
+
+    return combined;
+  }, [apiVendorItems, existingItems, initialData]);
+
+  // === 3. GUNAKAN DATA HASIL MERGE (allVendorItems) KE HOOK ===
   const { filteredCategories, filteredItems } = useVendorFormFilter({
     form,
     vendorCategories,
-    vendorItems,
+    vendorItems: allVendorItems, // Kirim yang sudah dimerge
   });
 
-  // === API CALLS ===
+  const currentCategoryId = form.watch("categoryId");
+
+  // Logic deteksi perubahan kategori (Tetap sama)
+  useEffect(() => {
+    if (!initialData) {
+      setHasCategoryChanged(true);
+      return;
+    }
+    if (!isFormReady.current) {
+      isFormReady.current = true;
+      return;
+    }
+    if (initialData && currentCategoryId !== initialData.categoryId) {
+      setHasCategoryChanged(true);
+    }
+  }, [currentCategoryId, initialData]);
+
+  // === 4. API CALLS (HAPUS dependency existingItems) ===
+  // Fetch hanya sekali saat mount. Tidak perlu fetch ulang saat existingItems berubah.
   useEffect(() => {
     const fetchDependencies = async () => {
       try {
@@ -152,7 +201,6 @@ export default function VendorForm({
         const { token } = await tokenRes.json();
         const headers = { Authorization: `Bearer ${token}` };
 
-        // Parallel Fetch
         const [platformsRes, catsRes, itemsRes] = await Promise.all([
           fetch(`${apiUrl}/contact-platforms/active`, { headers }),
           fetch(`${apiUrl}/vendor-categories/active`, { headers }),
@@ -161,15 +209,20 @@ export default function VendorForm({
 
         if (platformsRes.ok) setContactPlatforms(await platformsRes.json());
         if (catsRes.ok) setVendorCategories(await catsRes.json());
-        if (itemsRes.ok) setVendorItems(await itemsRes.json());
+
+        if (itemsRes.ok) {
+          // HANYA SIMPAN DATA API MURNI DI SINI
+          setApiVendorItems(await itemsRes.json());
+        }
       } catch (error) {
         console.error("Failed loading form dependencies");
       }
     };
     fetchDependencies();
-  }, []);
+  }, []); // Empty dependency array = run once
 
   const handleSubmit = (values: VendorFormValues) => {
+    // ... submit logic ...
     const payload = {
       ...values,
       contacts: [
@@ -179,6 +232,10 @@ export default function VendorForm({
     onSubmit(payload);
   };
 
+  // 5. PILIH ITEM YANG DITAMPILKAN
+  // Gunakan allVendorItems (hasil merge) jika belum ada perubahan kategori
+  const itemsToDisplay =
+    initialData && !hasCategoryChanged ? allVendorItems : filteredItems;
   return (
     <Card>
       {isLoading && (
@@ -341,6 +398,7 @@ export default function VendorForm({
                     <Select
                       onValueChange={field.onChange}
                       value={field.value}
+                      // Disable loading logic jika perlu
                       disabled={!form.watch("type") || loadingCategories}>
                       <FormControl>
                         <SelectTrigger>
@@ -348,6 +406,7 @@ export default function VendorForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        {/* Gunakan filteredCategories agar Dropdown Kategori tetap rapi sesuai Type */}
                         {filteredCategories.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.name}
@@ -360,15 +419,20 @@ export default function VendorForm({
                 )}
               />
 
-              {/* ✅ VENDOR ITEMS (LOGIKA LANGSUNG - PASTI MUNCUL) */}
+              {/* === VENDOR ITEMS === */}
               <FormField
                 control={form.control}
                 name="itemIds"
                 render={({ field }) => (
-                  <FormItem className="">
+                  <FormItem>
                     <FormLabel className="flex items-center gap-2">
                       <PackageSearch className="h-4 w-4 text-muted-foreground" />
                       Vendor Items
+                      {!hasCategoryChanged && initialData && (
+                        <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">
+                          All Categories Shown
+                        </span>
+                      )}
                     </FormLabel>
                     <Popover
                       open={isComboboxOpen}
@@ -387,15 +451,16 @@ export default function VendorForm({
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0">
+                      <PopoverContent className="w-100 p-0">
                         <Command>
                           <CommandInput placeholder="Cari item..." />
                           <CommandList>
                             <CommandEmpty>Item tidak ditemukan.</CommandEmpty>
                             <CommandGroup>
-                              {filteredItems.map((item) => {
+                              {/* RENDER ITEMS */}
+                              {itemsToDisplay.map((item) => {
                                 const isSelected = (field.value ?? []).includes(
-                                  item.id
+                                  item.id,
                                 );
                                 return (
                                   <CommandItem
@@ -411,10 +476,20 @@ export default function VendorForm({
                                     <Check
                                       className={cn(
                                         "mr-2 h-4 w-4",
-                                        isSelected ? "opacity-100" : "opacity-0"
+                                        isSelected
+                                          ? "opacity-100"
+                                          : "opacity-0",
                                       )}
                                     />
-                                    {item.name}
+                                    <div className="flex flex-col">
+                                      <span>{item.name}</span>
+                                      {/* Optional: Tampilkan badge kecil jika item ini dari kategori lain */}
+                                      {item.categoryId === "mixed" && (
+                                        <span className="text-[10px] text-muted-foreground">
+                                          Existing Item
+                                        </span>
+                                      )}
+                                    </div>
                                   </CommandItem>
                                 );
                               })}
@@ -424,39 +499,27 @@ export default function VendorForm({
                       </PopoverContent>
                     </Popover>
 
-                    {/* ✅ BAGIAN PENTING: MENAMPILKAN ITEM YANG TERPILIH */}
+                    {/* BADGE LIST */}
                     <div className="flex flex-wrap gap-2 mt-2">
                       {(field.value ?? []).map((selectedId) => {
-                        // 1. Coba cari di Existing Data (Data bawaan halaman edit - PASTI VALID)
-                        let item = existingItems.find(
-                          (i) => i.id === selectedId
+                        // Cari item di allVendorItems (karena sudahimerge, pasti ada di sini)
+                        let item = allVendorItems.find(
+                          (i) => i.id === selectedId,
                         );
 
-                        // 2. Jika tidak ada di Existing, cari di API Vendor Items
-                        if (!item) {
-                          item = vendorItems.find((i) => i.id === selectedId);
-                        }
-
-                        // 3. Render
                         return (
                           <Badge
                             key={selectedId}
                             variant={item ? "secondary" : "outline"}
-                            className={cn(
-                              "cursor-pointer hover:bg-red-100 hover:text-red-600 gap-1 pl-2 pr-1",
-                              !item && "border-dashed text-muted-foreground" // Styling kalau loading
-                            )}
+                            className="cursor-pointer hover:bg-red-100 hover:text-red-600 gap-1 pl-2 pr-1"
                             onClick={() => {
                               const next = (field.value ?? []).filter(
-                                (v) => v !== selectedId
+                                (v) => v !== selectedId,
                               );
                               field.onChange(next);
                             }}>
-                            {/* Tampilkan Nama jika ada, jika tidak tampilkan Loading... */}
-                            {item ? item.name : <span>Loading Item...</span>}
-                            <span className="ml-1 text-[10px] font-bold">
-                              ✕
-                            </span>
+                            {item ? item.name : "Loading..."}
+                            <span className="text-[10px] font-bold">✕</span>
                           </Badge>
                         );
                       })}
