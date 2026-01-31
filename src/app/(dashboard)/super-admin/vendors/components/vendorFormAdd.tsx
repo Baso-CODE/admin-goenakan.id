@@ -125,7 +125,7 @@ export default function AddVendorForm({
   });
 
   const { filteredCategories, filteredItems } = useVendorFormFilter({
-    form,
+    form: form as any,
     vendorCategories,
     vendorItems,
   });
