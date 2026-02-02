@@ -51,11 +51,8 @@ const faqItemSchema = z.object({
   categoryId: z.string().min(1, {
     message: "Please select a category.",
   }),
-  // z.coerce handling number input
-  displayOrder: z.coerce
-    .number()
-    .min(0, "Order must be 0 or greater")
-    .default(0),
+
+  displayOrder: z.number().min(0, "Order must be 0 or greater").default(0),
   isFeatured: z.boolean().default(false),
   isActive: z.boolean().default(true),
 });
@@ -190,7 +187,7 @@ export default function FaqItemForm({
                       <FormControl>
                         <Textarea
                           placeholder="Type the answer here..."
-                          className="min-h-[120px] resize-y"
+                          className="min-h-30 resize-y"
                           {...field}
                           value={field.value ?? ""}
                           disabled={isLoading || isSubmitting}
@@ -280,7 +277,7 @@ export default function FaqItemForm({
                   control={form.control}
                   name="isFeatured"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-center gap-3 p-3 border rounded-lg w-full h-[50px]">
+                    <FormItem className="flex flex-row items-center gap-3 p-3 border rounded-lg w-full h-12.5">
                       <FormControl>
                         <Checkbox
                           checked={field.value}
@@ -308,7 +305,7 @@ export default function FaqItemForm({
                   control={form.control}
                   name="isActive"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-center gap-3 p-3 border rounded-lg w-full h-[50px]">
+                    <FormItem className="flex flex-row items-center gap-3 p-3 border rounded-lg w-full h-12.5">
                       <FormControl>
                         <Checkbox
                           checked={field.value}
