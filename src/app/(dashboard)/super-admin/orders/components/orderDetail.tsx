@@ -157,12 +157,54 @@ export default function OrderDetail() {
 
   // === NOTES STATES ===
   const [noteCategories, setNoteCategories] = useState<any[]>([]);
-  console.log("note categories", noteCategories);
 
-  const [selectedNoteTemplate, setSelectedNoteTemplate] = useState<string>("");
   const [invoiceNotes, setInvoiceNotes] = useState<
-    { categoryId: string; content: string }[]
+    { categoryId: string; contents: string[] }[]
   >([]);
+  const toggleNoteTemplate = (categoryId: string, templateContent: string) => {
+    setInvoiceNotes((prev) => {
+      const existingCat = prev.find((n) => n.categoryId === categoryId);
+
+      if (existingCat) {
+        // Jika kategori sudah ada, kita cek apakah konten sudah terpilih?
+        const contentExists = existingCat.contents.includes(templateContent);
+
+        let newContents;
+        if (contentExists) {
+          // Kalau sudah ada, hapus (Uncheck)
+          newContents = existingCat.contents.filter(
+            (c) => c !== templateContent,
+          );
+        } else {
+          // Kalau belum ada, tambahkan (Check)
+          newContents = [...existingCat.contents, templateContent];
+        }
+
+        // Jika array kosong, hapus kategori dari state agar bersih
+        if (newContents.length === 0) {
+          return prev.filter((n) => n.categoryId !== categoryId);
+        }
+
+        // Update state
+        return prev.map((n) =>
+          n.categoryId === categoryId ? { ...n, contents: newContents } : n,
+        );
+      } else {
+        // Jika kategori belum ada, buat baru
+        return [...prev, { categoryId, contents: [templateContent] }];
+      }
+    });
+  };
+
+  const [manualInputs, setManualInputs] = useState<Record<string, string>>({});
+
+  const addManualNote = (categoryId: string) => {
+    const text = manualInputs[categoryId];
+    if (!text || text.trim() === "") return;
+
+    toggleNoteTemplate(categoryId, text);
+    setManualInputs((prev) => ({ ...prev, [categoryId]: "" }));
+  };
 
   // === FETCH ORDER ===
   const loadOrder = async () => {
@@ -260,15 +302,15 @@ export default function OrderDetail() {
   const updateItemQty = (productId: string, newQty: number) => {
     setSelectedItems((prev) =>
       prev.map((item) =>
-        item.productId === productId ? { ...item, quantity: newQty } : item
-      )
+        item.productId === productId ? { ...item, quantity: newQty } : item,
+      ),
     );
   };
 
   // Hitung total dari item yang dipilih (untuk Split Mode)
   const splitTotalAmount = selectedItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
-    0
+    0,
   );
 
   const handleCreateInvoice = async () => {
@@ -293,9 +335,6 @@ export default function OrderDetail() {
           productId: item.productId,
           quantity: item.quantity,
         }));
-        // Category biasanya Full Payment per item (atau custom)
-        // Disini kita set FULL_PAYMENT context item tersebut, atau INSTALLMENT jika parsial?
-        // Sederhananya, jika split, backend akan hitung harga item * qty.
       } else {
         // Logic Standard (DP / Full Global)
         if (invoiceCategory === "DP") {
@@ -317,7 +356,12 @@ export default function OrderDetail() {
         dpPercentage: finalDpPercentage,
         customAmount: finalCustomAmount,
         selectedItems: payloadSelectedItems,
-        notes: invoiceNotes.filter((n) => n.content.trim() !== ""),
+        notes: invoiceNotes
+          .filter((n) => n.contents.length > 0)
+          .map((n) => ({
+            categoryId: n.categoryId,
+            contents: n.contents,
+          })),
       };
 
       const res = await fetch(`${apiUrl}/invoices`, {
@@ -350,22 +394,21 @@ export default function OrderDetail() {
     }
   };
 
-  const handleNoteChange = (categoryId: string, content: string) => {
-    setInvoiceNotes((prev) => {
-      const existing = prev.find((n) => n.categoryId === categoryId);
-      if (existing) {
-        // Jika konten kosong, hapus dari state (opsional, tergantung UX)
-        if (!content.trim())
-          return prev.filter((n) => n.categoryId !== categoryId);
-        // Update konten
-        return prev.map((n) =>
-          n.categoryId === categoryId ? { ...n, content } : n
-        );
-      }
-      // Tambah baru
-      return [...prev, { categoryId, content }];
-    });
-  };
+  // const handleNoteChange = (categoryId: string, content: string) => {
+  //   setInvoiceNotes((prev) => {
+  //     const existing = prev.find((n) => n.categoryId === categoryId);
+  //     if (existing) {
+  //       if (!content.trim())
+  //         return prev.filter((n) => n.categoryId !== categoryId);
+
+  //       return prev.map((n) =>
+  //         n.categoryId === categoryId ? { ...n, content } : n,
+  //       );
+  //     }
+
+  //     return [...prev, { categoryId, content }];
+  //   });
+  // };
   if (loading) return <DetailPageSkeleton />;
 
   if (!order) {
@@ -550,8 +593,8 @@ export default function OrderDetail() {
                               inv.status === "PAID"
                                 ? "default"
                                 : inv.status === "UNPAID"
-                                ? "secondary"
-                                : "destructive"
+                                  ? "secondary"
+                                  : "destructive"
                             }>
                             {inv.status}
                           </Badge>
@@ -850,7 +893,7 @@ export default function OrderDetail() {
 
       {/* --- [NEW] SMART INVOICE DIALOG --- */}
       <Dialog open={invoiceDialogOpen} onOpenChange={setInvoiceDialogOpen}>
-        <DialogContent className="sm:max-w-150">
+        <DialogContent className="sm:max-w-160">
           <DialogHeader>
             <DialogTitle>Generate Invoice</DialogTitle>
             <DialogDescription>
@@ -964,7 +1007,7 @@ export default function OrderDetail() {
                         <p className="text-xs text-muted-foreground">
                           Nominal:{" "}
                           {formatCurrency(
-                            (totalOrderAmount * invoiceDPPercent) / 100
+                            (totalOrderAmount * invoiceDPPercent) / 100,
                           )}
                         </p>
                       </div>
@@ -1015,7 +1058,7 @@ export default function OrderDetail() {
                       {order.products
                         .filter(
                           (item) =>
-                            (item.remainingQuantity || item.quantity) > 0
+                            (item.remainingQuantity || item.quantity) > 0,
                         )
                         .map((item) => {
                           // Hitung Max Qty yang bisa dipilih (Sisa tagihan)
@@ -1027,11 +1070,11 @@ export default function OrderDetail() {
 
                           const isSelected = selectedItems.some(
                             (sel) =>
-                              sel.productId === (item.productId || item.id)
+                              sel.productId === (item.productId || item.id),
                           );
                           const selectedData = selectedItems.find(
                             (sel) =>
-                              sel.productId === (item.productId || item.id)
+                              sel.productId === (item.productId || item.id),
                           );
 
                           return (
@@ -1057,8 +1100,8 @@ export default function OrderDetail() {
                                         prev.filter(
                                           (i) =>
                                             i.productId !==
-                                            (item.productId || item.id)
-                                        )
+                                            (item.productId || item.id),
+                                        ),
                                       );
                                     }
                                   }}
@@ -1096,7 +1139,7 @@ export default function OrderDetail() {
 
                                       updateItemQty(
                                         item.productId || item.id,
-                                        val
+                                        val,
                                       );
                                     }}
                                   />
@@ -1112,7 +1155,7 @@ export default function OrderDetail() {
 
                       {/* Empty State jika semua sudah lunas */}
                       {order.products.every(
-                        (p) => (p.remainingQuantity || 0) <= 0
+                        (p) => (p.remainingQuantity || 0) <= 0,
                       ) && (
                         <TableRow>
                           <TableCell
@@ -1137,64 +1180,111 @@ export default function OrderDetail() {
               </div>
             )}
 
-            {/* --- SECTION: INVOICE NOTES --- */}
+            {/* --- SECTION: INVOICE NOTES (MULTI SELECT) --- */}
             <div className="space-y-4 pt-4 border-t">
               <Label className="text-base font-semibold">
                 Catatan Invoice (Opsional)
               </Label>
-              <div className="grid gap-4 max-h-75 overflow-y-auto pr-2">
-                {noteCategories.map((cat) => (
-                  <div
-                    key={cat.id}
-                    className="space-y-2 bg-gray-50 p-3 rounded-md border">
-                    <div className="flex justify-between items-center">
-                      <Label className="text-sm font-medium text-gray-700">
+              <div className="grid gap-4 max-h-96 overflow-y-auto pr-2">
+                {noteCategories.map((cat) => {
+                  // Ambil data catatan yang sudah terpilih untuk kategori ini
+                  const selectedNotes =
+                    invoiceNotes.find((n) => n.categoryId === cat.id)
+                      ?.contents || [];
+
+                  return (
+                    <div
+                      key={cat.id}
+                      className="space-y-3 bg-gray-50 p-4 rounded-md border">
+                      <Label className="text-sm font-bold text-gray-800 uppercase tracking-wide">
                         {cat.name}
                       </Label>
-                      {/* Dropdown Template Helper */}
-                      <Select
-                        onValueChange={(val) => {
-                          const selectedTemplate = cat.templates?.find(
-                            (t: any) => t.id === val
-                          );
-                          if (selectedTemplate) {
-                            handleNoteChange(cat.id, selectedTemplate.content);
-                          }
-                        }}>
-                        <SelectTrigger className="h-7 text-xs w-45 bg-white">
-                          <SelectValue placeholder="Pilih Template..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {cat.templates && cat.templates.length > 0 ? (
-                            cat.templates.map((t: any) => (
-                              <SelectItem
-                                key={t.id}
-                                value={t.id}
-                                className="text-xs">
-                                {t.title}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <div className="p-2 text-xs text-muted-foreground">
-                              No templates
-                            </div>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
 
-                    {/* Text Area untuk Edit Manual */}
-                    <textarea
-                      className="flex w-full rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 min-h-20"
-                      placeholder={`Tulis catatan untuk ${cat.name}...`}
-                      value={
-                        invoiceNotes.find((n) => n.categoryId === cat.id)
-                          ?.content || ""
-                      }
-                      onChange={(e) => handleNoteChange(cat.id, e.target.value)}
-                    />
-                  </div>
-                ))}
+                      {/* A. LIST TEMPLATE (CHECKBOXES) */}
+                      <div className="space-y-2 pl-1">
+                        {cat.templates && cat.templates.length > 0 ? (
+                          cat.templates.map((t: any) => {
+                            const isChecked = selectedNotes.includes(t.content);
+                            return (
+                              <div
+                                key={t.id}
+                                className="flex items-start space-x-2">
+                                <Checkbox
+                                  id={`note-${t.id}`}
+                                  checked={isChecked}
+                                  onCheckedChange={() =>
+                                    toggleNoteTemplate(cat.id, t.content)
+                                  }
+                                />
+                                <label
+                                  htmlFor={`note-${t.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer pt-0.5 text-gray-600">
+                                  {t.title}
+                                  <span className="block text-[10px] text-muted-foreground font-normal mt-0.5">
+                                    {t.content.length > 50
+                                      ? t.content.substring(0, 50) + "..."
+                                      : t.content}
+                                  </span>
+                                </label>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic">
+                            Tidak ada template.
+                          </p>
+                        )}
+                      </div>
+
+                      {/* B. CUSTOM MANUAL INPUT */}
+                      <div className="flex gap-2 pt-2 border-t mt-2">
+                        <Input
+                          placeholder="Tulis catatan manual..."
+                          className="h-8 text-xs bg-white"
+                          value={manualInputs[cat.id] || ""}
+                          onChange={(e) =>
+                            setManualInputs({
+                              ...manualInputs,
+                              [cat.id]: e.target.value,
+                            })
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addManualNote(cat.id);
+                            }
+                          }}
+                        />
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                          onClick={() => addManualNote(cat.id)}
+                          type="button">
+                          Add
+                        </Button>
+                      </div>
+
+                      {/* C. PREVIEW CHIPS (Yang sudah dipilih) */}
+                      {selectedNotes.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {selectedNotes.map((note, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-white border text-xs px-2 py-1 rounded-md flex items-center gap-2 shadow-sm">
+                              <span className="truncate max-w-50">{note}</span>
+                              <button
+                                onClick={() => toggleNoteTemplate(cat.id, note)}
+                                className="text-red-500 hover:text-red-700">
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

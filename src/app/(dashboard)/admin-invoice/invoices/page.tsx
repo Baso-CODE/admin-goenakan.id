@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
-import { Eye, FileText, Filter, Search } from "lucide-react";
+import { Eye, FileText, Filter, NotebookPen, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -153,12 +153,22 @@ export default function InvoicesPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+            {/* === TOMBOL MENUJU PAGE NOTES === */}
+            <Link href="/admin-invoice/notes">
+              <Button
+                variant="outline"
+                className="gap-2 border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 hover:text-orange-800 w-full sm:w-auto cursor-pointer">
+                <NotebookPen className="h-4 w-4" />
+                Manage Notes
+              </Button>
+            </Link>
+
             {/* Search Bar */}
-            <div className="relative w-full md:w-70">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Cari No Invoice / Client / PO..."
+                placeholder="Cari No Invoice / Client..."
                 className="pl-9"
                 value={search}
                 onChange={(e) => {

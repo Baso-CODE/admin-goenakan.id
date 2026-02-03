@@ -79,6 +79,7 @@ export default function SidebarRole({ ...props }) {
           { title: "Invoices", url: "/admin-invoice/invoices" },
           { title: "Cashflow", url: "/super-admin/cashflow" },
           { title: "Payments", url: "/admin-invoice/payments" },
+          { title: "Currency", url: "/admin-invoice/currency" },
         ],
       },
       {
