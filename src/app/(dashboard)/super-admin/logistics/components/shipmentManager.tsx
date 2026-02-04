@@ -3,29 +3,27 @@
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import {
-  CalendarIcon, // Icon baru untuk Date Picker
+  CalendarIcon,
   CheckCircle,
   ExternalLink,
   FileText,
-  MapPin,
   MessageSquare,
   Plus,
   Truck,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-// Import Calendar & Popover
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-
 import {
   Card,
   CardContent,
@@ -44,6 +42,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -60,7 +64,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiUrl } from "@/helper/apiurl";
-import { cn } from "@/lib/utils"; // Pastikan Anda punya utilitas cn
+import { cn } from "@/lib/utils";
+
+// --- TIPE DATA NOTES ---
+type NoteCategory = {
+  id: string;
+  name: string;
+  templates: { title: string; content: string }[];
+};
+
+type NoteSelection = {
+  categoryId: string;
+  contents: string[];
+};
 
 interface ShipmentManagerProps {
   type: "INBOUND" | "OUTBOUND";
@@ -79,32 +95,57 @@ export default function ShipmentManager({
   couriers,
   onUpdate,
 }: ShipmentManagerProps) {
-  console.log("ini adalah data shipments:", shipments);
-
   // === STATE MANAGEMENT ===
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Master Data Categories
+  const [noteCategories, setNoteCategories] = useState<NoteCategory[]>([]);
 
   // State untuk Mark Arrived
   const [confirmArriveId, setConfirmArriveId] = useState<string | null>(null);
   const [arriving, setArriving] = useState(false);
 
-  // Date Picker State (Gunakan Date object, bukan string)
+  // Date Picker State
   const [arriveDate, setArriveDate] = useState<Date | undefined>(new Date());
-  const [arriveRemarks, setArriveRemarks] = useState("");
 
   // Form States (Create Shipment)
   const [vendorId, setVendorId] = useState("");
   const [trackingNo, setTrackingNo] = useState("");
-
-  // Field Origin, Destination, trackingUrl DIHAPUS dari State (Disederhanakan)
-
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [method, setMethod] = useState("LAND");
-  const [remarks, setRemarks] = useState("");
   const [selectedItems, setSelectedItems] = useState<
     { id: string; qty: number }[]
   >([]);
+
+  // --- STATE NOTES (Multi-Select) ---
+  // Kita simpan sebagai Record: { "cat_id": ["content1", "content2"] }
+  const [selectedNotes, setSelectedNotes] = useState<Record<string, string[]>>(
+    {},
+  );
+
+  // === FETCH CATEGORIES ===
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const tokenRes = await fetch("/api/auth/token");
+        const { token } = await tokenRes.json();
+        const res = await fetch(`${apiUrl}/shipment-notes-categories`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setNoteCategories(data);
+        }
+      } catch (error) {
+        console.error("Gagal load categories", error);
+      }
+    };
+
+    if (isOpen || confirmArriveId) {
+      fetchCategories();
+    }
+  }, [isOpen, confirmArriveId]); // Load saat dialog dibuka
 
   // === HELPER FUNCTIONS ===
   const getRemainingQty = (productId: string, totalOrderQty: number) => {
@@ -142,6 +183,37 @@ export default function ShipmentManager({
     );
   };
 
+  // --- LOGIC HANDLE NOTES SELECTION ---
+  const handleToggleNote = (categoryId: string, content: string) => {
+    setSelectedNotes((prev) => {
+      const currentContents = prev[categoryId] || [];
+      const exists = currentContents.includes(content);
+
+      let newContents;
+      if (exists) {
+        newContents = currentContents.filter((c) => c !== content);
+      } else {
+        newContents = [...currentContents, content];
+      }
+
+      // Jika kosong hapus key-nya, jika ada update
+      if (newContents.length === 0) {
+        const { [categoryId]: _, ...rest } = prev;
+        return rest;
+      }
+
+      return { ...prev, [categoryId]: newContents };
+    });
+  };
+
+  // Helper convert state record ke DTO array
+  const getNotesPayload = () => {
+    return Object.entries(selectedNotes).map(([categoryId, contents]) => ({
+      categoryId,
+      contents,
+    }));
+  };
+
   // === API ACTIONS ===
   const handleSubmit = async () => {
     if (selectedItems.length === 0) {
@@ -169,11 +241,12 @@ export default function ShipmentManager({
         trackingNumber: trackingNo,
         method,
         departureDate: date ? date.toISOString() : new Date().toISOString(),
-        remarks: remarks || null,
         items: selectedItems.map((i) => ({
           orderProductId: i.id,
           quantity: Number(i.qty),
         })),
+        // PAYLOAD NOTES BARU
+        notes: getNotesPayload(),
       };
 
       const res = await fetch(`${apiUrl}/logistics/shipments`, {
@@ -195,7 +268,7 @@ export default function ShipmentManager({
       setSelectedItems([]);
       setVendorId("");
       setTrackingNo("");
-      setRemarks("");
+      setSelectedNotes({}); // Reset notes
       setDate(new Date());
     } catch (e) {
       toast.error("Gagal membuat pengiriman");
@@ -221,7 +294,8 @@ export default function ShipmentManager({
           arrivalDate: arriveDate
             ? arriveDate.toISOString()
             : new Date().toISOString(),
-          remarks: arriveRemarks || "Arrived confirmed by Admin",
+          // PAYLOAD NOTES BARU
+          notes: getNotesPayload(),
         }),
       });
 
@@ -230,7 +304,7 @@ export default function ShipmentManager({
 
       // Close & Reset
       setConfirmArriveId(null);
-      setArriveRemarks("");
+      setSelectedNotes({});
       setArriveDate(new Date());
     } catch (e) {
       toast.error("Failed to update");
@@ -238,6 +312,78 @@ export default function ShipmentManager({
       setArriving(false);
     }
   };
+
+  // --- RENDER COMPONENT NOTES SELECTOR ---
+  const renderNotesSelector = () => (
+    <div className="space-y-3 border rounded-md p-3 bg-slate-50">
+      <div className="flex justify-between items-center">
+        <Label className="text-sm font-semibold text-slate-700">
+          Catatan Pengiriman (Opsional)
+        </Label>
+        <span className="text-[10px] text-muted-foreground">
+          {Object.keys(selectedNotes).length} kategori dipilih
+        </span>
+      </div>
+      <ScrollArea className="h-50 pr-3">
+        {noteCategories.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-4">
+            Belum ada template kategori catatan.
+            <br />
+            Silakan buat di menu Master Data.
+          </p>
+        ) : (
+          <Accordion type="multiple" className="w-full">
+            {noteCategories.map((cat) => (
+              <AccordionItem key={cat.id} value={cat.id} className="border-b-0">
+                <AccordionTrigger className="py-2 text-sm hover:no-underline hover:bg-slate-100 rounded px-2">
+                  <div className="flex items-center gap-2">
+                    <span>{cat.name}</span>
+                    {(selectedNotes[cat.id]?.length || 0) > 0 && (
+                      <Badge variant="secondary" className="text-[10px] h-5">
+                        {selectedNotes[cat.id].length} dipilih
+                      </Badge>
+                    )}
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-2 pb-2 pl-4">
+                  <div className="grid gap-2">
+                    {(cat.templates || []).map((tpl, idx) => {
+                      const isChecked = (selectedNotes[cat.id] || []).includes(
+                        tpl.content,
+                      );
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-start space-x-2 border p-2 rounded bg-white">
+                          <Checkbox
+                            id={`${cat.id}-${idx}`}
+                            checked={isChecked}
+                            onCheckedChange={() =>
+                              handleToggleNote(cat.id, tpl.content)
+                            }
+                          />
+                          <div className="grid gap-1.5 leading-none">
+                            <label
+                              htmlFor={`${cat.id}-${idx}`}
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                              {tpl.title}
+                            </label>
+                            <p className="text-xs text-muted-foreground">
+                              {tpl.content}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        )}
+      </ScrollArea>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -324,15 +470,6 @@ export default function ShipmentManager({
                         <span className="font-medium">
                           {ship.vendor?.companyName || "Unknown Courier"}
                         </span>
-                        {(ship.origin || ship.destination) && (
-                          <>
-                            <span className="text-muted-foreground/30">|</span>
-                            <MapPin className="h-4 w-4" />
-                            <span>{ship.origin || "?"}</span>
-                            <span className="text-muted-foreground/50">➝</span>
-                            <span>{ship.destination || "?"}</span>
-                          </>
-                        )}
                       </div>
                     </div>
 
@@ -359,7 +496,7 @@ export default function ShipmentManager({
                           onClick={() => {
                             setConfirmArriveId(ship.id);
                             setArriveDate(new Date());
-                            setArriveRemarks("");
+                            setSelectedNotes({}); // Reset notes saat buka dialog arrive
                           }}>
                           <CheckCircle className="h-3.5 w-3.5" />
                           Mark Arrived
@@ -387,18 +524,38 @@ export default function ShipmentManager({
                       ))}
                     </ul>
 
-                    {ship.remarks && (
+                    {/* --- DISPLAY NOTES --- */}
+                    {ship.notes && ship.notes.length > 0 && (
                       <>
                         <Separator className="my-3 bg-muted-foreground/10" />
-                        <div className="flex gap-2 items-start text-muted-foreground">
-                          <MessageSquare className="h-4 w-4 mt-0.5 shrink-0 text-gray-400" />
-                          <div>
-                            <span className="text-[10px] font-bold uppercase mr-1">
-                              Note:
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <MessageSquare className="h-3.5 w-3.5" />
+                            <span className="text-[10px] font-bold uppercase">
+                              Catatan:
                             </span>
-                            <span className="text-xs italic">
-                              {ship.remarks}
-                            </span>
+                          </div>
+                          <div className="grid gap-2 pl-5">
+                            {/* Group notes by category (Logic rendering sederhana) */}
+                            {Array.from(
+                              new Set(
+                                ship.notes.map((n: any) => n.category?.name),
+                              ),
+                            ).map((catName: any) => (
+                              <div key={catName} className="text-xs">
+                                <span className="font-semibold text-slate-700">
+                                  {catName}:
+                                </span>{" "}
+                                <span className="text-slate-500">
+                                  {ship.notes
+                                    .filter(
+                                      (n: any) => n.category?.name === catName,
+                                    )
+                                    .map((n: any) => n.content)
+                                    .join(", ")}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       </>
@@ -434,14 +591,14 @@ export default function ShipmentManager({
         </CardContent>
       </Card>
 
-      {/* === CREATE DIALOG (SIMPLIFIED) === */}
+      {/* === CREATE DIALOG === */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto flex flex-col">
           <DialogHeader>
             <DialogTitle>Buat Pengiriman Baru ({type})</DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-4 pr-2">
             {/* 1. Vendor Selection */}
             <div className="grid gap-2">
               <Label>Ekspedisi / Vendor</Label>
@@ -486,7 +643,7 @@ export default function ShipmentManager({
               </div>
             </div>
 
-            {/* 4. Date Picker (Shadcn UI) */}
+            {/* 4. Date Picker */}
             <div className="grid gap-2">
               <Label>Tanggal Berangkat</Label>
               <Popover>
@@ -516,18 +673,14 @@ export default function ShipmentManager({
               </Popover>
             </div>
 
-            <div className="grid gap-2">
-              <Label>Catatan (Opsional)</Label>
-              <Input
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder="Catatan tambahan..."
-              />
-            </div>
+            <Separator className="my-1" />
 
-            <Separator className="my-2" />
+            {/* 5. NOTES SELECTOR (REPLACEMENT FOR REMARKS) */}
+            {renderNotesSelector()}
 
-            {/* 5. Items Selection */}
+            <Separator className="my-1" />
+
+            {/* 6. Items Selection */}
             <div>
               <Label className="mb-2 block font-semibold">
                 Pilih Barang untuk Dikirim:
@@ -606,13 +759,13 @@ export default function ShipmentManager({
         </DialogContent>
       </Dialog>
 
-      {/* === MODAL ARRIVED DIALOG (Date Picker Updated) === */}
+      {/* === MODAL ARRIVED DIALOG === */}
       <Dialog
         open={!!confirmArriveId}
         onOpenChange={(open) => {
           if (!open) setConfirmArriveId(null);
         }}>
-        <DialogContent className="sm:max-w-106.25">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Konfirmasi Barang Sampai</DialogTitle>
             <CardDescription>
@@ -650,15 +803,8 @@ export default function ShipmentManager({
               </Popover>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="arriveRemarks">Catatan Tambahan (Opsional)</Label>
-              <Input
-                id="arriveRemarks"
-                placeholder="Contoh: Diterima oleh Satpam"
-                value={arriveRemarks}
-                onChange={(e) => setArriveRemarks(e.target.value)}
-              />
-            </div>
+            {/* NOTES SELECTOR UNTUK ARRIVAL */}
+            {renderNotesSelector()}
           </div>
 
           <DialogFooter>

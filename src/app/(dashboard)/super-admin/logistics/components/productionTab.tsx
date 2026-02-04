@@ -79,7 +79,7 @@ export default function ProductionTab({
   const [selectedVendor, setSelectedVendor] = useState<string>("");
   const [qty, setQty] = useState<number>(0);
   const [date, setDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [activeTrackerId, setActiveTrackerId] = useState<string>(""); // Untuk Complete
 
@@ -148,7 +148,7 @@ export default function ProductionTab({
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(payload),
-        }
+        },
       );
 
       if (!res.ok) throw new Error("Gagal menyelesaikan produksi");
@@ -194,7 +194,6 @@ export default function ProductionTab({
               {products.map((prod) =>
                 prod.productionTrackers &&
                 prod.productionTrackers.length > 0 ? (
-                  // Jika ada history produksi, render baris per history
                   prod.productionTrackers.map((track) => (
                     <TableRow key={track.id}>
                       <TableCell className="font-medium">
@@ -279,7 +278,7 @@ export default function ProductionTab({
                       </Button>
                     </TableCell>
                   </TableRow>
-                )
+                ),
               )}
             </TableBody>
           </Table>

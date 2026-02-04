@@ -90,7 +90,7 @@ export default function SidebarRole({ ...props }) {
           { title: "Tracking Dashboard", url: "/super-admin/logistics" },
           {
             title: "Delivery Notes",
-            url: "/super-admin/logistics/delivery-notes",
+            url: "/super-admin/logistics/shipment-notes",
           },
         ],
       },

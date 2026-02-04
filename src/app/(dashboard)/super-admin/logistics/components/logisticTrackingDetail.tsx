@@ -1,7 +1,12 @@
 "use client";
 
 import { ArrowLeft, Factory, PlaneLanding, PlaneTakeoff } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -18,12 +23,28 @@ export default function LogisticsTrackingDetail() {
   const { orderId } = useParams();
   const router = useRouter();
 
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [order, setOrder] = useState<any>(null);
-  console.log("ini adalah data ordxer", order);
 
   const [vendors, setVendors] = useState<any[]>([]);
   const [couriers, setCouriers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const activeTab = searchParams.get("tab") || "production";
+
+  // 2. FUNGSI GANTI TAB (Update URL tanpa reload)
+  const handleTabChange = (value: string) => {
+    const newParams = new URLSearchParams(searchParams.toString());
+    newParams.set("tab", value);
+
+    router.replace(`${pathname}?${newParams.toString()}`);
+  };
+
+  // 3. FUNGSI UPDATE DATA
+  const handleRefresh = () => {
+    router.refresh();
+  };
 
   // FETCH DATA
   const loadData = async () => {
@@ -93,7 +114,10 @@ export default function LogisticsTrackingDetail() {
       <Separator />
 
       {/* MAIN TABS */}
-      <Tabs defaultValue="production" className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={handleTabChange}
+        className="w-full">
         <TabsList className="grid w-full grid-cols-3 h-12">
           <TabsTrigger value="production" className="flex gap-2">
             <Factory className="h-4 w-4" /> Produksi
@@ -126,7 +150,7 @@ export default function LogisticsTrackingDetail() {
             }
             products={order.products}
             couriers={couriers}
-            onUpdate={loadData}
+            onUpdate={handleRefresh}
           />
         </TabsContent>
 
@@ -140,7 +164,7 @@ export default function LogisticsTrackingDetail() {
             }
             products={order.products}
             couriers={couriers}
-            onUpdate={loadData}
+            onUpdate={handleRefresh}
           />
         </TabsContent>
       </Tabs>
