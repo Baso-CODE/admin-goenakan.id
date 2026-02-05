@@ -100,6 +100,7 @@ export default function SidebarRole({ ...props }) {
         icon: MessageSquareQuote,
         items: [
           { title: "Quotations", url: "/admin-invoice/quotations" },
+          { title: "Quotation Notes", url: "/admin-invoice/quotations/notes" },
           {
             title: "Follow Up Tracking",
             url: "/admin-invoice/follow-up",

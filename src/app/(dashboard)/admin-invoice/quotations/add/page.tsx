@@ -3,14 +3,14 @@
 import { apiUrl } from "@/helper/apiurl";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import QuotationForm, {
-  QuotationFormValues,
-} from "../components/quotationForm";
+import QuotationAddForm, {
+  AddQuotationFormValues,
+} from "../components/quotationFormAdd";
 
 export default function AddQuotationPage() {
   const router = useRouter();
 
-  const handleCreate = async (data: QuotationFormValues) => {
+  const handleCreate = async (data: AddQuotationFormValues) => {
     try {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
@@ -39,7 +39,7 @@ export default function AddQuotationPage() {
       <h1 className="text-2xl font-bold tracking-tight">
         Create New Quotation
       </h1>
-      <QuotationForm onSubmit={handleCreate} isLoading={false} />
+      <QuotationAddForm onSubmit={handleCreate} isLoading={false} />
     </div>
   );
 }

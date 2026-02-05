@@ -1,46 +1,47 @@
 import { QuotationFormValues } from "@/app/(dashboard)/admin-invoice/quotations/components/quotationForm";
 
 export const cleanQuotationPayload = (data: QuotationFormValues) => {
-  // Gunakan 'any' sebentar agar kita bisa men-delete property tanpa error TypeScript
+  // 1. Clone data agar tidak mutasi state form asli
   const payload: any = { ...data };
 
-  // === FIX UTAMA: HAPUS FIELD UI STATE ===
-  // Field ini tidak ada di database, jadi harus dibuang
+  // 2. Buang field UI State yang hanya ada di frontend
   delete payload.isManualClient;
 
-  // LOGIC HYBRID CLIENT
-  // (Menggunakan data asli 'data.isManualClient' untuk pengecekan logic)
+  // 3. Logic Hybrid Client
   if (!data.isManualClient && data.clientId) {
-    payload.manualClientName = undefined;
-    payload.manualClientCompany = undefined;
-    payload.manualClientEmail = undefined;
-    payload.manualClientPhone = undefined;
-    payload.manualClientAddress = undefined;
+    // Jika pakai DB Client, hapus data manual
+    delete payload.manualClientName;
+    delete payload.manualClientCompany;
+    delete payload.manualClientEmail;
+    delete payload.manualClientPhone;
+    delete payload.manualClientAddress;
   } else {
-    payload.clientId = undefined;
+    // Jika manual, pastikan clientId null (untuk Prisma)
+    payload.clientId = null;
   }
 
-  // LOGIC ITEMS
+  // 4. Logic Items
   payload.items = data.items.map((item) => {
-    const cleanItem: any = { ...item };
+    const { isManualProduct, ...cleanItem }: any = { ...item };
 
-    // === FIX ITEM: HAPUS FIELD UI STATE DI ITEM JUGA ===
-    delete cleanItem.isManualProduct;
-
-    if (!item.isManualProduct && item.productId) {
+    if (!isManualProduct && item.productId) {
       // Produk dari DB
     } else {
-      // Produk Manual
-      cleanItem.productId = undefined;
+      // Produk Manual, paksa productId null
+      cleanItem.productId = null;
     }
 
-    // Pastikan angka
+    // Pastikan tipe data benar
     cleanItem.quantity = Number(item.quantity);
     cleanItem.unitPrice = Number(item.unitPrice);
     cleanItem.discount = Number(item.discount || 0);
 
     return cleanItem;
   });
+
+  // 5. Logic Notes
+  // Pastikan notes dikirim. Jika undefined, kirim array kosong agar backend bisa melakukan 'reset' jika perlu.
+  payload.notes = data.notes || [];
 
   return payload;
 };

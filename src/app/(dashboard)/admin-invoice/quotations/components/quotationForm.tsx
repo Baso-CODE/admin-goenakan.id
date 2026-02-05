@@ -2,12 +2,30 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { Box, CalendarIcon, Loader2, Plus, Trash2, User } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  Box,
+  CalendarIcon,
+  FileText,
+  Loader2,
+  Lock,
+  MapPin,
+  Phone,
+  Plus,
+  Trash2,
+  User,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Resolver, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +43,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -37,22 +56,44 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { apiUrl } from "@/helper/apiurl";
 import { cn } from "@/lib/utils";
+import { NoteItem } from "./noteItem";
 
 // === TYPES FOR API DATA ===
-type ClientData = {
+export type PICData = {
   id: string;
   name: string;
-  type: string;
-  address: string;
-  purchaseChannelId: string;
+  phone?: string;
+  email?: string;
+  position?: string;
 };
 
-type ProductData = {
+// 2. Update ClientData Utama
+export type ClientData = {
+  id: string;
+  name: string;
+  type: "B2B" | "B2C" | string;
+  custCode: string;
+  phone: string;
+  address: string;
+  originalAddress?: string;
+  purchaseChannelId: string;
+  pics: PICData[];
+};
+
+export type ProductData = {
   id: string;
   name: string;
   sku: string;
   basePrice: number;
   productVariants: { id: string; variantName: string; price: number }[];
+};
+
+// Tipe Data untuk Kategori Note
+export type NoteCategory = {
+  id: string;
+  name: string;
+  isPublic: boolean;
+  templates: { title: string; content: string }[];
 };
 
 // === CONSTANTS ===
@@ -70,8 +111,6 @@ const QUOTATION_STATUSES = [
 const quotationSchema = z.object({
   date: z.date(),
   validUntil: z.date().optional(),
-
-  // 1. TAMBAHKAN FIELD STATUS DI SINI
   status: z.enum(QUOTATION_STATUSES).default("DRAFT"),
 
   // Logic Hybrid Client
@@ -83,8 +122,14 @@ const quotationSchema = z.object({
   manualClientPhone: z.string().optional(),
   manualClientAddress: z.string().optional(),
 
-  notes: z.string().optional(),
-  internalNotes: z.string().optional(),
+  notes: z
+    .array(
+      z.object({
+        categoryId: z.string(),
+        contents: z.array(z.string()).min(1),
+      }),
+    )
+    .optional(),
 
   // Items
   items: z
@@ -116,8 +161,12 @@ export default function QuotationForm({
   isLoading,
 }: QuotationFormProps) {
   const [clients, setClients] = useState<ClientData[]>([]);
+  console.log("ini adalah data client", clients);
+
   const [products, setProducts] = useState<ProductData[]>([]);
+  const [noteCategories, setNoteCategories] = useState<NoteCategory[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [selectedClient, setSelectedClient] = useState<ClientData | null>(null);
 
   // === FETCH DATA ===
   useEffect(() => {
@@ -127,11 +176,15 @@ export default function QuotationForm({
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const [resClients, resProducts] = await Promise.all([
+        // Fetch Clients, Products, dan Note Categories sekaligus
+        const [resClients, resProducts, resNotes] = await Promise.all([
           fetch(`${apiUrl}/clients/order`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
           fetch(`${apiUrl}/products/order`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${apiUrl}/quotation-notes-categories`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -141,6 +194,7 @@ export default function QuotationForm({
 
         const clientData = await resClients.json();
         const productData = await resProducts.json();
+        const notesData = await resNotes.json();
 
         setClients(
           Array.isArray(clientData) ? clientData : clientData.data || [],
@@ -148,9 +202,10 @@ export default function QuotationForm({
         setProducts(
           Array.isArray(productData) ? productData : productData.data || [],
         );
+        setNoteCategories(Array.isArray(notesData) ? notesData : []);
       } catch (error) {
         console.error("Error loading data:", error);
-        toast.error("Gagal memuat data Client atau Produk");
+        toast.error("Gagal memuat data Master");
       } finally {
         setLoadingData(false);
       }
@@ -159,30 +214,64 @@ export default function QuotationForm({
     fetchData();
   }, []);
 
+  const defaultValues = useMemo(() => {
+    if (!initialData) {
+      return {
+        date: new Date(),
+        status: "DRAFT",
+        isManualClient: false,
+        items: [
+          {
+            isManualProduct: false,
+            productName: "",
+            quantity: 1,
+            unitPrice: 0,
+            discount: 0,
+          },
+        ],
+        notes: [],
+      };
+    }
+
+    // Transform Flat Notes to Grouped Notes
+    const groupedNotes: Record<string, string[]> = {};
+    if (initialData.notes && Array.isArray(initialData.notes)) {
+      initialData.notes.forEach((n: any) => {
+        if (!groupedNotes[n.categoryId]) {
+          groupedNotes[n.categoryId] = [];
+        }
+        groupedNotes[n.categoryId].push(n.content);
+      });
+    }
+
+    const formattedNotes = Object.entries(groupedNotes).map(
+      ([categoryId, contents]) => ({
+        categoryId,
+        contents,
+      }),
+    );
+
+    return {
+      ...initialData,
+      date: initialData.date ? new Date(initialData.date) : new Date(),
+      validUntil: initialData.validUntil
+        ? new Date(initialData.validUntil)
+        : undefined,
+      notes: formattedNotes,
+    };
+  }, [initialData]);
+
   const form = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema) as Resolver<QuotationFormValues>,
-    defaultValues: initialData || {
-      date: new Date(),
-      status: "DRAFT", // 2. SET DEFAULT VALUE
-      isManualClient: false,
-      items: [
-        {
-          isManualProduct: false,
-          productName: "",
-          quantity: 1,
-          unitPrice: 0,
-          discount: 0,
-        },
-      ],
-    },
+    defaultValues: defaultValues,
   });
 
-  // Re-sync jika initialData berubah (untuk Edit Mode)
+  // Re-sync jika initialData berubah (Edit Mode)
   useEffect(() => {
     if (initialData) {
-      form.reset(initialData);
+      form.reset(defaultValues);
     }
-  }, [initialData, form]);
+  }, [initialData, defaultValues, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -217,9 +306,126 @@ export default function QuotationForm({
   };
 
   const handleClientSelect = (clientId: string) => {
-    // Logic auto-fill address if needed
+    const client = clients.find((c) => c.id === clientId);
+    if (client) setSelectedClient(client);
   };
 
+  const handleToggleNote = useCallback(
+    (categoryId: string, content: string) => {
+      const prevNotes = form.getValues("notes") || [];
+      const categoryIndex = prevNotes.findIndex(
+        (n) => n.categoryId === categoryId,
+      );
+      let newNotes = [...prevNotes];
+
+      if (categoryIndex === -1) {
+        newNotes.push({ categoryId, contents: [content] });
+      } else {
+        const contents = [...newNotes[categoryIndex].contents];
+        if (contents.includes(content)) {
+          const filtered = contents.filter((c) => c !== content);
+          if (filtered.length === 0) newNotes.splice(categoryIndex, 1);
+          else
+            newNotes[categoryIndex] = {
+              ...newNotes[categoryIndex],
+              contents: filtered,
+            };
+        } else {
+          newNotes[categoryIndex] = {
+            ...newNotes[categoryIndex],
+            contents: [...contents, content],
+          };
+        }
+      }
+      form.setValue("notes", newNotes, { shouldDirty: true });
+    },
+    [form],
+  );
+
+  // === ISOLATED WATCHERS (PENCEGAH LOOP) ===
+  const NoteBadgeWatcher = ({
+    control,
+    categoryId,
+  }: {
+    control: any;
+    categoryId: string;
+  }) => {
+    const notes = useWatch({ control, name: "notes" }) || [];
+    const count =
+      notes.find((n: any) => n.categoryId === categoryId)?.contents.length || 0;
+    return count > 0 ? (
+      <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+        {count}
+      </Badge>
+    ) : null;
+  };
+
+  const NoteItemWatcher = ({ control, categoryId, content, children }: any) => {
+    const notes = useWatch({ control, name: "notes" }) || [];
+    const isSelected =
+      notes
+        .find((n: any) => n.categoryId === categoryId)
+        ?.contents.includes(content) || false;
+    return children(isSelected);
+  };
+
+  const renderNoteSelector = (isPublic: boolean, title: string, icon: any) => {
+    const filteredCategories = noteCategories.filter(
+      (c) => c.isPublic === isPublic,
+    );
+    return (
+      <Card className={!isPublic ? "bg-slate-50 border-slate-200" : ""}>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            {icon} {title}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea className="h-64 pr-4">
+            <Accordion type="multiple" className="w-full">
+              {filteredCategories.map((cat) => (
+                <AccordionItem
+                  key={cat.id}
+                  value={cat.id}
+                  className="border-b-0 mb-1">
+                  <AccordionTrigger className="py-2 px-3 text-sm hover:no-underline rounded-md border border-transparent data-[state=open]:bg-white">
+                    <div className="flex items-center gap-2">
+                      <span>{cat.name}</span>
+                      <NoteBadgeWatcher
+                        control={form.control}
+                        categoryId={cat.id}
+                      />
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-2 px-3 pb-2 bg-white/50">
+                    <div className="grid gap-2">
+                      {cat.templates?.map((tpl, tplIdx) => (
+                        <NoteItemWatcher
+                          key={`${cat.id}-${tplIdx}`}
+                          control={form.control}
+                          categoryId={cat.id}
+                          content={tpl.content}>
+                          {(isSelected: boolean) => (
+                            <NoteItem
+                              catId={cat.id}
+                              tpl={tpl}
+                              idx={tplIdx}
+                              isSelected={isSelected}
+                              onToggle={handleToggleNote}
+                            />
+                          )}
+                        </NoteItemWatcher>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    );
+  };
   const handleSubmit = (data: QuotationFormValues) => {
     if (!data.isManualClient && !data.clientId) {
       form.setError("clientId", { message: "Please select a client" });
@@ -235,7 +441,7 @@ export default function QuotationForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-        {/* === HEADER & CLIENT === */}
+        {/* ... (HEADER & CLIENT SECTION TETAP SAMA SEPERTI SEBELUMNYA) ... */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-1">
             <CardHeader>
@@ -245,7 +451,6 @@ export default function QuotationForm({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* --- 3. FIELD STATUS --- */}
               <FormField
                 control={form.control}
                 name="status"
@@ -264,7 +469,6 @@ export default function QuotationForm({
                       <SelectContent>
                         {QUOTATION_STATUSES.map((status) => (
                           <SelectItem key={status} value={status}>
-                            {/* Sedikit styling opsional agar lebih terbaca */}
                             <span
                               className={cn(
                                 "font-medium",
@@ -283,10 +487,7 @@ export default function QuotationForm({
                   </FormItem>
                 )}
               />
-
               <Separator />
-
-              {/* Date Fields */}
               <FormField
                 control={form.control}
                 name="date"
@@ -366,7 +567,7 @@ export default function QuotationForm({
             </CardContent>
           </Card>
 
-          {/* Client Selection (Sama seperti sebelumnya) */}
+          {/* Client Selection */}
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -391,125 +592,200 @@ export default function QuotationForm({
                 )}
               />
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {!isManualClient ? (
-                <div className="col-span-2">
-                  <FormField
-                    control={form.control}
-                    name="clientId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Select Client</FormLabel>
-                        <Select
-                          onValueChange={(val) => {
-                            field.onChange(val);
-                            handleClientSelect(val);
-                          }}
-                          defaultValue={field.value}
-                          value={field.value} // Add value prop for edit mode
-                          disabled={loadingData}>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {!isManualClient ? (
+                  <div className="col-span-2 space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="clientId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Select Client</FormLabel>
+                          <Select
+                            onValueChange={(val) => {
+                              field.onChange(val);
+                              handleClientSelect(val);
+                            }}
+                            defaultValue={field.value}
+                            value={field.value}
+                            disabled={loadingData}>
+                            <FormControl>
+                              <SelectTrigger className="bg-white">
+                                <SelectValue
+                                  placeholder={
+                                    loadingData
+                                      ? "Loading clients..."
+                                      : "Select a client..."
+                                  }
+                                />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {clients.map((c) => (
+                                <SelectItem key={c.id} value={c.id}>
+                                  {c.name} ({c.type})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* === TAMPILAN DETAIL CLIENT DARI DATABASE === */}
+                    {selectedClient && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 animate-in fade-in slide-in-from-top-1">
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              Client Detail
+                            </p>
+                            <h3 className="text-lg font-bold text-blue-600">
+                              {selectedClient.name}
+                            </h3>
+                            <div className="flex gap-2 mt-1">
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px]">
+                                {selectedClient.custCode}
+                              </Badge>
+                              <Badge
+                                className={cn(
+                                  "text-[10px]",
+                                  selectedClient.type === "B2B"
+                                    ? "bg-purple-100 text-purple-700"
+                                    : "bg-green-100 text-green-700",
+                                )}>
+                                {selectedClient.type}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-2 text-sm text-slate-600">
+                            <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
+                            <span>{selectedClient.address}</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <Phone className="w-4 h-4 shrink-0" />
+                            <span>{selectedClient.phone || "-"}</span>
+                          </div>
+
+                          {/* Tampilkan PIC jika B2B */}
+                          {selectedClient.type === "B2B" &&
+                            selectedClient.pics &&
+                            selectedClient.pics.length > 0 && (
+                              <div className="p-2 rounded bg-white border border-slate-200">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                                  Person in Charge (PIC)
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600">
+                                    {selectedClient.pics[0].name.charAt(0)}
+                                  </div>
+                                  <div className="text-xs">
+                                    <p className="font-semibold">
+                                      {selectedClient.pics[0].name}
+                                    </p>
+                                    <p className="text-muted-foreground">
+                                      {selectedClient.pics[0].phone ||
+                                        selectedClient.pics[0].email}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {/* INPUT MANUAL TETAP SAMA */}
+                    <FormField
+                      control={form.control}
+                      name="manualClientName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Client Name *</FormLabel>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue
-                                placeholder={
-                                  loadingData
-                                    ? "Loading clients..."
-                                    : "Select a client..."
-                                }
-                              />
-                            </SelectTrigger>
+                            <Input placeholder="John Doe" {...field} />
                           </FormControl>
-                          <SelectContent>
-                            {clients.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
-                                {c.name} ({c.type})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              ) : (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="manualClientName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Client Name *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="manualClientCompany"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Company</FormLabel>
-                        <FormControl>
-                          <Input placeholder="PT. ..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="manualClientEmail"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="email"
-                            placeholder="mail@example.com"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="manualClientPhone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone</FormLabel>
-                        <FormControl>
-                          <Input placeholder="+62..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="manualClientAddress"
-                    render={({ field }) => (
-                      <FormItem className="col-span-2">
-                        <FormLabel>Address</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Full address..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              )}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="manualClientCompany"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Company</FormLabel>
+                          <FormControl>
+                            <Input placeholder="PT. ..." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="manualClientEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="email"
+                              placeholder="mail@example.com"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="manualClientPhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone</FormLabel>
+                          <FormControl>
+                            <Input placeholder="+62..." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="manualClientAddress"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Address</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Full address..."
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* === ITEMS (Sama seperti sebelumnya) === */}
+        {/* ... (ITEMS SECTION TETAP SAMA) ... */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -673,41 +949,26 @@ export default function QuotationForm({
           </CardContent>
         </Card>
 
-        {/* === SUMMARY & NOTES (Sama seperti sebelumnya) === */}
+        {/* === SUMMARY & NOTES (UPDATED WITH MULTI-SELECT) === */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Notes</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes to Client</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} placeholder="Payment terms..." />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="internalNotes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Internal Notes</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} placeholder="Team notes..." />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+          {/* BAGIAN NOTES BARU */}
+          <div className="space-y-6">
+            {/* 1. PUBLIC NOTES (Muncul di PDF) */}
+            {renderNoteSelector(
+              true,
+              "Notes to Client (Public)",
+              <FileText className="w-5 h-5 text-blue-600" />,
+            )}
 
-          <Card className="bg-slate-50">
+            {/* 2. INTERNAL NOTES (Hanya Tim) */}
+            {renderNoteSelector(
+              false,
+              "Internal Notes (Private)",
+              <Lock className="w-5 h-5 text-amber-600" />,
+            )}
+          </div>
+
+          <Card className="bg-slate-50 h-fit">
             <CardHeader>
               <CardTitle className="text-base">Financial Summary</CardTitle>
             </CardHeader>

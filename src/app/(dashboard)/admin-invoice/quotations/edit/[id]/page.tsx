@@ -17,10 +17,10 @@ export default function EditQuotationPage() {
   const [initialData, setInitialData] = useState<QuotationFormValues | null>(
     null,
   );
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // === 1. FETCH DATA BY ID ===
   useEffect(() => {
     const fetchQuotation = async () => {
       try {
@@ -35,17 +35,15 @@ export default function EditQuotationPage() {
 
         const data = await res.json();
 
-        // === 2. DATA TRANSFORMATION (API -> FORM) ===
-        // Kita harus mengubah data dari database agar cocok dengan Schema Zod Form
-        const formattedData: QuotationFormValues = {
-          date: new Date(data.date), // Convert string ISO ke Date
+        // === DATA TRANSFORMATION (API -> FORM) ===
+        const formattedData: any = {
+          date: new Date(data.date),
           validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
           status: data.status,
-          notes: data.notes || "",
-          internalNotes: data.internalNotes || "",
 
-          // Logic Hybrid Client
-          isManualClient: !data.clientId, // Jika clientId null, berarti manual
+          notes: data.notes || [],
+
+          isManualClient: !data.clientId,
           clientId: data.clientId || "",
           manualClientName: data.manualClientName || "",
           manualClientCompany: data.manualClientCompany || "",
@@ -53,13 +51,11 @@ export default function EditQuotationPage() {
           manualClientPhone: data.manualClientPhone || "",
           manualClientAddress: data.manualClientAddress || "",
 
-          // Logic Items
           items: data.items.map((item: any) => ({
-            isManualProduct: !item.productId, // Jika productId null, berarti manual
+            isManualProduct: !item.productId,
             productId: item.productId || "",
-            productName: item.productName, // Ini snapshot name
+            productName: item.productName,
             description: item.description || "",
-            // Convert Decimal/String ke Number
             quantity: Number(item.quantity),
             unitPrice: Number(item.unitPrice),
             discount: Number(item.discount || 0),
@@ -70,7 +66,7 @@ export default function EditQuotationPage() {
       } catch (error) {
         console.error(error);
         toast.error("Gagal memuat data penawaran");
-        router.push("/super-admin/quotations"); // Redirect jika error
+        router.push("/super-admin/quotations");
       } finally {
         setIsLoading(false);
       }
@@ -79,14 +75,15 @@ export default function EditQuotationPage() {
     if (id) fetchQuotation();
   }, [id, router]);
 
-  // === 3. HANDLE UPDATE ===
   const handleUpdate = async (data: QuotationFormValues) => {
     setIsSaving(true);
     try {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
+
+      // Gunakan helper yang sudah diupdate
       const payload = cleanQuotationPayload(data);
-      // Gunakan method PATCH untuk update
+
       const res = await fetch(`${apiUrl}/quotations/${id}`, {
         method: "PATCH",
         headers: {
@@ -96,18 +93,18 @@ export default function EditQuotationPage() {
         body: JSON.stringify(payload),
       });
 
+      const result = await res.json();
+
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || "Failed to update");
+        throw new Error(result.message || "Failed to update");
       }
 
       toast.success("Quotation updated successfully!");
-      router.push("/admin-invoice/quotations");
+      router.push("/admin-invoice/quotations"); // Sesuaikan dengan route list Anda
+      router.refresh(); // Paksa refresh data server
     } catch (error) {
       console.error(error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update quotation",
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to update");
     } finally {
       setIsSaving(false);
     }
@@ -123,14 +120,9 @@ export default function EditQuotationPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto py-6 space-y-6">
+    <div className=" mx-auto py-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Edit Quotation</h1>
-          <p className="text-sm text-muted-foreground">
-            Perbarui data penawaran yang sudah ada.
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Edit Quotation</h1>
       </div>
 
       {initialData && (

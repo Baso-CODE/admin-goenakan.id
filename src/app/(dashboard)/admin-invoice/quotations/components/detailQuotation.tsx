@@ -3,13 +3,13 @@
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import {
-  AlertCircle,
   ArrowLeft,
   Box,
   CalendarIcon,
   Edit3,
   FileText,
   History,
+  Lock,
   MessageSquare,
   Plus,
   Printer,
@@ -96,6 +96,16 @@ type QuotationItem = {
   discount: string | number;
 };
 
+type QuotationNote = {
+  id: string;
+  categoryId: string;
+  content: string;
+  category: {
+    name: string;
+    isPublic: boolean;
+  };
+};
+
 // === 3. Update QuotationDetail Utama ===
 type QuotationDetail = {
   id: string;
@@ -105,11 +115,7 @@ type QuotationDetail = {
   status: string;
   subTotal: string | number;
   totalAmount: string | number;
-  notes: string | null;
-  internalNotes: string | null;
-
-  // Client Data (Gunakan any jika struktur client B2B/B2C sangat kompleks,
-  // tapi pastikan data ini di-include dari backend)
+  notes: QuotationNote[];
   client?: any;
   manualClientName?: string | null;
   manualClientCompany?: string | null;
@@ -133,6 +139,9 @@ export default function QuotationDetail() {
     notes: "",
     nextAction: "",
   });
+
+  const publicNotes = data?.notes?.filter((n) => n.category.isPublic) || [];
+  const internalNotes = data?.notes?.filter((n) => !n.category.isPublic) || [];
 
   const [loading, setLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -434,28 +443,68 @@ export default function QuotationDetail() {
 
           {/* NOTES */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">
-                Catatan Client
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <FileText className="h-4 w-4 text-blue-600" /> Catatan Penawaran
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground italic">
-                {data.notes || "Tidak ada catatan untuk client."}
-              </p>
+            <CardContent className="space-y-4">
+              {publicNotes.length > 0 ? (
+                // Grouping berdasarkan kategori agar rapi
+                Object.entries(
+                  publicNotes.reduce(
+                    (acc, note) => {
+                      const catName = note.category.name;
+                      if (!acc[catName]) acc[catName] = [];
+                      acc[catName].push(note.content);
+                      return acc;
+                    },
+                    {} as Record<string, string[]>,
+                  ),
+                ).map(([categoryName, contents]) => (
+                  <div key={categoryName} className="space-y-1">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      {categoryName}
+                    </p>
+                    <ul className="list-disc list-inside space-y-1">
+                      {contents.map((content, i) => (
+                        <li
+                          key={i}
+                          className="text-sm text-slate-700 leading-relaxed italic">
+                          {content}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground italic">
+                  Tidak ada catatan untuk client.
+                </p>
+              )}
             </CardContent>
           </Card>
 
-          {data.internalNotes && (
-            <Card className="border-yellow-200 bg-yellow-50/30">
+          {/* === UPDATE: DISPLAY INTERNAL NOTES === */}
+          {internalNotes.length > 0 && (
+            <Card className="border-amber-200 bg-amber-50/30">
               <CardHeader className="flex flex-row items-center gap-2 py-3">
-                <AlertCircle className="h-4 w-4 text-yellow-600" />
-                <CardTitle className="text-sm font-semibold text-yellow-700">
-                  Internal Note
+                <Lock className="h-4 w-4 text-amber-600" />
+                <CardTitle className="text-sm font-semibold text-amber-700">
+                  Internal Memo
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-xs text-yellow-800">{data.internalNotes}</p>
+              <CardContent className="space-y-3">
+                {internalNotes.map((note) => (
+                  <div
+                    key={note.id}
+                    className="border-l-2 border-amber-200 pl-3">
+                    <p className="text-[10px] font-bold text-amber-600 uppercase">
+                      {note.category.name}
+                    </p>
+                    <p className="text-xs text-amber-800">{note.content}</p>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           )}
