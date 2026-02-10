@@ -4,9 +4,9 @@ import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import {
   CalendarIcon,
-  CheckCircle,
-  ExternalLink,
   FileText,
+  History,
+  MapPin,
   MessageSquare,
   Plus,
   Truck,
@@ -66,16 +66,34 @@ import {
 import { apiUrl } from "@/helper/apiurl";
 import { cn } from "@/lib/utils";
 
-// --- TIPE DATA NOTES ---
+// --- KONFIGURASI STATUS (Sesuai DTO Backend) ---
+const SHIPMENT_STATUSES = {
+  INBOUND: [
+    { value: "DISPATCHED", label: "Dispatched (Baru Berangkat)" },
+    {
+      value: "ARRIVED_ORIGIN_WAREHOUSE",
+      label: "Sampai Gudang Asal (Luar Negeri)",
+    },
+    { value: "DEPARTED_ORIGIN", label: "Keluar Negara Asal (OTW)" },
+    { value: "IN_TRANSIT", label: "In Transit (Laut/Udara)" },
+    { value: "AT_CUSTOMS", label: "Di Bea Cukai (Customs)" },
+    { value: "RELEASED_FROM_CUSTOMS", label: "Lolos Bea Cukai" },
+    { value: "ARRIVED_DESTINATION", label: "Sampai Gudang Tujuan (Final)" },
+  ],
+  OUTBOUND: [
+    { value: "DISPATCHED", label: "Dispatched (Diproses)" },
+    { value: "PICKED_UP", label: "Diambil Kurir" },
+    { value: "IN_TRANSIT", label: "Dalam Perjalanan" },
+    { value: "ARRIVED_CITY", label: "Sampai Kota Tujuan" },
+    { value: "ARRIVED_DESTINATION", label: "Diterima Client (Final)" },
+  ],
+};
+
+// --- TIPE DATA ---
 type NoteCategory = {
   id: string;
   name: string;
   templates: { title: string; content: string }[];
-};
-
-type NoteSelection = {
-  categoryId: string;
-  contents: string[];
 };
 
 interface ShipmentManagerProps {
@@ -98,28 +116,33 @@ export default function ShipmentManager({
   // === STATE MANAGEMENT ===
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  console.log("ini adalaah data shipment", shipments);
 
   // Master Data Categories
   const [noteCategories, setNoteCategories] = useState<NoteCategory[]>([]);
 
-  // State untuk Mark Arrived
-  const [confirmArriveId, setConfirmArriveId] = useState<string | null>(null);
-  const [arriving, setArriving] = useState(false);
+  // --- STATE UPDATE STATUS (TRACKING) ---
+  const [updateStatusId, setUpdateStatusId] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // Date Picker State
-  const [arriveDate, setArriveDate] = useState<Date | undefined>(new Date());
+  // Form Update Status
+  const [statusVal, setStatusVal] = useState("");
+  const [statusCity, setStatusCity] = useState(""); // Input Lokasi Manual
+  const [statusDate, setStatusDate] = useState<Date | undefined>(new Date());
+  const [statusNote, setStatusNote] = useState(""); // Note manual (optional)
 
-  // Form States (Create Shipment)
+  // --- STATE CREATE SHIPMENT ---
   const [vendorId, setVendorId] = useState("");
   const [trackingNo, setTrackingNo] = useState("");
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [method, setMethod] = useState("LAND");
+  const [origin, setOrigin] = useState(""); // Kota Asal
+  const [destination, setDestination] = useState(""); // Kota Tujuan
   const [selectedItems, setSelectedItems] = useState<
     { id: string; qty: number }[]
   >([]);
 
   // --- STATE NOTES (Multi-Select) ---
-  // Kita simpan sebagai Record: { "cat_id": ["content1", "content2"] }
   const [selectedNotes, setSelectedNotes] = useState<Record<string, string[]>>(
     {},
   );
@@ -142,10 +165,10 @@ export default function ShipmentManager({
       }
     };
 
-    if (isOpen || confirmArriveId) {
+    if (isOpen || updateStatusId) {
       fetchCategories();
     }
-  }, [isOpen, confirmArriveId]); // Load saat dialog dibuka
+  }, [isOpen, updateStatusId]);
 
   // === HELPER FUNCTIONS ===
   const getRemainingQty = (productId: string, totalOrderQty: number) => {
@@ -195,18 +218,14 @@ export default function ShipmentManager({
       } else {
         newContents = [...currentContents, content];
       }
-
-      // Jika kosong hapus key-nya, jika ada update
       if (newContents.length === 0) {
         const { [categoryId]: _, ...rest } = prev;
         return rest;
       }
-
       return { ...prev, [categoryId]: newContents };
     });
   };
 
-  // Helper convert state record ke DTO array
   const getNotesPayload = () => {
     return Object.entries(selectedNotes).map(([categoryId, contents]) => ({
       categoryId,
@@ -214,20 +233,12 @@ export default function ShipmentManager({
     }));
   };
 
-  // === API ACTIONS ===
+  // === 1. CREATE SHIPMENT ===
   const handleSubmit = async () => {
-    if (selectedItems.length === 0) {
-      toast.error("Pilih minimal 1 item untuk dikirim");
-      return;
-    }
-    if (!vendorId) {
-      toast.error("Pilih Vendor/Ekspedisi");
-      return;
-    }
-    if (!trackingNo) {
-      toast.error("Nomor Resi wajib diisi");
-      return;
-    }
+    if (selectedItems.length === 0) return toast.error("Pilih minimal 1 item");
+    if (!vendorId) return toast.error("Pilih Vendor");
+    if (!trackingNo) return toast.error("Isi Nomor Resi");
+    if (!origin || !destination) return toast.error("Isi Kota Asal & Tujuan");
 
     try {
       setLoading(true);
@@ -240,12 +251,13 @@ export default function ShipmentManager({
         vendorId,
         trackingNumber: trackingNo,
         method,
+        origin, // New Field
+        destination, // New Field
         departureDate: date ? date.toISOString() : new Date().toISOString(),
         items: selectedItems.map((i) => ({
           orderProductId: i.id,
           quantity: Number(i.qty),
         })),
-        // PAYLOAD NOTES BARU
         notes: getNotesPayload(),
       };
 
@@ -268,7 +280,9 @@ export default function ShipmentManager({
       setSelectedItems([]);
       setVendorId("");
       setTrackingNo("");
-      setSelectedNotes({}); // Reset notes
+      setOrigin("");
+      setDestination("");
+      setSelectedNotes({});
       setDate(new Date());
     } catch (e) {
       toast.error("Gagal membuat pengiriman");
@@ -277,39 +291,54 @@ export default function ShipmentManager({
     }
   };
 
-  const handleConfirmArrive = async () => {
-    if (!confirmArriveId) return;
-    setArriving(true);
+  // === 2. UPDATE STATUS TRACKING (Add History) ===
+  const handleUpdateStatus = async () => {
+    if (!updateStatusId) return;
+    if (!statusVal) return toast.error("Pilih Status Baru");
+    if (!statusCity) return toast.error("Isi Lokasi Terkini (Kota/Gudang)");
+
+    setIsUpdating(true);
     try {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      await fetch(`${apiUrl}/logistics/shipments/${confirmArriveId}/arrive`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          arrivalDate: arriveDate
-            ? arriveDate.toISOString()
-            : new Date().toISOString(),
-          // PAYLOAD NOTES BARU
-          notes: getNotesPayload(),
-        }),
-      });
+      // Payload sesuai AddShipmentHistoryDTO
+      const payload = {
+        status: statusVal,
+        city: statusCity,
+        date: statusDate ? statusDate.toISOString() : new Date().toISOString(),
+        note: statusNote, // Manual text note
+        shipmentNotes: getNotesPayload(), // Template notes
+      };
 
-      toast.success("Status updated: Arrived");
+      const res = await fetch(
+        `${apiUrl}/logistics/shipments/${updateStatusId}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      if (!res.ok) throw new Error("Failed");
+
+      toast.success("Tracking berhasil diupdate!");
       onUpdate();
 
       // Close & Reset
-      setConfirmArriveId(null);
+      setUpdateStatusId(null);
+      setStatusVal("");
+      setStatusCity("");
+      setStatusNote("");
       setSelectedNotes({});
-      setArriveDate(new Date());
+      setStatusDate(new Date());
     } catch (e) {
-      toast.error("Failed to update");
+      toast.error("Gagal update status");
     } finally {
-      setArriving(false);
+      setIsUpdating(false);
     }
   };
 
@@ -318,18 +347,16 @@ export default function ShipmentManager({
     <div className="space-y-3 border rounded-md p-3 bg-slate-50">
       <div className="flex justify-between items-center">
         <Label className="text-sm font-semibold text-slate-700">
-          Catatan Pengiriman (Opsional)
+          Catatan Tambahan (Ceklis Kondisi)
         </Label>
         <span className="text-[10px] text-muted-foreground">
-          {Object.keys(selectedNotes).length} kategori dipilih
+          {Object.keys(selectedNotes).length} kategori
         </span>
       </div>
-      <ScrollArea className="h-50 pr-3">
+      <ScrollArea className="h-40 pr-3">
         {noteCategories.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-4">
-            Belum ada template kategori catatan.
-            <br />
-            Silakan buat di menu Master Data.
+            Tidak ada template catatan.
           </p>
         ) : (
           <Accordion type="multiple" className="w-full">
@@ -340,7 +367,7 @@ export default function ShipmentManager({
                     <span>{cat.name}</span>
                     {(selectedNotes[cat.id]?.length || 0) > 0 && (
                       <Badge variant="secondary" className="text-[10px] h-5">
-                        {selectedNotes[cat.id].length} dipilih
+                        {selectedNotes[cat.id].length}
                       </Badge>
                     )}
                   </div>
@@ -362,13 +389,13 @@ export default function ShipmentManager({
                               handleToggleNote(cat.id, tpl.content)
                             }
                           />
-                          <div className="grid gap-1.5 leading-none">
+                          <div className="grid gap-1">
                             <label
                               htmlFor={`${cat.id}-${idx}`}
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                              className="text-xs font-medium cursor-pointer">
                               {tpl.title}
                             </label>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-[10px] text-muted-foreground">
                               {tpl.content}
                             </p>
                           </div>
@@ -385,6 +412,12 @@ export default function ShipmentManager({
     </div>
   );
 
+  // Helper untuk mendapatkan label status
+  const getStatusLabel = (val: string) => {
+    const all = [...SHIPMENT_STATUSES.INBOUND, ...SHIPMENT_STATUSES.OUTBOUND];
+    return all.find((s) => s.value === val)?.label || val;
+  };
+
   return (
     <div className="space-y-6">
       <Card
@@ -397,23 +430,23 @@ export default function ShipmentManager({
           <div>
             <CardTitle>
               {type === "INBOUND"
-                ? "Inbound Log (Masuk)"
-                : "Outbound Log (Keluar)"}
+                ? "Inbound Log (Import)"
+                : "Outbound Log (Export/Local)"}
             </CardTitle>
             <CardDescription>
               {type === "INBOUND"
-                ? "Catat perjalanan dari Vendor -> Gudang -> HO."
-                : "Catat pengiriman dari HO -> Client."}
+                ? "Monitor pergerakan barang dari Supplier ke Gudang."
+                : "Monitor pengiriman barang ke Client."}
             </CardDescription>
           </div>
           <Button
             onClick={() => setIsOpen(true)}
             className="bg-primary hover:bg-primary/90">
-            <Plus className="mr-2 h-4 w-4" /> Buat Pengiriman Baru
+            <Plus className="mr-2 h-4 w-4" /> Buat Pengiriman
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-6">
             {shipments.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground bg-muted/20 rounded-lg border border-dashed flex flex-col items-center justify-center">
                 <Truck className="h-10 w-10 text-muted-foreground/30 mb-2" />
@@ -423,166 +456,192 @@ export default function ShipmentManager({
               shipments.map((ship) => (
                 <div
                   key={ship.id}
-                  className="border rounded-lg p-5 bg-card hover:shadow-md transition-shadow">
+                  className="border rounded-lg bg-card hover:shadow-md transition-shadow overflow-hidden">
                   {/* HEADER CARD */}
-                  <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
-                    {/* INFO KIRI: Tracking & Lokasi */}
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-3">
-                        <Badge
-                          variant="outline"
-                          className="font-mono text-xs px-2 py-0.5">
+                  <div className="p-4 bg-muted/10 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge variant="outline" className="font-mono bg-white">
                           {ship.method}
                         </Badge>
-
-                        {/* Tracking No + Link */}
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-lg tracking-tight">
-                            {ship.trackingNumber || "No Resi"}
-                          </span>
-                          {ship.vendor.trackingUrl && (
-                            <Link
-                              href={
-                                ship.vendor.trackingUrl.startsWith("http")
-                                  ? ship.vendor.trackingUrl
-                                  : `https://${ship.vendor.trackingUrl}`
-                              }
-                              target="_blank"
-                              className="text-blue-500 hover:text-blue-700 transition-colors p-1 rounded-full hover:bg-blue-50"
-                              title="Lacak Resi">
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </Link>
-                          )}
-                        </div>
-
+                        <h3 className="font-bold text-lg">
+                          {ship.trackingNumber || "No Resi"}
+                        </h3>
                         <Badge
-                          className={
-                            ship.status === "ARRIVED"
-                              ? "bg-green-600 hover:bg-green-700"
-                              : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                          }>
-                          {ship.status}
+                          className={cn(
+                            "ml-2",
+                            ship.status.includes("ARRIVED_DESTINATION")
+                              ? "bg-green-600"
+                              : "bg-blue-600",
+                          )}>
+                          {getStatusLabel(ship.status)}
                         </Badge>
                       </div>
-
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1">
-                        <Truck className="h-4 w-4" />
-                        <span className="font-medium">
-                          {ship.vendor?.companyName || "Unknown Courier"}
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Truck className="h-3.5 w-3.5" />{" "}
+                          {ship.vendor?.companyName}
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5" /> {ship.origin}{" "}
+                          <span className="mx-1">→</span> {ship.destination}
                         </span>
                       </div>
                     </div>
 
-                    {/* ACTION BUTTONS (KANAN) */}
                     <div className="flex gap-2">
+                      {/* Link Surat Jalan */}
                       <Link
                         href={`/super-admin/logistics/print/${ship.id}`}
                         target="_blank">
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 gap-2 border-gray-300 hover:bg-gray-100 text-gray-700">
+                          className="h-9 gap-2">
                           <FileText className="h-3.5 w-3.5" />
-                          {type === "OUTBOUND" ? "Surat Jalan" : "Manifest"}
+                          Doc
                         </Button>
                       </Link>
 
-                      {/* TOMBOL MARK ARRIVED */}
-                      {ship.status === "DISPATCHED" && (
+                      {/* TOMBOL UPDATE STATUS (Ganti Mark Arrived) */}
+                      {!ship.status.includes("COMPLETED") && (
                         <Button
                           size="sm"
-                          variant="outline"
-                          className="h-8 border-green-200 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 transition-colors gap-2"
+                          className="h-9 gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                           onClick={() => {
-                            setConfirmArriveId(ship.id);
-                            setArriveDate(new Date());
-                            setSelectedNotes({}); // Reset notes saat buka dialog arrive
+                            setUpdateStatusId(ship.id);
+                            setStatusVal(""); // Reset select
+                            setStatusCity(""); // Reset city
+                            setSelectedNotes({});
                           }}>
-                          <CheckCircle className="h-3.5 w-3.5" />
-                          Mark Arrived
+                          <History className="h-3.5 w-3.5" /> Update Tracking
                         </Button>
                       )}
                     </div>
                   </div>
 
-                  {/* ITEM LIST */}
-                  <div className="bg-muted/30 p-3 rounded-md border text-sm">
-                    <p className="font-semibold mb-2 text-[10px] uppercase text-muted-foreground tracking-wider">
-                      Items in this shipment:
-                    </p>
-                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-1">
-                      {ship.items.map((item: any) => (
-                        <li key={item.id} className="flex items-center gap-2">
-                          <span className="h-1.5 w-1.5 rounded-full bg-primary/40"></span>
-                          <span>{item.orderProduct.product.name}</span>
-                          <Badge
-                            variant="secondary"
-                            className="text-[10px] h-5 px-1.5 ml-auto">
-                            {item.quantity} pcs
-                          </Badge>
-                        </li>
-                      ))}
-                    </ul>
-
-                    {/* --- DISPLAY NOTES --- */}
-                    {ship.notes && ship.notes.length > 0 && (
-                      <>
-                        <Separator className="my-3 bg-muted-foreground/10" />
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-1.5 text-muted-foreground">
-                            <MessageSquare className="h-3.5 w-3.5" />
-                            <span className="text-[10px] font-bold uppercase">
-                              Catatan:
+                  <div className="p-4 grid md:grid-cols-3 gap-6">
+                    {/* COLUMN LEFT: Items & NOTES */}
+                    <div className="md:col-span-1 border-r pr-4">
+                      {/* 1. LIST BARANG */}
+                      <p className="font-semibold text-xs uppercase text-muted-foreground mb-3">
+                        Items:
+                      </p>
+                      <ul className="space-y-2 mb-6">
+                        {ship.items.map((item: any) => (
+                          <li
+                            key={item.id}
+                            className="text-sm flex justify-between items-center bg-slate-50 p-2 rounded">
+                            <span className="line-clamp-1 text-slate-700">
+                              {item.orderProduct.product.name}
                             </span>
-                          </div>
-                          <div className="grid gap-2 pl-5">
-                            {/* Group notes by category (Logic rendering sederhana) */}
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] ml-2 shrink-0">
+                              {item.quantity} pcs
+                            </Badge>
+                          </li>
+                        ))}
+                      </ul>
+
+                      {/* 2. FIX: MENAMPILKAN NOTES DISINI */}
+                      {ship.notes && ship.notes.length > 0 && (
+                        <div className="pt-4 border-t border-dashed">
+                          <p className="font-semibold text-xs uppercase text-muted-foreground mb-3 flex items-center gap-1">
+                            <MessageSquare className="w-3 h-3" /> Catatan /
+                            Kondisi:
+                          </p>
+
+                          <div className="space-y-3">
                             {Array.from(
                               new Set(
                                 ship.notes.map((n: any) => n.category?.name),
                               ),
-                            ).map((catName: any) => (
-                              <div key={catName} className="text-xs">
-                                <span className="font-semibold text-slate-700">
-                                  {catName}:
-                                </span>{" "}
-                                <span className="text-slate-500">
-                                  {ship.notes
-                                    .filter(
-                                      (n: any) => n.category?.name === catName,
-                                    )
-                                    .map((n: any) => n.content)
-                                    .join(", ")}
-                                </span>
-                              </div>
-                            ))}
+                            )
+                              .filter(Boolean)
+                              .map((catName: any) => (
+                                <div
+                                  key={catName}
+                                  className="bg-yellow-50/50 p-2 rounded border border-yellow-100">
+                                  <span className="text-[10px] font-bold text-yellow-700 uppercase block mb-1">
+                                    {catName}
+                                  </span>
+                                  <ul className="list-disc list-inside text-xs text-slate-700 space-y-0.5">
+                                    {ship.notes
+                                      .filter(
+                                        (n: any) =>
+                                          n.category?.name === catName,
+                                      )
+                                      .map((n: any, i: number) => (
+                                        <li key={i}>{n.content}</li>
+                                      ))}
+                                  </ul>
+                                </div>
+                              ))}
                           </div>
                         </div>
-                      </>
-                    )}
-                  </div>
+                      )}
+                    </div>
 
-                  {/* FOOTER DATE */}
-                  <div className="mt-3 flex items-center text-xs text-muted-foreground font-medium">
-                    <span>
-                      Berangkat:{" "}
-                      {ship.departureDate
-                        ? format(new Date(ship.departureDate), "dd MMM yyyy", {
-                            locale: idLocale,
-                          })
-                        : "-"}
-                    </span>
-                    {ship.arrivalDate && (
-                      <>
-                        <span className="mx-2 text-muted-foreground/30">•</span>
-                        <span className="text-green-600">
-                          Sampai:{" "}
-                          {format(new Date(ship.arrivalDate), "dd MMM yyyy", {
-                            locale: idLocale,
-                          })}
-                        </span>
-                      </>
-                    )}
+                    {/* COLUMN RIGHT: TIMELINE HISTORY */}
+                    <div className="md:col-span-2">
+                      <p className="font-semibold text-xs uppercase text-muted-foreground mb-3">
+                        Tracking History:
+                      </p>
+
+                      <div className="relative pl-2 ml-1 border-l-2 border-slate-200 space-y-6">
+                        {ship.history && ship.history.length > 0 ? (
+                          ship.history.map((hist: any, idx: number) => (
+                            <div key={hist.id} className="relative pl-6">
+                              {/* DOT */}
+                              <div
+                                className={cn(
+                                  "absolute -left-2.25 top-1.5 h-4 w-4 rounded-full border-2 border-white shadow-sm",
+                                  idx === 0
+                                    ? "bg-green-500 ring-2 ring-green-100"
+                                    : "bg-slate-300",
+                                )}></div>
+
+                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                                <div>
+                                  <p
+                                    className={cn(
+                                      "text-sm font-semibold",
+                                      idx === 0
+                                        ? "text-slate-900"
+                                        : "text-slate-500",
+                                    )}>
+                                    {getStatusLabel(hist.status)}
+                                  </p>
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                                    <MapPin className="h-3 w-3" />
+                                    <span className="font-medium text-slate-700">
+                                      {hist.city}
+                                    </span>
+                                  </div>
+
+                                  {hist.note && (
+                                    <p className="text-xs italic text-slate-500 mt-1 bg-slate-50 p-1 rounded inline-block">
+                                      "{hist.note}"
+                                    </p>
+                                  )}
+                                </div>
+                                <span className="text-xs text-slate-400 font-mono mt-1 sm:mt-0">
+                                  {format(new Date(hist.date), "dd MMM HH:mm", {
+                                    locale: idLocale,
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground pl-4">
+                            History loading...
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))
@@ -591,100 +650,110 @@ export default function ShipmentManager({
         </CardContent>
       </Card>
 
-      {/* === CREATE DIALOG === */}
+      {/* === DIALOG CREATE SHIPMENT === */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Buat Pengiriman Baru ({type})</DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4 pr-2">
-            {/* 1. Vendor Selection */}
-            <div className="grid gap-2">
-              <Label>Ekspedisi / Vendor</Label>
-              <Select value={vendorId} onValueChange={setVendorId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih Ekspedisi / Vendor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {couriers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.companyName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
+          <div className="grid gap-4 py-4">
+            {/* 1. Header Info */}
             <div className="grid grid-cols-2 gap-4">
-              {/* 2. Resi Input */}
-              <div className="grid gap-2">
-                <Label>No. Resi (Tracking Number)</Label>
+              <div className="space-y-2">
+                <Label>Ekspedisi / Vendor</Label>
+                <Select value={vendorId} onValueChange={setVendorId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {couriers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.companyName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>No. Resi</Label>
                 <Input
                   value={trackingNo}
                   onChange={(e) => setTrackingNo(e.target.value)}
-                  placeholder="Masukkan Nomor Resi"
+                  placeholder="Contoh: INV/JP/2023"
                 />
               </div>
+            </div>
 
-              {/* 3. Method Selection */}
-              <div className="grid gap-2">
+            {/* 2. Route Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Kota Asal (Origin)</Label>
+                <Input
+                  value={origin}
+                  onChange={(e) => setOrigin(e.target.value)}
+                  placeholder="Misal: Guangzhou / Osaka"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Kota Tujuan (Dest)</Label>
+                <Input
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
+                  placeholder="Misal: Jakarta / Surabaya"
+                />
+              </div>
+            </div>
+
+            {/* 3. Method & Date */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label>Metode</Label>
                 <Select value={method} onValueChange={setMethod}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="LAND">Darat</SelectItem>
-                    <SelectItem value="SEA">Laut</SelectItem>
-                    <SelectItem value="AIR">Udara</SelectItem>
+                    <SelectItem value="LAND">Darat (Land)</SelectItem>
+                    <SelectItem value="SEA">Laut (Sea)</SelectItem>
+                    <SelectItem value="AIR">Udara (Air)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>Tanggal Berangkat</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className="w-full justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {date ? (
+                        format(date, "PPP", { locale: idLocale })
+                      ) : (
+                        <span>Pilih tanggal</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      onSelect={setDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
 
-            {/* 4. Date Picker */}
-            <div className="grid gap-2">
-              <Label>Tanggal Berangkat</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !date && "text-muted-foreground",
-                    )}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? (
-                      format(date, "PPP", { locale: idLocale })
-                    ) : (
-                      <span>Pilih tanggal</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={setDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <Separator className="my-1" />
-
-            {/* 5. NOTES SELECTOR (REPLACEMENT FOR REMARKS) */}
+            <Separator />
             {renderNotesSelector()}
+            <Separator />
 
-            <Separator className="my-1" />
-
-            {/* 6. Items Selection */}
+            {/* 4. Items Table */}
             <div>
-              <Label className="mb-2 block font-semibold">
-                Pilih Barang untuk Dikirim:
-              </Label>
+              <Label className="mb-2 block font-semibold">Pilih Barang:</Label>
               <div className="border rounded-md max-h-48 overflow-y-auto">
                 <Table>
                   <TableHeader>
@@ -692,7 +761,7 @@ export default function ShipmentManager({
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Produk</TableHead>
                       <TableHead>Sisa</TableHead>
-                      <TableHead>Kirim</TableHead>
+                      <TableHead>Qty</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -714,7 +783,7 @@ export default function ShipmentManager({
                               disabled={remaining === 0}
                             />
                           </TableCell>
-                          <TableCell className="font-medium">
+                          <TableCell className="font-medium text-xs">
                             {p.productName}
                           </TableCell>
                           <TableCell>
@@ -724,7 +793,7 @@ export default function ShipmentManager({
                             {isSelected ? (
                               <Input
                                 type="number"
-                                className="h-8 w-20"
+                                className="h-7 w-16 text-xs"
                                 value={isSelected.qty}
                                 max={remaining}
                                 min={1}
@@ -753,69 +822,106 @@ export default function ShipmentManager({
               Batal
             </Button>
             <Button onClick={handleSubmit} disabled={loading}>
-              {loading ? "Menyimpan..." : "Buat Pengiriman"}
+              {loading ? "Memproses..." : "Buat Pengiriman"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* === MODAL ARRIVED DIALOG === */}
+      {/* === DIALOG UPDATE STATUS (TRACKING) === */}
       <Dialog
-        open={!!confirmArriveId}
+        open={!!updateStatusId}
         onOpenChange={(open) => {
-          if (!open) setConfirmArriveId(null);
+          if (!open) setUpdateStatusId(null);
         }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Konfirmasi Barang Sampai</DialogTitle>
-            <CardDescription>
-              Status pengiriman akan diubah menjadi <strong>ARRIVED</strong>.
-            </CardDescription>
+            <DialogTitle>Update Tracking Status</DialogTitle>
+            <CardDescription>Perbarui posisi terkini paket.</CardDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="arriveDate">Tanggal Sampai</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !arriveDate && "text-muted-foreground",
-                    )}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {arriveDate ? (
-                      format(arriveDate, "PPP", { locale: idLocale })
-                    ) : (
-                      <span>Pilih tanggal</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={arriveDate}
-                    onSelect={setArriveDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+            {/* 1. Status Selection */}
+            <div className="space-y-2">
+              <Label>Status Baru</Label>
+              <Select value={statusVal} onValueChange={setStatusVal}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih tahapan..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(type === "INBOUND"
+                    ? SHIPMENT_STATUSES.INBOUND
+                    : SHIPMENT_STATUSES.OUTBOUND
+                  ).map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* NOTES SELECTOR UNTUK ARRIVAL */}
+            {/* 2. Date & Location */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tanggal Kejadian</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className="w-full justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {statusDate ? (
+                        format(statusDate, "dd/MM/yyyy")
+                      ) : (
+                        <span>Pilih</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={statusDate}
+                      onSelect={setStatusDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>Lokasi (Kota/Gudang)</Label>
+                <Input
+                  placeholder="Contoh: Shenzhen, Tj. Priok"
+                  value={statusCity}
+                  onChange={(e) => setStatusCity(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* 3. Manual Note */}
+            <div className="space-y-2">
+              <Label>Catatan Singkat (Opsional)</Label>
+              <Input
+                placeholder="Contoh: Barang tertahan pemeriksaan fisik"
+                value={statusNote}
+                onChange={(e) => setStatusNote(e.target.value)}
+              />
+            </div>
+
+            {/* 4. Template Notes */}
+            <Separator />
             {renderNotesSelector()}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmArriveId(null)}>
+            <Button variant="outline" onClick={() => setUpdateStatusId(null)}>
               Batal
             </Button>
             <Button
-              onClick={handleConfirmArrive}
-              disabled={arriving}
-              className="bg-green-600 hover:bg-green-700">
-              {arriving ? "Menyimpan..." : "Konfirmasi Sampai"}
+              onClick={handleUpdateStatus}
+              disabled={isUpdating}
+              className="bg-blue-600 hover:bg-blue-700">
+              {isUpdating ? "Menyimpan..." : "Simpan Update"}
             </Button>
           </DialogFooter>
         </DialogContent>

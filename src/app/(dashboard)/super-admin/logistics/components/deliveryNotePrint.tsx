@@ -145,9 +145,6 @@ export default function DeliveryNotePrint() {
         </Button>
       </div>
 
-      {/* === KERTAS A4 (Target Reference) === */}
-      {/* Container overflow-auto ini HANYA untuk preview di layar, 
-          saat html2canvas bekerja dia akan merender full height */}
       <div className="flex justify-center overflow-auto px-4 pb-10 w-full">
         <div
           id="invoice-content"
@@ -156,7 +153,7 @@ export default function DeliveryNotePrint() {
           style={{
             width: "210mm", // Lebar A4 Pas
             minHeight: "297mm", // Tinggi A4 Minimal
-            padding: "40mm 20mm", // Padding Kertas (Atas/Bawah 40mm, Kiri/Kanan 20mm agar rapi saat diprint)
+            padding: "20mm 10mm", // Padding Kertas (Atas/Bawah 40mm, Kiri/Kanan 20mm agar rapi saat diprint)
             display: "flex",
             flexDirection: "column",
           }}>
