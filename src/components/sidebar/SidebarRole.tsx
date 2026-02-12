@@ -66,7 +66,8 @@ export default function SidebarRole({ ...props }) {
         url: "#",
         icon: ListOrdered,
         items: [
-          { title: "Dashboard Overview", url: "/" },
+          { title: "Sales Dashboard", url: "/super-admin/sales" },
+          // { title: "Dashboard Overview", url: "/" },
           { title: "Order Form", url: "/super-admin/orders/add" },
           { title: "All Orders List", url: "/super-admin/orders" },
         ],
@@ -159,7 +160,7 @@ export default function SidebarRole({ ...props }) {
         url: "#",
         icon: HandshakeIcon,
         items: [
-          { title: "All Sales Team", url: "/super-admin/sales" },
+          { title: "All Sales Team", url: "/super-admin/sales-team" },
           { title: "Sales Performance", url: "/super-admin/sales/performance" },
         ],
       },

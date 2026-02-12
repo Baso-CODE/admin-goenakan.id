@@ -52,7 +52,6 @@ import { apiUrl } from "@/helper/apiurl";
 import { OrderFormValues, orderSchema } from "../order-schema";
 import { fetchWithToken, generatePoNumber, postOrder } from "../order-service";
 
-// --- TYPES (Updated IDs to String) ---
 type PIC = {
   id: string;
   name: string;
@@ -115,10 +114,10 @@ export default function AddOrderForm() {
       vendorIds: [],
       products: [
         {
-          productId: "", // String kosong (sesuai tipe string)
-          variantId: "", // String kosong
-          quantity: 1, // Number (sesuai tipe number)
-          price: 0, // Number
+          productId: "",
+          variantId: "",
+          quantity: 1,
+          price: 0,
           customization: "",
           remarks: "",
         },
@@ -138,12 +137,11 @@ export default function AddOrderForm() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
-    []
+    [],
   );
   const [loading, setLoading] = useState(false);
   const [generatingPo, setGeneratingPo] = useState(false);
 
-  // Client Combobox State
   const [clientOpen, setClientOpen] = useState(false);
 
   // Watchers
@@ -364,11 +362,11 @@ export default function AddOrderForm() {
                             role="combobox"
                             className={cn(
                               "w-full justify-between",
-                              !field.value && "text-muted-foreground"
+                              !field.value && "text-muted-foreground",
                             )}>
                             {field.value
                               ? clients.find(
-                                  (client) => client.id === field.value
+                                  (client) => client.id === field.value,
                                 )?.name
                               : "Select client..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -397,7 +395,7 @@ export default function AddOrderForm() {
                                       "mr-2 h-4 w-4",
                                       client.id === field.value
                                         ? "opacity-100"
-                                        : "opacity-0"
+                                        : "opacity-0",
                                     )}
                                   />
                                   {client.name}
@@ -584,7 +582,7 @@ export default function AddOrderForm() {
                               type="button"
                               onClick={() =>
                                 field.onChange(
-                                  field.value.filter((vId) => vId !== id)
+                                  field.value.filter((vId) => vId !== id),
                                 )
                               }
                               className="text-red-500 hover:text-red-700 rounded-full p-0.5">
@@ -644,7 +642,7 @@ export default function AddOrderForm() {
                 {fields.map((field, index) => {
                   const currentProductId = watch(`products.${index}.productId`);
                   const selectedProduct = products.find(
-                    (p) => p.id === currentProductId
+                    (p) => p.id === currentProductId,
                   );
                   const isCustomProduct = selectedProduct?.isCustom;
 
@@ -677,24 +675,24 @@ export default function AddOrderForm() {
                                     // Reset Variant (as string empty)
                                     form.setValue(
                                       `products.${index}.variantId`,
-                                      ""
+                                      "",
                                     );
 
                                     // Find product by string ID
                                     const prod = products.find(
-                                      (p) => p.id === val
+                                      (p) => p.id === val,
                                     );
 
                                     if (prod) {
                                       if (!prod.isCustom) {
                                         form.setValue(
                                           `products.${index}.price`,
-                                          prod.basePrice
+                                          prod.basePrice,
                                         );
                                       } else {
                                         form.setValue(
                                           `products.${index}.price`,
-                                          0
+                                          0,
                                         );
                                       }
                                     }
@@ -744,12 +742,12 @@ export default function AddOrderForm() {
 
                                       const variant =
                                         selectedProduct?.productVariants.find(
-                                          (v) => v.id === val
+                                          (v) => v.id === val,
                                         );
                                       if (variant) {
                                         form.setValue(
                                           `products.${index}.price`,
-                                          Number(variant.price)
+                                          Number(variant.price),
                                         );
                                       }
                                     }}>
@@ -765,7 +763,7 @@ export default function AddOrderForm() {
                                           <SelectItem key={v.id} value={v.id}>
                                             {v.variantName}
                                           </SelectItem>
-                                        )
+                                        ),
                                       )}
                                     </SelectContent>
                                   </Select>
@@ -807,24 +805,24 @@ export default function AddOrderForm() {
                                             ...selectedProduct.priceTiers,
                                           ].sort(
                                             (a, b) =>
-                                              b.minQuantity - a.minQuantity
+                                              b.minQuantity - a.minQuantity,
                                           );
                                           const applicableTier = tiers.find(
-                                            (tier) => val >= tier.minQuantity
+                                            (tier) => val >= tier.minQuantity,
                                           );
 
                                           if (applicableTier) {
                                             form.setValue(
                                               `products.${index}.price`,
-                                              Number(applicableTier.price)
+                                              Number(applicableTier.price),
                                             );
                                             toast.info(
-                                              `Price updated to tier ≥${applicableTier.minQuantity}`
+                                              `Price updated to tier ≥${applicableTier.minQuantity}`,
                                             );
                                           } else {
                                             form.setValue(
                                               `products.${index}.price`,
-                                              selectedProduct.basePrice
+                                              selectedProduct.basePrice,
                                             );
                                           }
                                         }

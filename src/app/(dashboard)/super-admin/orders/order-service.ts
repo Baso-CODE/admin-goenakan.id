@@ -26,7 +26,7 @@ async function getAuthToken() {
 
 export async function fetchWithTokenNew(
   url: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ) {
   try {
     const token = await getAuthToken();
@@ -75,23 +75,39 @@ export async function postOrder(data: any) {
 }
 
 export async function generatePoNumber() {
-  const token = await getToken();
-  const res = await fetch(`${apiUrl}/orders/generate-po`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  try {
+    const token = await getToken();
 
-  if (!res.ok) {
+    const res = await fetch(`${apiUrl}/orders/generate-po`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      throw new Error(`API Error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data.poNumber;
+  } catch (error) {
+    console.error(
+      "Gagal generate PO dari server, menggunakan fallback:",
+      error,
+    );
+
     const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
     const random = Math.floor(Math.random() * 1000)
       .toString()
       .padStart(3, "0");
-    return `PO-${date.getFullYear()}${(date.getMonth() + 1)
-      .toString()
-      .padStart(2, "0")}-${random}`;
+    return `GI-FB-${year}${month}-${random}`;
   }
-
-  const data = await res.json();
-  return data.poNumber;
 }
 
 export async function fetchOrderById(id: string) {

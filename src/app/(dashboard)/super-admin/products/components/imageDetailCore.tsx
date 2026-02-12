@@ -1,6 +1,6 @@
 "use client";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Check, Star, X } from "lucide-react";
@@ -21,7 +21,7 @@ interface ImageDetailModalProps {
   // Kita cukup pakai satu fungsi ini untuk update semua field (altText & isFeatured)
   setImageMetaField: (
     tempId: string | number,
-    patch: Partial<ImageMeta>
+    patch: Partial<ImageMeta>,
   ) => void;
 
   // Prop setFeaturedImage tidak wajib dipakai di sini jika kita gabung logicnya
@@ -65,18 +65,17 @@ export const ImageDetailModalCore = ({
         <button
           onClick={onClose}
           className="absolute top-3 right-3 p-1 rounded-full bg-black/10 hover:bg-black/20 text-gray-700 transition z-10"
-          title="Close without saving"
-        >
+          title="Close without saving">
           <X className="w-5 h-5" />
         </button>
 
         {/* --- KOLOM KIRI: PREVIEW GAMBAR --- */}
-        <div className="w-full md:w-1/2 bg-gray-100 flex items-center justify-center p-6 relative min-h-[300px]">
+        <div className="w-full md:w-1/2 bg-gray-100 flex items-center justify-center p-6 relative min-h-75">
           {imageMeta.url ? (
             <img
               src={imageMeta.url}
               alt={altText || "Preview"}
-              className="max-w-full max-h-[300px] object-contain shadow-md rounded-md"
+              className="max-w-full max-h-75 object-contain shadow-md rounded-md"
             />
           ) : (
             <div className="text-gray-400 text-sm">No Image</div>
@@ -117,23 +116,20 @@ export const ImageDetailModalCore = ({
                   isFeatured // Gunakan State Lokal
                     ? "border-indigo-600 bg-indigo-50"
                     : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
+                }`}>
                 <div className="flex items-center gap-3">
                   <div
                     className={`w-5 h-5 rounded-full flex items-center justify-center border ${
                       isFeatured // Gunakan State Lokal
                         ? "bg-indigo-600 border-indigo-600"
                         : "border-gray-400"
-                    }`}
-                  >
+                    }`}>
                     {isFeatured && <Check className="w-3 h-3 text-white" />}
                   </div>
                   <span
                     className={`text-sm font-medium ${
                       isFeatured ? "text-indigo-700" : "text-gray-600"
-                    }`}
-                  >
+                    }`}>
                     Set as Featured Image
                   </span>
                 </div>
@@ -155,14 +151,13 @@ export const ImageDetailModalCore = ({
             <div className="space-y-2">
               <Label
                 htmlFor="alt-text"
-                className="text-sm font-semibold text-gray-700"
-              >
+                className="text-sm font-semibold text-gray-700">
                 Alt Text (SEO Description)
               </Label>
               <Textarea
                 id="alt-text"
                 placeholder="Describe the image..."
-                className="resize-none min-h-[100px] focus-visible:ring-indigo-500"
+                className="resize-none min-h-25 focus-visible:ring-indigo-500"
                 value={altText} // Bind ke State Lokal
                 onChange={(e) => setAltText(e.target.value)} // Update State Lokal
               />
@@ -173,8 +168,7 @@ export const ImageDetailModalCore = ({
           <div className="pt-6 mt-4">
             <Button
               onClick={handleSaveAndClose}
-              className="w-full bg-gray-900 hover:bg-gray-800"
-            >
+              className="w-full bg-gray-900 hover:bg-gray-800">
               Save Changes & Close
             </Button>
           </div>
