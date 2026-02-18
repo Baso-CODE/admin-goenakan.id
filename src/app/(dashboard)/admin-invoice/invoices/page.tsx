@@ -2,15 +2,21 @@
 
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
-import { Eye, FileText, Filter, NotebookPen, Search } from "lucide-react";
+import { CalendarIcon, Eye, FileText, NotebookPen, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -28,9 +34,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiUrl } from "@/helper/apiurl";
-import { useDebounce } from "@/helper/debounce"; // Pastikan path ini benar
+import { useDebounce } from "@/helper/debounce";
+import { cn } from "@/lib/utils";
 
-// === TYPES (Sesuai Response Service getAllInvoices) ===
 type Invoice = {
   id: string;
   invoiceDate: string;
@@ -183,18 +189,31 @@ export default function InvoicesPage() {
 
       {/* Filter Bar */}
       <Card className="p-4 shadow-sm bg-gray-50/50 border-gray-100">
-        <div className="flex flex-col xl:flex-row gap-4 justify-between items-end xl:items-center">
+        <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-end">
           {/* Group Filter Utama */}
           <div className="flex flex-wrap gap-3 w-full xl:w-auto items-end">
-            {/* Label Filter Icon */}
-            <div className="hidden md:flex items-center gap-2 mr-1 h-9 bg-white px-3 border rounded-md shadow-sm text-muted-foreground">
-              <Filter className="h-4 w-4" />
-              <span className="text-xs font-medium">Filter</span>
+            {/* 1. Search Invoice / PO */}
+            <div className="flex flex-col gap-1.5 w-full sm:w-60">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">
+                Search
+              </span>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search Invoice / PO Number..."
+                  className="pl-9 h-10 text-sm bg-white"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Filter Status */}
+            {/* 2. Filter Status */}
             <div className="flex flex-col gap-1.5 w-full sm:w-40">
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider ml-1">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">
                 Status
               </span>
               <Select
@@ -203,22 +222,22 @@ export default function InvoicesPage() {
                   setStatusFilter(val);
                   setPage(1);
                 }}>
-                <SelectTrigger className="h-9 text-xs bg-white">
+                <SelectTrigger className="h-10 text-sm bg-white">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Semua Status</SelectItem>
-                  <SelectItem value="UNPAID">Unpaid (Belum Lunas)</SelectItem>
-                  <SelectItem value="PAID">Paid (Lunas)</SelectItem>
-                  <SelectItem value="OVERDUE">Overdue (Telat)</SelectItem>
+                  <SelectItem value="UNPAID">Unpaid</SelectItem>
+                  <SelectItem value="PAID">Paid</SelectItem>
+                  <SelectItem value="OVERDUE">Overdue</SelectItem>
                   <SelectItem value="CANCELLED">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Filter Kategori */}
-            <div className="flex flex-col gap-1.5 w-full sm:w-45">
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider ml-1">
+            {/* 3. Filter Kategori */}
+            <div className="flex flex-col gap-1.5 w-full sm:w-44">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">
                 Kategori
               </span>
               <Select
@@ -227,67 +246,101 @@ export default function InvoicesPage() {
                   setCategoryFilter(val);
                   setPage(1);
                 }}>
-                <SelectTrigger className="h-9 text-xs bg-white">
+                <SelectTrigger className="h-10 text-sm bg-white">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Semua Kategori</SelectItem>
                   <SelectItem value="FULL_PAYMENT">Full Payment</SelectItem>
-                  <SelectItem value="DP">Down Payment (DP)</SelectItem>
+                  <SelectItem value="DP">Down Payment</SelectItem>
                   <SelectItem value="INSTALLMENT">Cicilan</SelectItem>
                   <SelectItem value="REMAINING_BALANCE">Pelunasan</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Filter Date Range */}
-            <div className="flex items-center gap-2 bg-white p-1 rounded-md border shadow-sm w-full sm:w-auto mt-2 sm:mt-0">
-              <div className="flex flex-col gap-0.5 px-2">
-                <span className="text-[9px] text-muted-foreground font-medium uppercase">
-                  Dari
+            {/* 4. Filter Date Range (Updated Style) */}
+            <div className="flex gap-2 w-full sm:w-auto">
+              {/* Start Date Picker */}
+              <div className="flex flex-col gap-1.5 w-1/2 sm:w-36">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">
+                  Start Date
                 </span>
-                <input
-                  type="date"
-                  className="text-xs font-medium focus:outline-none bg-transparent h-5 w-27.5"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value);
-                    setPage(1);
-                  }}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal text-sm h-10 px-3 bg-white",
+                        !startDate && "text-muted-foreground",
+                      )}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate ? (
+                        format(new Date(startDate), "dd MMM yyyy", {
+                          locale: idLocale,
+                        })
+                      ) : (
+                        <span>Pick date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={startDate ? new Date(startDate) : undefined}
+                      onSelect={(date) => {
+                        const dateStr = date ? format(date, "yyyy-MM-dd") : "";
+                        setStartDate(dateStr);
+                        setPage(1);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
-              <div className="h-6 w-px bg-gray-200"></div> {/* Separator */}
-              <div className="flex flex-col gap-0.5 px-2">
-                <span className="text-[9px] text-muted-foreground font-medium uppercase">
-                  Sampai
+
+              {/* End Date Picker */}
+              <div className="flex flex-col gap-1.5 w-1/2 sm:w-36">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">
+                  End Date
                 </span>
-                <input
-                  type="date"
-                  className="text-xs font-medium focus:outline-none bg-transparent h-5 w-27.5"
-                  value={endDate}
-                  onChange={(e) => {
-                    setEndDate(e.target.value);
-                    setPage(1);
-                  }}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal text-sm h-10 px-3 bg-white",
+                        !endDate && "text-muted-foreground",
+                      )}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {endDate ? (
+                        format(new Date(endDate), "dd MMM yyyy", {
+                          locale: idLocale,
+                        })
+                      ) : (
+                        <span>Pick date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={endDate ? new Date(endDate) : undefined}
+                      onSelect={(date) => {
+                        const dateStr = date ? format(date, "yyyy-MM-dd") : "";
+                        setEndDate(dateStr);
+                        setPage(1);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </div>
 
-          {/* Tombol Export */}
-          {/* <Button
-            variant="outline"
-            className="w-full xl:w-auto h-9 text-xs font-medium border-green-600 text-green-700 hover:bg-green-50 hover:text-green-800 gap-2 shadow-sm"
-            onClick={handleExport}
-            disabled={exporting}
-          >
-            {exporting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <FileDown className="h-3.5 w-3.5" />
-            )}
-            Export Excel
-          </Button> */}
+          {/* Tombol Export atau Action Lain (Opsional) */}
+          {/* <Button variant="outline" ... >Export</Button> */}
         </div>
       </Card>
 

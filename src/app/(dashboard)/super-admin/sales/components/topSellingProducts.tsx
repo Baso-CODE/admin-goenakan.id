@@ -8,9 +8,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { apiUrl } from "@/helper/apiurl";
 import { Package, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
 
-// Helper formatter
+// === TYPES SESUAI API BACKEND ===
+interface TopProduct {
+  id: string;
+  name: string;
+  sku: string;
+  category: string;
+  sold: number;
+  revenue: number;
+  image: string | null;
+  status: string;
+}
+
 const formatIDR = (amount: number) => {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -20,57 +34,38 @@ const formatIDR = (amount: number) => {
 };
 
 export default function TopSellingProducts() {
-  // DUMMY DATA: 5 Produk Terlaris
-  const topProducts = [
-    {
-      id: "1",
-      name: "Kaos Polos Cotton Combed 30s",
-      sku: "TS-POLOS-01",
-      category: "Apparel",
-      sold: 1250,
-      revenue: 43750000,
-      status: "Trending",
-    },
-    {
-      id: "2",
-      name: "Kemeja Flanel Premium",
-      sku: "KM-FLNL-02",
-      category: "Apparel",
-      sold: 850,
-      revenue: 127500000,
-      status: "Stable",
-    },
-    {
-      id: "3",
-      name: "Hoodie Jumper Fleece",
-      sku: "HD-JMP-01",
-      category: "Outerwear",
-      sold: 620,
-      revenue: 93000000,
-      status: "Trending",
-    },
-    {
-      id: "4",
-      name: "Topi Baseball Custom",
-      sku: "TP-BASE-01",
-      category: "Accessories",
-      sold: 540,
-      revenue: 162000000, // Misal ini pesanan partai besar
-      status: "Stable",
-    },
-    {
-      id: "5",
-      name: "Totebag Canvas Premium",
-      sku: "TB-CNV-03",
-      category: "Accessories",
-      sold: 430,
-      revenue: 21500000,
-      status: "Down",
-    },
-  ];
+  const [products, setProducts] = useState<TopProduct[]>([]);
+
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTopProducts = async () => {
+      try {
+        setLoading(true);
+        const tokenRes = await fetch("/api/auth/token");
+        const { token } = await tokenRes.json();
+
+        const res = await fetch(`${apiUrl}/products/top-selling?limit=5`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error("Gagal mengambil data produk terlaris");
+
+        const result = await res.json();
+        setProducts(result.data || []);
+      } catch (error) {
+        console.error(error);
+        // toast.error("Gagal memuat Top Products"); // Optional: hide toast agar tidak spam saat init
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTopProducts();
+  }, []);
 
   return (
-    <Card className="shadow-sm">
+    <Card className="shadow-sm h-full border-l-4 border-l-blue-500">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -78,7 +73,7 @@ export default function TopSellingProducts() {
               Top Selling Products
             </CardTitle>
             <CardDescription>
-              Produk dengan volume penjualan tertinggi bulan ini.
+              Produk dengan volume penjualan tertinggi.
             </CardDescription>
           </div>
           <div className="p-2 bg-blue-50 rounded-full">
@@ -88,51 +83,91 @@ export default function TopSellingProducts() {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {topProducts.map((product, index) => (
-            <div key={product.id} className="flex items-center justify-between">
-              {/* Bagian Kiri: Info Produk */}
-              <div className="flex items-center gap-4">
-                {/* Avatar / Icon Placeholder */}
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg border bg-slate-50">
-                  <Package className="h-6 w-6 text-slate-400" />
+          {loading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Skeleton className="h-12 w-12 rounded-lg" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium leading-none">
-                    {product.name}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="font-mono">{product.sku}</span>
-                    <span>•</span>
-                    <span>{product.category}</span>
+                <div className="flex flex-col items-end gap-1">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </div>
+            ))
+          ) : products.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              Belum ada data penjualan produk.
+            </div>
+          ) : (
+            products.map((product) => (
+              <div
+                key={product.id}
+                className="flex items-center justify-between hover:bg-slate-50 p-2 rounded-lg transition-colors">
+                {/* Bagian Kiri: Info Produk */}
+                <div className="flex items-center gap-4">
+                  {/* Avatar / Gambar */}
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-white overflow-hidden relative">
+                    {product.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          // Fallback jika URL gambar rusak/expired
+                          e.currentTarget.style.display = "none";
+                          e.currentTarget.parentElement?.classList.add(
+                            "bg-slate-100",
+                          );
+                        }}
+                      />
+                    ) : (
+                      <Package className="h-6 w-6 text-slate-400" />
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium leading-none line-clamp-1 w-32 sm:w-48">
+                      {product.name}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-mono bg-slate-100 px-1 rounded">
+                        {product.sku}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bagian Kanan: Stats Penjualan */}
+                <div className="text-right flex flex-col items-end gap-1">
+                  <div className="font-semibold text-sm">
+                    {formatIDR(product.revenue)}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground hidden sm:inline">
+                      {product.sold.toLocaleString("id-ID")} Terjual
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] px-1.5 py-0 h-4 ${
+                        product.status === "Trending"
+                          ? "text-green-600 border-green-200 bg-green-50"
+                          : product.status === "Slow"
+                            ? "text-red-600 border-red-200 bg-red-50"
+                            : "text-blue-600 border-blue-200 bg-blue-50"
+                      }`}>
+                      {product.status}
+                    </Badge>
                   </div>
                 </div>
               </div>
-
-              {/* Bagian Kanan: Stats Penjualan */}
-              <div className="text-right flex flex-col items-end gap-1">
-                <div className="font-semibold text-sm">
-                  {formatIDR(product.revenue)}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    {product.sold.toLocaleString("id-ID")} Terjual
-                  </span>
-                  {/* Badge Indikator Status */}
-                  <Badge
-                    variant="outline"
-                    className={`text-[10px] px-1.5 py-0 h-4 ${
-                      product.status === "Trending"
-                        ? "text-green-600 border-green-200 bg-green-50"
-                        : product.status === "Down"
-                          ? "text-red-600 border-red-200 bg-red-50"
-                          : "text-slate-600 border-slate-200 bg-slate-50"
-                    }`}>
-                    {product.status}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </CardContent>
     </Card>

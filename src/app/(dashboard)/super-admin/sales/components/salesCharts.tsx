@@ -1,6 +1,9 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { apiUrl } from "@/helper/apiurl";
+import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -12,22 +15,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { toast } from "sonner";
 
-// DUMMY DATA TRANSAKSI 12 BULAN
-const chartData = [
-  { name: "Jan", orders: 65, profit: 15000000 },
-  { name: "Feb", orders: 59, profit: 12000000 },
-  { name: "Mar", orders: 80, profit: 25000000 },
-  { name: "Apr", orders: 81, profit: 27000000 },
-  { name: "Mei", orders: 56, profit: 18000000 },
-  { name: "Jun", orders: 55, profit: 17000000 },
-  { name: "Jul", orders: 40, profit: 10000000 },
-  { name: "Ags", orders: 90, profit: 32000000 },
-  { name: "Sep", orders: 110, profit: 45000000 },
-  { name: "Okt", orders: 130, profit: 55000000 },
-  { name: "Nov", orders: 140, profit: 60000000 },
-  { name: "Des", orders: 170, profit: 85000000 },
-];
+// Tipe Data Chart (Sesuai return API)
+interface ChartData {
+  name: string; // Jan, Feb, dst
+  orders: number; // Jumlah Order
+  profit: number; // Profit/Keuntungan
+}
 
 // Helper formatter untuk Tooltip Rupiah
 const formatRupiahTooltip = (value: number) => {
@@ -39,6 +34,67 @@ const formatRupiahTooltip = (value: number) => {
 };
 
 export default function SalesCharts() {
+  // === STATE ===
+  const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // === FETCH DATA API ===
+  useEffect(() => {
+    const fetchChartData = async () => {
+      try {
+        setLoading(true);
+
+        // 1. Ambil Token
+        const tokenRes = await fetch("/api/auth/token");
+        const { token } = await tokenRes.json();
+
+        const res = await fetch(`${apiUrl}/orders/analytics/charts`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error("Gagal mengambil data chart");
+
+        const json = await res.json();
+
+        setChartData(json.data || []);
+      } catch (error) {
+        console.error(error);
+        toast.error("Gagal memuat statistik penjualan");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchChartData();
+  }, []);
+
+  // === RENDER LOADING (SKELETON) ===
+  if (loading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 mt-4">
+        {/* Skeleton Chart 1 */}
+        <Card className="shadow-sm">
+          <CardHeader>
+            <Skeleton className="h-6 w-48" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-75 w-full rounded-lg" />
+          </CardContent>
+        </Card>
+        {/* Skeleton Chart 2 */}
+        <Card className="shadow-sm">
+          <CardHeader>
+            <Skeleton className="h-6 w-48" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-75 w-full rounded-lg" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // === RENDER CHARTS ===
   return (
     <div className="grid gap-4 md:grid-cols-2 mt-4">
       {/* CHART 1: TOTAL ORDERS (BAR CHART) */}
@@ -69,6 +125,7 @@ export default function SalesCharts() {
                 <YAxis tickLine={false} axisLine={false} fontSize={12} />
                 <Tooltip
                   cursor={{ fill: "rgba(0,0,0,0.05)" }}
+                  formatter={(value: number) => [`${value} Orders`, "Total"]}
                   contentStyle={{
                     borderRadius: "8px",
                     border: "none",
@@ -116,7 +173,12 @@ export default function SalesCharts() {
                   tickLine={false}
                   axisLine={false}
                   fontSize={12}
-                  tickFormatter={(value) => `Rp ${value / 1000000}M`} // Tampilkan dalam format M (Juta) agar tidak kepanjangan
+                  // Formatter Y-Axis: Jika > 1 Juta, pakai 'M', jika > 1 Ribu pakai 'K'
+                  tickFormatter={(value) => {
+                    if (value >= 1000000) return `Rp ${value / 1000000}M`;
+                    if (value >= 1000) return `Rp ${value / 1000}K`;
+                    return `${value}`;
+                  }}
                 />
                 <Tooltip
                   formatter={(value: number) => [

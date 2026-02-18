@@ -1,7 +1,11 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { apiUrl } from "@/helper/apiurl";
 import { CreditCard, DollarSign, ShoppingBag, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 // Helper untuk format Rupiah
 const formatIDR = (amount: number) => {
@@ -12,15 +16,87 @@ const formatIDR = (amount: number) => {
   }).format(amount);
 };
 
-export default function SalesMetrics() {
-  // DUMMY DATA
-  const metrics = {
-    totalRevenue: 1250000000, // 1.25 M
-    totalProfit: 450000000, // 450 Jt
-    totalOrders: 1245,
-    totalSpending: 800000000, // 800 Jt
-  };
+// Helper untuk format Persentase (+/-)
+const formatPercent = (val: number) => {
+  const sign = val > 0 ? "+" : "";
+  return `${sign}${val.toFixed(1)}%`;
+};
 
+const getTrendColor = (val: number) => {
+  if (val > 0) return "text-green-600";
+  if (val < 0) return "text-red-600";
+  return "text-muted-foreground";
+};
+
+export default function SalesMetrics() {
+  // === STATE ===
+  const [metrics, setMetrics] = useState({
+    totalRevenue: 0,
+    revenueChange: 0,
+    totalProfit: 0,
+    profitChange: 0,
+    totalOrders: 0,
+    ordersChange: 0,
+    totalSpending: 0,
+    spendingChange: 0,
+  });
+
+  const [loading, setLoading] = useState(true);
+
+  // === FETCH API ===
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      try {
+        setLoading(true);
+
+        // 1. Ambil Token Auth
+        const tokenRes = await fetch("/api/auth/token");
+        const { token } = await tokenRes.json();
+
+        // 2. Panggil Endpoint Analytics
+        const res = await fetch(`${apiUrl}/orders/analytics/metrics`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error("Gagal mengambil data metrics");
+
+        const json = await res.json();
+
+        // Simpan data ke state
+        setMetrics(json.data);
+      } catch (error) {
+        console.error("Error fetching metrics:", error);
+        toast.error("Gagal memuat ringkasan penjualan");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMetrics();
+  }, []);
+
+  // === RENDER LOADING (SKELETON) ===
+  if (loading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i} className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <Skeleton className="h-4 w-24" /> {/* Title Skeleton */}
+              <Skeleton className="h-4 w-4 rounded-full" />{" "}
+              {/* Icon Skeleton */}
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-8 w-32 mb-2" /> {/* Value Skeleton */}
+              <Skeleton className="h-3 w-20" /> {/* Subtext Skeleton */}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  // === RENDER DATA ===
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {/* CARD 1: TOTAL REVENUE */}
@@ -33,8 +109,8 @@ export default function SalesMetrics() {
           <div className="text-2xl font-bold">
             {formatIDR(metrics.totalRevenue)}
           </div>
-          <p className="text-xs text-muted-foreground">
-            +20.1% dari bulan lalu
+          <p className={`text-xs ${getTrendColor(metrics.revenueChange)}`}>
+            {formatPercent(metrics.revenueChange)} dari bulan lalu
           </p>
         </CardContent>
       </Card>
@@ -49,8 +125,8 @@ export default function SalesMetrics() {
           <div className="text-2xl font-bold text-green-600">
             {formatIDR(metrics.totalProfit)}
           </div>
-          <p className="text-xs text-muted-foreground">
-            +15.3% dari bulan lalu
+          <p className={`text-xs ${getTrendColor(metrics.profitChange)}`}>
+            {formatPercent(metrics.profitChange)} dari bulan lalu
           </p>
         </CardContent>
       </Card>
@@ -66,7 +142,9 @@ export default function SalesMetrics() {
             {metrics.totalOrders.toLocaleString("id-ID")}
           </div>
           <p className="text-xs text-muted-foreground">
-            +180 order baru minggu ini
+            {/* Logic plus sign untuk order */}
+            {metrics.ordersChange >= 0 ? "+" : ""}
+            {metrics.ordersChange} order baru bulan ini
           </p>
         </CardContent>
       </Card>
@@ -82,7 +160,7 @@ export default function SalesMetrics() {
             {formatIDR(metrics.totalSpending)}
           </div>
           <p className="text-xs text-muted-foreground">
-            Pengeluaran bahan baku & operasional
+            Pengeluaran Operasional & Modal
           </p>
         </CardContent>
       </Card>

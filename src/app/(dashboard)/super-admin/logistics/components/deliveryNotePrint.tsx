@@ -76,8 +76,6 @@ export default function DeliveryNotePrint() {
       const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
       // 4. Masukkan Gambar ke PDF
-      // Jika konten lebih panjang dari 1 halaman A4, logic-nya bisa ditambah (multi-page).
-      // Untuk surat jalan standar biasanya cukup 1 halaman.
       pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, imgHeight);
 
       // 5. Download File
@@ -153,7 +151,7 @@ export default function DeliveryNotePrint() {
           style={{
             width: "210mm", // Lebar A4 Pas
             minHeight: "297mm", // Tinggi A4 Minimal
-            padding: "20mm 10mm", // Padding Kertas (Atas/Bawah 40mm, Kiri/Kanan 20mm agar rapi saat diprint)
+            padding: "20mm 10mm", // Padding Kertas
             display: "flex",
             flexDirection: "column",
           }}>
@@ -185,7 +183,9 @@ export default function DeliveryNotePrint() {
                       </td>
                     </tr>
                     <tr>
-                      <td className="font-semibold py-0.5">Tanggal Kirim</td>
+                      <td className="font-semibold w-32 py-0.5">
+                        Tanggal Kirim
+                      </td>
                       <td className="py-0.5">
                         :{" "}
                         {format(new Date(departureDate), "dd MMMM yyyy", {
@@ -194,18 +194,22 @@ export default function DeliveryNotePrint() {
                       </td>
                     </tr>
                     <tr>
-                      <td className="font-semibold py-0.5">No. PO (Ref)</td>
+                      <td className="font-semibold w-32 py-0.5">
+                        No. PO (Ref)
+                      </td>
                       <td className="py-0.5">: {order.poNumber}</td>
                     </tr>
                     <tr>
-                      <td className="font-semibold py-0.5">Ekspedisi</td>
+                      <td className="font-semibold w-32 py-0.5">Ekspedisi</td>
                       <td className="py-0.5 uppercase">
                         : {vendor?.companyName || "Internal Armada"}
                       </td>
                     </tr>
-                    {trackingNumber && (
+
+                    {/* --- LOGIC NO RESI: HANYA TAMPIL JIKA ADA --- */}
+                    {trackingNumber && trackingNumber !== "-" && (
                       <tr>
-                        <td className="font-semibold py-0.5">No. Resi</td>
+                        <td className="font-semibold w-32 py-0.5">No. Resi</td>
                         <td className="py-0.5 uppercase">: {trackingNumber}</td>
                       </tr>
                     )}
@@ -280,6 +284,7 @@ export default function DeliveryNotePrint() {
                     );
                   })}
 
+                  {/* Empty rows filler */}
                   {items.length < 5 &&
                     Array.from({ length: 5 - items.length }).map((_, i) => (
                       <tr key={`empty-${i}`} className="h-8">
@@ -338,7 +343,7 @@ export default function DeliveryNotePrint() {
                       src={order.sales.signatureUrl}
                       alt="Signature"
                       className="h-full w-auto object-contain opacity-80"
-                      crossOrigin="anonymous" // Penting!
+                      crossOrigin="anonymous"
                     />
                   ) : (
                     <div className="h-16 w-full"></div>
