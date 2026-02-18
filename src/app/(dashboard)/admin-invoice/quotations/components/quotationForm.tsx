@@ -407,11 +407,12 @@ export default function QuotationForm({
                           content={tpl.content}>
                           {(isSelected: boolean) => (
                             <NoteItem
-                              catId={cat.id}
-                              tpl={tpl}
-                              idx={tplIdx}
+                              title={tpl.title}
+                              content={tpl.content}
                               isSelected={isSelected}
-                              onToggle={handleToggleNote}
+                              onToggle={() =>
+                                handleToggleNote(cat.id, tpl.content)
+                              }
                             />
                           )}
                         </NoteItemWatcher>
