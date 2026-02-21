@@ -27,6 +27,8 @@ export default function DeliveryNotePrint() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
+        // Pastikan endpoint backend ini (getShipmentById) mereturn relasi B2BPIC dan Department
+        // sesuai dengan query Prisma yang Anda berikan.
         const res = await fetch(`${apiUrl}/logistics/shipments/${shipmentId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -54,33 +56,25 @@ export default function DeliveryNotePrint() {
       setIsDownloading(true);
       toast.info("Sedang membuat PDF...");
 
-      // 1. Generate Canvas dari DOM
       const canvas = await html2canvas(element, {
-        scale: 2, // Tingkatkan scale agar teks tajam (High Resolution)
-        useCORS: true, // Agar gambar external (logo/ttd) termuat
-        backgroundColor: "#ffffff", // Pastikan background putih
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
       });
 
-      // 2. Konversi Canvas ke Image Data
       const imgData = canvas.toDataURL("image/png");
-
-      // 3. Setup PDF (A4 Portrait)
       const pdf = new jsPDF("p", "mm", "a4");
 
-      // Ukuran A4 dalam mm
       const pdfWidth = 210;
       const pdfHeight = 297;
 
-      // Hitung dimensi gambar agar pas di lebar A4
       const imgProps = pdf.getImageProperties(imgData);
       const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-      // 4. Masukkan Gambar ke PDF
       pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, imgHeight);
 
-      // 5. Download File
       const fileName = `Surat_Jalan_${data?.deliveryNoteNumber || "Draft"}.pdf`;
-      pdf.save(fileName.replace(/\//g, "-")); // Ganti slash dengan dash agar valid filename
+      pdf.save(fileName.replace(/\//g, "-"));
 
       toast.success("PDF Berhasil didownload!");
     } catch (error) {
@@ -105,30 +99,42 @@ export default function DeliveryNotePrint() {
   const {
     deliveryNoteNumber,
     departureDate,
-    trackingNumber,
-    vendor,
     order,
     items,
     remarks,
-    origin,
     destination,
   } = data;
 
-  let receiverName = "-";
+  // Setup Variabel Penerima
+  let receiverCompany = "-";
   let receiverAddress = destination || order.shippingAddress;
-  let receiverPhone = "-";
+  let picName = "-";
+  let picDept = "-";
+  let picPhone = "-";
 
+  // Ekstrak data dari struktur relasi backend
   if (order.client?.b2b) {
-    receiverName = order.client.b2b.companyName;
-    receiverPhone = order.client.b2b.phone;
+    receiverCompany = order.client.b2b.companyName;
+
+    // Ambil detail PIC dari order (berdasarkan schema: Order -> clientB2BPIC -> b2b -> dept)
+    if (order.pic) {
+      picName = `${order.pic.prefix ? order.pic.prefix + " " : ""}${order.pic.name}`;
+      picPhone = order.pic.phone || order.client.b2b.phone || "-";
+      picDept = order.client.b2b.department?.name || "-";
+    } else {
+      // Fallback jika tidak ada PIC spesifik di order
+      picPhone = order.client.b2b.phone || "-";
+      picDept = order.client.b2b.department?.name || "-";
+    }
   } else if (order.client?.b2c) {
-    receiverName = order.client.b2c.name;
-    receiverPhone = order.client.b2c.phone;
+    receiverCompany = order.client.b2c.name;
+    picName = "Personal";
+    picPhone = order.client.b2c.phone || "-";
   }
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center py-10">
-      {/* TOMBOL DOWNLOAD PDF (Fixed Position) */}
+      {/* TOMBOL DOWNLOAD PDF */}
       <div className="fixed top-5 right-5 z-50">
         <Button
           onClick={handleDownloadPDF}
@@ -149,44 +155,44 @@ export default function DeliveryNotePrint() {
           ref={invoiceRef}
           className="bg-white text-[#1e293b] font-sans text-[13px] leading-relaxed relative box-border shadow-xl"
           style={{
-            width: "210mm", // Lebar A4 Pas
-            minHeight: "297mm", // Tinggi A4 Minimal
-            padding: "20mm 10mm", // Padding Kertas
+            width: "210mm",
+            minHeight: "297mm",
+            padding: "20mm 10mm",
             display: "flex",
             flexDirection: "column",
           }}>
           <div className="flex-1">
-            {/* 1. HEADER IMAGE */}
+            {/* 1. HEADER IMAGE KOP SURAT */}
             <div className="w-full mb-6 border-b-2 border-gray-800 pb-4">
               <img
-                src="/images/invoice.png"
-                alt="Header"
+                src="/images/surat-jalan-header.png"
+                alt="Kop Surat"
                 className="w-full h-auto object-contain max-h-30"
-                crossOrigin="anonymous" // Penting agar tidak CORS error saat generate canvas
               />
             </div>
 
             {/* 2. JUDUL & INFO UTAMA */}
-            <div className="flex justify-between items-start mb-8">
-              <div>
+            <div className="flex justify-between items-start mb-8 gap-4">
+              {/* Kolom Kiri: Info Surat Jalan */}
+              <div className="flex-1">
                 <h1 className="text-2xl font-extrabold uppercase tracking-widest mb-4 text-gray-900">
                   SURAT JALAN
                 </h1>
                 <table className="text-sm">
                   <tbody>
                     <tr>
-                      <td className="font-semibold w-32 py-0.5">
+                      <td className="font-semibold w-32 py-0.5 align-top">
                         No. Surat Jalan
                       </td>
-                      <td className="font-bold uppercase py-0.5">
+                      <td className="font-bold uppercase py-0.5 align-top">
                         : {deliveryNoteNumber || "-"}
                       </td>
                     </tr>
                     <tr>
-                      <td className="font-semibold w-32 py-0.5">
+                      <td className="font-semibold w-32 py-0.5 align-top">
                         Tanggal Kirim
                       </td>
-                      <td className="py-0.5">
+                      <td className="py-0.5 align-top">
                         :{" "}
                         {format(new Date(departureDate), "dd MMMM yyyy", {
                           locale: idLocale,
@@ -194,62 +200,72 @@ export default function DeliveryNotePrint() {
                       </td>
                     </tr>
                     <tr>
-                      <td className="font-semibold w-32 py-0.5">
+                      <td className="font-semibold w-32 py-0.5 align-top">
                         No. PO (Ref)
                       </td>
-                      <td className="py-0.5">: {order.poNumber}</td>
+                      <td className="py-0.5 align-top">: {order.poNumber}</td>
                     </tr>
-                    <tr>
-                      <td className="font-semibold w-32 py-0.5">Ekspedisi</td>
-                      <td className="py-0.5 uppercase">
-                        : {vendor?.companyName || "Internal Armada"}
-                      </td>
-                    </tr>
-
-                    {/* --- LOGIC NO RESI: HANYA TAMPIL JIKA ADA --- */}
-                    {trackingNumber && trackingNumber !== "-" && (
-                      <tr>
-                        <td className="font-semibold w-32 py-0.5">No. Resi</td>
-                        <td className="py-0.5 uppercase">: {trackingNumber}</td>
-                      </tr>
-                    )}
+                    {/* Ekspedisi & Resi di-takeout sesuai request */}
                   </tbody>
                 </table>
               </div>
 
-              <div className="w-[45%] border border-gray-300 p-4 rounded-sm bg-gray-50/50">
+              {/* Kolom Kanan: Info Penerima (Kepada Yth) */}
+              <div className="w-[50%] border border-gray-300 p-4 rounded-sm bg-gray-50/50">
                 <div className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-2 border-b border-gray-200 pb-1">
                   Kepada Yth / Ship To:
                 </div>
+
+                {/* Nama Perusahaan / Instansi */}
                 <div className="font-bold text-base uppercase mb-1">
-                  {receiverName}
+                  {receiverCompany}
                 </div>
-                <div className="text-xs text-gray-600 mb-2 whitespace-pre-line leading-relaxed">
+
+                {/* Alamat Lengkap */}
+                <div className="text-xs text-gray-700 mb-3 whitespace-pre-line leading-relaxed">
                   {receiverAddress}
                 </div>
-                <div className="text-xs font-medium">Telp: {receiverPhone}</div>
+
+                {/* Detail PIC */}
+                <div className="bg-white p-2 border border-gray-200 rounded text-[11px]">
+                  <table className="w-full">
+                    <tbody>
+                      <tr>
+                        <td className="text-gray-500 w-24 pb-1">Attn (PIC)</td>
+                        <td className="font-semibold pb-1">: {picName}</td>
+                      </tr>
+                      {picDept !== "-" && (
+                        <tr>
+                          <td className="text-gray-500 w-24 pb-1">
+                            Departemen
+                          </td>
+                          <td className="pb-1">: {picDept}</td>
+                        </tr>
+                      )}
+                      <tr>
+                        <td className="text-gray-500 w-24">No. HP / Telp</td>
+                        <td className="font-medium">: {picPhone}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
             {/* 3. PRODUCT TABLE */}
+            {/* Kolom 'Satuan' dan 'Ceklis' dihapus sesuai request */}
             <div className="mb-6">
               <table className="w-full border-collapse border border-[#94a3b8]">
                 <thead>
                   <tr className="bg-[#f3f4f6] text-center font-bold text-xs uppercase text-gray-700">
                     <th className="border border-[#94a3b8] py-2 w-12">No</th>
-                    <th className="border border-[#94a3b8] py-2 w-32">
+                    <th className="border border-[#94a3b8] py-2 w-40">
                       Kode Barang (SKU)
                     </th>
                     <th className="border border-[#94a3b8] py-2">
                       Nama Barang / Deskripsi
                     </th>
                     <th className="border border-[#94a3b8] py-2 w-24">Qty</th>
-                    <th className="border border-[#94a3b8] py-2 w-24">
-                      Satuan
-                    </th>
-                    <th className="border border-[#94a3b8] py-2 w-40">
-                      Ceklis
-                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -260,69 +276,63 @@ export default function DeliveryNotePrint() {
                         <td className="border border-[#94a3b8] py-2 text-center">
                           {index + 1}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 px-3 font-mono text-xs">
+                        <td className="border border-[#94a3b8] py-2 px-3 font-mono text-xs text-center">
                           {product.sku || "-"}
                         </td>
                         <td className="border border-[#94a3b8] py-2 px-3">
-                          <div className="font-bold text-sm">
+                          <div className="font-bold text-sm text-gray-800">
                             {product.name}
                           </div>
                           {item.orderProduct.customization && (
-                            <div className="text-[10px] text-gray-500 mt-1 italic">
+                            <div className="text-[10px] text-gray-500 mt-1 italic leading-tight">
                               Spec: {item.orderProduct.customization}
                             </div>
                           )}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 text-center font-bold text-sm">
-                          {item.quantity}
+                        <td className="border border-[#94a3b8] py-2 text-center">
+                          <span className="font-bold text-sm">
+                            {item.quantity}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-1">
+                            Pcs
+                          </span>
                         </td>
-                        <td className="border border-[#94a3b8] py-2 text-center text-xs uppercase">
-                          Pcs
-                        </td>
-                        <td className="border border-[#94a3b8] py-2 px-2"></td>
                       </tr>
                     );
                   })}
 
-                  {/* Empty rows filler */}
-                  {items.length < 5 &&
-                    Array.from({ length: 5 - items.length }).map((_, i) => (
-                      <tr key={`empty-${i}`} className="h-8">
-                        <td className="border border-[#94a3b8]"></td>
-                        <td className="border border-[#94a3b8]"></td>
-                        <td className="border border-[#94a3b8]"></td>
-                        <td className="border border-[#94a3b8]"></td>
-                        <td className="border border-[#94a3b8]"></td>
-                        <td className="border border-[#94a3b8]"></td>
-                      </tr>
-                    ))}
+                  {/* Blok 'Empty rows filler' sudah di-takeout sesuai request */}
                 </tbody>
               </table>
             </div>
 
             {/* 4. REMARKS */}
             <div className="mb-10">
-              <div className="font-bold text-xs uppercase mb-1">
+              <div className="font-bold text-xs uppercase mb-1 text-gray-700">
                 Catatan (Remarks):
               </div>
-              <div className="border border-gray-300 p-3 min-h-15 rounded-sm text-xs text-gray-600 bg-gray-50/30 whitespace-pre-wrap">
-                {remarks || "Barang diterima dalam kondisi baik."}
+              <div className="border border-gray-300 p-3 min-h-[60px] rounded-sm text-xs text-gray-600 bg-gray-50/30 whitespace-pre-wrap">
+                {remarks ||
+                  "Barang diterima dalam kondisi baik dan sesuai pesanan."}
               </div>
             </div>
           </div>
 
-          {/* 5. FOOTER */}
-          <div className="mt-auto break-inside-avoid">
+          {/* 5. FOOTER (Tanda Tangan) */}
+          <div className="mt-auto break-inside-avoid pt-4">
             <div className="flex justify-between text-center px-4">
               <div className="flex flex-col items-center">
                 <div className="mb-16 text-sm font-semibold">
-                  Diterima Oleh,
-                  <div className="text-[10px] font-normal text-gray-500">
+                  Penerima (PIC),
+                  <div className="text-[10px] font-normal text-gray-500 mt-0.5">
                     (Tanda Tangan & Stempel)
                   </div>
                 </div>
                 <div className="border-b border-black w-40 mb-1"></div>
-                <div className="text-xs">Nama Terang & Tanggal</div>
+                <div className="text-xs font-semibold">{picName}</div>
+                <div className="text-[10px] text-gray-500">
+                  {picDept !== "-" ? picDept : "Tgl: ....................."}
+                </div>
               </div>
 
               <div className="flex flex-col items-center">
@@ -330,14 +340,14 @@ export default function DeliveryNotePrint() {
                   Pengirim / Driver,
                 </div>
                 <div className="border-b border-black w-40 mb-1"></div>
-                <div className="text-xs">
-                  ( ........................................ )
+                <div className="text-xs text-gray-500">
+                  (Nama Terang & Tanda Tangan)
                 </div>
               </div>
 
               <div className="flex flex-col items-center">
                 <div className="mb-4 text-sm font-bold">Hormat Kami,</div>
-                <div className="relative h-20 w-32 flex items-center justify-center -mb2.5">
+                <div className="relative h-20 w-32 flex items-center justify-center -mb-2">
                   {order.sales?.signatureUrl ? (
                     <img
                       src={order.sales.signatureUrl}
@@ -358,9 +368,9 @@ export default function DeliveryNotePrint() {
               </div>
             </div>
 
-            <div className="mt-8 text-[10px] text-center text-gray-400 italic">
-              * Surat Jalan ini merupakan bukti sah penerimaan barang. Harap
-              disimpan sebagai arsip.
+            <div className="mt-10 text-[10px] text-center text-gray-400 italic border-t border-gray-200 pt-3">
+              * Surat Jalan ini merupakan bukti sah pengiriman dan penerimaan
+              barang. Harap disimpan dengan baik.
             </div>
           </div>
         </div>

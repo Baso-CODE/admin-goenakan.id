@@ -76,6 +76,7 @@ import { cn } from "@/lib/utils";
 // === 1. Tambahkan Type Khusus Follow Up ===
 type QuotationFollowUp = {
   id: string;
+  name: string;
   quotationId: string;
   date: string;
   method: string | null;
@@ -134,6 +135,7 @@ export default function QuotationDetail() {
   const [data, setData] = useState<QuotationDetail | null>(null);
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
   const [followUpData, setFollowUpData] = useState({
+    name: "",
     date: new Date(),
     method: "WhatsApp",
     notes: "",
@@ -214,6 +216,7 @@ export default function QuotationDetail() {
       toast.success("Follow up berhasil dicatat");
       setIsFollowUpOpen(false);
       setFollowUpData({
+        name: "",
         date: new Date(),
         method: "WhatsApp",
         notes: "",
@@ -534,6 +537,22 @@ export default function QuotationDetail() {
                 <DialogTitle>Catat Hasil Follow Up</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Judul Aktivitas <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    placeholder="Contoh: Follow Up 1, Convert to Sales..."
+                    value={followUpData.name}
+                    onChange={(e) =>
+                      setFollowUpData({
+                        ...followUpData,
+                        name: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
                 {/* Date Picker */}
                 <div className="space-y-2 flex flex-col">
                   <label className="text-sm font-medium">Tanggal</label>
@@ -568,6 +587,7 @@ export default function QuotationDetail() {
                     </PopoverContent>
                   </Popover>
                 </div>
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Metode</label>
                   <Select
@@ -586,6 +606,7 @@ export default function QuotationDetail() {
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">
                     Hasil Pembicaraan
@@ -601,6 +622,7 @@ export default function QuotationDetail() {
                     }
                   />
                 </div>
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">
                     Action Selanjutnya
@@ -648,15 +670,26 @@ export default function QuotationDetail() {
                           locale: idLocale,
                         })}
                       </span>
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px] h-5 px-2 bg-blue-50 text-blue-600 border-blue-100">
-                        {fu.method}
-                      </Badge>
+                      {fu.method && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] h-5 px-2 bg-blue-50 text-blue-600 border-blue-100">
+                          {fu.method}
+                        </Badge>
+                      )}
                     </div>
-                    <p className="text-sm text-slate-700 font-medium">
-                      {fu.notes}
+
+                    {/* --- TAMPILKAN NAMA / JUDUL DI SINI --- */}
+                    <p className="text-base font-bold text-gray-900 mt-1">
+                      {fu.name}
                     </p>
+
+                    {fu.notes && (
+                      <p className="text-sm text-slate-700 font-medium">
+                        {fu.notes}
+                      </p>
+                    )}
+
                     {fu.nextAction && (
                       <div className="flex items-center gap-1.5 mt-1 text-xs text-orange-600 bg-orange-50 w-fit px-2 py-1 rounded">
                         <Send className="h-3 w-3" />
