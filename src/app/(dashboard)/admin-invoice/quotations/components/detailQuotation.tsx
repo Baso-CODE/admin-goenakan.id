@@ -261,7 +261,12 @@ export default function QuotationDetail() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => window.print()}>
+            onClick={() => {
+              window.open(
+                `/admin-invoice/quotations/print/${data.id}`,
+                "_blank",
+              );
+            }}>
             <Printer className="h-4 w-4" /> Print PDF
           </Button>
 

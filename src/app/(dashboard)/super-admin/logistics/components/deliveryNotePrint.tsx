@@ -16,6 +16,8 @@ export default function DeliveryNotePrint() {
   const { shipmentId } = useParams();
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<any>(null);
+  console.log("ini adalahd data", data);
+
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -27,8 +29,6 @@ export default function DeliveryNotePrint() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        // Pastikan endpoint backend ini (getShipmentById) mereturn relasi B2BPIC dan Department
-        // sesuai dengan query Prisma yang Anda berikan.
         const res = await fetch(`${apiUrl}/logistics/shipments/${shipmentId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -105,32 +105,42 @@ export default function DeliveryNotePrint() {
     destination,
   } = data;
 
-  // Setup Variabel Penerima
+  // Setup Variabel Penerima & PIC
   let receiverCompany = "-";
-  let receiverAddress = destination || order.shippingAddress;
+  let receiverAddress = destination || order?.shippingAddress || "-";
   let picName = "-";
   let picDept = "-";
   let picPhone = "-";
 
-  // Ekstrak data dari struktur relasi backend
-  if (order.client?.b2b) {
-    receiverCompany = order.client.b2b.companyName;
+  // Setup Variabel Sales (Untuk kontak info di DN)
+  const salesName = order?.sales?.name || "Goenakan Admin";
+  const salesPhone = order?.sales?.phone || "+62 823-8790-2238";
 
-    // Ambil detail PIC dari order (berdasarkan schema: Order -> clientB2BPIC -> b2b -> dept)
+  // Ekstrak data dari struktur relasi backend
+  if (order?.client?.b2b) {
+    receiverCompany = order.client.b2b.companyName;
+    if (order.client.b2b.fullAddress) {
+      receiverAddress = order.client.b2b.fullAddress;
+    }
     if (order.pic) {
       picName = `${order.pic.prefix ? order.pic.prefix + " " : ""}${order.pic.name}`;
       picPhone = order.pic.phone || order.client.b2b.phone || "-";
       picDept = order.client.b2b.department?.name || "-";
     } else {
-      // Fallback jika tidak ada PIC spesifik di order
       picPhone = order.client.b2b.phone || "-";
       picDept = order.client.b2b.department?.name || "-";
     }
-  } else if (order.client?.b2c) {
+  } else if (order?.client?.b2c) {
     receiverCompany = order.client.b2c.name;
+    if (order.client.b2c.fullAddress) {
+      receiverAddress = order.client.b2c.fullAddress;
+    }
     picName = "Personal";
     picPhone = order.client.b2c.phone || "-";
   }
+
+  // Cek jika ada invoice di order, kalau tidak ada kita kasih "-"
+  const invoiceNumber = order?.invoices?.[0]?.invoiceNumber || "-";
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center py-10">
@@ -157,196 +167,212 @@ export default function DeliveryNotePrint() {
           style={{
             width: "210mm",
             minHeight: "297mm",
-            padding: "20mm 10mm",
+            padding: "15mm 15mm",
             display: "flex",
             flexDirection: "column",
           }}>
           <div className="flex-1">
-            {/* 1. HEADER IMAGE KOP SURAT */}
-            <div className="w-full mb-6 border-b-2 border-gray-800 pb-4">
-              <img
-                src="/images/surat-jalan-header.png"
-                alt="Kop Surat"
-                className="w-full h-auto object-contain max-h-30"
-              />
+            <div className="flex justify-between items-start mb-8 text-[12px] text-gray-900">
+              <div className="w-full mb-6 border-b-2 border-gray-800 pb-4">
+                <img
+                  src="/images/surat-jalan-header.png"
+                  alt="Kop Surat"
+                  className="w-full h-auto object-contain max-h-30"
+                  crossOrigin="anonymous" // Tambahkan ini agar tidak error saat print PDF
+                />
+              </div>
             </div>
 
-            {/* 2. JUDUL & INFO UTAMA */}
-            <div className="flex justify-between items-start mb-8 gap-4">
-              {/* Kolom Kiri: Info Surat Jalan */}
-              <div className="flex-1">
-                <h1 className="text-2xl font-extrabold uppercase tracking-widest mb-4 text-gray-900">
-                  SURAT JALAN
-                </h1>
-                <table className="text-sm">
+            {/* ========================================================= */}
+            {/* 2. CUSTOMER INFO & DN INFO (MENGGUNAKAN DATA API) */}
+            {/* ========================================================= */}
+            <div className="mb-6 flex flex-col items-start">
+              <div className="flex flex-col items-start w-[50%] mb-4">
+                <table className="text-[12px] text-left">
                   <tbody>
                     <tr>
-                      <td className="font-semibold w-32 py-0.5 align-top">
-                        No. Surat Jalan
+                      <td className="py-0.5 pr-4 align-top w-20">Phone</td>
+                      <td className="py-0.5 align-top font-medium">
+                        : {salesPhone} ({salesName})
                       </td>
-                      <td className="font-bold uppercase py-0.5 align-top">
+                    </tr>
+                    <tr>
+                      <td className="py-0.5 pr-4 align-top">E-mail</td>
+                      <td className="py-0.5 align-top font-medium">
+                        : goenakan.id@gmail.com
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-0.5 pr-4 align-top">DN Date</td>
+                      <td className="py-0.5 align-top font-medium">
+                        :{" "}
+                        {departureDate
+                          ? format(new Date(departureDate), "dd MMMM yyyy", {
+                              locale: idLocale,
+                            })
+                          : "-"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-0.5 pr-4 align-top">DN No.</td>
+                      <td className="py-0.5 align-top font-bold">
                         : {deliveryNoteNumber || "-"}
                       </td>
                     </tr>
-                    <tr>
-                      <td className="font-semibold w-32 py-0.5 align-top">
-                        Tanggal Kirim
-                      </td>
-                      <td className="py-0.5 align-top">
-                        :{" "}
-                        {format(new Date(departureDate), "dd MMMM yyyy", {
-                          locale: idLocale,
-                        })}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="font-semibold w-32 py-0.5 align-top">
-                        No. PO (Ref)
-                      </td>
-                      <td className="py-0.5 align-top">: {order.poNumber}</td>
-                    </tr>
-                    {/* Ekspedisi & Resi di-takeout sesuai request */}
                   </tbody>
                 </table>
               </div>
 
-              {/* Kolom Kanan: Info Penerima (Kepada Yth) */}
-              <div className="w-[50%] border border-gray-300 p-4 rounded-sm bg-gray-50/50">
-                <div className="font-bold text-xs uppercase tracking-wide text-gray-500 mb-2 border-b border-gray-200 pb-1">
-                  Kepada Yth / Ship To:
-                </div>
-
-                {/* Nama Perusahaan / Instansi */}
-                <div className="font-bold text-base uppercase mb-1">
-                  {receiverCompany}
-                </div>
-
-                {/* Alamat Lengkap */}
-                <div className="text-xs text-gray-700 mb-3 whitespace-pre-line leading-relaxed">
-                  {receiverAddress}
-                </div>
-
-                {/* Detail PIC */}
-                <div className="bg-white p-2 border border-gray-200 rounded text-[11px]">
-                  <table className="w-full">
-                    <tbody>
-                      <tr>
-                        <td className="text-gray-500 w-24 pb-1">Attn (PIC)</td>
-                        <td className="font-semibold pb-1">: {picName}</td>
-                      </tr>
-                      {picDept !== "-" && (
-                        <tr>
-                          <td className="text-gray-500 w-24 pb-1">
-                            Departemen
-                          </td>
-                          <td className="pb-1">: {picDept}</td>
-                        </tr>
-                      )}
-                      <tr>
-                        <td className="text-gray-500 w-24">No. HP / Telp</td>
-                        <td className="font-medium">: {picPhone}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+              {/* Bagian Customer (Kiri Bawah) */}
+              <div className="w-full mt-2">
+                <h2 className="text-[15px] font-bold text-gray-900 mb-2">
+                  Customer
+                </h2>
+                <table className="text-[12px] w-full text-gray-900">
+                  <tbody>
+                    <tr>
+                      <td className="py-0.5 w-28 align-top">Name</td>
+                      <td className="py-0.5 align-top font-bold uppercase">
+                        : {receiverCompany}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-0.5 align-top">Department</td>
+                      <td className="py-0.5 align-top">
+                        : {picDept !== "-" ? picDept : ""}{" "}
+                        {picName !== "Personal" ? `(UP: ${picName})` : ""}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-0.5 align-top">PO No.</td>
+                      <td className="py-0.5 align-top">
+                        : {order?.poNumber || "-"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-0.5 align-top">Invoice No.</td>
+                      <td className="py-0.5 align-top">: {invoiceNumber}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-0.5 align-top">Address</td>
+                      <td className="py-0.5 align-top pr-10">
+                        : {receiverAddress}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
 
+            {/* ========================================================= */}
             {/* 3. PRODUCT TABLE */}
-            {/* Kolom 'Satuan' dan 'Ceklis' dihapus sesuai request */}
+            {/* ========================================================= */}
             <div className="mb-6">
               <table className="w-full border-collapse border border-[#94a3b8]">
                 <thead>
-                  <tr className="bg-[#f3f4f6] text-center font-bold text-xs uppercase text-gray-700">
-                    <th className="border border-[#94a3b8] py-2 w-12">No</th>
-                    <th className="border border-[#94a3b8] py-2 w-40">
-                      Kode Barang (SKU)
+                  <tr className="bg-[#f3f4f6] text-center font-bold text-[11px] uppercase text-gray-700">
+                    <th className="border border-[#94a3b8] py-2 w-10">No</th>
+                    <th className="border border-[#94a3b8] py-2 w-32">
+                      Product Details
                     </th>
                     <th className="border border-[#94a3b8] py-2">
                       Nama Barang / Deskripsi
                     </th>
-                    <th className="border border-[#94a3b8] py-2 w-24">Qty</th>
+                    <th className="border border-[#94a3b8] py-2 w-28">
+                      Order Qty (pcs)
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item: any, index: number) => {
+                  {items?.map((item: any, index: number) => {
                     const product = item.orderProduct.product;
                     return (
-                      <tr key={item.id} className="align-top">
+                      <tr key={item.id} className="align-top text-[12px]">
                         <td className="border border-[#94a3b8] py-2 text-center">
                           {index + 1}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 px-3 font-mono text-xs text-center">
+                        <td className="border border-[#94a3b8] py-2 px-3 font-mono text-center">
                           {product.sku || "-"}
                         </td>
                         <td className="border border-[#94a3b8] py-2 px-3">
-                          <div className="font-bold text-sm text-gray-800">
+                          <div className="font-bold text-gray-800">
                             {product.name}
                           </div>
                           {item.orderProduct.customization && (
-                            <div className="text-[10px] text-gray-500 mt-1 italic leading-tight">
+                            <div className="text-[10px] text-gray-500 mt-0.5 italic leading-tight">
                               Spec: {item.orderProduct.customization}
                             </div>
                           )}
                         </td>
                         <td className="border border-[#94a3b8] py-2 text-center">
-                          <span className="font-bold text-sm">
-                            {item.quantity}
-                          </span>
-                          <span className="text-xs text-gray-500 ml-1">
-                            Pcs
-                          </span>
+                          <span className="font-bold">{item.quantity}</span>
                         </td>
                       </tr>
                     );
                   })}
-
-                  {/* Blok 'Empty rows filler' sudah di-takeout sesuai request */}
                 </tbody>
               </table>
             </div>
 
+          
             {/* 4. REMARKS */}
             <div className="mb-10">
-              <div className="font-bold text-xs uppercase mb-1 text-gray-700">
+              <div className="font-bold text-[12px] uppercase mb-1 text-gray-700">
                 Catatan (Remarks):
               </div>
-              <div className="border border-gray-300 p-3 min-h-[60px] rounded-sm text-xs text-gray-600 bg-gray-50/30 whitespace-pre-wrap">
-                {remarks ||
-                  "Barang diterima dalam kondisi baik dan sesuai pesanan."}
+              <div className="border border-gray-300 p-3 min-h-15 rounded-sm text-[11px] text-gray-600 bg-gray-50/30 whitespace-pre-wrap">
+                {/* LOGIKA MENAMPILKAN NOTES */}
+                {data?.notes && data.notes.length > 0 ? (
+                  <ul className="list-disc pl-4 space-y-1">
+                    {data.notes.map((note: any) => (
+                      <li key={note.id}>
+                        <span className="font-bold">
+                          [{note.category?.name}]
+                        </span>{" "}
+                        {note.content}
+                      </li>
+                    ))}
+                  </ul>
+                ) : remarks ? (
+                  <p>{remarks}</p>
+                ) : (
+                  <p>Barang diterima dalam kondisi baik dan sesuai pesanan.</p>
+                )}
               </div>
             </div>
           </div>
 
-          {/* 5. FOOTER (Tanda Tangan) */}
+          {/* ========================================================= */}
+          {/* 5. FOOTER */}
+          {/* ========================================================= */}
           <div className="mt-auto break-inside-avoid pt-4">
             <div className="flex justify-between text-center px-4">
               <div className="flex flex-col items-center">
-                <div className="mb-16 text-sm font-semibold">
+                <div className="mb-16 text-[12px] font-semibold">
                   Penerima (PIC),
-                  <div className="text-[10px] font-normal text-gray-500 mt-0.5">
+                  <div className="text-[9px] font-normal text-gray-500 mt-0.5">
                     (Tanda Tangan & Stempel)
                   </div>
                 </div>
                 <div className="border-b border-black w-40 mb-1"></div>
-                <div className="text-xs font-semibold">{picName}</div>
-                <div className="text-[10px] text-gray-500">
+                <div className="text-[12px] font-semibold">{picName}</div>
+                <div className="text-[9px] text-gray-500">
                   {picDept !== "-" ? picDept : "Tgl: ....................."}
                 </div>
               </div>
 
               <div className="flex flex-col items-center">
-                <div className="mb-16 text-sm font-semibold">
+                <div className="mb-16 text-[12px] font-semibold">
                   Pengirim / Driver,
                 </div>
                 <div className="border-b border-black w-40 mb-1"></div>
-                <div className="text-xs text-gray-500">
+                <div className="text-[11px] text-gray-500">
                   (Nama Terang & Tanda Tangan)
                 </div>
               </div>
 
               <div className="flex flex-col items-center">
-                <div className="mb-4 text-sm font-bold">Hormat Kami,</div>
+                <div className="mb-4 text-[12px] font-bold">Hormat Kami,</div>
                 <div className="relative h-20 w-32 flex items-center justify-center -mb-2">
                   {order.sales?.signatureUrl ? (
                     <img
@@ -359,16 +385,16 @@ export default function DeliveryNotePrint() {
                     <div className="h-16 w-full"></div>
                   )}
                 </div>
-                <div className="font-bold underline text-sm mt-1">
+                <div className="font-bold underline text-[12px] mt-1">
                   Goenakan Indonesia
                 </div>
-                <div className="text-[10px] font-bold text-[#475569]">
+                <div className="text-[9px] font-bold text-[#475569]">
                   Logistic Dept.
                 </div>
               </div>
             </div>
 
-            <div className="mt-10 text-[10px] text-center text-gray-400 italic border-t border-gray-200 pt-3">
+            <div className="mt-10 text-[9px] text-center text-gray-400 italic border-t border-gray-200 pt-3">
               * Surat Jalan ini merupakan bukti sah pengiriman dan penerimaan
               barang. Harap disimpan dengan baik.
             </div>

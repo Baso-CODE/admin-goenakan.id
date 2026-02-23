@@ -134,7 +134,6 @@ export default function CashflowClient() {
         </CardHeader>
       </Card>
 
-      {/* 🔥 2. CARD UTANG PIUTANG (DI SINI POSISINYA) 🔥 */}
       <UtangPiutangCard />
 
       {/* 3. Filter Bar & Tabel */}

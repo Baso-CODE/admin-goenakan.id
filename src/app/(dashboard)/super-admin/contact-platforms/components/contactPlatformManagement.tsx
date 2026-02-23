@@ -1,5 +1,6 @@
 "use client";
 
+import { ConfirmDeleteDialog } from "@/app/(dashboard)/components/confirmDeleteDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,17 +59,16 @@ export default function ContactPlatformsManagement() {
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
 
-  // NOTE: Menghapus state 'typeFilter' karena tidak ada di skema Prisma Anda.
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // const [typeFilter, setTypeFilter] = useState<string>("ALL");
 
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  // 'ALL' | 'true' | 'false'
+
   const [isActiveFilter, setIsActiveFilter] = useState<string>("ALL");
 
-  // === FETCH DATA DARI BACKEND (UNTUK TABEL) ===
-  // Note: Filter tanggal dan isActive tidak disertakan di sini,
-  // hanya search dan pagination, yang sudah benar untuk tampilan tabel.
   const fetchContactPlatforms = async () => {
     setLoading(true);
     setError(null);
@@ -113,11 +113,9 @@ export default function ContactPlatformsManagement() {
   };
 
   useEffect(() => {
-    // Jalankan ulang fetch saat page, search, atau isActiveFilter berubah
     fetchContactPlatforms();
   }, [page, debouncedSearch, isActiveFilter]);
 
-  // === HANDLE EXPORT DATA EXCEL (PERBAIKAN FOKUS DI SINI) ===
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -157,7 +155,7 @@ export default function ContactPlatformsManagement() {
           .json()
           .catch(() => ({ message: "Unknown error" }));
         throw new Error(
-          errorBody.message || "Export failed. Server responded with an error."
+          errorBody.message || "Export failed. Server responded with an error.",
         );
       }
 
@@ -184,13 +182,43 @@ export default function ContactPlatformsManagement() {
       toast.error(
         `Gagal meng-export data: ${
           error instanceof Error ? error.message : "Error tidak diketahui"
-        }`
+        }`,
       );
     } finally {
       setExporting(false);
     }
   };
-  // -------------------------------------------------------------
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+
+    setIsDeleting(true);
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const response = await fetch(`${apiUrl}/vendor-items/${deleteId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || "Gagal menghapus kategori");
+      }
+
+      toast.success("Item berhasil dihapus");
+      setPage(1);
+      fetchContactPlatforms();
+    } catch (error: any) {
+      toast.error(error.message || "Terjadi kesalahan saat menghapus data");
+    } finally {
+      setIsDeleting(false);
+      setDeleteId(null);
+    }
+  };
 
   return (
     <div className="space-y-4 w-full  mx-auto">
@@ -374,6 +402,7 @@ export default function ContactPlatformsManagement() {
                         <Button
                           variant="destructive"
                           size="sm"
+                          onClick={() => setDeleteId(data.id)}
                           className="text-xs">
                           Delete
                         </Button>
@@ -418,6 +447,14 @@ export default function ContactPlatformsManagement() {
           </div>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        isOpen={deleteId !== null}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        isLoading={isDeleting}
+        warningMessage="Contact Platform tidak dapat dihapus jika sudah digunakan dalam data lain. Pastikan tidak ada data yang terkait sebelum menghapus."
+      />
     </div>
   );
 }

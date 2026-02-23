@@ -68,13 +68,21 @@ type InvoiceDetail = {
     b2b?: {
       companyName: string;
       fullAddress: string;
-      department?: { name: string };
-      pics?: { name: string; phone: string }[];
+      phone?: string | null;
+      department?: {
+        name: string;
+      };
+      pics?: {
+        prefix?: string | null;
+        name: string;
+        phone?: string | null;
+        email?: string | null;
+      }[];
     };
     b2c?: {
       name: string;
       fullAddress: string;
-      phone: string;
+      phone?: string | null;
     };
   };
   items: {
@@ -108,6 +116,8 @@ export default function InvoiceDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
+  console.log("ini adlaah data invoice", invoice);
+
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -115,7 +125,7 @@ export default function InvoiceDetailPage() {
   const [isPaying, setIsPaying] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("BANK_TRANSFER");
   const [paymentDate, setPaymentDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
 
   const invoiceRef = useRef<HTMLDivElement>(null);
@@ -237,6 +247,11 @@ export default function InvoiceDetailPage() {
       ? invoice.client.b2b.pics[0].name
       : null;
 
+  const picPrefix = invoice?.client?.b2b?.pics?.[0]?.prefix || "";
+  const picPhone =
+    invoice?.client?.b2b?.pics?.[0]?.phone ||
+    invoice?.client?.b2b?.phone ||
+    "-";
   const departmentName = isB2B ? invoice.client.b2b?.department?.name : null;
   const invoiceDate = new Date(invoice.createdAt);
   const displayInvoiceNo = invoice.invoiceNumber || `INV/${invoice.id}`;
@@ -412,20 +427,31 @@ export default function InvoiceDetailPage() {
                     </td>
                   </tr>
                   {isB2B && (
-                    <tr>
-                      <td className="font-medium align-top py-0.5">
-                        Department
-                      </td>
-                      <td className="align-top py-0.5">
-                        : {departmentName || "-"}{" "}
-                        {picName ? `(UP: Mr./Ms. ${picName})` : ""}
-                      </td>
-                    </tr>
+                    <>
+                      <tr>
+                        <td className="font-medium align-top py-0.5">
+                          Department
+                        </td>
+                        <td className="align-top py-0.5">
+                          : {departmentName || "-"}{" "}
+                          {picName
+                            ? `(UP: ${picPrefix ? picPrefix + " " : ""}${picName})`
+                            : ""}
+                        </td>
+                      </tr>
+
+                      <tr>
+                        <td className="font-medium align-top py-0.5">Phone</td>
+                        <td className="align-top py-0.5">
+                          : {picPhone || "-"}
+                        </td>
+                      </tr>
+                    </>
                   )}
                   <tr>
                     <td className="font-medium align-top py-0.5">PO No.</td>
                     <td className="align-top py-0.5">
-                      : {invoice.order.poNumber}
+                      : {invoice?.order?.poNumber || "-"}
                     </td>
                   </tr>
                   <tr>

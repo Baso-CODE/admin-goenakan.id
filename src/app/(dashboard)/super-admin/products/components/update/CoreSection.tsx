@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { apiUrl } from "@/helper/apiurl";
 
 const FormCoreSchema = z.object({
@@ -34,16 +34,16 @@ const FormCoreSchema = z.object({
   sku: z.string().optional(),
   basePrice: z.preprocess(
     (v) => Number(v),
-    z.number().nonnegative("Harga harus angka valid")
+    z.number().nonnegative("Harga harus angka valid"),
   ),
   isCustom: z.boolean().optional(),
   materialType: z.string().optional(),
   categoryId: z.string().min(1, "Kategori wajib dipilih"),
 
-  weight: z.preprocess((v) => Number(v), z.number().min(0).optional()),
-  length: z.preprocess((v) => Number(v), z.number().min(0).optional()),
-  width: z.preprocess((v) => Number(v), z.number().min(0).optional()),
-  height: z.preprocess((v) => Number(v), z.number().min(0).optional()),
+  weight: z.coerce.number().min(0).optional(),
+  length: z.coerce.number().min(0).optional(),
+  width: z.coerce.number().min(0).optional(),
+  height: z.coerce.number().min(0).optional(),
 });
 
 export type ProductCoreFormValues = z.infer<typeof FormCoreSchema>;
@@ -59,7 +59,7 @@ export default function FormProductCore({
 }) {
   console.log(
     "ini adalah data dari intial di form update product",
-    initialData
+    initialData,
   );
 
   const [categories, setCategories] = useState<any[]>([]);
@@ -236,13 +236,37 @@ export default function FormProductCore({
             control={form.control}
             name="isCustom"
             render={({ field }) => (
-              <FormItem className="flex items-center gap-3">
-                <Checkbox
-                  checked={!!field.value}
-                  onCheckedChange={(v) => field.onChange(Boolean(v))}
-                />
-                <FormLabel>Produk Custom?</FormLabel>
-                <FormMessage />
+              <FormItem>
+                <FormLabel>Tipe Produk</FormLabel>
+                <FormControl>
+                  <div className="flex items-center gap-3 h-10 border rounded-md px-3">
+                    <span
+                      className={`text-sm cursor-pointer transition-colors ${
+                        !field.value ? "font-bold text-black" : "text-gray-400"
+                      }`}
+                      onClick={() => field.onChange(false)}>
+                      Standard
+                    </span>
+
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+
+                    <span
+                      className={`text-sm cursor-pointer transition-colors ${
+                        field.value ? "font-bold text-black" : "text-gray-400"
+                      }`}
+                      onClick={() => field.onChange(true)}>
+                      Custom
+                    </span>
+                  </div>
+                </FormControl>
+                <p className="text-[0.8rem] text-muted-foreground">
+                  {field.value
+                    ? "Produk memiliki varian & attribut (Warna, Ukuran, dll)."
+                    : "Produk standar tanpa variasi."}
+                </p>
               </FormItem>
             )}
           />
@@ -256,7 +280,16 @@ export default function FormProductCore({
               <FormItem>
                 <FormLabel>Berat (gram)</FormLabel>
                 <FormControl>
-                  <Input type="number" min={0} {...field} />
+                  <Input
+                    type="number"
+                    step="any"
+                    min={0}
+                    {...field}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      field.onChange(isNaN(val) ? 0 : val);
+                    }}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -269,7 +302,16 @@ export default function FormProductCore({
               <FormItem>
                 <FormLabel>Panjang (cm)</FormLabel>
                 <FormControl>
-                  <Input type="number" min={0} {...field} />
+                  <Input
+                    type="number"
+                    step="any"
+                    min={0}
+                    {...field}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      field.onChange(isNaN(val) ? 0 : val);
+                    }}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -282,7 +324,16 @@ export default function FormProductCore({
               <FormItem>
                 <FormLabel>Lebar (cm)</FormLabel>
                 <FormControl>
-                  <Input type="number" min={0} {...field} />
+                  <Input
+                    type="number"
+                    step="any"
+                    min={0}
+                    {...field}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      field.onChange(isNaN(val) ? 0 : val);
+                    }}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -295,7 +346,16 @@ export default function FormProductCore({
               <FormItem>
                 <FormLabel>Tinggi (cm)</FormLabel>
                 <FormControl>
-                  <Input type="number" min={0} {...field} />
+                  <Input
+                    type="number"
+                    step="any"
+                    min={0}
+                    {...field}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      field.onChange(isNaN(val) ? 0 : val);
+                    }}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

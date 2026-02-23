@@ -55,7 +55,7 @@ export default function EditProductPage() {
   }, [id]);
 
   const handleUpdateProduct = async (
-    coreValues: ProductCoreFormValues
+    coreValues: ProductCoreFormValues,
   ): Promise<void> => {
     setIsSubmitting(true);
 
@@ -81,7 +81,7 @@ export default function EditProductPage() {
     } catch (err) {
       console.error(err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to update product"
+        err instanceof Error ? err.message : "Failed to update product",
       );
     } finally {
       setIsSubmitting(false);
@@ -208,7 +208,7 @@ export default function EditProductPage() {
       }));
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to update variants"
+        err instanceof Error ? err.message : "Failed to update variants",
       );
     } finally {
       setIsSubmitting(false);
@@ -219,7 +219,7 @@ export default function EditProductPage() {
 
   const handleUpdateMediaMetadata = async (
     mediaId: string,
-    updates: { altText?: string; isFeatured?: boolean }
+    updates: { altText?: string; isFeatured?: boolean },
   ) => {
     setIsSubmitting(true);
     try {
@@ -260,7 +260,7 @@ export default function EditProductPage() {
 
         // Update image yang spesifik dengan data baru dari backend
         newImages = newImages.map((img) =>
-          img.id === mediaId ? { ...img, ...updatedImage } : img
+          img.id === mediaId ? { ...img, ...updatedImage } : img,
         );
 
         return {
@@ -273,7 +273,7 @@ export default function EditProductPage() {
     } catch (err) {
       console.error("Error updating media:", err);
       toast.error(
-        err instanceof Error ? err.message : "Gagal memperbarui detail gambar"
+        err instanceof Error ? err.message : "Gagal memperbarui detail gambar",
       );
     } finally {
       setIsSubmitting(false);
@@ -282,7 +282,7 @@ export default function EditProductPage() {
 
   const handleUpdateVideoMetadata = async (
     mediaId: string,
-    updates: { altText?: string; title?: string; isFeatured?: boolean }
+    updates: { altText?: string; title?: string; isFeatured?: boolean },
   ) => {
     setIsSubmitting(true);
     try {
@@ -322,7 +322,7 @@ export default function EditProductPage() {
 
         // Update video target
         newVideos = newVideos.map((vid) =>
-          vid.id === mediaId ? { ...vid, ...updatedVideo } : vid
+          vid.id === mediaId ? { ...vid, ...updatedVideo } : vid,
         );
 
         return {
@@ -335,7 +335,7 @@ export default function EditProductPage() {
     } catch (err) {
       console.error("Error updating video metadata:", err);
       toast.error(
-        err instanceof Error ? err.message : "Gagal memperbarui detail video"
+        err instanceof Error ? err.message : "Gagal memperbarui detail video",
       );
     } finally {
       setIsSubmitting(false);
@@ -370,7 +370,7 @@ export default function EditProductPage() {
     } catch (err) {
       console.error("Error adding image:", err);
       toast.error(
-        err instanceof Error ? err.message : "Gagal menambahkan gambar"
+        err instanceof Error ? err.message : "Gagal menambahkan gambar",
       );
     }
   };
@@ -389,7 +389,7 @@ export default function EditProductPage() {
         {
           method: "POST",
           body: cloudinaryFormData,
-        }
+        },
       );
 
       if (!uploadRes.ok) throw new Error("Gagal upload ke Cloudinary");
@@ -429,7 +429,7 @@ export default function EditProductPage() {
     } catch (err) {
       console.error("Error adding video:", err);
       toast.error(
-        err instanceof Error ? err.message : "Gagal menambahkan video"
+        err instanceof Error ? err.message : "Gagal menambahkan video",
       );
     } finally {
       setIsSubmitting(false);
@@ -460,7 +460,7 @@ export default function EditProductPage() {
     } catch (err) {
       console.error("Error deleting image:", err);
       toast.error(
-        err instanceof Error ? err.message : "Gagal menghapus gambar"
+        err instanceof Error ? err.message : "Gagal menghapus gambar",
       );
     } finally {
       setIsSubmitting(false);
@@ -509,7 +509,7 @@ export default function EditProductPage() {
         values: attr.values.filter((val: any) =>
           selections
             .find((sel) => sel.attributeId === attr.id)
-            ?.valueIds.includes(val.id)
+            ?.valueIds.includes(val.id),
         ),
       }))
       .filter((attr) => attr.values.length > 0);
@@ -557,10 +557,9 @@ export default function EditProductPage() {
 
   // Fungsi Handler Utama di EditProductPage.tsx
   const handleGenerateVariants = () => {
-    // 1. Generate semua kombinasi yang valid dari atribut yang dipilih
     const newCombinations = generateCrossProduct(
       currentSelections,
-      currentFullList
+      currentFullList,
     );
 
     // Ambil variants yang sudah ada
@@ -597,10 +596,8 @@ export default function EditProductPage() {
       });
 
       if (existingMatch) {
-        // A. Variant LAMA DITEMUKAN, PERTAHANKAN
         newVariantsState.push({
-          ...existingMatch, // Pertahankan ID, price, SKU, images, dll.
-          // Pastikan _isDeleted disetel false
+          ...existingMatch,
           _isDeleted: false,
         });
         usedExistingVariantIds.add(existingMatch.id);
@@ -626,7 +623,7 @@ export default function EditProductPage() {
         _isDeleted: true,
       }));
 
-    const finalVariantsState = [...newVariantsState, ...variantsToKeep];
+    const finalVariantsState = [...variantsToKeep, ...newVariantsState];
 
     setProductData((prev: any) => ({
       ...prev,
@@ -634,7 +631,7 @@ export default function EditProductPage() {
     }));
 
     toast.info(
-      `Generated ${newCombinations.length} variants. Check form below.`
+      `Generated ${newCombinations.length} variants. Check form below.`,
     );
   };
 
@@ -654,7 +651,7 @@ export default function EditProductPage() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(tiers), // Kirim array tiers
-        }
+        },
       );
 
       if (!res.ok) {
@@ -673,7 +670,7 @@ export default function EditProductPage() {
     } catch (err) {
       console.error(err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to update tiers"
+        err instanceof Error ? err.message : "Failed to update tiers",
       );
     } finally {
       setIsSubmitting(false);

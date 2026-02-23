@@ -1,9 +1,14 @@
 "use client";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -22,8 +27,16 @@ import {
 } from "@/components/ui/table";
 import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { cn } from "@/lib/utils"; // Pastikan path utils Anda benar
 import { formatDate } from "@/utils/formatDate";
-import { FileDown, Loader2, Search } from "lucide-react"; // Import FileDown dan Loader2
+import { format } from "date-fns";
+import {
+  Calendar as CalendarIcon,
+  FileDown,
+  Loader2,
+  Search,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -71,10 +84,14 @@ const Sales = () => {
   const [page, setPage] = useState(1);
 
   // --- STATE UNTUK EXPORT FILTER ---
-  const [exportStartDate, setExportStartDate] = useState<string>("");
-  const [exportEndDate, setExportEndDate] = useState<string>("");
+  const [exportStartDate, setExportStartDate] = useState<Date | undefined>(
+    undefined,
+  );
+  const [exportEndDate, setExportEndDate] = useState<Date | undefined>(
+    undefined,
+  );
   const [exportIsActive, setExportIsActive] = useState<string>("ALL");
-  const [exporting, setExporting] = useState<boolean>(false); // State untuk loading button export
+  const [exporting, setExporting] = useState<boolean>(false);
 
   // --- FUNGSI FETCH DATA (Untuk Tabel) ---
   const fetchSales = async () => {
@@ -86,11 +103,19 @@ const Sales = () => {
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
-        // Menggunakan statusFilter dari filter tabel
         isActive: statusFilter,
       });
       if (debouncedSearch.trim()) {
         params.append("search", debouncedSearch.trim());
+      }
+      if (exportStartDate) {
+        params.append(
+          "startDate",
+          format(new Date(exportStartDate), "yyyy-MM-dd"),
+        );
+      }
+      if (exportEndDate) {
+        params.append("endDate", format(new Date(exportEndDate), "yyyy-MM-dd"));
       }
 
       const res = await fetch(`${apiUrl}/sales?${params}`, {
@@ -125,16 +150,19 @@ const Sales = () => {
 
       // 2. Kumpulkan Filter (menggunakan state filter export)
       const exportFilters: SalesExportQuery = {
-        ...(exportStartDate && { startDate: exportStartDate }),
-        ...(exportEndDate && { endDate: exportEndDate }),
-        // Menggunakan state filter status khusus export
+        ...(exportStartDate && {
+          startDate: format(new Date(exportStartDate), "yyyy-MM-dd"),
+        }),
+        ...(exportEndDate && {
+          endDate: format(new Date(exportEndDate), "yyyy-MM-dd"),
+        }),
         ...(exportIsActive !== "ALL" && {
           isActive: exportIsActive as "true" | "false",
         }),
       };
 
       const queryString = new URLSearchParams(
-        exportFilters as Record<string, string>
+        exportFilters as Record<string, string>,
       ).toString();
 
       // URL untuk export (Sesuaikan dengan endpoint backend Anda)
@@ -182,8 +210,7 @@ const Sales = () => {
 
   useEffect(() => {
     fetchSales();
-  }, [page, debouncedSearch, statusFilter]);
-
+  }, [page, debouncedSearch, statusFilter, exportStartDate, exportEndDate]);
   // === RENDER ===
   return (
     <div className="space-y-4 overflow-x-hidden w-full mx-auto">
@@ -191,7 +218,7 @@ const Sales = () => {
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 overflow-x-auto">
           <CardTitle className="text-xl font-semibold whitespace-nowrap">
-            Sales Management 📈
+            Sales Team Management 📈
           </CardTitle>
 
           <div className="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
@@ -251,36 +278,105 @@ const Sales = () => {
             </Select>
           </div>
 
-          {/* Filter Tanggal Mulai (Untuk Export) */}
           <div className="flex flex-col">
             <label className="text-xs font-medium text-muted-foreground mb-1">
               Start Date
             </label>
-            <Input
-              type="date"
-              value={exportStartDate}
-              onChange={(e) => setExportStartDate(e.target.value)}
-              className="w-37.5"
-            />
+
+            <div className="relative">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-50 justify-start text-left font-normal pr-10",
+                      !exportStartDate && "text-muted-foreground",
+                    )}>
+                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />{" "}
+                    <span className="truncate">
+                      {exportStartDate
+                        ? format(exportStartDate, "PPP")
+                        : "Pick a date"}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={exportStartDate}
+                    onSelect={(date) => {
+                      setExportStartDate(date);
+                      setPage(1);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              {/* Tombol Reset Tanggal */}
+              {exportStartDate && (
+                <X
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground cursor-pointer hover:text-black"
+                  onClick={() => {
+                    setExportStartDate(undefined);
+                    setPage(1);
+                  }}
+                />
+              )}
+            </div>
           </div>
 
-          {/* Filter Tanggal Akhir (Untuk Export) */}
+          {/* Filter Tanggal Akhir */}
           <div className="flex flex-col">
             <label className="text-xs font-medium text-muted-foreground mb-1">
               End Date
             </label>
-            <Input
-              type="date"
-              value={exportEndDate}
-              onChange={(e) => setExportEndDate(e.target.value)}
-              className="w-37.5"
-            />
+
+            <div className="relative">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-50 justify-start text-left font-normal pr-10",
+                      !exportEndDate && "text-muted-foreground",
+                    )}>
+                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />{" "}
+                    <span className="truncate">
+                      {exportEndDate
+                        ? format(exportEndDate, "PPP")
+                        : "Pick a date"}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={exportEndDate}
+                    onSelect={(date) => {
+                      setExportEndDate(date);
+                      setPage(1);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {exportEndDate && (
+                <X
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground cursor-pointer hover:text-black"
+                  onClick={() => {
+                    setExportEndDate(undefined);
+                    setPage(1);
+                  }}
+                />
+              )}
+            </div>
           </div>
 
           {/* Tombol Add Sales */}
-          <Link href="/super-admin/sales/add" className="ml-auto">
+          <Link href="/super-admin/sales-team/add" className="ml-auto">
             <Button size="sm" className="gap-2 cursor-pointer">
-              + Add Sales
+              + Add Sales Person
             </Button>
           </Link>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { ConfirmDeleteDialog } from "@/app/(dashboard)/components/confirmDeleteDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +62,9 @@ export default function DepartmentTable() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
+
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [exportStartDate, setExportStartDate] = useState<string>("");
   const [exportEndDate, setExportEndDate] = useState<string>("");
@@ -130,7 +134,7 @@ export default function DepartmentTable() {
       };
 
       const queryString = new URLSearchParams(
-        exportFilters as Record<string, string>
+        exportFilters as Record<string, string>,
       ).toString();
 
       // URL untuk export (Endpoint: ${apiUrl}/departments/export/excel)
@@ -176,6 +180,36 @@ export default function DepartmentTable() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!deleteId) return;
+
+    setIsDeleting(true);
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const response = await fetch(`${apiUrl}/departments/${deleteId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || "Gagal menghapus kategori");
+      }
+
+      toast.success("Department berhasil dihapus");
+      setPage(1);
+      fetchDepartments();
+    } catch (error: any) {
+      toast.error(error.message || "Terjadi kesalahan saat menghapus data");
+    } finally {
+      setIsDeleting(false);
+      setDeleteId(null);
+    }
+  };
   return (
     <div className="space-y-4 w-auto mx-auto">
       {/* === HEADER === */}
@@ -200,7 +234,6 @@ export default function DepartmentTable() {
           </div>
         </CardHeader>
       </Card>
-
       {/* --- FILTER DAN EXPORT BARU --- */}
       <Card className="p-4">
         <div className="flex flex-wrap items-end gap-4">
@@ -273,7 +306,6 @@ export default function DepartmentTable() {
           </Button>
         </div>
       </Card>
-
       {/* === TABLE === */}
       <Card className="w-full">
         <CardContent className="p-0">
@@ -348,6 +380,7 @@ export default function DepartmentTable() {
                       <Button
                         variant="destructive"
                         size="sm"
+                        onClick={() => setDeleteId(data.id)}
                         className="text-xs cursor-pointer">
                         Delete
                       </Button>
@@ -367,7 +400,6 @@ export default function DepartmentTable() {
           </Table>
         </CardContent>
       </Card>
-
       {/* === PAGINATION === */}
       {meta && (
         <div className="flex justify-between items-center p-4 border-t text-sm text-muted-foreground">
@@ -393,7 +425,14 @@ export default function DepartmentTable() {
             </Button>
           </div>
         </div>
-      )}
+      )}{" "}
+      <ConfirmDeleteDialog
+        isOpen={deleteId !== null}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        isLoading={isDeleting}
+        warningMessage="Department tidak dapat dihapus jika sudah digunakan dalam data lain. Pastikan tidak ada data yang terkait sebelum menghapus."
+      />
     </div>
   );
 }

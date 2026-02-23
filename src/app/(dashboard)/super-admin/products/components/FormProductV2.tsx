@@ -89,7 +89,7 @@ const productSchema = z.object({
       z.object({
         isFeatured: z.boolean().optional(),
         altText: z.string().optional(),
-      })
+      }),
     )
     .optional(),
   videosMetadata: z.array(videoMetaSchema).optional(),
@@ -104,7 +104,7 @@ export type ProductFormValues = z.infer<typeof productSchema> & {
 function cartesianProduct<T>(arr: T[][]): T[][] {
   return arr.reduce(
     (acc, curr) => acc.flatMap((a) => curr.map((b) => [...a, b])),
-    [[]] as T[][]
+    [[]] as T[][],
   );
 }
 
@@ -120,7 +120,7 @@ export default function ProductFormV2({
       images: File[] | null;
       videos: File[] | null;
       variantImages: File[][];
-    }
+    },
   ) => Promise<void>;
   isLoading?: boolean;
   isSubmitting?: boolean;
@@ -169,7 +169,6 @@ export default function ProductFormV2({
     } as ProductFormValues,
   });
 
-  // ✅ LOGIC ADDED: Watch Status isCustom
   const isCustomProduct = form.watch("isCustom");
 
   const [attributeSelections, setAttributeSelections] = useState<
@@ -202,7 +201,6 @@ export default function ProductFormV2({
 
   useEffect(() => {
     if (!isCustomProduct) {
-      // Jika Standard, kosongkan semua state attributes & variants
       setAttributeSelections([]);
       setCombinations([]);
       setVariantMetas([]);
@@ -302,7 +300,7 @@ export default function ProductFormV2({
   const handleUpdateVariantMeta = (
     index: number,
     field: string,
-    value: any
+    value: any,
   ) => {
     const updatedMetas = variantMetas.map((meta) => {
       if (meta.variantIndex === index) {
@@ -320,7 +318,6 @@ export default function ProductFormV2({
 
   const submit = async (values: ProductFormValues) => {
     try {
-      // ✅ LOGIC ADDED: Paksa hapus attributes jika Standard saat submit (Double Safety)
       const finalAttributes = isCustomProduct ? attributeSelections : undefined;
       const finalVariantMetas = isCustomProduct ? variantMetas : [];
       const finalVariantFiles = isCustomProduct ? variantFilesMap : [];
@@ -328,10 +325,10 @@ export default function ProductFormV2({
       const payload: ProductFormValues = {
         ...values,
         basePrice: Number(values.basePrice),
-        weight: Number(values.weight || 0),
-        width: Number(values.width || 0),
-        height: Number(values.height || 0),
-        length: Number(values.length || 0),
+        weight: values.weight ? Number(values.weight) : 0,
+        width: values.width ? Number(values.width) : 0,
+        height: values.height ? Number(values.height) : 0,
+        length: values.length ? Number(values.length) : 0,
 
         attributes: finalAttributes?.length ? finalAttributes : undefined,
 
@@ -519,7 +516,6 @@ export default function ProductFormV2({
 
             {/* DIMENSI & DESKRIPSI & MEDIA - TIDAK BERUBAH */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4 mt-4">
-              {/* ... (Input dimensi tidak berubah) ... */}
               <FormField
                 control={form.control}
                 name="weight"
@@ -529,8 +525,12 @@ export default function ProductFormV2({
                     <FormControl>
                       <Input
                         type="number"
+                        step="any"
                         {...field}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          field.onChange(isNaN(val) ? 0 : val);
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -546,9 +546,13 @@ export default function ProductFormV2({
                     <FormControl>
                       <Input
                         type="number"
+                        step="any"
                         {...field}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                      />
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          field.onChange(isNaN(val) ? 0 : val);
+                        }}
+                      />{" "}
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -563,8 +567,12 @@ export default function ProductFormV2({
                     <FormControl>
                       <Input
                         type="number"
+                        step="any"
                         {...field}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          field.onChange(isNaN(val) ? 0 : val);
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -580,9 +588,13 @@ export default function ProductFormV2({
                     <FormControl>
                       <Input
                         type="number"
+                        step="any"
                         {...field}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                      />
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          field.onChange(isNaN(val) ? 0 : val);
+                        }}
+                      />{" "}
                     </FormControl>
                     <FormMessage />
                   </FormItem>

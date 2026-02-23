@@ -1,13 +1,30 @@
 "use client";
 
-import { FileDown, Loader2, Search, UserCircle, UserPlus } from "lucide-react";
+import {
+  Eye,
+  FileDown,
+  Loader2,
+  MoreHorizontal,
+  Search,
+  Trash2,
+  UserCircle,
+  UserPlus,
+} from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { ConfirmDeleteDialog } from "@/app/(dashboard)/components/confirmDeleteDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -43,7 +60,7 @@ interface ClientBase {
 interface ClientB2B extends ClientBase {
   type: "B2B";
   companyName: string;
-  picName?: string; // Diperbaiki, harusnya optional atau null
+  picName?: string;
 }
 
 interface ClientB2C extends ClientBase {
@@ -86,8 +103,11 @@ export default function ClientManagementTable() {
   const [search, setSearch] = useState<string>("");
   const debouncedSearch = useDebounce(search, 500);
   const [clientTypeFilter, setClientTypeFilter] = useState<string>("ALL");
-  const [startDate, setStartDate] = useState<string>(""); // Filter tanggal
-  const [endDate, setEndDate] = useState<string>(""); // Filter tanggal
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fungsi untuk mereset halaman ke 1 saat filter utama berubah
   const handleFilterChange = (filterUpdate: Partial<ClientExportQuery>) => {
@@ -99,50 +119,44 @@ export default function ClientManagementTable() {
     // Search sudah ditangani oleh debouncedSearch useEffect
   };
 
-  useEffect(() => {
-    const fetchClients = async () => {
-      setLoading(true);
-      setError(null);
+  const fetchClients = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-      try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
 
-        // Query params untuk LIST (Pagination dan Filter Dasar)
-        const params = new URLSearchParams({
-          page: meta.page.toString(),
-          take: meta.perPage.toString(),
-          type: clientTypeFilter,
-          // Tambahkan filter tanggal ke list jika diperlukan untuk visual
-          ...(startDate && { startDate }),
-          ...(endDate && { endDate }),
-        });
-        if (debouncedSearch.trim()) {
-          params.append("search", debouncedSearch.trim());
-        }
-
-        const res = await fetch(`${apiUrl}/clients?${params}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const result = await res.json();
-        if (res.ok) {
-          setClients(result.data || []);
-          setMeta(result.meta || meta);
-        } else {
-          throw new Error(result.message || "Failed to fetch data");
-        }
-      } catch (err) {
-        console.error("❌ Error fetching clients:", err);
-        setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        setLoading(false);
+      const params = new URLSearchParams({
+        page: meta.page.toString(),
+        take: meta.perPage.toString(),
+        type: clientTypeFilter,
+        ...(startDate && { startDate }),
+        ...(endDate && { endDate }),
+      });
+      if (debouncedSearch.trim()) {
+        params.append("search", debouncedSearch.trim());
       }
-    };
 
-    fetchClients();
+      const res = await fetch(`${apiUrl}/clients?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await res.json();
+      if (res.ok) {
+        setClients(result.data || []);
+        setMeta(result.meta || meta);
+      } else {
+        throw new Error(result.message || "Failed to fetch data");
+      }
+    } catch (err) {
+      console.error("❌ Error fetching clients:", err);
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
   }, [
     meta.page,
     meta.perPage,
@@ -151,7 +165,9 @@ export default function ClientManagementTable() {
     startDate,
     endDate,
   ]);
-
+  useEffect(() => {
+    fetchClients();
+  }, [fetchClients]);
   // === FUNGSI HANDLE EXPORT ===
   const handleExport = async () => {
     setExporting(true);
@@ -171,7 +187,7 @@ export default function ClientManagementTable() {
       };
 
       const queryString = new URLSearchParams(
-        exportFilters as Record<string, string>
+        exportFilters as Record<string, string>,
       ).toString();
 
       // URL untuk export
@@ -214,7 +230,7 @@ export default function ClientManagementTable() {
     } catch (error) {
       console.error("Export Error:", error);
       toast.error(
-        "Gagal meng-export data. Pastikan filter sudah benar dan Anda memiliki akses."
+        "Gagal meng-export data. Pastikan filter sudah benar dan Anda memiliki akses.",
       );
     } finally {
       setExporting(false);
@@ -229,6 +245,37 @@ export default function ClientManagementTable() {
 
   const getClientPicOrEmail = (client: ClientData) =>
     client.type === "B2B" ? (client as ClientB2B).picName : client.email;
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+
+    setIsDeleting(true);
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const response = await fetch(`${apiUrl}/vendors/${deleteId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || "Gagal menghapus kategori");
+      }
+
+      toast.success("Client berhasil dihapus");
+
+      fetchClients();
+    } catch (error: any) {
+      toast.error(error.message || "Terjadi kesalahan saat menghapus data");
+    } finally {
+      setIsDeleting(false);
+      setDeleteId(null);
+    }
+  };
 
   // === RENDER ===
   return (
@@ -446,12 +493,39 @@ export default function ClientManagementTable() {
                     <TableCell className="font-mono text-xs">
                       {formatDate(client.createdAt, { style: "relative" })}
                     </TableCell>
-                    <TableCell className="text-right">
+                    {/* <TableCell className="text-right">
                       <Link href={`/super-admin/clients/detail/${client.id}`}>
                         <Button variant="secondary" size="sm">
                           View
                         </Button>
                       </Link>
+                    </TableCell> */}
+
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />{" "}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/super-admin/clients/detail/${client.id}}`}
+                              className="cursor-pointer">
+                              <Eye className="mr-2 h-4 w-4" /> View
+                            </Link>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600 cursor-pointer"
+                            onClick={() => setDeleteId(client.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))
@@ -498,6 +572,14 @@ export default function ClientManagementTable() {
           </div>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        isOpen={deleteId !== null}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        isLoading={isDeleting}
+        warningMessage="Client tidak dapat dihapus jika sudah digunakan dalam data lain. Pastikan tidak ada data yang terkait sebelum menghapus."
+      />
     </div>
   );
 }
