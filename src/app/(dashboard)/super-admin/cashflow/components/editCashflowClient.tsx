@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { apiUrl } from "@/helper/apiurl";
 import { cn } from "@/lib/utils";
 
@@ -75,12 +76,13 @@ const cashflowSchema = z.object({
       exchangeRate: anyToNumberDefaultOne,
 
       total: z.number(), // Calculated field
-    })
+    }),
   ),
   costItems: z.array(
     z.object({
+      isManual: z.boolean().default(false).optional(),
       description: z.string().min(1, "Description required"),
-      vendorId: z.string().min(1, "Vendor required"),
+      vendorId: z.string().optional(),
 
       // PAKAI HELPER YANG SAMA
       costPerUnit: anyToNumber,
@@ -90,7 +92,7 @@ const cashflowSchema = z.object({
       exchangeRate: anyToNumberDefaultOne,
 
       total: z.number(),
-    })
+    }),
   ),
 });
 
@@ -210,8 +212,9 @@ export default function EditCashflowClient() {
             total: Number(r.total),
           })),
           costItems: detailData.costs.map((c: any) => ({
+            isManual: !c.vendorId,
             description: c.description,
-            vendorId: c.vendorId,
+            vendorId: z.string().optional(),
             costPerUnit: Number(c.costPerUnit),
             quantity: Number(c.quantity),
             currency: c.currency || "IDR",
@@ -245,6 +248,7 @@ export default function EditCashflowClient() {
         })),
         costItems: data.costItems.map((item) => ({
           ...item,
+          vendorId: item.isManual ? null : item.vendorId,
           total: item.costPerUnit * item.quantity * (item.exchangeRate || 1),
         })),
       };
@@ -385,7 +389,7 @@ export default function EditCashflowClient() {
                           <span className="text-sm font-semibold text-emerald-700">
                             {formatCurrency(
                               (watch(`revenueItems.${index}.unitPrice`) || 0) *
-                                (watch(`revenueItems.${index}.quantity`) || 0)
+                                (watch(`revenueItems.${index}.quantity`) || 0),
                             )}
                           </span>
                         </div>
@@ -444,221 +448,259 @@ export default function EditCashflowClient() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="p-4 space-y-4">
-                    {costFields.fields.map((field, index) => (
-                      <div
-                        key={field.id}
-                        className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start border-b border-dashed pb-4 last:border-0 last:pb-0 bg-gray-50/50 p-3 rounded-md">
-                        {/* Row 1: Description & Vendor */}
-                        <div className="md:col-span-5 space-y-3">
-                          {/* 1. Pilih Vendor Dulu */}
-                          <div>
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                              Vendor
-                            </label>
-                            <FormField
-                              control={control}
-                              name={`costItems.${index}.vendorId`}
-                              render={({ field }) => (
-                                <Select
-                                  onValueChange={(val) => {
-                                    field.onChange(val);
-                                    // Reset description saat vendor ganti
-                                    setValue(
-                                      `costItems.${index}.description`,
-                                      ""
-                                    );
-                                  }}
-                                  value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-8 text-sm bg-white">
-                                      <SelectValue placeholder="Select Vendor" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {vendors.map((v) => (
-                                      <SelectItem key={v.id} value={v.id}>
-                                        {v.companyName}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              )}
-                            />
+                    {costFields.fields.map((field, index) => {
+                      // 🔥 AMBIL STATUS MANUAL DARI WATCH
+                      const isManual = watch(`costItems.${index}.isManual`);
+
+                      return (
+                        <div
+                          key={field.id}
+                          className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start border-b border-dashed pb-4 last:border-0 last:pb-0 bg-gray-50/50 p-3 rounded-md">
+                          {/* 🔥 Row 1: Description & Vendor */}
+                          <div className="md:col-span-5 space-y-3">
+                            {/* 🔥 TOGGLE INPUT MANUAL / VENDOR */}
+                            <div className="flex items-center gap-2 mb-1">
+                              <Switch
+                                checked={isManual}
+                                onCheckedChange={(val) => {
+                                  setValue(`costItems.${index}.isManual`, val);
+                                  // Bersihkan kolom jika ganti mode
+                                  setValue(`costItems.${index}.vendorId`, "");
+                                  setValue(
+                                    `costItems.${index}.description`,
+                                    "",
+                                  );
+                                }}
+                              />
+                              <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                                Input Manual?
+                              </span>
+                            </div>
+
+                            {!isManual ? (
+                              // 🔥 JIKA DARI VENDOR (TAMPILAN LAMA)
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                    Vendor
+                                  </label>
+                                  <FormField
+                                    control={control}
+                                    name={`costItems.${index}.vendorId`}
+                                    render={({ field }) => (
+                                      <Select
+                                        onValueChange={(val) => {
+                                          field.onChange(val);
+                                          setValue(
+                                            `costItems.${index}.description`,
+                                            "",
+                                          );
+                                        }}
+                                        value={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger className="h-8 text-sm bg-white">
+                                            <SelectValue placeholder="Select Vendor" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          {vendors.map((v) => (
+                                            <SelectItem key={v.id} value={v.id}>
+                                              {v.companyName}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    )}
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                    Item / Servis Vendor
+                                  </label>
+                                  <FormField
+                                    control={control}
+                                    name={`costItems.${index}.description`}
+                                    render={({ field }) => {
+                                      const currentVendorId = watch(
+                                        `costItems.${index}.vendorId`,
+                                      );
+                                      const selectedVendor = vendors.find(
+                                        (v) => v.id === currentVendorId,
+                                      );
+                                      const vendorItems =
+                                        selectedVendor?.items || [];
+
+                                      return (
+                                        <Select
+                                          onValueChange={field.onChange}
+                                          value={field.value}
+                                          disabled={!currentVendorId}>
+                                          <FormControl>
+                                            <SelectTrigger className="h-8 text-sm bg-white">
+                                              <SelectValue placeholder="Select Item Type" />
+                                            </SelectTrigger>
+                                          </FormControl>
+                                          <SelectContent>
+                                            {vendorItems.length > 0 ? (
+                                              vendorItems.map((item) => (
+                                                <SelectItem
+                                                  key={item.id}
+                                                  value={item.name}>
+                                                  {item.name}
+                                                </SelectItem>
+                                              ))
+                                            ) : (
+                                              <div className="p-2 text-xs text-muted-foreground text-center">
+                                                No items found.
+                                              </div>
+                                            )}
+                                            <SelectItem value="Lainnya">
+                                              Lainnya (Manual)
+                                            </SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      );
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              // 🔥 JIKA INPUT MANUAL (TAMPILAN BARU)
+                              <div className="pt-1">
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                  Nama Pengeluaran / Deskripsi
+                                </label>
+                                <FormField
+                                  control={control}
+                                  name={`costItems.${index}.description`}
+                                  render={({ field }) => (
+                                    <Input
+                                      {...field}
+                                      placeholder="Contoh: Bensin, Makan Siang..."
+                                      className="h-8 text-sm bg-white mt-1"
+                                    />
+                                  )}
+                                />
+                              </div>
+                            )}
                           </div>
 
-                          {/* 2. Pilih Description (Item) Berdasarkan Vendor */}
-                          <div>
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                              Description / Item
-                            </label>
-                            <FormField
-                              control={control}
-                              name={`costItems.${index}.description`}
-                              render={({ field }) => {
-                                // Cari vendor yang sedang dipilih di baris ini
-                                const currentVendorId = watch(
-                                  `costItems.${index}.vendorId`
-                                );
-                                const selectedVendor = vendors.find(
-                                  (v) => v.id === currentVendorId
-                                );
-                                const vendorItems = selectedVendor?.items || [];
-
-                                return (
+                          {/* Row 2: Financials (Currency, Cost, Rate, Qty) */}
+                          <div className="md:col-span-6 grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                Curr
+                              </label>
+                              <FormField
+                                control={control}
+                                name={`costItems.${index}.currency`}
+                                render={({ field }) => (
                                   <Select
-                                    onValueChange={field.onChange}
-                                    value={field.value}
-                                    disabled={!currentVendorId}>
+                                    onValueChange={(val) => {
+                                      field.onChange(val);
+                                      if (val === "IDR")
+                                        setValue(
+                                          `costItems.${index}.exchangeRate`,
+                                          1,
+                                        );
+                                    }}
+                                    value={field.value}>
                                     <FormControl>
                                       <SelectTrigger className="h-8 text-sm bg-white">
-                                        <SelectValue placeholder="Select Item Type" />
+                                        <SelectValue />
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      {vendorItems.length > 0 ? (
-                                        vendorItems.map((item) => (
-                                          // Value disimpan nama item-nya langsung (string)
-                                          <SelectItem
-                                            key={item.id}
-                                            value={item.name}>
-                                            {item.name}
-                                          </SelectItem>
-                                        ))
-                                      ) : (
-                                        <div className="p-2 text-xs text-muted-foreground text-center">
-                                          No items found for this vendor.
-                                        </div>
-                                      )}
-                                      {/* Opsi Manual Input jika perlu */}
-                                      <SelectItem value="Other">
-                                        Other (Manual)
-                                      </SelectItem>
+                                      {currencies.map((c) => (
+                                        <SelectItem key={c.code} value={c.code}>
+                                          {c.code}
+                                        </SelectItem>
+                                      ))}
                                     </SelectContent>
                                   </Select>
-                                );
-                              }}
-                            />
+                                )}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                Cost/Unit
+                              </label>
+                              <FormField
+                                control={control}
+                                name={`costItems.${index}.costPerUnit`}
+                                render={({ field }) => (
+                                  <Input
+                                    type="number"
+                                    {...field}
+                                    className="h-8 text-sm text-right bg-white"
+                                  />
+                                )}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                Rate (IDR)
+                              </label>
+                              <FormField
+                                control={control}
+                                name={`costItems.${index}.exchangeRate`}
+                                render={({ field }) => (
+                                  <Input
+                                    type="number"
+                                    {...field}
+                                    className="h-8 text-sm text-right bg-white"
+                                    disabled={
+                                      watch(`costItems.${index}.currency`) ===
+                                      "IDR"
+                                    }
+                                  />
+                                )}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                Qty
+                              </label>
+                              <FormField
+                                control={control}
+                                name={`costItems.${index}.quantity`}
+                                render={({ field }) => (
+                                  <Input
+                                    type="number"
+                                    {...field}
+                                    className="h-8 text-sm text-center bg-white"
+                                  />
+                                )}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Delete & Total */}
+                          <div className="md:col-span-1 flex flex-col items-end justify-between h-full py-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-gray-400 hover:text-red-600 mb-2"
+                              onClick={() => costFields.remove(index)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                            <span className="text-xs font-bold text-gray-700">
+                              {formatCurrency(
+                                (watch(`costItems.${index}.costPerUnit`) || 0) *
+                                  (watch(`costItems.${index}.quantity`) || 0) *
+                                  (watch(`costItems.${index}.exchangeRate`) ||
+                                    1),
+                              )}
+                            </span>
                           </div>
                         </div>
-
-                        {/* Row 2: Financials (Currency, Cost, Rate, Qty) */}
-                        <div className="md:col-span-6 grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {/* Currency */}
-                          <div>
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                              Curr
-                            </label>
-                            <FormField
-                              control={control}
-                              name={`costItems.${index}.currency`}
-                              render={({ field }) => (
-                                <Select
-                                  onValueChange={(val) => {
-                                    field.onChange(val);
-                                    // Auto set rate to 1 if IDR
-                                    if (val === "IDR")
-                                      setValue(
-                                        `costItems.${index}.exchangeRate`,
-                                        1
-                                      );
-                                  }}
-                                  value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-8 text-sm bg-white">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {currencies.map((c) => (
-                                      <SelectItem key={c.code} value={c.code}>
-                                        {c.code}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              )}
-                            />
-                          </div>
-
-                          {/* Cost Per Unit */}
-                          <div>
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                              Cost/Unit
-                            </label>
-                            <FormField
-                              control={control}
-                              name={`costItems.${index}.costPerUnit`}
-                              render={({ field }) => (
-                                <Input
-                                  type="number"
-                                  {...field}
-                                  className="h-8 text-sm text-right bg-white"
-                                />
-                              )}
-                            />
-                          </div>
-
-                          {/* Exchange Rate */}
-                          <div>
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                              Rate (IDR)
-                            </label>
-                            <FormField
-                              control={control}
-                              name={`costItems.${index}.exchangeRate`}
-                              render={({ field }) => (
-                                <Input
-                                  type="number"
-                                  {...field}
-                                  className="h-8 text-sm text-right bg-white"
-                                  disabled={
-                                    watch(`costItems.${index}.currency`) ===
-                                    "IDR"
-                                  } // Disable if IDR
-                                />
-                              )}
-                            />
-                          </div>
-
-                          {/* Quantity */}
-                          <div>
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                              Qty
-                            </label>
-                            <FormField
-                              control={control}
-                              name={`costItems.${index}.quantity`}
-                              render={({ field }) => (
-                                <Input
-                                  type="number"
-                                  {...field}
-                                  className="h-8 text-sm text-center bg-white"
-                                />
-                              )}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Delete & Total */}
-                        <div className="md:col-span-1 flex flex-col items-end justify-between h-full py-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-gray-400 hover:text-red-600 mb-2"
-                            onClick={() => costFields.remove(index)}>
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                          <span className="text-xs font-bold text-gray-700">
-                            {formatCurrency(
-                              (watch(`costItems.${index}.costPerUnit`) || 0) *
-                                (watch(`costItems.${index}.quantity`) || 0) *
-                                (watch(`costItems.${index}.exchangeRate`) || 1)
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     {costFields.fields.length === 0 && (
                       <div className="text-center py-8 text-muted-foreground text-sm border-2 border-dashed rounded-lg bg-gray-50">
@@ -673,6 +715,7 @@ export default function EditCashflowClient() {
                       size="sm"
                       onClick={() =>
                         costFields.append({
+                          isManual: false, // 🔥 SET DEFAULT VALUE ISMANUAL = FALSE
                           description: "",
                           vendorId: "",
                           costPerUnit: 0,
@@ -722,7 +765,7 @@ export default function EditCashflowClient() {
                           "font-bold font-mono",
                           summary.profit >= 0
                             ? "text-emerald-400"
-                            : "text-red-400"
+                            : "text-red-400",
                         )}>
                         {formatCurrency(summary.profit)}
                       </span>
@@ -747,7 +790,7 @@ export default function EditCashflowClient() {
                       onClick={form.handleSubmit(onSubmit, (errors) => {
                         console.log("VALIDASI GAGAL:", errors);
                         toast.error(
-                          "Cek kembali isian form, ada yang belum lengkap/valid."
+                          "Cek kembali isian form, ada yang belum lengkap/valid.",
                         );
                       })}
                       disabled={submitting}>

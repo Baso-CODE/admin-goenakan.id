@@ -50,10 +50,15 @@ import { cn } from "@/lib/utils";
 import { QuotationNotesSection } from "./helper/quotationNotesSection";
 import { ClientData, NoteCategory, ProductData } from "./quotationForm";
 
+type SalesData = {
+  id: string;
+  name: string;
+};
 const QUOTATION_STATUSES = ["DRAFT", "SENT", "FOLLOW_UP"] as const;
 
 const quotationSchema = z.object({
   date: z.date(),
+  salesId: z.string().optional(),
   validUntil: z.date().optional(),
   status: z.enum(QUOTATION_STATUSES).default("DRAFT"),
   isManualClient: z.boolean().default(false),
@@ -101,12 +106,14 @@ export default function QuotationAddForm({
   const [selectedClient, setSelectedClient] = useState<ClientData | null>(null);
   const [loadingMaster, setLoadingMaster] = useState(true);
   const [manualNotes, setManualNotes] = useState<any[]>([]);
+  const [salesList, setSalesList] = useState<SalesData[]>([]);
 
   const form = useForm<AddQuotationFormValues>({
     resolver: zodResolver(quotationSchema) as Resolver<AddQuotationFormValues>,
     defaultValues: {
       date: new Date(),
       status: "DRAFT",
+      salesId: "",
       isManualClient: false,
       items: [
         {
@@ -138,15 +145,18 @@ export default function QuotationAddForm({
         const { token } = await tokenRes.json();
         const headers = { Authorization: `Bearer ${token}` };
 
-        const [resC, resP, resN] = await Promise.all([
+        const [resC, resP, resN, resS] = await Promise.all([
           fetch(`${apiUrl}/clients/order`, { headers }),
           fetch(`${apiUrl}/products/order`, { headers }),
           fetch(`${apiUrl}/quotation-notes-categories`, { headers }),
+          fetch(`${apiUrl}/sales?isActive=true`, { headers }),
         ]);
 
         setClients(await resC.json());
         setProducts(await resP.json());
         setNoteCategories(await resN.json());
+        const salesResult = await resS.json();
+        setSalesList(salesResult.data || salesResult);
       } catch (e) {
         toast.error("Gagal memuat master data");
       } finally {
@@ -241,6 +251,40 @@ export default function QuotationAddForm({
                         />
                       </PopoverContent>
                     </Popover>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="salesId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>PIC Sales</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={loadingMaster}>
+                      <FormControl>
+                        <SelectTrigger className="bg-white">
+                          <SelectValue
+                            placeholder={
+                              loadingMaster
+                                ? "Memuat data sales..."
+                                : "Pilih PIC Sales"
+                            }
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {salesList.map((sales) => (
+                          <SelectItem key={sales.id} value={sales.id}>
+                            {sales.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
