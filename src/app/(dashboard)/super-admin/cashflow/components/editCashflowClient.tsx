@@ -214,7 +214,7 @@ export default function EditCashflowClient() {
           costItems: detailData.costs.map((c: any) => ({
             isManual: !c.vendorId,
             description: c.description,
-            vendorId: z.string().optional(),
+            vendorId: c.vendorId || "",
             costPerUnit: Number(c.costPerUnit),
             quantity: Number(c.quantity),
             currency: c.currency || "IDR",
@@ -447,24 +447,21 @@ export default function EditCashflowClient() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="p-4 space-y-4">
+                  <div className="p-4 space-y-5">
                     {costFields.fields.map((field, index) => {
-                      // 🔥 AMBIL STATUS MANUAL DARI WATCH
                       const isManual = watch(`costItems.${index}.isManual`);
 
                       return (
                         <div
                           key={field.id}
-                          className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start border-b border-dashed pb-4 last:border-0 last:pb-0 bg-gray-50/50 p-3 rounded-md">
-                          {/* 🔥 Row 1: Description & Vendor */}
-                          <div className="md:col-span-5 space-y-3">
-                            {/* 🔥 TOGGLE INPUT MANUAL / VENDOR */}
-                            <div className="flex items-center gap-2 mb-1">
+                          className="flex flex-col gap-4 border border-gray-200 shadow-sm bg-gray-50/30 p-4 rounded-xl">
+                          {/* 🔥 BARIS 1: TOMBOL SWITCH */}
+                          <div className="flex items-center justify-between pb-3 border-b border-gray-200/80">
+                            <div className="flex items-center gap-3">
                               <Switch
                                 checked={isManual}
                                 onCheckedChange={(val) => {
                                   setValue(`costItems.${index}.isManual`, val);
-                                  // Bersihkan kolom jika ganti mode
                                   setValue(`costItems.${index}.vendorId`, "");
                                   setValue(
                                     `costItems.${index}.description`,
@@ -472,15 +469,17 @@ export default function EditCashflowClient() {
                                   );
                                 }}
                               />
-                              <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                              <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">
                                 Input Manual?
                               </span>
                             </div>
+                          </div>
 
+                          {/* 🔥 BARIS 2: VENDOR & DESKRIPSI (FULL WIDTH) */}
+                          <div className="w-full">
                             {!isManual ? (
-                              // 🔥 JIKA DARI VENDOR (TAMPILAN LAMA)
-                              <div className="space-y-3">
-                                <div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
                                   <label className="text-[10px] font-bold text-muted-foreground uppercase">
                                     Vendor
                                   </label>
@@ -498,8 +497,8 @@ export default function EditCashflowClient() {
                                         }}
                                         value={field.value}>
                                         <FormControl>
-                                          <SelectTrigger className="h-8 text-sm bg-white">
-                                            <SelectValue placeholder="Select Vendor" />
+                                          <SelectTrigger className="h-10 text-sm bg-white">
+                                            <SelectValue placeholder="Pilih Vendor" />
                                           </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
@@ -514,7 +513,7 @@ export default function EditCashflowClient() {
                                   />
                                 </div>
 
-                                <div>
+                                <div className="space-y-1.5">
                                   <label className="text-[10px] font-bold text-muted-foreground uppercase">
                                     Item / Servis Vendor
                                   </label>
@@ -537,8 +536,8 @@ export default function EditCashflowClient() {
                                           value={field.value}
                                           disabled={!currentVendorId}>
                                           <FormControl>
-                                            <SelectTrigger className="h-8 text-sm bg-white">
-                                              <SelectValue placeholder="Select Item Type" />
+                                            <SelectTrigger className="h-10 text-sm bg-white">
+                                              <SelectValue placeholder="Pilih Item" />
                                             </SelectTrigger>
                                           </FormControl>
                                           <SelectContent>
@@ -552,7 +551,7 @@ export default function EditCashflowClient() {
                                               ))
                                             ) : (
                                               <div className="p-2 text-xs text-muted-foreground text-center">
-                                                No items found.
+                                                Item kosong
                                               </div>
                                             )}
                                             <SelectItem value="Lainnya">
@@ -566,8 +565,7 @@ export default function EditCashflowClient() {
                                 </div>
                               </div>
                             ) : (
-                              // 🔥 JIKA INPUT MANUAL (TAMPILAN BARU)
-                              <div className="pt-1">
+                              <div className="space-y-1.5 w-full">
                                 <label className="text-[10px] font-bold text-muted-foreground uppercase">
                                   Nama Pengeluaran / Deskripsi
                                 </label>
@@ -577,8 +575,8 @@ export default function EditCashflowClient() {
                                   render={({ field }) => (
                                     <Input
                                       {...field}
-                                      placeholder="Contoh: Bensin, Makan Siang..."
-                                      className="h-8 text-sm bg-white mt-1"
+                                      placeholder="Contoh: Bensin Operasional, Makan Siang..."
+                                      className="h-10 text-sm bg-white"
                                     />
                                   )}
                                 />
@@ -586,9 +584,10 @@ export default function EditCashflowClient() {
                             )}
                           </div>
 
-                          {/* Row 2: Financials (Currency, Cost, Rate, Qty) */}
-                          <div className="md:col-span-6 grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <div>
+                          {/* 🔥 BARIS 3: FINANCIALS SEJAJAR (Dibungkus card putih) */}
+                          <div className="grid grid-cols-2 lg:grid-cols-12 gap-4 items-end bg-white p-3.5 rounded-lg border border-gray-100 shadow-sm mt-1">
+                            {/* Curr */}
+                            <div className="col-span-1 lg:col-span-2 space-y-1.5">
                               <label className="text-[10px] font-bold text-muted-foreground uppercase">
                                 Curr
                               </label>
@@ -607,7 +606,7 @@ export default function EditCashflowClient() {
                                     }}
                                     value={field.value}>
                                     <FormControl>
-                                      <SelectTrigger className="h-8 text-sm bg-white">
+                                      <SelectTrigger className="h-9 text-sm bg-white">
                                         <SelectValue />
                                       </SelectTrigger>
                                     </FormControl>
@@ -623,7 +622,8 @@ export default function EditCashflowClient() {
                               />
                             </div>
 
-                            <div>
+                            {/* Cost/Unit */}
+                            <div className="col-span-1 lg:col-span-3 space-y-1.5">
                               <label className="text-[10px] font-bold text-muted-foreground uppercase">
                                 Cost/Unit
                               </label>
@@ -634,13 +634,14 @@ export default function EditCashflowClient() {
                                   <Input
                                     type="number"
                                     {...field}
-                                    className="h-8 text-sm text-right bg-white"
+                                    className="h-9 text-sm text-right bg-white"
                                   />
                                 )}
                               />
                             </div>
 
-                            <div>
+                            {/* Rate */}
+                            <div className="col-span-1 lg:col-span-2 space-y-1.5">
                               <label className="text-[10px] font-bold text-muted-foreground uppercase">
                                 Rate (IDR)
                               </label>
@@ -651,7 +652,7 @@ export default function EditCashflowClient() {
                                   <Input
                                     type="number"
                                     {...field}
-                                    className="h-8 text-sm text-right bg-white"
+                                    className="h-9 text-sm text-right bg-gray-50"
                                     disabled={
                                       watch(`costItems.${index}.currency`) ===
                                       "IDR"
@@ -661,7 +662,8 @@ export default function EditCashflowClient() {
                               />
                             </div>
 
-                            <div>
+                            {/* Qty */}
+                            <div className="col-span-1 lg:col-span-2 space-y-1.5">
                               <label className="text-[10px] font-bold text-muted-foreground uppercase">
                                 Qty
                               </label>
@@ -672,50 +674,59 @@ export default function EditCashflowClient() {
                                   <Input
                                     type="number"
                                     {...field}
-                                    className="h-8 text-sm text-center bg-white"
+                                    className="h-9 text-sm text-center bg-white"
                                   />
                                 )}
                               />
                             </div>
-                          </div>
 
-                          {/* Delete & Total */}
-                          <div className="md:col-span-1 flex flex-col items-end justify-between h-full py-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-gray-400 hover:text-red-600 mb-2"
-                              onClick={() => costFields.remove(index)}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                            <span className="text-xs font-bold text-gray-700">
-                              {formatCurrency(
-                                (watch(`costItems.${index}.costPerUnit`) || 0) *
-                                  (watch(`costItems.${index}.quantity`) || 0) *
-                                  (watch(`costItems.${index}.exchangeRate`) ||
-                                    1),
-                              )}
-                            </span>
+                            {/* Total & Delete */}
+                            <div className="col-span-2 lg:col-span-3 flex justify-end items-center gap-4 h-9">
+                              <div className="flex flex-col items-end leading-none justify-center">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">
+                                  Total IDR
+                                </span>
+                                <span className="text-[15px] font-bold text-red-600 leading-none">
+                                  {formatCurrency(
+                                    (watch(`costItems.${index}.costPerUnit`) ||
+                                      0) *
+                                      (watch(`costItems.${index}.quantity`) ||
+                                        0) *
+                                      (watch(
+                                        `costItems.${index}.exchangeRate`,
+                                      ) || 1),
+                                  )}
+                                </span>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-gray-400 hover:bg-red-100 hover:text-red-600 shrink-0"
+                                onClick={() => costFields.remove(index)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       );
                     })}
 
                     {costFields.fields.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground text-sm border-2 border-dashed rounded-lg bg-gray-50">
+                      <div className="text-center py-10 text-muted-foreground text-sm border-2 border-dashed rounded-xl bg-gray-50">
                         Belum ada pengeluaran diinput.
                       </div>
                     )}
                   </div>
-                  <div className="bg-gray-50 p-3 border-t flex justify-center">
+
+                  <div className="bg-gray-50/80 p-4 border-t border-gray-200 flex justify-center rounded-b-lg">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       onClick={() =>
                         costFields.append({
-                          isManual: false, // 🔥 SET DEFAULT VALUE ISMANUAL = FALSE
+                          isManual: false,
                           description: "",
                           vendorId: "",
                           costPerUnit: 0,
@@ -725,8 +736,9 @@ export default function EditCashflowClient() {
                           total: 0,
                         })
                       }
-                      className="text-red-700 border-red-200 hover:bg-red-50">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Cost Item
+                      className="text-red-700 border-red-200 hover:bg-red-50 bg-white shadow-sm">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Tambah Pengeluaran
+                      Baru
                     </Button>
                   </div>
                 </CardContent>
