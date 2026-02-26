@@ -19,7 +19,6 @@ export async function fetchWithToken(url: string) {
 
 async function getAuthToken() {
   const session = await getSession();
-  console.log("ini adlah console.log", session);
 
   return session?.expires ? session.user : null;
 }

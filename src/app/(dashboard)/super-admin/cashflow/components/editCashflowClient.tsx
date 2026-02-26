@@ -800,7 +800,6 @@ export default function EditCashflowClient() {
                       size="lg"
                       // Tambahkan parameter kedua untuk melihat error di console
                       onClick={form.handleSubmit(onSubmit, (errors) => {
-                        console.log("VALIDASI GAGAL:", errors);
                         toast.error(
                           "Cek kembali isian form, ada yang belum lengkap/valid.",
                         );

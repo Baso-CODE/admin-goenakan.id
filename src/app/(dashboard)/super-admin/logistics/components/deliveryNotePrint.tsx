@@ -16,7 +16,6 @@ export default function DeliveryNotePrint() {
   const { shipmentId } = useParams();
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<any>(null);
-  console.log("ini adalahd data", data);
 
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -314,7 +313,6 @@ export default function DeliveryNotePrint() {
               </table>
             </div>
 
-          
             {/* 4. REMARKS */}
             <div className="mb-10">
               <div className="font-bold text-[12px] uppercase mb-1 text-gray-700">

@@ -52,16 +52,10 @@ export function RevenueChart() {
         const month = date.getMonth() + 1;
         const year = date.getFullYear();
 
-        // PANGGILAN API YANG BENAR:
-        // 1. Tidak perlu ambil token manual (sudah dihandle fetchWithToken)
-        // 2. Tidak perlu .json() lagi (sudah dihandle fetchWithToken)
-
         const data = await fetchWithToken(
-          `${apiUrl}/invoices/chart?month=${month}&year=${year}`
+          `${apiUrl}/invoices/chart?month=${month}&year=${year}`,
         );
 
-        // Langsung set data karena 'data' sudah berupa array JSON dari backend
-        console.log("Chart Data:", data); // Debugging: Cek di console browser
         setChartData(data);
       } catch (error) {
         console.error("Gagal ambil data chart", error);

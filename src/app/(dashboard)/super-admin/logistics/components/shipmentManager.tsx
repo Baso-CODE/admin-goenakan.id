@@ -116,7 +116,6 @@ export default function ShipmentManager({
   // === STATE MANAGEMENT ===
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  console.log("ini adalaah data shipment", shipments);
 
   // Master Data Categories
   const [noteCategories, setNoteCategories] = useState<NoteCategory[]>([]);

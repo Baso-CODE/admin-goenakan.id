@@ -136,7 +136,6 @@ export default function OrderDetail() {
   const router = useRouter();
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
-  console.log("Order Detail", order);
 
   const [loading, setLoading] = useState(true);
 

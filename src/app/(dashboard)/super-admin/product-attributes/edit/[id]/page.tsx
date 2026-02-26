@@ -33,7 +33,6 @@ export default function EditAttributePage() {
         if (!res.ok) throw new Error("Failed to fetch attribute data");
 
         const data = await res.json();
-        console.log("ini adlah data attributes", data);
 
         setAttributeData({
           name: data.name,
@@ -76,7 +75,7 @@ export default function EditAttributePage() {
       router.refresh();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to update attribute"
+        err instanceof Error ? err.message : "Failed to update attribute",
       );
     } finally {
       setIsSubmitting(false);

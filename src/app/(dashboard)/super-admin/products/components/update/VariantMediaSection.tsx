@@ -26,9 +26,15 @@ interface FormUpdateProductMediaProps {
   productId: string;
   initialData: Product | undefined;
   isSubmitting: boolean;
-  onAddImage: (file: File) => Promise<void>;
+  onAddImage: (
+    file: File,
+    onProgress?: (progress: number) => void,
+  ) => Promise<void>;
   onDeleteImage: (mediaId: string) => Promise<void>;
-  onAddVideo: (file: File) => Promise<void>;
+  onAddVideo: (
+    file: File,
+    onProgress?: (progress: number) => void,
+  ) => Promise<void>;
   onDeleteVideo: (mediaId: string) => Promise<void>;
   onUpdateMediaMetadata: (mediaId: string, updates: any) => Promise<void>;
   onUpdateVideoMetadata: (mediaId: string, updates: any) => Promise<void>;
@@ -117,8 +123,9 @@ export default function FormUpdateProductMedia({
   onUpdateMediaMetadata,
   onUpdateVideoMetadata,
 }: FormUpdateProductMediaProps) {
-  const [isUploading, setIsUploading] = useState(false);
-
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedMedia, setSelectedMedia] = useState<ProductMedia | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -161,23 +168,41 @@ export default function FormUpdateProductMedia({
     }
   };
 
-  const handleFileChange = async (
-    e: ChangeEvent<HTMLInputElement>,
-    handler: (file: File) => Promise<void>,
-    ref: React.RefObject<HTMLInputElement | null>
-  ) => {
+  const handleVideoFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsUploading(true);
+    setIsUploadingVideo(true);
+    setUploadProgress(0);
+
     try {
-      await handler(file);
+      await onAddVideo(file, (progress) => {
+        setUploadProgress(Math.round(progress));
+      });
     } catch (error) {
-      console.error("Upload failed", error);
+      console.error("Video upload failed", error);
     } finally {
-      setIsUploading(false);
-      if (ref.current) {
-        ref.current.value = "";
+      setIsUploadingVideo(false);
+      setUploadProgress(0);
+      if (videoInputRef.current) {
+        videoInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleImageFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingImage(true);
+    try {
+      await onAddImage(file);
+    } catch (error) {
+      console.error("Image upload failed", error);
+    } finally {
+      setIsUploadingImage(false);
+      if (imageInputRef.current) {
+        imageInputRef.current.value = "";
       }
     }
   };
@@ -204,8 +229,8 @@ export default function FormUpdateProductMedia({
                 type="file"
                 accept="image/*"
                 ref={imageInputRef}
-                onChange={(e) => handleFileChange(e, onAddImage, imageInputRef)}
-                disabled={isSubmitting || isUploading}
+                onChange={handleImageFileChange}
+                disabled={isSubmitting || isUploadingImage}
                 className="max-w-xs"
               />
               <Button
@@ -213,9 +238,9 @@ export default function FormUpdateProductMedia({
                 variant="outline"
                 size="sm"
                 onClick={() => imageInputRef.current?.click()}
-                disabled={isSubmitting || isUploading}>
+                disabled={isSubmitting || isUploadingImage}>
                 <Plus className="h-4 w-4 mr-2" />
-                {isUploading ? "Uploading..." : "Tambah Gambar"}
+                {isUploadingImage ? "Uploading..." : "Tambah Gambar"}
               </Button>
             </div>
           </div>
@@ -235,8 +260,8 @@ export default function FormUpdateProductMedia({
                 type="file"
                 accept="video/mp4,video/quicktime"
                 ref={videoInputRef}
-                onChange={(e) => handleFileChange(e, onAddVideo, videoInputRef)}
-                disabled={isSubmitting || isUploading}
+                onChange={handleVideoFileChange}
+                disabled={isSubmitting || isUploadingVideo}
                 className="max-w-xs"
               />
               <Button
@@ -244,13 +269,14 @@ export default function FormUpdateProductMedia({
                 variant="outline"
                 size="sm"
                 onClick={() => videoInputRef.current?.click()}
-                disabled={isSubmitting || isUploading}>
-                {/* Tambahkan Icon Loader jika uploading */}
-                {isUploading ? (
+                disabled={isSubmitting || isUploadingVideo}
+                className="min-w-32">
+                {isUploadingVideo ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Uploading (
-                    {/* Anda bisa menambah % progress disini jika mau */})...
+                    {uploadProgress > 0
+                      ? `Uploading (${uploadProgress}%)`
+                      : "Uploading..."}
                   </>
                 ) : (
                   <>
@@ -260,6 +286,13 @@ export default function FormUpdateProductMedia({
                 )}
               </Button>
             </div>
+            {isUploadingVideo && uploadProgress > 0 && (
+              <div className="w-full max-w-sm bg-gray-200 rounded-full h-2.5 mt-2">
+                <div
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}></div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

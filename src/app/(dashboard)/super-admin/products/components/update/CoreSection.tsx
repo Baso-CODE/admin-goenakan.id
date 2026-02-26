@@ -57,11 +57,6 @@ export default function FormProductCore({
   onSubmit: (values: ProductCoreFormValues) => void;
   isSubmitting: boolean;
 }) {
-  console.log(
-    "ini adalah data dari intial di form update product",
-    initialData,
-  );
-
   const [categories, setCategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
 

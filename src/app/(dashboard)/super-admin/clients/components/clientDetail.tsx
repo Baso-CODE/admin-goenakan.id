@@ -380,7 +380,6 @@ export default function ClientDetail() {
   const router = useRouter();
 
   const [client, setClient] = useState<ClientDetail | null>(null);
-  console.log("ini adalah data client", client);
 
   const [loading, setLoading] = useState(true);
 

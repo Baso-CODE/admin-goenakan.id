@@ -161,7 +161,6 @@ export default function QuotationForm({
   isLoading,
 }: QuotationFormProps) {
   const [clients, setClients] = useState<ClientData[]>([]);
-  console.log("ini adalah data client", clients);
 
   const [products, setProducts] = useState<ProductData[]>([]);
   const [noteCategories, setNoteCategories] = useState<NoteCategory[]>([]);

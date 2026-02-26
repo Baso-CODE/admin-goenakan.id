@@ -132,7 +132,6 @@ const initialFormData: ClientFormData = {
 
 export default function ClientEditForm() {
   const [formData, setFormData] = useState<ClientFormData>(initialFormData);
-  console.log("ini adalah data", formData);
 
   const [clientType, setClientType] = useState<ClientType>("");
   const [provinces, setProvinces] = useState<any[]>([]);
@@ -147,7 +146,7 @@ export default function ClientEditForm() {
   const [subDistrictB2C, setSubDistrictB2C] = useState<any[]>([]);
 
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
-    []
+    [],
   );
   const [departments, setDepartments] = useState<Departement[]>([]);
   const router = useRouter();
@@ -197,7 +196,7 @@ export default function ClientEditForm() {
       const prov = provinces.find((p) => p.name === provinceName);
       if (prov) {
         const res = await fetch(
-          `https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${prov.id}.json`
+          `https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${prov.id}.json`,
         );
         const data = await res.json();
         setCitiesFn(data);
@@ -228,12 +227,12 @@ export default function ClientEditForm() {
     const handler = async (
       cityName: string,
       citiesRef: any[],
-      setDistrictFn: any
+      setDistrictFn: any,
     ) => {
       const city = citiesRef.find((c) => c.name === cityName);
       if (city) {
         const res = await fetch(
-          `https://www.emsifa.com/api-wilayah-indonesia/api/districts/${city.id}.json`
+          `https://www.emsifa.com/api-wilayah-indonesia/api/districts/${city.id}.json`,
         );
         const data = await res.json();
         setDistrictFn(data);
@@ -265,12 +264,12 @@ export default function ClientEditForm() {
     const handler = async (
       distName: string,
       districtRef: any[],
-      setSubFn: any
+      setSubFn: any,
     ) => {
       const dist = districtRef.find((d) => d.name === distName);
       if (dist) {
         const res = await fetch(
-          `https://www.emsifa.com/api-wilayah-indonesia/api/villages/${dist.id}.json`
+          `https://www.emsifa.com/api-wilayah-indonesia/api/villages/${dist.id}.json`,
         );
         const data = await res.json();
         setSubFn(data);
@@ -306,12 +305,10 @@ export default function ClientEditForm() {
         const res = await fetch(`${apiUrl}/clients/${clientId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        console.log("ini adalah data res", res);
 
         if (!res.ok) throw new Error("Gagal mengambil data klien");
 
         const data = await res.json();
-        console.log("ini adlaah data dari fetch client", data);
 
         setFormData((prev) => ({
           ...initialFormData,
@@ -406,7 +403,7 @@ export default function ClientEditForm() {
   }, [clientId]);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));

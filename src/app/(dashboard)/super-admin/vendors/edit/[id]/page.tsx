@@ -17,8 +17,6 @@ export default function EditVendorPage() {
     { id: string; name: string }[]
   >([]);
 
-  console.log("ini adlah date existing items edit page", existingItems);
-
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

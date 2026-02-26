@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Loader2, Tag, ListPlus, Trash2 } from "lucide-react";
+import { ListPlus, Loader2, Tag, Trash2 } from "lucide-react";
 
 // ===================== Schema ===================== //
 
@@ -54,8 +54,6 @@ export default function AttributeForm({
     },
   });
 
-  console.log(form.getValues());
-
   useEffect(() => {
     if (initialData) form.reset(initialData);
   }, [initialData, form]);
@@ -83,8 +81,7 @@ export default function AttributeForm({
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(handleSubmit)}
-            className="space-y-6 w-full"
-          >
+            className="space-y-6 w-full">
             {/* ===================== Attribute Name ===================== */}
             <FormField
               control={form.control}
@@ -144,8 +141,7 @@ export default function AttributeForm({
                         } else {
                           remove(index);
                         }
-                      }}
-                    >
+                      }}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -157,8 +153,7 @@ export default function AttributeForm({
                 variant="outline"
                 className="gap-2"
                 onClick={() => append({ value: "" })}
-                disabled={isLoading || isSubmitting}
-              >
+                disabled={isLoading || isSubmitting}>
                 <ListPlus className="h-4 w-4" /> Add Value
               </Button>
             </div>
@@ -168,8 +163,7 @@ export default function AttributeForm({
               <Button
                 type="submit"
                 className="w-full md:w-auto"
-                disabled={isLoading || isSubmitting}
-              >
+                disabled={isLoading || isSubmitting}>
                 {isSubmitting ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (

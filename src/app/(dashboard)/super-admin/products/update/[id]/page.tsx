@@ -42,7 +42,6 @@ export default function EditProductPage() {
         if (!res.ok) throw new Error("Failed to fetch product data");
 
         const data = await res.json();
-        console.log("ini adalah data ", data);
 
         setProductData(data);
       } catch (err) {
@@ -215,8 +214,6 @@ export default function EditProductPage() {
     }
   };
 
-  // Di dalam EditProductPage.tsx
-
   const handleUpdateMediaMetadata = async (
     mediaId: string,
     updates: { altText?: string; isFeatured?: boolean },
@@ -240,25 +237,20 @@ export default function EditProductPage() {
         throw new Error(errorData.message || "Failed to update image details");
       }
 
-      // 1. Dapatkan data IMAGE yang sudah diupdate dari backend
       const updatedImage = await res.json();
 
-      // 2. Update State secara Manual (Immutably)
       setProductData((prev: any) => {
         if (!prev) return prev;
 
-        // Clone array images
         let newImages = [...prev.images];
 
-        // Jika user mengubah isFeatured menjadi true, kita harus set false yang lain di state UI
         if (updates.isFeatured === true) {
           newImages = newImages.map((img) => ({
             ...img,
-            isFeatured: false, // Reset semua jadi false dulu
+            isFeatured: false,
           }));
         }
 
-        // Update image yang spesifik dengan data baru dari backend
         newImages = newImages.map((img) =>
           img.id === mediaId ? { ...img, ...updatedImage } : img,
         );
@@ -375,31 +367,51 @@ export default function EditProductPage() {
     }
   };
 
-  const handleAddVideo = async (file: File): Promise<void> => {
-    setIsSubmitting(true); // Opsional: block UI saat upload
+  const handleAddVideo = async (
+    file: File,
+    onProgress?: (progress: number) => void,
+  ): Promise<void> => {
+    setIsSubmitting(true);
     try {
-      // A. DIRECT UPLOAD KE CLOUDINARY (Frontend)
+      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`;
       const cloudinaryFormData = new FormData();
       cloudinaryFormData.append("file", file);
       cloudinaryFormData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
       cloudinaryFormData.append("resource_type", "video");
 
-      const uploadRes = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`,
-        {
-          method: "POST",
-          body: cloudinaryFormData,
-        },
-      );
+      const uploadData = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
 
-      if (!uploadRes.ok) throw new Error("Gagal upload ke Cloudinary");
-      const uploadData = await uploadRes.json();
+        xhr.open("POST", cloudinaryUrl, true);
 
-      // B. KIRIM URL KE BACKEND UNTUK DISIMPAN
+        // Track Progress Upload
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = (event.loaded / event.total) * 100;
+
+            if (onProgress) {
+              onProgress(percentComplete);
+            }
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            reject(new Error(`Gagal upload ke Cloudinary: ${xhr.statusText}`));
+          }
+        };
+
+        xhr.onerror = () =>
+          reject(new Error("Network Error saat upload ke Cloudinary"));
+
+        xhr.send(cloudinaryFormData);
+      });
+
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      // Payload JSON (Bukan FormData lagi)
       const payload = {
         url: uploadData.secure_url,
         publicId: uploadData.public_id,
@@ -411,7 +423,7 @@ export default function EditProductPage() {
       const res = await fetch(`${apiUrl}/products/${id}/video`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json", // Header JSON
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
@@ -455,7 +467,7 @@ export default function EditProductPage() {
       }
 
       const updatedProduct = await res.json();
-      setProductData(updatedProduct); // Update state dengan data produk terbaru
+      // setProductData(updatedProduct);
       toast.success("Gambar berhasil dihapus!");
     } catch (err) {
       console.error("Error deleting image:", err);
@@ -536,41 +548,36 @@ export default function EditProductPage() {
 
     const rawCombinations = combine(activeAttributes);
 
-    // 3. Format hasil menjadi objek yang mudah dibandingkan (contoh: 'Warna: Merah | Ukuran: XL')
     const formattedCombinations = rawCombinations.map((combination: any[]) => {
-      const attributeMap: Record<string, string> = {}; // { attr_id: val_id }
-      const nameParts: string[] = []; // ["Merah", "XL"]
+      const attributeMap: Record<string, string> = {};
+      const nameParts: string[] = [];
 
       combination.forEach((val) => {
         attributeMap[val.attributeId] = val.id;
-        nameParts.push(val.value); // Asumsi 'value' adalah nama atribut
+        nameParts.push(val.value);
       });
 
       return {
-        attributeMap, // {attr_1: val_a, attr_2: val_b}
-        variantName: nameParts.join(" • "), // "Merah • XL"
+        attributeMap,
+        variantName: nameParts.join(" • "),
       };
     });
 
     return formattedCombinations;
   };
 
-  // Fungsi Handler Utama di EditProductPage.tsx
   const handleGenerateVariants = () => {
     const newCombinations = generateCrossProduct(
       currentSelections,
       currentFullList,
     );
 
-    // Ambil variants yang sudah ada
     const existingVariants = productData?.productVariants || [];
 
     const newVariantsState: any[] = [];
     const usedExistingVariantIds = new Set();
 
-    // Helper untuk membuat signature variant (untuk perbandingan)
     const getVariantSignature = (variant: any) => {
-      // Gabungkan semua ID nilai atribut menjadi string yang terurut
       const attributeIds = variant.attributeValues
         .map((av: any) => av.attributeValueId)
         .sort()
@@ -578,16 +585,12 @@ export default function EditProductPage() {
       return attributeIds;
     };
 
-    // 2. Loop melalui kombinasi BARU dan bandingkan dengan yang sudah ada
     for (const newComb of newCombinations) {
-      // Buat signature baru
       const newCombAttributeIds = Object.values(newComb.attributeMap)
         .sort()
         .join("|");
 
-      // Cari apakah kombinasi ini sudah ada
       const existingMatch = existingVariants.find((v: any) => {
-        // Jika variant lama sudah ditandai dihapus, abaikan
         if (v._isDeleted) return false;
 
         // Cek apakah signature atributnya cocok
@@ -604,13 +607,13 @@ export default function EditProductPage() {
       } else {
         // B. Variant BARU DIBUAT
         newVariantsState.push({
-          id: undefined, // Variant baru, tidak ada ID
+          id: undefined,
           variantName: newComb.variantName,
           sku: "",
           price: 0,
           images: [],
           _isDeleted: false,
-          // Simpan attributeValueIds yang akan diperlukan backend untuk menyimpan relasi
+
           attributeValueIds: Object.values(newComb.attributeMap),
         });
       }

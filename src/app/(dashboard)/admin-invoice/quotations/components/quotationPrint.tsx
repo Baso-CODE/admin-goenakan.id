@@ -27,7 +27,6 @@ export default function QuotationPrint() {
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   const [data, setData] = useState<any>(null);
-  console.log("ini adalah data", data);
 
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);

@@ -116,7 +116,6 @@ export default function InvoiceDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
-  console.log("ini adlaah data invoice", invoice);
 
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
