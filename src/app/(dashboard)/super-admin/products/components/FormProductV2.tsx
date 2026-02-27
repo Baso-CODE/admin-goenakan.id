@@ -414,14 +414,14 @@ export default function ProductFormV2({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Kategori</FormLabel>
+
                     <Select
                       onValueChange={field.onChange}
-                      value={field.value ?? ""}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih kategori..." />
-                        </SelectTrigger>
-                      </FormControl>
+                      defaultValue={field.value}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih kategori..." />
+                      </SelectTrigger>
+
                       <SelectContent>
                         {categories.map((cat) => (
                           <SelectItem key={cat.id} value={cat.id}>
@@ -430,6 +430,8 @@ export default function ProductFormV2({
                         ))}
                       </SelectContent>
                     </Select>
+
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -552,7 +554,7 @@ export default function ProductFormV2({
                           const val = parseFloat(e.target.value);
                           field.onChange(isNaN(val) ? 0 : val);
                         }}
-                      />{" "}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -594,7 +596,7 @@ export default function ProductFormV2({
                           const val = parseFloat(e.target.value);
                           field.onChange(isNaN(val) ? 0 : val);
                         }}
-                      />{" "}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -643,7 +645,6 @@ export default function ProductFormV2({
               </div>
             </div>
 
-            {/* ✅ LOGIC ADDED: Conditional Rendering (Hanya Tampil Jika Custom) */}
             {isCustomProduct && (
               <div className="animate-in fade-in zoom-in duration-300">
                 <div className="border rounded p-4 bg-gray-50/50">

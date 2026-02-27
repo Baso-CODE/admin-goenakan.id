@@ -18,7 +18,7 @@ export default function AddProductPage() {
 
   const handleAddProduct = async (
     data: ProductFormValues,
-    files: FileUploads
+    files: FileUploads,
   ) => {
     setIsSubmitting(true);
 
