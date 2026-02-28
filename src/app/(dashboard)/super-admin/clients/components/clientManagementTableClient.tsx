@@ -254,7 +254,7 @@ export default function ClientManagementTable() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const response = await fetch(`${apiUrl}/vendors/${deleteId}`, {
+      const response = await fetch(`${apiUrl}/clients/${deleteId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -263,7 +263,7 @@ export default function ClientManagementTable() {
 
       if (!response.ok) {
         const errData = await response.json();
-        throw new Error(errData.message || "Gagal menghapus kategori");
+        throw new Error(errData.message || "Gagal menghapus Client");
       }
 
       toast.success("Client berhasil dihapus");
@@ -513,7 +513,7 @@ export default function ClientManagementTable() {
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuItem asChild>
                             <Link
-                              href={`/super-admin/clients/detail/${client.id}}`}
+                              href={`/super-admin/clients/detail/${client.id}`}
                               className="cursor-pointer">
                               <Eye className="mr-2 h-4 w-4" /> View
                             </Link>
