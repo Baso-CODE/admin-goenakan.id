@@ -200,12 +200,16 @@ export default function ClientAddForm() {
   const [subDistrictB2C, setSubDistrictB2C] = useState<any[]>([]);
 
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
-    []
+    [],
   );
   const [departments, setDepartments] = useState<Departement[]>([]);
-
   const [openB2BCountry, setOpenB2BCountry] = useState(false);
-  const [openB2CCountry, setOpenB2CCountry] = useState(false);
+
+  const [manualDistrictB2B, setManualDistrictB2B] = useState(false);
+  const [manualSubDistrictB2B, setManualSubDistrictB2B] = useState(false);
+  const [manualDistrictB2C, setManualDistrictB2C] = useState(false);
+  const [manualSubDistrictB2C, setManualSubDistrictB2C] = useState(false);
+
   const { data: session } = useSession();
   const router = useRouter();
 
@@ -252,7 +256,7 @@ export default function ClientAddForm() {
       const prov = provinces.find((p) => p.name === provinceName);
       if (prov) {
         const res = await fetch(
-          `https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${prov.id}.json`
+          `https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${prov.id}.json`,
         );
         const data = await res.json();
         setCitiesFn(data);
@@ -283,12 +287,12 @@ export default function ClientAddForm() {
     const handler = async (
       cityName: string,
       citiesRef: any[],
-      setDistrictFn: any
+      setDistrictFn: any,
     ) => {
       const city = citiesRef.find((c) => c.name === cityName);
       if (city) {
         const res = await fetch(
-          `https://www.emsifa.com/api-wilayah-indonesia/api/districts/${city.id}.json`
+          `https://www.emsifa.com/api-wilayah-indonesia/api/districts/${city.id}.json`,
         );
         const data = await res.json();
         setDistrictFn(data);
@@ -320,12 +324,12 @@ export default function ClientAddForm() {
     const handler = async (
       distName: string,
       districtRef: any[],
-      setSubFn: any
+      setSubFn: any,
     ) => {
       const dist = districtRef.find((d) => d.name === distName);
       if (dist) {
         const res = await fetch(
-          `https://www.emsifa.com/api-wilayah-indonesia/api/villages/${dist.id}.json`
+          `https://www.emsifa.com/api-wilayah-indonesia/api/villages/${dist.id}.json`,
         );
         const data = await res.json();
         setSubFn(data);
@@ -353,7 +357,7 @@ export default function ClientAddForm() {
   ]);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -367,70 +371,72 @@ export default function ClientAddForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const validation = clientSchema.safeParse({
-      type: formData.type,
-    });
+    const validation = clientSchema.safeParse({ type: formData.type });
     if (!validation.success) {
-      toast("error");
+      toast.error("Pilih tipe klien terlebih dahulu!");
       return;
     }
 
     if (!session) {
-      toast("Kamu belum login!");
+      toast.error("Kamu belum login!");
       return;
+    }
+
+    // Validasi manual field required B2B
+    if (clientType === "B2B") {
+      if (!formData.b2b_companyName)
+        return toast.error("Nama perusahaan wajib diisi");
+      if (!formData.b2b_departmentId)
+        return toast.error("Departemen wajib dipilih");
+      if (!formData.b2b_purchaseChannelId)
+        return toast.error("Saluran pembelian wajib dipilih");
+    }
+
+    // Validasi manual field required B2C
+    if (clientType === "B2C") {
+      if (!formData.b2c_name) return toast.error("Nama lengkap wajib diisi");
+      if (!formData.b2c_purchaseChannelIdB2C)
+        return toast.error("Saluran pembelian wajib dipilih");
     }
 
     try {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
+      // ✅ FIX: Payload B2C pakai nama field yang benar sesuai DTO backend
       const payload =
         clientType === "B2C"
           ? {
               type: "B2C",
-
-              custCode: formData.custCode,
-
-              // === B2C ===
               name: formData.b2c_name,
               prefix: formData.b2c_prefix,
               phone: formData.b2c_phone,
 
-              // ADDRESS
-              country: formData.b2c_country,
-              province: formData.b2c_province,
-              city: formData.b2c_city,
-              district: formData.b2c_district,
-              subDistrict: formData.b2c_subDistrict,
-              postalCode: formData.b2c_postalCode,
-
-              fullAddress: formData.b2c_fullAddressB2C,
-              purchaseChannelId: formData.b2c_purchaseChannelIdB2C,
+              // ✅ BENAR - pakai suffix B2C sesuai DTO
+              countryB2C: formData.b2c_country,
+              provinceB2C: formData.b2c_province,
+              cityB2C: formData.b2c_city,
+              districtB2C: formData.b2c_district,
+              subDistrictB2C: formData.b2c_subDistrict,
+              postalCodeB2C: formData.b2c_postalCode,
+              fullAddressB2C: formData.b2c_fullAddressB2C,
+              purchaseChannelIdB2C: formData.b2c_purchaseChannelIdB2C,
             }
           : {
               type: "B2B",
-
-              custCode: formData.custCode,
-
-              // === B2B ===
               companyName: formData.b2b_companyName,
               departmentId: formData.b2b_departmentId,
               phone: formData.b2b_phone,
               email: formData.b2b_email,
               website: formData.b2b_website,
-
-              // ADDRESS
               country: formData.b2b_country,
               province: formData.b2b_province,
               city: formData.b2b_city,
-              district: formData.b2b_district, // kecamatan
-              subDistrict: formData.b2b_subDistrict, // kelurahan
+              district: formData.b2b_district,
+              subDistrict: formData.b2b_subDistrict,
               postalCode: formData.b2b_postalCode,
-
               fullAddress: formData.b2b_fullAddress,
               purchaseChannelId: formData.b2b_purchaseChannelId,
-
-              // MULTIPLE PIC
               pics: formData.b2b_pics.map((pic) => ({
                 prefix: pic.prefix,
                 name: pic.name,
@@ -439,7 +445,8 @@ export default function ClientAddForm() {
               })),
             };
 
-      await fetch(`${apiUrl}/clients`, {
+      // ✅ FIX: Cek response, jangan langsung toast success
+      const res = await fetch(`${apiUrl}/clients`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -448,10 +455,19 @@ export default function ClientAddForm() {
         body: JSON.stringify(payload),
       });
 
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(
+          `Gagal menyimpan: ${errData.message || "Terjadi kesalahan server"}`,
+        );
+        return;
+      }
+
       toast.success("Client berhasil ditambahkan!");
       router.push("/super-admin/clients");
     } catch (err) {
-      toast.error("Terjadi kesalahan saat mengirim data.");
+      toast.error("Terjadi kesalahan koneksi ke server.");
+      console.error(err);
     }
   };
 
@@ -591,10 +607,7 @@ export default function ClientAddForm() {
                 </div>
 
                 <h3 className="text-lg font-semibold border-b pb-2">Alamat</h3>
-                {/* === ADDRESS SECTION === */}
                 <div className="grid grid-cols-3 gap-4">
-                  {/* === COUNTRY === */}
-                  {/* === COUNTRY (SEARCHABLE COMBOBOX) === */}
                   <div className="space-y-2 flex flex-col">
                     <Label>Negara</Label>
                     <Popover
@@ -607,7 +620,7 @@ export default function ClientAddForm() {
                           aria-expanded={openB2BCountry}
                           className={cn(
                             "w-full justify-between pl-3 font-normal",
-                            !formData.b2b_country && "text-muted-foreground"
+                            !formData.b2b_country && "text-muted-foreground",
                           )}>
                           {formData.b2b_country ? (
                             <span className="flex items-center gap-2 truncate">
@@ -615,7 +628,7 @@ export default function ClientAddForm() {
                               <span>
                                 {
                                   countries.find(
-                                    (c) => c.name === formData.b2b_country
+                                    (c) => c.name === formData.b2b_country,
                                   )?.flag
                                 }
                               </span>
@@ -638,10 +651,9 @@ export default function ClientAddForm() {
                                   key={c.code}
                                   value={c.name}
                                   onSelect={(currentValue) => {
-                                    // Logic update state (sama seperti sebelumnya)
                                     setFormData((prev) => ({
                                       ...prev,
-                                      b2b_country: c.name, // Gunakan nama asli dari data countries
+                                      b2b_country: c.name,
                                       b2b_province: "",
                                       b2b_city: "",
                                       b2b_district: "",
@@ -655,7 +667,7 @@ export default function ClientAddForm() {
                                       "mr-2 h-4 w-4",
                                       formData.b2b_country === c.name
                                         ? "opacity-100"
-                                        : "opacity-0"
+                                        : "opacity-0",
                                     )}
                                   />
                                   <span className="mr-2">{c.flag}</span>
@@ -751,10 +763,32 @@ export default function ClientAddForm() {
                     )}
                   </div>
 
-                  {/* === DISTRICT === */}
+                  {/* === DISTRICT B2B === */}
                   <div className="space-y-2">
-                    <Label>Kecamatan </Label>
-                    {formData.b2b_country === "Indonesia" ? (
+                    <div className="flex items-center justify-between">
+                      <Label>Kecamatan</Label>
+                      {formData.b2b_country === "Indonesia" &&
+                        formData.b2b_city && (
+                          <button
+                            type="button"
+                            className="text-xs text-blue-500 hover:underline"
+                            onClick={() => {
+                              setManualDistrictB2B((prev) => !prev);
+                              setFormData((prev) => ({
+                                ...prev,
+                                b2b_district: "",
+                                b2b_subDistrict: "",
+                              }));
+                            }}>
+                            {manualDistrictB2B
+                              ? "Pilih dari daftar"
+                              : "Ketik manual"}
+                          </button>
+                        )}
+                    </div>
+
+                    {formData.b2b_country === "Indonesia" &&
+                    !manualDistrictB2B ? (
                       <Select
                         disabled={!formData.b2b_city}
                         value={formData.b2b_district}
@@ -781,20 +815,43 @@ export default function ClientAddForm() {
                       <Input
                         placeholder="Masukkan Kecamatan"
                         value={formData.b2b_district}
+                        disabled={!formData.b2b_city}
                         onChange={(e) =>
                           setFormData((prev) => ({
                             ...prev,
                             b2b_district: e.target.value,
+                            b2b_subDistrict: "",
                           }))
                         }
                       />
                     )}
                   </div>
 
-                  {/* === SUB-DISTRICT === */}
+                  {/* === SUB-DISTRICT B2B === */}
                   <div className="space-y-2">
-                    <Label>Kelurahan </Label>
-                    {formData.b2b_country === "Indonesia" ? (
+                    <div className="flex items-center justify-between">
+                      <Label>Kelurahan</Label>
+                      {formData.b2b_country === "Indonesia" &&
+                        formData.b2b_district && (
+                          <button
+                            type="button"
+                            className="text-xs text-blue-500 hover:underline"
+                            onClick={() => {
+                              setManualSubDistrictB2B((prev) => !prev);
+                              setFormData((prev) => ({
+                                ...prev,
+                                b2b_subDistrict: "",
+                              }));
+                            }}>
+                            {manualSubDistrictB2B
+                              ? "Pilih dari daftar"
+                              : "Ketik manual"}
+                          </button>
+                        )}
+                    </div>
+
+                    {formData.b2b_country === "Indonesia" &&
+                    !manualSubDistrictB2B ? (
                       <Select
                         disabled={!formData.b2b_district}
                         value={formData.b2b_subDistrict}
@@ -819,6 +876,7 @@ export default function ClientAddForm() {
                       <Input
                         placeholder="Masukkan Kelurahan"
                         value={formData.b2b_subDistrict}
+                        disabled={!formData.b2b_district}
                         onChange={(e) =>
                           setFormData((prev) => ({
                             ...prev,
@@ -864,7 +922,7 @@ export default function ClientAddForm() {
                 {formData.b2b_pics.map((pic, index) => {
                   const updateField = (
                     field: keyof PICFormData,
-                    value: string
+                    value: string,
                   ) => {
                     const updated = [...formData.b2b_pics];
                     updated[index] = { ...updated[index], [field]: value };
@@ -1078,7 +1136,6 @@ export default function ClientAddForm() {
                       </SelectContent>
                     </Select>
                   </div>
-
                   {/* PROVINCE */}
                   <div className="space-y-2">
                     <Label>Provinsi </Label>
@@ -1119,7 +1176,6 @@ export default function ClientAddForm() {
                       />
                     )}
                   </div>
-
                   {/* CITY */}
                   <div className="space-y-2">
                     <Label>Kota / Kabupaten </Label>
@@ -1160,11 +1216,32 @@ export default function ClientAddForm() {
                       />
                     )}
                   </div>
-
-                  {/* DISTRICT */}
+                  {/* === DISTRICT B2C === */}
                   <div className="space-y-2">
-                    <Label>Kecamatan </Label>
-                    {formData.b2c_country === "Indonesia" ? (
+                    <div className="flex items-center justify-between">
+                      <Label>Kecamatan</Label>
+                      {formData.b2c_country === "Indonesia" &&
+                        formData.b2c_city && (
+                          <button
+                            type="button"
+                            className="text-xs text-blue-500 hover:underline"
+                            onClick={() => {
+                              setManualDistrictB2C((prev) => !prev);
+                              setFormData((prev) => ({
+                                ...prev,
+                                b2c_district: "",
+                                b2c_subDistrict: "",
+                              }));
+                            }}>
+                            {manualDistrictB2C
+                              ? "Pilih dari daftar"
+                              : "Ketik manual"}
+                          </button>
+                        )}
+                    </div>
+
+                    {formData.b2c_country === "Indonesia" &&
+                    !manualDistrictB2C ? (
                       <Select
                         disabled={!formData.b2c_city}
                         value={formData.b2c_district}
@@ -1191,20 +1268,42 @@ export default function ClientAddForm() {
                       <Input
                         placeholder="Masukkan Kecamatan"
                         value={formData.b2c_district}
+                        disabled={!formData.b2c_city}
                         onChange={(e) =>
                           setFormData((prev) => ({
                             ...prev,
                             b2c_district: e.target.value,
+                            b2c_subDistrict: "",
                           }))
                         }
                       />
                     )}
                   </div>
-
-                  {/* SUBDISTRICT */}
+                  {/* === SUBDISTRICT B2C === */}
                   <div className="space-y-2">
-                    <Label>Kelurahan </Label>
-                    {formData.b2c_country === "Indonesia" ? (
+                    <div className="flex items-center justify-between">
+                      <Label>Kelurahan</Label>
+                      {formData.b2c_country === "Indonesia" &&
+                        formData.b2c_district && (
+                          <button
+                            type="button"
+                            className="text-xs text-blue-500 hover:underline"
+                            onClick={() => {
+                              setManualSubDistrictB2C((prev) => !prev);
+                              setFormData((prev) => ({
+                                ...prev,
+                                b2c_subDistrict: "",
+                              }));
+                            }}>
+                            {manualSubDistrictB2C
+                              ? "Pilih dari daftar"
+                              : "Ketik manual"}
+                          </button>
+                        )}
+                    </div>
+
+                    {formData.b2c_country === "Indonesia" &&
+                    !manualSubDistrictB2C ? (
                       <Select
                         disabled={!formData.b2c_district}
                         value={formData.b2c_subDistrict}
@@ -1229,6 +1328,7 @@ export default function ClientAddForm() {
                       <Input
                         placeholder="Masukkan Kelurahan"
                         value={formData.b2c_subDistrict}
+                        disabled={!formData.b2c_district}
                         onChange={(e) =>
                           setFormData((prev) => ({
                             ...prev,
@@ -1238,7 +1338,6 @@ export default function ClientAddForm() {
                       />
                     )}
                   </div>
-
                   {/* POSTAL CODE */}
                   <div className="space-y-2">
                     <Label>Kode Pos </Label>

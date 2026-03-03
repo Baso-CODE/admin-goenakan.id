@@ -236,7 +236,6 @@ export default function ShipmentManager({
   const handleSubmit = async () => {
     if (selectedItems.length === 0) return toast.error("Pilih minimal 1 item");
     if (!vendorId) return toast.error("Pilih Vendor");
-    if (!trackingNo) return toast.error("Isi Nomor Resi");
     if (!origin || !destination) return toast.error("Isi Kota Asal & Tujuan");
 
     try {
@@ -651,7 +650,7 @@ export default function ShipmentManager({
 
       {/* === DIALOG CREATE SHIPMENT === */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Buat Pengiriman Baru ({type})</DialogTitle>
           </DialogHeader>
@@ -675,11 +674,16 @@ export default function ShipmentManager({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>No. Resi</Label>
+                <Label>
+                  No. Resi{" "}
+                  <span className="text-muted-foreground text-xs">
+                    (Opsional)
+                  </span>
+                </Label>
                 <Input
                   value={trackingNo}
                   onChange={(e) => setTrackingNo(e.target.value)}
-                  placeholder="Contoh: INV/JP/2023"
+                  placeholder="Isi jika sudah ada resi Contoh: INV/JP/2023"
                 />
               </div>
             </div>
@@ -833,7 +837,7 @@ export default function ShipmentManager({
         onOpenChange={(open) => {
           if (!open) setUpdateStatusId(null);
         }}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Update Tracking Status</DialogTitle>
             <CardDescription>Perbarui posisi terkini paket.</CardDescription>

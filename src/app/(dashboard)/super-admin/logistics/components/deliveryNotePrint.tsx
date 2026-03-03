@@ -177,7 +177,7 @@ export default function DeliveryNotePrint() {
                   src="/images/surat-jalan-header.png"
                   alt="Kop Surat"
                   className="w-full h-auto object-contain max-h-30"
-                  crossOrigin="anonymous" // Tambahkan ini agar tidak error saat print PDF
+                  crossOrigin="anonymous"
                 />
               </div>
             </div>

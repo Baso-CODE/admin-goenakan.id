@@ -130,7 +130,7 @@ const initialFormData: ClientFormData = {
   b2b_pics: [{ prefix: "", name: "", email: "", phone: "" }],
 };
 
-export default function ClientEditForm() {
+export default function zClientEditForm() {
   const [formData, setFormData] = useState<ClientFormData>(initialFormData);
 
   const [clientType, setClientType] = useState<ClientType>("");
@@ -152,6 +152,11 @@ export default function ClientEditForm() {
   const router = useRouter();
   const params = useParams();
   const clientId = params?.clientId;
+
+  const [manualDistrictB2B, setManualDistrictB2B] = useState(false);
+  const [manualSubDistrictB2B, setManualSubDistrictB2B] = useState(false);
+  const [manualDistrictB2C, setManualDistrictB2C] = useState(false);
+  const [manualSubDistrictB2C, setManualSubDistrictB2C] = useState(false);
 
   useEffect(() => {
     const fetchMasterData = async () => {
@@ -358,6 +363,8 @@ export default function ClientEditForm() {
                     },
                   ],
           });
+          if (data.b2b.district) setManualDistrictB2B(true);
+          if (data.b2b.subDistrict) setManualSubDistrictB2B(true);
         }
 
         // === HANDLE B2C ===
@@ -387,6 +394,8 @@ export default function ClientEditForm() {
             b2c_fullAddressB2C: data.b2c.fullAddress || "",
             b2c_purchaseChannelIdB2C: data.b2c.purchaseChannel?.id || "",
           });
+          if (data.b2c.district) setManualDistrictB2C(true);
+          if (data.b2c.subDistrict) setManualSubDistrictB2C(true);
         }
 
         // === INVALID ===
@@ -702,10 +711,29 @@ export default function ClientEditForm() {
           )}
         </div>
 
-        {/* === DISTRICT === */}
+        {/* === DISTRICT B2B === */}
         <div className="space-y-2">
-          <Label>Kecamatan </Label>
-          {formData.b2b_country === "Indonesia" ? (
+          <div className="flex items-center justify-between">
+            <Label>Kecamatan</Label>
+            {formData.b2b_country === "Indonesia" && formData.b2b_city && (
+              <button
+                type="button"
+                className="text-xs text-blue-500 hover:underline"
+                onClick={() => {
+                  setManualDistrictB2B((prev) => !prev);
+                  setFormData((prev) => ({
+                    ...prev,
+                    b2b_district: "",
+                    b2b_subDistrict: "",
+                  }));
+                  setManualSubDistrictB2B(false);
+                }}>
+                {manualDistrictB2B ? "Pilih dari daftar" : "Ketik manual"}
+              </button>
+            )}
+          </div>
+
+          {formData.b2b_country === "Indonesia" && !manualDistrictB2B ? (
             <Select
               disabled={!formData.b2b_city}
               value={formData.b2b_district}
@@ -732,28 +760,41 @@ export default function ClientEditForm() {
             <Input
               placeholder="Masukkan Kecamatan"
               value={formData.b2b_district}
+              disabled={!formData.b2b_city}
               onChange={(e) =>
                 setFormData((prev) => ({
                   ...prev,
                   b2b_district: e.target.value,
+                  b2b_subDistrict: "",
                 }))
               }
             />
           )}
         </div>
 
-        {/* === SUB-DISTRICT === */}
+        {/* === SUB-DISTRICT B2B === */}
         <div className="space-y-2">
-          <Label>Kelurahan </Label>
-          {formData.b2b_country === "Indonesia" ? (
+          <div className="flex items-center justify-between">
+            <Label>Kelurahan</Label>
+            {formData.b2b_country === "Indonesia" && formData.b2b_district && (
+              <button
+                type="button"
+                className="text-xs text-blue-500 hover:underline"
+                onClick={() => {
+                  setManualSubDistrictB2B((prev) => !prev);
+                  setFormData((prev) => ({ ...prev, b2b_subDistrict: "" }));
+                }}>
+                {manualSubDistrictB2B ? "Pilih dari daftar" : "Ketik manual"}
+              </button>
+            )}
+          </div>
+
+          {formData.b2b_country === "Indonesia" && !manualSubDistrictB2B ? (
             <Select
               disabled={!formData.b2b_district}
               value={formData.b2b_subDistrict}
               onValueChange={(val) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  b2b_subDistrict: val,
-                }))
+                setFormData((prev) => ({ ...prev, b2b_subDistrict: val }))
               }>
               <SelectTrigger>
                 <SelectValue placeholder="Pilih Kelurahan" />
@@ -770,6 +811,7 @@ export default function ClientEditForm() {
             <Input
               placeholder="Masukkan Kelurahan"
               value={formData.b2b_subDistrict}
+              disabled={!formData.b2b_district}
               onChange={(e) =>
                 setFormData((prev) => ({
                   ...prev,
@@ -1095,10 +1137,29 @@ export default function ClientEditForm() {
             )}
           </div>
 
-          {/* DISTRICT */}
+          {/* === DISTRICT B2C === */}
           <div className="space-y-2">
-            <Label>Kecamatan </Label>
-            {formData.b2c_country === "Indonesia" ? (
+            <div className="flex items-center justify-between">
+              <Label>Kecamatan</Label>
+              {formData.b2c_country === "Indonesia" && formData.b2c_city && (
+                <button
+                  type="button"
+                  className="text-xs text-blue-500 hover:underline"
+                  onClick={() => {
+                    setManualDistrictB2C((prev) => !prev);
+                    setFormData((prev) => ({
+                      ...prev,
+                      b2c_district: "",
+                      b2c_subDistrict: "",
+                    }));
+                    setManualSubDistrictB2C(false);
+                  }}>
+                  {manualDistrictB2C ? "Pilih dari daftar" : "Ketik manual"}
+                </button>
+              )}
+            </div>
+
+            {formData.b2c_country === "Indonesia" && !manualDistrictB2C ? (
               <Select
                 disabled={!formData.b2c_city}
                 value={formData.b2c_district}
@@ -1125,28 +1186,44 @@ export default function ClientEditForm() {
               <Input
                 placeholder="Masukkan Kecamatan"
                 value={formData.b2c_district}
+                disabled={!formData.b2c_city}
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
                     b2c_district: e.target.value,
+                    b2c_subDistrict: "",
                   }))
                 }
               />
             )}
           </div>
 
-          {/* SUBDISTRICT */}
+          {/* === SUBDISTRICT B2C === */}
           <div className="space-y-2">
-            <Label>Kelurahan </Label>
-            {formData.b2c_country === "Indonesia" ? (
+            <div className="flex items-center justify-between">
+              <Label>Kelurahan</Label>
+              {formData.b2c_country === "Indonesia" &&
+                formData.b2c_district && (
+                  <button
+                    type="button"
+                    className="text-xs text-blue-500 hover:underline"
+                    onClick={() => {
+                      setManualSubDistrictB2C((prev) => !prev);
+                      setFormData((prev) => ({ ...prev, b2c_subDistrict: "" }));
+                    }}>
+                    {manualSubDistrictB2C
+                      ? "Pilih dari daftar"
+                      : "Ketik manual"}
+                  </button>
+                )}
+            </div>
+
+            {formData.b2c_country === "Indonesia" && !manualSubDistrictB2C ? (
               <Select
                 disabled={!formData.b2c_district}
                 value={formData.b2c_subDistrict}
                 onValueChange={(v) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    b2c_subDistrict: v,
-                  }))
+                  setFormData((prev) => ({ ...prev, b2c_subDistrict: v }))
                 }>
                 <SelectTrigger>
                   <SelectValue placeholder="Pilih Kelurahan" />
@@ -1163,6 +1240,7 @@ export default function ClientEditForm() {
               <Input
                 placeholder="Masukkan Kelurahan"
                 value={formData.b2c_subDistrict}
+                disabled={!formData.b2c_district}
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
