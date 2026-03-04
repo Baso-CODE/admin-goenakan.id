@@ -113,6 +113,68 @@ export default function LogisticsTrackingDetail() {
 
       <Separator />
 
+      {order.durationSummary && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            {
+              label: "Produksi",
+              days: order.durationSummary.production.days,
+              isComplete: order.durationSummary.production.isComplete,
+              color: "text-orange-600",
+              bg: "bg-orange-50 border-orange-100",
+            },
+            {
+              label: "Inbound",
+              days: order.durationSummary.inbound.days,
+              isComplete: order.durationSummary.inbound.isComplete,
+              color: "text-blue-600",
+              bg: "bg-blue-50 border-blue-100",
+            },
+            {
+              label: "Outbound",
+              days: order.durationSummary.outbound.days,
+              isComplete: order.durationSummary.outbound.isComplete,
+              color: "text-green-600",
+              bg: "bg-green-50 border-green-100",
+            },
+            {
+              label: "Total Durasi",
+              days: order.durationSummary.total.days,
+              isComplete: order.durationSummary.total.isComplete,
+              color: "text-purple-600",
+              bg: "bg-purple-50 border-purple-100",
+            },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className={`rounded-lg border p-3 ${item.bg} flex flex-col gap-1`}>
+              <span className="text-xs text-muted-foreground font-medium">
+                {item.label}
+              </span>
+              <div className="flex items-end gap-1">
+                <span className={`text-2xl font-bold ${item.color}`}>
+                  {item.days > 0 ? item.days : "-"}
+                </span>
+                {item.days > 0 && (
+                  <span className="text-xs text-muted-foreground mb-0.5">
+                    hari
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px]">
+                {item.isComplete ? (
+                  <span className="text-green-600 font-medium">✓ Selesai</span>
+                ) : item.days > 0 ? (
+                  <span className="text-orange-500">⏳ On Progress</span>
+                ) : (
+                  <span className="text-gray-400">Belum dimulai</span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* MAIN TABS */}
       <Tabs
         value={activeTab}
