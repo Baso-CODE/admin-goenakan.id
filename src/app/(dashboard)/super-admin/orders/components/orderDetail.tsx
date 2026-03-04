@@ -150,6 +150,13 @@ export default function OrderDetail() {
 
   // === SPLIT INVOICE STATES (NEW) ===
   const [isSplitMode, setIsSplitMode] = useState(false);
+  const [splitPaymentCategory, setSplitPaymentCategory] =
+    useState<string>("FULL_PAYMENT");
+  const [splitDpType, setSplitDpType] = useState<"PERCENTAGE" | "FIXED">(
+    "PERCENTAGE",
+  );
+  const [splitDpPercent, setSplitDpPercent] = useState<number>(0);
+  const [splitDpAmount, setSplitDpAmount] = useState<number>(0);
   const [selectedItems, setSelectedItems] = useState<
     { productId: string; quantity: number; maxQty: number; price: number }[]
   >([]);
@@ -329,29 +336,27 @@ export default function OrderDetail() {
         if (selectedItems.length === 0) {
           throw new Error("Pilih minimal 1 produk untuk Split Invoice.");
         }
-        // Kirim array item yang dipilih
         payloadSelectedItems = selectedItems.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
         }));
-      } else {
-        // Logic Standard (DP / Full Global)
-        if (invoiceCategory === "DP") {
-          if (dpType === "PERCENTAGE") {
-            finalDpPercentage = invoiceDPPercent;
+
+        if (splitPaymentCategory === "DP") {
+          if (splitDpType === "PERCENTAGE") {
+            finalDpPercentage = splitDpPercent;
           } else {
-            if (totalOrderAmount > 0) {
-              finalDpPercentage = (invoiceDPAmount / totalOrderAmount) * 100;
+            if (splitTotalAmount > 0) {
+              finalDpPercentage = (splitDpAmount / splitTotalAmount) * 100;
             }
           }
-        } else if (invoiceCategory === "INSTALLMENT") {
+        } else if (splitPaymentCategory === "INSTALLMENT") {
           finalCustomAmount = customAmount;
         }
       }
 
       const payload = {
         orderId: order.id,
-        category: isSplitMode ? "FULL_PAYMENT" : invoiceCategory,
+        category: isSplitMode ? splitPaymentCategory : invoiceCategory,
         dpPercentage: finalDpPercentage,
         customAmount: finalCustomAmount,
         selectedItems: payloadSelectedItems,
@@ -384,6 +389,9 @@ export default function OrderDetail() {
       setInvoiceCategory("");
       setIsSplitMode(false);
       setSelectedItems([]);
+      setSplitPaymentCategory("FULL_PAYMENT");
+      setSplitDpPercent(0);
+      setSplitDpAmount(0);
       loadOrder();
     } catch (error: any) {
       console.error(error);
@@ -471,7 +479,6 @@ export default function OrderDetail() {
               <Wallet className="h-5 w-5 text-blue-600" />
               Financial Summary
             </CardTitle>
-            {/* Tombol Generate Invoice: Muncul jika masih ada sisa tagihan */}
             {remainingToInvoice > 0 && (
               <Button
                 size="sm"
@@ -892,7 +899,7 @@ export default function OrderDetail() {
 
       {/* --- [NEW] SMART INVOICE DIALOG --- */}
       <Dialog open={invoiceDialogOpen} onOpenChange={setInvoiceDialogOpen}>
-        <DialogContent className="sm:max-w-160">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Generate Invoice</DialogTitle>
             <DialogDescription>
@@ -1041,8 +1048,10 @@ export default function OrderDetail() {
             )}
 
             {/* --- MODE 2: SPLIT ITEMS (Checkbox List) --- */}
+            {/* --- MODE 2: SPLIT ITEMS (Checkbox List) --- */}
             {isSplitMode && (
               <div className="space-y-4 animate-in fade-in">
+                {/* TABEL PRODUK */}
                 <div className="border rounded-md max-h-75 overflow-y-auto">
                   <Table>
                     <TableHeader className="bg-gray-50 sticky top-0">
@@ -1053,20 +1062,16 @@ export default function OrderDetail() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {/* FILTER: Hanya tampilkan produk yang belum lunas */}
                       {order.products
                         .filter(
                           (item) =>
                             (item.remainingQuantity || item.quantity) > 0,
                         )
                         .map((item) => {
-                          // Hitung Max Qty yang bisa dipilih (Sisa tagihan)
-                          // Fallback ke item.quantity jika backend belum update field baru
                           const maxQty =
                             item.remainingQuantity !== undefined
                               ? item.remainingQuantity
                               : item.quantity;
-
                           const isSelected = selectedItems.some(
                             (sel) =>
                               sel.productId === (item.productId || item.id),
@@ -1075,7 +1080,6 @@ export default function OrderDetail() {
                             (sel) =>
                               sel.productId === (item.productId || item.id),
                           );
-
                           return (
                             <TableRow key={item.id}>
                               <TableCell>
@@ -1083,18 +1087,16 @@ export default function OrderDetail() {
                                   checked={isSelected}
                                   onCheckedChange={(checked) => {
                                     if (checked) {
-                                      // Add logic khusus: set default qty = maxQty (sisa)
                                       setSelectedItems((prev) => [
                                         ...prev,
                                         {
                                           productId: item.productId || item.id,
-                                          quantity: maxQty, // Default langsung sisa
+                                          quantity: maxQty,
                                           maxQty: maxQty,
                                           price: item.unitPrice,
                                         },
                                       ]);
                                     } else {
-                                      // Remove logic (sama seperti sebelumnya)
                                       setSelectedItems((prev) =>
                                         prev.filter(
                                           (i) =>
@@ -1128,14 +1130,13 @@ export default function OrderDetail() {
                                   <Input
                                     type="number"
                                     min={1}
-                                    max={maxQty} // Batasi input user max sesuai sisa
+                                    max={maxQty}
                                     className="h-8 w-20 text-center"
                                     value={selectedData?.quantity}
                                     onChange={(e) => {
                                       let val = Number(e.target.value);
-                                      if (val > maxQty) val = maxQty; // Prevent over-bill
+                                      if (val > maxQty) val = maxQty;
                                       if (val < 1) val = 1;
-
                                       updateItemQty(
                                         item.productId || item.id,
                                         val,
@@ -1152,7 +1153,6 @@ export default function OrderDetail() {
                           );
                         })}
 
-                      {/* Empty State jika semua sudah lunas */}
                       {order.products.every(
                         (p) => (p.remainingQuantity || 0) <= 0,
                       ) && (
@@ -1168,17 +1168,118 @@ export default function OrderDetail() {
                   </Table>
                 </div>
 
+                {/* TOTAL SPLIT */}
                 <div className="flex justify-between items-center bg-blue-50 p-3 rounded-md border border-blue-100">
                   <span className="text-sm font-medium text-blue-900">
-                    Total Tagihan Split:
+                    Total Item Dipilih:
                   </span>
                   <span className="text-lg font-bold text-blue-700">
                     {formatCurrency(splitTotalAmount)}
                   </span>
                 </div>
+
+                {/* ✅ JENIS TAGIHAN UNTUK SPLIT */}
+                <div className="border-t pt-4 space-y-4">
+                  <Label className="text-sm font-semibold">
+                    Jenis Tagihan Split
+                  </Label>
+                  <Select
+                    value={splitPaymentCategory}
+                    onValueChange={setSplitPaymentCategory}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Jenis Tagihan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="FULL_PAYMENT">
+                        Full Payment (Langsung Lunas)
+                      </SelectItem>
+                      <SelectItem value="DP">Down Payment (DP)</SelectItem>
+                      <SelectItem value="INSTALLMENT">Cicilan</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* DP untuk Split */}
+                  {splitPaymentCategory === "DP" && (
+                    <div className="space-y-4 bg-gray-50 p-4 rounded-md border">
+                      <div className="flex items-center gap-4">
+                        <Label className="text-xs">Tipe DP:</Label>
+                        <div className="flex bg-white rounded border p-1">
+                          <button
+                            type="button"
+                            onClick={() => setSplitDpType("PERCENTAGE")}
+                            className={`text-xs px-2 py-1 rounded ${
+                              splitDpType === "PERCENTAGE"
+                                ? "bg-primary text-white"
+                                : "text-gray-500"
+                            }`}>
+                            %
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSplitDpType("FIXED")}
+                            className={`text-xs px-2 py-1 rounded ${
+                              splitDpType === "FIXED"
+                                ? "bg-primary text-white"
+                                : "text-gray-500"
+                            }`}>
+                            Rp
+                          </button>
+                        </div>
+                      </div>
+                      {splitDpType === "PERCENTAGE" ? (
+                        <div className="space-y-1">
+                          <Input
+                            type="number"
+                            placeholder="Contoh: 50 (untuk 50%)"
+                            value={splitDpPercent}
+                            onChange={(e) =>
+                              setSplitDpPercent(Number(e.target.value))
+                            }
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Nominal DP:{" "}
+                            {formatCurrency(
+                              (splitTotalAmount * splitDpPercent) / 100,
+                            )}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <Input
+                            type="number"
+                            placeholder="Nominal DP (Rp)"
+                            value={splitDpAmount}
+                            onChange={(e) =>
+                              setSplitDpAmount(Number(e.target.value))
+                            }
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Max: {formatCurrency(splitTotalAmount)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Cicilan untuk Split */}
+                  {splitPaymentCategory === "INSTALLMENT" && (
+                    <div className="space-y-2">
+                      <Label>Nominal Cicilan (Rp)</Label>
+                      <Input
+                        type="number"
+                        value={customAmount}
+                        onChange={(e) =>
+                          setCustomAmount(Number(e.target.value))
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Max: {formatCurrency(splitTotalAmount)}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-
             {/* --- SECTION: INVOICE NOTES (MULTI SELECT) --- */}
             <div className="space-y-4 pt-4 border-t">
               <Label className="text-base font-semibold">
