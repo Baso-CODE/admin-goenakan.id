@@ -102,6 +102,8 @@ export default function DeliveryNotePrint() {
     items,
     remarks,
     destination,
+    invoiceNumbers,
+    previousDO,
   } = data;
 
   // Setup Variabel Penerima & PIC
@@ -182,9 +184,6 @@ export default function DeliveryNotePrint() {
               </div>
             </div>
 
-            {/* ========================================================= */}
-            {/* 2. CUSTOMER INFO & DN INFO (MENGGUNAKAN DATA API) */}
-            {/* ========================================================= */}
             <div className="mb-6 flex flex-col items-start">
               <div className="flex flex-col items-start w-[50%] mb-4">
                 <table className="text-[12px] text-left">
@@ -218,11 +217,31 @@ export default function DeliveryNotePrint() {
                         : {deliveryNoteNumber || "-"}
                       </td>
                     </tr>
+
+                    <tr>
+                      <td className="py-0.5 pr-4 align-top">Invoice No.</td>
+                      <td className="py-0.5 align-top font-medium">
+                        :{" "}
+                        {invoiceNumbers && invoiceNumbers.length > 0
+                          ? invoiceNumbers.join(", ")
+                          : "-"}
+                      </td>
+                    </tr>
+
+                    {previousDO && (
+                      <tr>
+                        <td className="py-0.5 pr-4 align-top">
+                          Previous DO No.
+                        </td>
+                        <td className="py-0.5 align-top font-medium">
+                          : {previousDO.deliveryNoteNumber || "-"}
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
 
-              {/* Bagian Customer (Kiri Bawah) */}
               <div className="w-full mt-2">
                 <h2 className="text-[15px] font-bold text-gray-900 mb-2">
                   Customer

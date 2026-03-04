@@ -126,9 +126,10 @@ export default function ShipmentManager({
 
   // Form Update Status
   const [statusVal, setStatusVal] = useState("");
-  const [statusCity, setStatusCity] = useState(""); // Input Lokasi Manual
+  const [statusCity, setStatusCity] = useState("");
   const [statusDate, setStatusDate] = useState<Date | undefined>(new Date());
-  const [statusNote, setStatusNote] = useState(""); // Note manual (optional)
+  const [statusNote, setStatusNote] = useState("");
+  const [statusTrackingNo, setStatusTrackingNo] = useState("");
 
   // --- STATE CREATE SHIPMENT ---
   const [vendorId, setVendorId] = useState("");
@@ -249,8 +250,8 @@ export default function ShipmentManager({
         vendorId,
         trackingNumber: trackingNo,
         method,
-        origin, // New Field
-        destination, // New Field
+        origin,
+        destination,
         departureDate: date ? date.toISOString() : new Date().toISOString(),
         items: selectedItems.map((i) => ({
           orderProductId: i.id,
@@ -305,8 +306,9 @@ export default function ShipmentManager({
         status: statusVal,
         city: statusCity,
         date: statusDate ? statusDate.toISOString() : new Date().toISOString(),
-        note: statusNote, // Manual text note
-        shipmentNotes: getNotesPayload(), // Template notes
+        note: statusNote,
+        shipmentNotes: getNotesPayload(),
+        trackingNumber: statusTrackingNo || undefined,
       };
 
       const res = await fetch(
@@ -333,6 +335,7 @@ export default function ShipmentManager({
       setStatusNote("");
       setSelectedNotes({});
       setStatusDate(new Date());
+      setStatusTrackingNo("");
     } catch (e) {
       toast.error("Gagal update status");
     } finally {
@@ -509,9 +512,10 @@ export default function ShipmentManager({
                           className="h-9 gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                           onClick={() => {
                             setUpdateStatusId(ship.id);
-                            setStatusVal(""); // Reset select
-                            setStatusCity(""); // Reset city
+                            setStatusVal("");
+                            setStatusCity("");
                             setSelectedNotes({});
+                            setStatusTrackingNo("");
                           }}>
                           <History className="h-3.5 w-3.5" /> Update Tracking
                         </Button>
@@ -899,6 +903,19 @@ export default function ShipmentManager({
                   onChange={(e) => setStatusCity(e.target.value)}
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>
+                No. Resi
+                <span className="text-muted-foreground text-xs">
+                  (Opsional - isi jika baru tersedia)
+                </span>
+              </Label>
+              <Input
+                placeholder="Contoh: JNE123456789"
+                value={statusTrackingNo}
+                onChange={(e) => setStatusTrackingNo(e.target.value)}
+              />
             </div>
 
             {/* 3. Manual Note */}
