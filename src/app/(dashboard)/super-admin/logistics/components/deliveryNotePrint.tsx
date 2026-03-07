@@ -104,6 +104,9 @@ export default function DeliveryNotePrint() {
     destination,
     invoiceNumbers,
     previousDO,
+    isFirstShipment,
+    shipmentSequence,
+    totalShipments,
   } = data;
 
   // Setup Variabel Penerima & PIC
@@ -184,24 +187,50 @@ export default function DeliveryNotePrint() {
               </div>
             </div>
 
+            {/* Badge Partial Shipment */}
+            {totalShipments > 1 && (
+              <div className="mb-4 flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 bg-orange-50 border border-orange-300 text-orange-700 text-[11px] font-semibold px-3 py-1 rounded-full">
+                  ⚠ Pengiriman Partial — Surat Jalan ke-{shipmentSequence} dari{" "}
+                  {totalShipments}
+                </span>
+                {isFirstShipment && (
+                  <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-600 text-[10px] px-2 py-1 rounded-full">
+                    Pengiriman Pertama
+                  </span>
+                )}
+                {!isFirstShipment && shipmentSequence === totalShipments && (
+                  <span className="inline-flex items-center gap-1 bg-green-50 border border-green-200 text-green-600 text-[10px] px-2 py-1 rounded-full">
+                    Pengiriman Terakhir
+                  </span>
+                )}
+              </div>
+            )}
+
             <div className="mb-6 flex flex-col items-start">
               <div className="flex flex-col items-start w-[50%] mb-4">
-                <table className="text-[12px] text-left">
+                <table className="text-[12px] text-left w-full">
                   <tbody>
                     <tr>
-                      <td className="py-0.5 pr-4 align-top w-20">Phone</td>
+                      <td className="py-0.5 pr-4 align-top w-28 whitespace-nowrap">
+                        Phone
+                      </td>
                       <td className="py-0.5 align-top font-medium">
                         : {salesPhone} ({salesName})
                       </td>
                     </tr>
                     <tr>
-                      <td className="py-0.5 pr-4 align-top">E-mail</td>
+                      <td className="py-0.5 pr-4 align-top whitespace-nowrap">
+                        E-mail
+                      </td>
                       <td className="py-0.5 align-top font-medium">
                         : goenakan.id@gmail.com
                       </td>
                     </tr>
                     <tr>
-                      <td className="py-0.5 pr-4 align-top">DN Date</td>
+                      <td className="py-0.5 pr-4 align-top whitespace-nowrap">
+                        DN Date
+                      </td>
                       <td className="py-0.5 align-top font-medium">
                         :{" "}
                         {departureDate
@@ -212,14 +241,17 @@ export default function DeliveryNotePrint() {
                       </td>
                     </tr>
                     <tr>
-                      <td className="py-0.5 pr-4 align-top">DN No.</td>
+                      <td className="py-0.5 pr-4 align-top whitespace-nowrap">
+                        DN No.
+                      </td>
                       <td className="py-0.5 align-top font-bold">
                         : {deliveryNoteNumber || "-"}
                       </td>
                     </tr>
-
                     <tr>
-                      <td className="py-0.5 pr-4 align-top">Invoice No.</td>
+                      <td className="py-0.5 pr-4 align-top whitespace-nowrap">
+                        Invoice No.
+                      </td>
                       <td className="py-0.5 align-top font-medium">
                         :{" "}
                         {invoiceNumbers && invoiceNumbers.length > 0
@@ -227,10 +259,10 @@ export default function DeliveryNotePrint() {
                           : "-"}
                       </td>
                     </tr>
-
+                    {/* ✅ Previous DO — whitespace-nowrap agar label tidak turun */}
                     {previousDO && (
                       <tr>
-                        <td className="py-0.5 pr-4 align-top">
+                        <td className="py-0.5 pr-4 align-top whitespace-nowrap">
                           Previous DO No.
                         </td>
                         <td className="py-0.5 align-top font-medium">
@@ -249,30 +281,43 @@ export default function DeliveryNotePrint() {
                 <table className="text-[12px] w-full text-gray-900">
                   <tbody>
                     <tr>
-                      <td className="py-0.5 w-28 align-top">Name</td>
+                      <td className="py-0.5 w-28 align-top whitespace-nowrap">
+                        Name
+                      </td>
                       <td className="py-0.5 align-top font-bold uppercase">
                         : {receiverCompany}
                       </td>
                     </tr>
                     <tr>
-                      <td className="py-0.5 align-top">Department</td>
+                      <td className="py-0.5 align-top whitespace-nowrap">
+                        Department
+                      </td>
                       <td className="py-0.5 align-top">
                         : {picDept !== "-" ? picDept : ""}{" "}
                         {picName !== "Personal" ? `(UP: ${picName})` : ""}
                       </td>
                     </tr>
+
                     <tr>
-                      <td className="py-0.5 align-top">PO No.</td>
+                      <td className="py-0.5 align-top whitespace-nowrap">
+                        Phone
+                      </td>
+                      <td className="py-0.5 align-top">
+                        : {picPhone !== "-" ? picPhone : "-"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-0.5 align-top whitespace-nowrap">
+                        PO No.
+                      </td>
                       <td className="py-0.5 align-top">
                         : {order?.poNumber || "-"}
                       </td>
                     </tr>
                     <tr>
-                      <td className="py-0.5 align-top">Invoice No.</td>
-                      <td className="py-0.5 align-top">: {invoiceNumber}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-0.5 align-top">Address</td>
+                      <td className="py-0.5 align-top whitespace-nowrap">
+                        Address
+                      </td>
                       <td className="py-0.5 align-top pr-10">
                         : {receiverAddress}
                       </td>
