@@ -57,6 +57,7 @@ export interface OrderDetail {
   products: OrderProduct[];
   vendors: OrderVendor[];
   invoices: OrderInvoice[];
+  sampleFollowUps: SampleFollowUp[];
 }
 
 export interface NoteCategory {
@@ -76,3 +77,10 @@ export interface SplitItem {
   maxQty: number;
   price: number;
 }
+export type SampleFollowUp = {
+  id: string;
+  name: string;
+  date: string;
+  isDone: boolean;
+  createdAt: string;
+};

@@ -11,7 +11,6 @@ import {
   History,
   Lock,
   MessageSquare,
-  Plus,
   Printer,
   Send,
   Trash2,
@@ -35,29 +34,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -68,9 +45,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { apiUrl } from "@/helper/apiurl";
-import { cn } from "@/lib/utils";
+import { FollowUpStepperDialog } from "./followUpStepperDialog";
 
 // === TYPES (Sesuai Schema Database) ===
 // === 1. Tambahkan Type Khusus Follow Up ===
@@ -133,14 +109,6 @@ export default function QuotationDetail() {
   const { id } = useParams();
   const router = useRouter();
   const [data, setData] = useState<QuotationDetail | null>(null);
-  const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
-  const [followUpData, setFollowUpData] = useState({
-    name: "",
-    date: new Date(),
-    method: "WhatsApp",
-    notes: "",
-    nextAction: "",
-  });
 
   const publicNotes = data?.notes?.filter((n) => n.category.isPublic) || [];
   const internalNotes = data?.notes?.filter((n) => !n.category.isPublic) || [];
@@ -194,37 +162,6 @@ export default function QuotationDetail() {
       toast.error("Gagal menghapus data");
     } finally {
       setIsDeleting(false);
-    }
-  };
-
-  const handleAddFollowUp = async () => {
-    try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/quotations/${id}/follow-up`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(followUpData),
-      });
-
-      if (!res.ok) throw new Error("Failed to add follow up");
-
-      toast.success("Follow up berhasil dicatat");
-      setIsFollowUpOpen(false);
-      setFollowUpData({
-        name: "",
-        date: new Date(),
-        method: "WhatsApp",
-        notes: "",
-        nextAction: "",
-      });
-      fetchDetail();
-    } catch (error) {
-      toast.error("Gagal mencatat follow up");
     }
   };
 
@@ -527,135 +464,31 @@ export default function QuotationDetail() {
             Riwayat Follow Up
           </CardTitle>
 
-          {/* MODAL ADD FOLLOW UP */}
-          <Dialog open={isFollowUpOpen} onOpenChange={setIsFollowUpOpen}>
-            <DialogTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-2 border-orange-500 text-orange-600 hover:bg-orange-50">
-                <Plus className="h-4 w-4" /> Catat Follow Up
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Catat Hasil Follow Up</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Judul Aktivitas <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    placeholder="Contoh: Follow Up 1, Convert to Sales..."
-                    value={followUpData.name}
-                    onChange={(e) =>
-                      setFollowUpData({
-                        ...followUpData,
-                        name: e.target.value,
-                      })
-                    }
-                  />
-                </div>
+          {/* ✅ GANTI dialog lama dengan ini */}
+          <FollowUpStepperDialog
+            quotationId={data.id}
+            existingFollowUps={data.followUps || []}
+            onSuccess={() => fetchDetail()}
+            onSubmit={async (payload) => {
+              const tokenRes = await fetch("/api/auth/token");
+              const { token } = await tokenRes.json();
 
-                {/* Date Picker */}
-                <div className="space-y-2 flex flex-col">
-                  <label className="text-sm font-medium">Tanggal</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !followUpData.date && "text-muted-foreground",
-                        )}>
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {followUpData.date ? (
-                          format(followUpData.date, "PPP", { locale: idLocale })
-                        ) : (
-                          <span>Pilih tanggal</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={followUpData.date}
-                        onSelect={(date) =>
-                          setFollowUpData({
-                            ...followUpData,
-                            date: date || new Date(),
-                          })
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
+              const res = await fetch(
+                `${apiUrl}/quotations/${data.id}/follow-up`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify(payload),
+                },
+              );
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Metode</label>
-                  <Select
-                    value={followUpData.method}
-                    onValueChange={(val) =>
-                      setFollowUpData({ ...followUpData, method: val })
-                    }>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih Metode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="WhatsApp">WhatsApp</SelectItem>
-                      <SelectItem value="Email">Email</SelectItem>
-                      <SelectItem value="Phone Call">Phone Call</SelectItem>
-                      <SelectItem value="Meeting">Meeting / Visit</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Hasil Pembicaraan
-                  </label>
-                  <Textarea
-                    placeholder="Contoh: Client minta diskon 5% lagi..."
-                    value={followUpData.notes}
-                    onChange={(e) =>
-                      setFollowUpData({
-                        ...followUpData,
-                        notes: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Action Selanjutnya
-                  </label>
-                  <Input
-                    placeholder="Contoh: Hubungi lagi Senin depan"
-                    value={followUpData.nextAction}
-                    onChange={(e) =>
-                      setFollowUpData({
-                        ...followUpData,
-                        nextAction: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="ghost"
-                  onClick={() => setIsFollowUpOpen(false)}>
-                  Batal
-                </Button>
-                <Button onClick={handleAddFollowUp} className="bg-orange-600">
-                  Simpan Catatan
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              if (!res.ok) throw new Error("Failed");
+              toast.success("Follow up berhasil dicatat");
+            }}
+          />
         </CardHeader>
 
         <CardContent>

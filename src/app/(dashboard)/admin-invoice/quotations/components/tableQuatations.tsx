@@ -119,7 +119,7 @@ const renderFollowUpProgress = (
   const progressPercentage = (completedCount / maxFU) * 100;
 
   return (
-    <div className="flex flex-col gap-2 min-w-[160px] text-left">
+    <div className="flex flex-col gap-2 min-w-42 text-left">
       {/* Progress Bar Shadcn */}
       <Progress
         value={progressPercentage}
@@ -276,7 +276,7 @@ export default function QuotationsTable() {
       <Card className="shadow-sm border-t-0">
         <CardContent className="p-0">
           <div className="rounded-md border overflow-x-auto">
-            <Table className="min-w-[900px]">
+            <Table className="min-w-200">
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="w-28">Tanggal</TableHead>

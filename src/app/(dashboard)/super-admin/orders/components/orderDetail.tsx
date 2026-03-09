@@ -19,6 +19,7 @@ import { FinancialSummaryCard } from "./financialSummaryCard";
 import { GenerateInvoiceDialog } from "./helper/GenerateInvoiceDialog";
 import { InvoiceHistoryTable } from "./invoiceHistoryTable";
 import { OrderItemsTable } from "./orderItemsTable";
+import { OrderSampleFollowUps } from "./orderSampleFollowUps";
 import {
   CustomerCard,
   SalesCard,
@@ -190,6 +191,14 @@ export default function OrderDetailPage() {
           />
           <SalesCard sales={order.sales} />
           <VendorsCard vendors={order.vendors} />
+
+          {order.salesCategory === "SAMPLE" && (
+            <OrderSampleFollowUps
+              orderId={order.id}
+              followUps={order.sampleFollowUps || []}
+              onUpdate={loadOrder}
+            />
+          )}
         </div>
       </div>
 

@@ -51,6 +51,7 @@ import { toast } from "sonner";
 import { apiUrl } from "@/helper/apiurl";
 import { OrderFormValues, orderSchema } from "../order-schema";
 import { fetchWithToken, generatePoNumber, postOrder } from "../order-service";
+import { SampleFollowUpSection } from "./sampleFollowUpSection";
 
 type PIC = {
   id: string;
@@ -72,6 +73,12 @@ type Client = {
   type?: "B2B" | "B2C";
   pics?: PIC[];
   purchaseChannelId?: string;
+};
+
+type SampleStepItem = {
+  name: string;
+  date: Date | null;
+  enabled: boolean;
 };
 
 type Sales = { id: string; name: string; phone: string };
@@ -143,9 +150,11 @@ export default function AddOrderForm() {
   const [generatingPo, setGeneratingPo] = useState(false);
 
   const [clientOpen, setClientOpen] = useState(false);
-
   // Watchers
   const selectedClientId = watch("clientId");
+
+  const [sampleSteps, setSampleSteps] = useState<SampleStepItem[]>([]);
+  const salesCategory = watch("salesCategory");
 
   // Load Initial Data
   useEffect(() => {
@@ -229,7 +238,14 @@ export default function AddOrderForm() {
       // Remove phone from payload
       const { phone, ...payload } = data;
 
-      await postOrder(payload);
+      await postOrder({
+        ...payload,
+
+        sampleFollowUps: sampleSteps
+          .filter((s) => s.enabled && s.date)
+          .map((s) => ({ name: s.name, date: s.date })),
+      });
+
       toast.success("Order created successfully");
 
       // Reset form
@@ -242,6 +258,7 @@ export default function AddOrderForm() {
         shippingAddress: "",
         salesId: "",
         vendorIds: [],
+
         products: [
           {
             productId: "",
@@ -310,6 +327,11 @@ export default function AddOrderForm() {
                   </FormItem>
                 )}
               />
+              {salesCategory === "SAMPLE" && (
+                <div className="md:col-span-2">
+                  <SampleFollowUpSection onChange={setSampleSteps} />
+                </div>
+              )}
 
               <FormField
                 control={control}
