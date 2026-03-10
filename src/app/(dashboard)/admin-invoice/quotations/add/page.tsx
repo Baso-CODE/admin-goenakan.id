@@ -27,7 +27,7 @@ export default function AddQuotationPage() {
       if (!res.ok) throw new Error("Failed to create quotation");
 
       toast.success("Quotation created successfully!");
-      router.push("/super-admin/quotations");
+      router.push("/admin-invoice/quotations");
     } catch (error) {
       toast.error("Error creating quotation");
       console.error(error);

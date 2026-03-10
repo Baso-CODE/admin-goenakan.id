@@ -138,7 +138,7 @@ const renderFollowUpProgress = (
                 className={`h-1.5 w-1.5 rounded-full ${isCompleted ? "bg-green-500" : "bg-slate-300"}`}
               />
               <span className={isCompleted ? "text-green-600 font-medium" : ""}>
-                FU{index + 1}:{" "}
+                FU{index + 1}:
                 {isCompleted
                   ? format(new Date(fu.date), "dd MMM yyyy", {
                       locale: idLocale,
@@ -306,7 +306,7 @@ export default function QuotationsTable() {
                       </TableCell>
                       <TableCell>
                         <Skeleton className="h-16 w-40" />
-                      </TableCell>{" "}
+                      </TableCell>
                       {/* Skeleton Progress */}
                       <TableCell>
                         <Skeleton className="h-4 w-24 ml-auto" />
@@ -390,8 +390,8 @@ export default function QuotationsTable() {
       {meta && (
         <div className="flex items-center justify-between px-2 pt-4">
           <div className="text-xs text-muted-foreground">
-            Halaman <strong>{meta.page}</strong> dari{" "}
-            <strong>{meta.totalPage}</strong> • Total{" "}
+            Halaman <strong>{meta.page}</strong> dari
+            <strong>{meta.totalPage}</strong> • Total
             <strong>{meta.total}</strong> Data
           </div>
           <div className="flex gap-2">

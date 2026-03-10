@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import {
   Box,
   CalendarIcon,
+  ChevronDown,
   Loader2,
   MapPin,
   Phone,
@@ -12,8 +13,8 @@ import {
   Trash2,
   User,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { Resolver, useFieldArray, useForm, useWatch } from "react-hook-form";
+import { useEffect, useRef, useState } from "react";
+import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -54,6 +55,7 @@ type SalesData = {
   id: string;
   name: string;
 };
+
 const QUOTATION_STATUSES = ["DRAFT", "SENT", "FOLLOW_UP"] as const;
 
 const quotationSchema = z.object({
@@ -93,6 +95,214 @@ const quotationSchema = z.object({
 
 export type AddQuotationFormValues = z.infer<typeof quotationSchema>;
 
+// =========================================================
+// SUB-COMPONENT: Item Row — diisolasi agar tidak re-render parent
+// =========================================================
+function ItemRow({
+  index,
+  fieldId,
+  products,
+  form,
+  onRemove,
+  canRemove,
+}: {
+  index: number;
+  fieldId: string;
+  products: ProductData[];
+  form: any;
+  onRemove: () => void;
+  canRemove: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  // Gunakan local watch hanya untuk field ini
+  const isManualProduct = form.watch(`items.${index}.isManualProduct`);
+
+  return (
+    <div className="border rounded-lg bg-white">
+      {/* BARIS UTAMA */}
+      <div className="grid grid-cols-12 gap-2 items-center p-3">
+        {/* Switch Manual/DB */}
+        <div className="col-span-1 flex flex-col items-center gap-1">
+          <Switch
+            checked={!!isManualProduct}
+            onCheckedChange={(v) => {
+              form.setValue(`items.${index}.isManualProduct`, v);
+            }}
+            className="scale-75"
+          />
+          <span className="text-[10px] uppercase font-bold text-muted-foreground">
+            {isManualProduct ? "Man" : "DB"}
+          </span>
+        </div>
+
+        {/* Product Name / Select */}
+        <div className="col-span-4">
+          {isManualProduct ? (
+            <Input
+              placeholder="Nama barang/jasa..."
+              {...form.register(`items.${index}.productName`)}
+            />
+          ) : (
+            <Select
+              onValueChange={(v) => {
+                const p = products.find((x: any) => x.id === v);
+                if (p) {
+                  form.setValue(`items.${index}.productId`, p.id);
+                  form.setValue(`items.${index}.productName`, p.name);
+                  form.setValue(`items.${index}.unitPrice`, p.basePrice);
+                  if (p.description) {
+                    form.setValue(`items.${index}.description`, p.description);
+                    setExpanded(true);
+                  }
+                }
+              }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih Produk..." />
+              </SelectTrigger>
+              <SelectContent>
+                {products.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+
+        {/* Qty */}
+        <div className="col-span-2">
+          <Input
+            type="number"
+            placeholder="Qty"
+            {...form.register(`items.${index}.quantity`)}
+          />
+        </div>
+
+        {/* Harga */}
+        <div className="col-span-2">
+          <Input
+            type="number"
+            placeholder="Harga"
+            {...form.register(`items.${index}.unitPrice`)}
+          />
+        </div>
+
+        {/* Diskon */}
+        <div className="col-span-2">
+          <Input
+            type="number"
+            placeholder="Disc"
+            {...form.register(`items.${index}.discount`)}
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="col-span-1 flex items-center justify-end gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setExpanded((v) => !v)}>
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 text-gray-400 transition-transform duration-200",
+                expanded && "rotate-180",
+              )}
+            />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={onRemove}
+            disabled={!canRemove}>
+            <Trash2 className="w-4 h-4 text-red-500" />
+          </Button>
+        </div>
+      </div>
+
+      {/* ACCORDION Specification */}
+      {expanded && (
+        <div className="border-t bg-gray-50/50 px-4 pb-3 pt-2 rounded-b-lg">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+            Product Specification
+          </label>
+          <Textarea
+            placeholder={
+              "Contoh:\nFabric: 100D Anti color moving fabric\nPrint: Full digital print\nShaft: 14mm black fiberglass shaft\nRibs: 4.0 and 5.0mm black fiberglass ribs\nHandle: Wooden handle, auto open manual close\nTips: Black plastic tips\nTop: Black plastic frosted top"
+            }
+            className="text-xs min-h-[100px] resize-none bg-white font-mono"
+            {...form.register(`items.${index}.description`)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =========================================================
+// SUB-COMPONENT: Summary — diisolasi agar watch items tidak
+// mempengaruhi seluruh form
+// =========================================================
+function OrderSummary({ form, isLoading }: { form: any; isLoading: boolean }) {
+  const items = form.watch("items");
+  const subTotal = items.reduce(
+    (acc: number, item: any) =>
+      acc + Number(item.quantity) * Number(item.unitPrice),
+    0,
+  );
+  const discount = items.reduce(
+    (acc: number, item: any) => acc + Number(item.discount),
+    0,
+  );
+  const grandTotal = subTotal - discount;
+
+  return (
+    <Card className="bg-slate-50 border-blue-100 h-fit">
+      <CardHeader>
+        <CardTitle className="text-base">Ringkasan Biaya</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span>Subtotal</span>
+          <span>
+            {new Intl.NumberFormat("id-ID", {
+              style: "currency",
+              currency: "IDR",
+            }).format(subTotal)}
+          </span>
+        </div>
+        <Separator />
+        <div className="flex justify-between text-lg font-bold">
+          <span>Total Penawaran</span>
+          <span className="text-blue-600">
+            {new Intl.NumberFormat("id-ID", {
+              style: "currency",
+              currency: "IDR",
+            }).format(grandTotal)}
+          </span>
+        </div>
+        <Button
+          type="submit"
+          className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
+          disabled={isLoading}>
+          {isLoading ? (
+            <Loader2 className="animate-spin w-4 h-4 mr-2" />
+          ) : (
+            "Simpan & Generate Penawaran"
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// =========================================================
+// MAIN FORM
+// =========================================================
 export default function QuotationAddForm({
   onSubmit,
   isLoading,
@@ -105,8 +315,10 @@ export default function QuotationAddForm({
   const [noteCategories, setNoteCategories] = useState<NoteCategory[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClientData | null>(null);
   const [loadingMaster, setLoadingMaster] = useState(true);
-  const [manualNotes, setManualNotes] = useState<any[]>([]);
   const [salesList, setSalesList] = useState<SalesData[]>([]);
+
+  // Notes disimpan di ref — tidak perlu re-render saat berubah
+  const manualNotesRef = useRef<any[]>([]);
 
   const form = useForm<AddQuotationFormValues>({
     resolver: zodResolver(quotationSchema) as Resolver<AddQuotationFormValues>,
@@ -131,11 +343,11 @@ export default function QuotationAddForm({
     control: form.control,
     name: "items",
   });
-  const watchedItems = useWatch({ control: form.control, name: "items" });
-  const isManualClient = useWatch({
-    control: form.control,
-    name: "isManualClient",
-  });
+
+  // ✅ isManualClient hanya dipakai di sini, tidak di sub-component
+  const isManualClient = form.watch("isManualClient");
+
+  console.log("QuotationAddForm render");
 
   // === FETCH MASTER DATA ===
   useEffect(() => {
@@ -166,25 +378,19 @@ export default function QuotationAddForm({
     fetchMaster();
   }, []);
 
-  const { subTotal, grandTotal } = useMemo(() => {
-    const sub = watchedItems.reduce(
-      (acc, item) => acc + Number(item.quantity) * Number(item.unitPrice),
-      0,
-    );
-    const disc = watchedItems.reduce(
-      (acc, item) => acc + Number(item.discount),
-      0,
-    );
-    return { subTotal: sub, grandTotal: sub - disc };
-  }, [watchedItems]);
   const handleFinalSubmit = (data: AddQuotationFormValues) => {
-    // Gabungkan data form dengan manualNotes tepat sebelum dikirim
     const finalData = {
       ...data,
-      notes: manualNotes,
+      notes: manualNotesRef.current,
     };
     onSubmit(finalData);
   };
+
+  // ✅ Stable function via ref pattern — tidak perlu useCallback
+  function handleNotesChange(notes: any[]) {
+    manualNotesRef.current = notes;
+  }
+
   return (
     <Form {...form}>
       <form
@@ -254,7 +460,6 @@ export default function QuotationAddForm({
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="salesId"
@@ -311,7 +516,6 @@ export default function QuotationAddForm({
                         checked={field.value}
                         onCheckedChange={(val) => {
                           field.onChange(val);
-                          // Reset pilihan client saat switch berubah
                           setSelectedClient(null);
                           form.setValue("clientId", "");
                         }}
@@ -334,7 +538,6 @@ export default function QuotationAddForm({
                           <Select
                             onValueChange={(val) => {
                               field.onChange(val);
-                              // Set state selectedClient berdasarkan data yang di-fetch
                               const client = clients.find((c) => c.id === val);
                               if (client) setSelectedClient(client);
                             }}
@@ -363,8 +566,6 @@ export default function QuotationAddForm({
                         </FormItem>
                       )}
                     />
-
-                    {/* === TAMPILAN DETAIL CLIENT DARI DATABASE === */}
                     {selectedClient && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 animate-in fade-in slide-in-from-top-1">
                         <div className="space-y-3">
@@ -392,20 +593,16 @@ export default function QuotationAddForm({
                               </Badge>
                             </div>
                           </div>
-
                           <div className="flex items-start gap-2 text-sm text-slate-600">
                             <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-slate-400" />
                             <span>{selectedClient.address}</span>
                           </div>
                         </div>
-
                         <div className="space-y-3">
                           <div className="flex items-center gap-2 text-sm text-slate-600">
                             <Phone className="w-4 h-4 shrink-0 text-slate-400" />
                             <span>{selectedClient.phone || "-"}</span>
                           </div>
-
-                          {/* Tampilkan PIC jika B2B */}
                           {selectedClient.type === "B2B" &&
                             selectedClient.pics &&
                             selectedClient.pics.length > 0 && (
@@ -435,7 +632,6 @@ export default function QuotationAddForm({
                   </div>
                 ) : (
                   <>
-                    {/* INPUT MANUAL DENGAN LABEL LENGKAP */}
                     <FormField
                       control={form.control}
                       name="manualClientName"
@@ -543,83 +739,15 @@ export default function QuotationAddForm({
           </CardHeader>
           <CardContent className="pt-4 space-y-3">
             {fields.map((field, index) => (
-              <div
+              <ItemRow
                 key={field.id}
-                className="grid grid-cols-12 gap-2 items-end border-b pb-3 last:border-0">
-                <div className="col-span-1 flex flex-col items-center gap-1">
-                  <Switch
-                    checked={watchedItems[index]?.isManualProduct}
-                    onCheckedChange={(v) =>
-                      form.setValue(`items.${index}.isManualProduct`, v)
-                    }
-                    className="scale-75"
-                  />
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                    {watchedItems[index]?.isManualProduct ? "Man" : "DB"}
-                  </span>
-                </div>
-                <div className="col-span-4">
-                  {watchedItems[index]?.isManualProduct ? (
-                    <Input
-                      placeholder="Nama barang/jasa..."
-                      {...form.register(`items.${index}.productName`)}
-                    />
-                  ) : (
-                    <Select
-                      onValueChange={(v) => {
-                        const p = products.find((x) => x.id === v);
-                        if (p) {
-                          form.setValue(`items.${index}.productName`, p.name);
-                          form.setValue(
-                            `items.${index}.unitPrice`,
-                            p.basePrice,
-                          );
-                        }
-                      }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih Produk..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-                <div className="col-span-2">
-                  <Input
-                    type="number"
-                    placeholder="Qty"
-                    {...form.register(`items.${index}.quantity`)}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Input
-                    type="number"
-                    placeholder="Harga"
-                    {...form.register(`items.${index}.unitPrice`)}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Input
-                    type="number"
-                    placeholder="Disc"
-                    {...form.register(`items.${index}.discount`)}
-                  />
-                </div>
-                <div className="col-span-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => remove(index)}
-                    disabled={fields.length === 1}>
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </Button>
-                </div>
-              </div>
+                index={index}
+                fieldId={field.id}
+                products={products}
+                form={form}
+                onRemove={() => remove(index)}
+                canRemove={fields.length > 1}
+              />
             ))}
           </CardContent>
         </Card>
@@ -627,49 +755,13 @@ export default function QuotationAddForm({
         {/* FOOTER: NOTES & SUMMARY */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-6">
-            {/* Panggil LANGSUNG tanpa FormField wrapper */}
             <QuotationNotesSection
               noteCategories={noteCategories}
-              selectedNotes={manualNotes}
-              setSelectedNotes={setManualNotes}
+              onNotesChange={handleNotesChange}
             />
           </div>
-          <Card className="bg-slate-50 border-blue-100 h-fit">
-            <CardHeader>
-              <CardTitle className="text-base">Ringkasan Biaya</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>
-                  {new Intl.NumberFormat("id-ID", {
-                    style: "currency",
-                    currency: "IDR",
-                  }).format(subTotal)}
-                </span>
-              </div>
-              <Separator />
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total Penawaran</span>
-                <span className="text-blue-600">
-                  {new Intl.NumberFormat("id-ID", {
-                    style: "currency",
-                    currency: "IDR",
-                  }).format(grandTotal)}
-                </span>
-              </div>
-              <Button
-                type="submit"
-                className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
-                disabled={isLoading}>
-                {isLoading ? (
-                  <Loader2 className="animate-spin w-4 h-4 mr-2" />
-                ) : (
-                  "Simpan & Generate Penawaran"
-                )}
-              </Button>
-            </CardContent>
-          </Card>
+
+          <OrderSummary form={form} isLoading={isLoading} />
         </div>
       </form>
     </Form>

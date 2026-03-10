@@ -27,6 +27,7 @@ export default function QuotationPrint() {
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   const [data, setData] = useState<any>(null);
+  console.log("ini adalah data", data);
 
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -39,7 +40,6 @@ export default function QuotationPrint() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        // Panggil endpoint API quotation (sesuaikan path API Anda jika berbeda)
         const res = await fetch(`${apiUrl}/quotations/print/${quotationId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -202,7 +202,7 @@ export default function QuotationPrint() {
                     <tr>
                       <td className="py-0.5 pr-4 align-top">Qtn Date</td>
                       <td className="py-0.5 align-top font-medium">
-                        :{" "}
+                        :
                         {data.date
                           ? format(new Date(data.date), "dd MMMM yyyy", {
                               locale: idLocale,
@@ -219,7 +219,7 @@ export default function QuotationPrint() {
                     <tr>
                       <td className="py-0.5 pr-4 align-top">Currency</td>
                       <td className="py-0.5 align-top font-bold text-blue-600">
-                        : IDR{" "}
+                        : IDR
                       </td>
                     </tr>
                   </tbody>
@@ -300,13 +300,19 @@ export default function QuotationPrint() {
                           </div>
                         </td>
                         <td className="border border-[#94a3b8] py-2 px-3 text-gray-700">
-                          {item.description || "-"}{" "}
-                          {item.customization && (
-                            <div className="text-[10px] italic text-gray-500 mt-1">
-                              Spec: {item.customization}
+                          {item.description ? (
+                            <div className="text-[11px] leading-relaxed whitespace-pre-line">
+                              {item.description}
                             </div>
+                          ) : item.product?.description ? (
+                            <div className="text-[11px] leading-relaxed whitespace-pre-line text-gray-500">
+                              {item.product.description}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic text-[10px]">
+                              -
+                            </span>
                           )}
-                          {item.product.description}
                         </td>
                         <td className="border border-[#94a3b8] py-2 text-center font-semibold">
                           {item.quantity}

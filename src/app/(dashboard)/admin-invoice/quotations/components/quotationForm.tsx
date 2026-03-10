@@ -83,9 +83,11 @@ export type ClientData = {
 export type ProductData = {
   id: string;
   name: string;
-  sku: string;
   basePrice: number;
+  isCustom: boolean;
+  description?: string;
   productVariants: { id: string; variantName: string; price: number }[];
+  priceTiers: { minQuantity: number; price: number }[];
 };
 
 // Tipe Data untuk Kategori Note
