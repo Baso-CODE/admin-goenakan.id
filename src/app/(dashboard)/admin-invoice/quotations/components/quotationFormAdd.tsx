@@ -13,7 +13,7 @@ import {
   Trash2,
   User,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -48,13 +48,14 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { apiUrl } from "@/helper/apiurl";
 import { cn } from "@/lib/utils";
-import { QuotationNotesSection } from "./helper/quotationNotesSection";
+import {
+  QuotationNotesSection,
+  getNotesStore,
+  resetNotesStore,
+} from "./helper/quotationNotesSection";
 import { ClientData, NoteCategory, ProductData } from "./quotationForm";
 
-type SalesData = {
-  id: string;
-  name: string;
-};
+type SalesData = { id: string; name: string };
 
 const QUOTATION_STATUSES = ["DRAFT", "SENT", "FOLLOW_UP"] as const;
 
@@ -95,39 +96,36 @@ const quotationSchema = z.object({
 
 export type AddQuotationFormValues = z.infer<typeof quotationSchema>;
 
-// =========================================================
-// SUB-COMPONENT: Item Row — diisolasi agar tidak re-render parent
-// =========================================================
+// ============================================================
+// SUB-COMPONENT: ItemRow
+// form.watch hanya di dalam component ini — tidak bocor ke parent
+// ============================================================
 function ItemRow({
   index,
-  fieldId,
   products,
   form,
   onRemove,
   canRemove,
 }: {
   index: number;
-  fieldId: string;
   products: ProductData[];
   form: any;
   onRemove: () => void;
   canRemove: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  // Gunakan local watch hanya untuk field ini
   const isManualProduct = form.watch(`items.${index}.isManualProduct`);
 
   return (
     <div className="border rounded-lg bg-white">
-      {/* BARIS UTAMA */}
       <div className="grid grid-cols-12 gap-2 items-center p-3">
         {/* Switch Manual/DB */}
         <div className="col-span-1 flex flex-col items-center gap-1">
           <Switch
             checked={!!isManualProduct}
-            onCheckedChange={(v) => {
-              form.setValue(`items.${index}.isManualProduct`, v);
-            }}
+            onCheckedChange={(v) =>
+              form.setValue(`items.${index}.isManualProduct`, v)
+            }
             className="scale-75"
           />
           <span className="text-[10px] uppercase font-bold text-muted-foreground">
@@ -135,7 +133,7 @@ function ItemRow({
           </span>
         </div>
 
-        {/* Product Name / Select */}
+        {/* Product */}
         <div className="col-span-4">
           {isManualProduct ? (
             <Input
@@ -224,7 +222,6 @@ function ItemRow({
         </div>
       </div>
 
-      {/* ACCORDION Specification */}
       {expanded && (
         <div className="border-t bg-gray-50/50 px-4 pb-3 pt-2 rounded-b-lg">
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
@@ -234,7 +231,7 @@ function ItemRow({
             placeholder={
               "Contoh:\nFabric: 100D Anti color moving fabric\nPrint: Full digital print\nShaft: 14mm black fiberglass shaft\nRibs: 4.0 and 5.0mm black fiberglass ribs\nHandle: Wooden handle, auto open manual close\nTips: Black plastic tips\nTop: Black plastic frosted top"
             }
-            className="text-xs min-h-[100px] resize-none bg-white font-mono"
+            className="text-xs min-h-25 resize-none bg-white font-mono"
             {...form.register(`items.${index}.description`)}
           />
         </div>
@@ -243,10 +240,10 @@ function ItemRow({
   );
 }
 
-// =========================================================
-// SUB-COMPONENT: Summary — diisolasi agar watch items tidak
-// mempengaruhi seluruh form
-// =========================================================
+// ============================================================
+// SUB-COMPONENT: OrderSummary
+// form.watch("items") hanya di sini — tidak bocor ke parent
+// ============================================================
 function OrderSummary({ form, isLoading }: { form: any; isLoading: boolean }) {
   const items = form.watch("items");
   const subTotal = items.reduce(
@@ -300,9 +297,10 @@ function OrderSummary({ form, isLoading }: { form: any; isLoading: boolean }) {
   );
 }
 
-// =========================================================
+// ============================================================
 // MAIN FORM
-// =========================================================
+// Tidak ada form.watch di sini kecuali isManualClient
+// ============================================================
 export default function QuotationAddForm({
   onSubmit,
   isLoading,
@@ -316,9 +314,6 @@ export default function QuotationAddForm({
   const [selectedClient, setSelectedClient] = useState<ClientData | null>(null);
   const [loadingMaster, setLoadingMaster] = useState(true);
   const [salesList, setSalesList] = useState<SalesData[]>([]);
-
-  // Notes disimpan di ref — tidak perlu re-render saat berubah
-  const manualNotesRef = useRef<any[]>([]);
 
   const form = useForm<AddQuotationFormValues>({
     resolver: zodResolver(quotationSchema) as Resolver<AddQuotationFormValues>,
@@ -344,12 +339,15 @@ export default function QuotationAddForm({
     name: "items",
   });
 
-  // ✅ isManualClient hanya dipakai di sini, tidak di sub-component
+  // Hanya watch isManualClient untuk toggle UI client
   const isManualClient = form.watch("isManualClient");
 
-  console.log("QuotationAddForm render");
+  // Reset notes store saat component mount
+  useEffect(() => {
+    resetNotesStore();
+  }, []);
 
-  // === FETCH MASTER DATA ===
+  // Fetch master data
   useEffect(() => {
     const fetchMaster = async () => {
       try {
@@ -379,17 +377,13 @@ export default function QuotationAddForm({
   }, []);
 
   const handleFinalSubmit = (data: AddQuotationFormValues) => {
+    // Ambil notes dari module store — tidak ada state/props yang terlibat
     const finalData = {
       ...data,
-      notes: manualNotesRef.current,
+      notes: getNotesStore(),
     };
     onSubmit(finalData);
   };
-
-  // ✅ Stable function via ref pattern — tidak perlu useCallback
-  function handleNotesChange(notes: any[]) {
-    manualNotesRef.current = notes;
-  }
 
   return (
     <Form {...form}>
@@ -742,7 +736,6 @@ export default function QuotationAddForm({
               <ItemRow
                 key={field.id}
                 index={index}
-                fieldId={field.id}
                 products={products}
                 form={form}
                 onRemove={() => remove(index)}
@@ -755,12 +748,8 @@ export default function QuotationAddForm({
         {/* FOOTER: NOTES & SUMMARY */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-6">
-            <QuotationNotesSection
-              noteCategories={noteCategories}
-              onNotesChange={handleNotesChange}
-            />
+            <QuotationNotesSection noteCategories={noteCategories} />
           </div>
-
           <OrderSummary form={form} isLoading={isLoading} />
         </div>
       </form>

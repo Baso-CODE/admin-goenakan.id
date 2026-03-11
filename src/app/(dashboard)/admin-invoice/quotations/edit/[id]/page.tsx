@@ -18,6 +18,8 @@ export default function EditQuotationPage() {
     null,
   );
 
+  console.log("ini adalah dataa", initialData);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 

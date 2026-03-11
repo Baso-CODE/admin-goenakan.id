@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import {
   Box,
   CalendarIcon,
+  ChevronDown,
   FileText,
   Loader2,
   Lock,
@@ -14,17 +15,11 @@ import {
   Trash2,
   User,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Resolver, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -56,9 +51,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { apiUrl } from "@/helper/apiurl";
 import { cn } from "@/lib/utils";
-import { NoteItem } from "./noteItem";
 
-// === TYPES FOR API DATA ===
 export type PICData = {
   id: string;
   name: string;
@@ -66,8 +59,6 @@ export type PICData = {
   email?: string;
   position?: string;
 };
-
-// 2. Update ClientData Utama
 export type ClientData = {
   id: string;
   name: string;
@@ -79,7 +70,6 @@ export type ClientData = {
   purchaseChannelId: string;
   pics: PICData[];
 };
-
 export type ProductData = {
   id: string;
   name: string;
@@ -89,8 +79,6 @@ export type ProductData = {
   productVariants: { id: string; variantName: string; price: number }[];
   priceTiers: { minQuantity: number; price: number }[];
 };
-
-// Tipe Data untuk Kategori Note
 export type NoteCategory = {
   id: string;
   name: string;
@@ -98,7 +86,302 @@ export type NoteCategory = {
   templates: { title: string; content: string }[];
 };
 
-// === CONSTANTS ===
+// ============================================================
+// MODULE-LEVEL NOTES STORE
+// ============================================================
+let _editNotesStore: { categoryId: string; contents: string[] }[] = [];
+export function getEditNotesStore() {
+  return _editNotesStore;
+}
+export function resetEditNotesStore(
+  initial: { categoryId: string; contents: string[] }[] = [],
+) {
+  _editNotesStore = [...initial];
+}
+
+// ============================================================
+// NOTES SECTION COMPONENT
+// ============================================================
+function NotesSection({
+  noteCategories,
+  initialNotes,
+}: {
+  noteCategories: NoteCategory[];
+  initialNotes: { categoryId: string; contents: string[] }[];
+}) {
+  const [selectedNotes, setSelectedNotes] =
+    useState<{ categoryId: string; contents: string[] }[]>(initialNotes);
+  const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
+
+  function toggleCat(catId: string) {
+    setOpenCats((prev) => ({ ...prev, [catId]: !prev[catId] }));
+  }
+
+  function handleToggle(categoryId: string, content: string) {
+    const next = selectedNotes.map((n) => ({
+      ...n,
+      contents: [...n.contents],
+    }));
+    const idx = next.findIndex((n) => n.categoryId === categoryId);
+    let result: { categoryId: string; contents: string[] }[];
+    if (idx === -1) {
+      result = [...next, { categoryId, contents: [content] }];
+    } else {
+      const cat = next[idx];
+      const ci = cat.contents.indexOf(content);
+      if (ci === -1) cat.contents.push(content);
+      else cat.contents.splice(ci, 1);
+      result =
+        cat.contents.length === 0 ? next.filter((_, i) => i !== idx) : next;
+    }
+    _editNotesStore = result;
+    setSelectedNotes(result);
+  }
+
+  function isChecked(catId: string, content: string) {
+    return (
+      selectedNotes
+        .find((n) => n.categoryId === catId)
+        ?.contents.includes(content) || false
+    );
+  }
+  function getCount(catId: string) {
+    return (
+      selectedNotes.find((n) => n.categoryId === catId)?.contents.length || 0
+    );
+  }
+
+  function renderGroup(
+    isPublic: boolean,
+    title: string,
+    icon: React.ReactNode,
+  ) {
+    const filtered = noteCategories.filter((c) => c.isPublic === isPublic);
+    if (filtered.length === 0) return null;
+    return (
+      <Card className={!isPublic ? "bg-slate-50 border-slate-200" : ""}>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            {icon} {title}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea className="h-64 pr-4">
+            <div className="space-y-1">
+              {filtered.map((cat) => {
+                const isOpen = !!openCats[cat.id];
+                const count = getCount(cat.id);
+                return (
+                  <div
+                    key={cat.id}
+                    className="border rounded-md overflow-hidden">
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium hover:bg-muted/40 transition-colors"
+                      onClick={() => toggleCat(cat.id)}>
+                      <div className="flex items-center gap-2">
+                        <span>{cat.name}</span>
+                        {count > 0 && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] h-5 px-1.5">
+                            {count}
+                          </Badge>
+                        )}
+                      </div>
+                      <ChevronDown
+                        className={cn(
+                          "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
+                          isOpen && "rotate-180",
+                        )}
+                      />
+                    </button>
+                    {isOpen && (
+                      <div className="border-t bg-white px-2 py-2 space-y-1">
+                        {cat.templates.map((tpl, i) => {
+                          const checked = isChecked(cat.id, tpl.content);
+                          return (
+                            <div
+                              key={`${cat.id}-${i}`}
+                              className="flex items-start space-x-2 border p-2 rounded-md bg-white hover:bg-slate-50 transition-colors cursor-pointer select-none"
+                              onClick={() => handleToggle(cat.id, tpl.content)}>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {}}
+                                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 pointer-events-none"
+                              />
+                              <div className="grid gap-0.5 leading-none pointer-events-none">
+                                <span className="text-sm font-medium">
+                                  {tpl.title}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {tpl.content}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {renderGroup(
+        true,
+        "Notes to Client (Public)",
+        <FileText className="w-5 h-5 text-blue-600" />,
+      )}
+      {renderGroup(
+        false,
+        "Internal Notes (Private)",
+        <Lock className="w-5 h-5 text-amber-600" />,
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// ITEM ROW SUB-COMPONENT — form.watch terisolasi di sini
+// ============================================================
+function ItemRow({
+  index,
+  products,
+  form,
+  onRemove,
+  canRemove,
+}: {
+  index: number;
+  products: ProductData[];
+  form: any;
+  onRemove: () => void;
+  canRemove: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isManualProduct = form.watch(`items.${index}.isManualProduct`);
+
+  return (
+    <div className="border rounded-lg bg-white">
+      <div className="grid grid-cols-12 gap-2 items-center p-3">
+        <div className="col-span-1 flex flex-col items-center gap-1">
+          <Switch
+            checked={!!isManualProduct}
+            onCheckedChange={(v) =>
+              form.setValue(`items.${index}.isManualProduct`, v)
+            }
+            className="scale-75"
+          />
+          <span className="text-[10px] uppercase font-bold text-muted-foreground">
+            {isManualProduct ? "Man" : "DB"}
+          </span>
+        </div>
+        <div className="col-span-4">
+          {isManualProduct ? (
+            <Input
+              placeholder="Nama barang/jasa..."
+              {...form.register(`items.${index}.productName`)}
+            />
+          ) : (
+            <Select
+              onValueChange={(v) => {
+                const p = products.find((x: any) => x.id === v);
+                if (p) {
+                  form.setValue(`items.${index}.productId`, p.id);
+                  form.setValue(`items.${index}.productName`, p.name);
+                  form.setValue(`items.${index}.unitPrice`, p.basePrice);
+                  if (p.description) {
+                    form.setValue(`items.${index}.description`, p.description);
+                    setExpanded(true);
+                  }
+                }
+              }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih Produk..." />
+              </SelectTrigger>
+              <SelectContent>
+                {products.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        <div className="col-span-2">
+          <Input
+            type="number"
+            placeholder="Qty"
+            {...form.register(`items.${index}.quantity`)}
+          />
+        </div>
+        <div className="col-span-2">
+          <Input
+            type="number"
+            placeholder="Harga"
+            {...form.register(`items.${index}.unitPrice`)}
+          />
+        </div>
+        <div className="col-span-2">
+          <Input
+            type="number"
+            placeholder="Disc"
+            {...form.register(`items.${index}.discount`)}
+          />
+        </div>
+        <div className="col-span-1 flex items-center justify-end gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setExpanded((v) => !v)}>
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 text-gray-400 transition-transform duration-200",
+                expanded && "rotate-180",
+              )}
+            />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={onRemove}
+            disabled={!canRemove}>
+            <Trash2 className="w-4 h-4 text-red-500" />
+          </Button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="border-t bg-gray-50/50 px-4 pb-3 pt-2 rounded-b-lg">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+            Product Specification
+          </label>
+          <Textarea
+            placeholder={
+              "Contoh:\nFabric: 100D Anti color moving fabric\nPrint: Full digital print\nShaft: 14mm black fiberglass shaft\nRibs: 4.0 and 5.0mm black fiberglass ribs\nHandle: Wooden handle, auto open manual close\nTips: Black plastic tips\nTop: Black plastic frosted top"
+            }
+            className="text-xs min-h-25 resize-none bg-white font-mono"
+            {...form.register(`items.${index}.description`)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// === CONSTANTS & SCHEMA ===
 const QUOTATION_STATUSES = [
   "DRAFT",
   "SENT",
@@ -109,13 +392,10 @@ const QUOTATION_STATUSES = [
   "CANCELLED",
 ] as const;
 
-// === SCHEMA ===
 const quotationSchema = z.object({
   date: z.date(),
   validUntil: z.date().optional(),
   status: z.enum(QUOTATION_STATUSES).default("DRAFT"),
-
-  // Logic Hybrid Client
   isManualClient: z.boolean().default(false),
   clientId: z.string().optional(),
   manualClientName: z.string().optional(),
@@ -123,17 +403,6 @@ const quotationSchema = z.object({
   manualClientEmail: z.string().email().optional().or(z.literal("")),
   manualClientPhone: z.string().optional(),
   manualClientAddress: z.string().optional(),
-
-  notes: z
-    .array(
-      z.object({
-        categoryId: z.string(),
-        contents: z.array(z.string()).min(1),
-      }),
-    )
-    .optional(),
-
-  // Items
   items: z
     .array(
       z.object({
@@ -153,31 +422,52 @@ export type QuotationFormValues = z.infer<typeof quotationSchema>;
 
 interface QuotationFormProps {
   initialData?: any;
-  onSubmit: (data: QuotationFormValues) => void;
+  onSubmit: (data: QuotationFormValues & { notes: any[] }) => void;
   isLoading?: boolean;
 }
 
+// ============================================================
+// MAIN FORM
+// ============================================================
 export default function QuotationForm({
   initialData,
   onSubmit,
   isLoading,
 }: QuotationFormProps) {
   const [clients, setClients] = useState<ClientData[]>([]);
-
   const [products, setProducts] = useState<ProductData[]>([]);
   const [noteCategories, setNoteCategories] = useState<NoteCategory[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [selectedClient, setSelectedClient] = useState<ClientData | null>(null);
 
-  // === FETCH DATA ===
+  // ✅ initialNotes dihitung synchronous via useMemo — sudah siap saat NotesSection mount
+  const initialNotes = useMemo<
+    { categoryId: string; contents: string[] }[]
+  >(() => {
+    if (!initialData?.notes || !Array.isArray(initialData.notes)) return [];
+    const grouped: Record<string, string[]> = {};
+    initialData.notes.forEach((n: any) => {
+      if (n.content) {
+        if (!grouped[n.categoryId]) grouped[n.categoryId] = [];
+        grouped[n.categoryId].push(n.content);
+      } else if (n.contents) {
+        grouped[n.categoryId] = n.contents;
+      }
+    });
+    const result = Object.entries(grouped).map(([categoryId, contents]) => ({
+      categoryId,
+      contents,
+    }));
+    resetEditNotesStore(result);
+    return result;
+  }, [initialData]);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoadingData(true);
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
-
-        // Fetch Clients, Products, dan Note Categories sekaligus
         const [resClients, resProducts, resNotes] = await Promise.all([
           fetch(`${apiUrl}/clients/order`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -189,14 +479,9 @@ export default function QuotationForm({
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
-
-        if (!resClients.ok || !resProducts.ok)
-          throw new Error("Failed to load master data");
-
         const clientData = await resClients.json();
         const productData = await resProducts.json();
         const notesData = await resNotes.json();
-
         setClients(
           Array.isArray(clientData) ? clientData : clientData.data || [],
         );
@@ -205,21 +490,19 @@ export default function QuotationForm({
         );
         setNoteCategories(Array.isArray(notesData) ? notesData : []);
       } catch (error) {
-        console.error("Error loading data:", error);
         toast.error("Gagal memuat data Master");
       } finally {
         setLoadingData(false);
       }
     };
-
     fetchData();
   }, []);
 
   const defaultValues = useMemo(() => {
-    if (!initialData) {
+    if (!initialData)
       return {
         date: new Date(),
-        status: "DRAFT",
+        status: "DRAFT" as const,
         isManualClient: false,
         items: [
           {
@@ -230,48 +513,23 @@ export default function QuotationForm({
             discount: 0,
           },
         ],
-        notes: [],
       };
-    }
-
-    // Transform Flat Notes to Grouped Notes
-    const groupedNotes: Record<string, string[]> = {};
-    if (initialData.notes && Array.isArray(initialData.notes)) {
-      initialData.notes.forEach((n: any) => {
-        if (!groupedNotes[n.categoryId]) {
-          groupedNotes[n.categoryId] = [];
-        }
-        groupedNotes[n.categoryId].push(n.content);
-      });
-    }
-
-    const formattedNotes = Object.entries(groupedNotes).map(
-      ([categoryId, contents]) => ({
-        categoryId,
-        contents,
-      }),
-    );
-
     return {
       ...initialData,
       date: initialData.date ? new Date(initialData.date) : new Date(),
       validUntil: initialData.validUntil
         ? new Date(initialData.validUntil)
         : undefined,
-      notes: formattedNotes,
     };
   }, [initialData]);
 
   const form = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema) as Resolver<QuotationFormValues>,
-    defaultValues: defaultValues,
+    defaultValues,
   });
 
-  // Re-sync jika initialData berubah (Edit Mode)
   useEffect(() => {
-    if (initialData) {
-      form.reset(defaultValues);
-    }
+    if (initialData) form.reset(defaultValues);
   }, [initialData, defaultValues, form]);
 
   const { fields, append, remove } = useFieldArray({
@@ -286,148 +544,20 @@ export default function QuotationForm({
   });
 
   const { subTotal, totalDiscount, grandTotal } = useMemo(() => {
-    let sub = 0;
-    let disc = 0;
+    let sub = 0,
+      disc = 0;
     items.forEach((item) => {
-      const qty = Number(item.quantity) || 0;
-      const price = Number(item.unitPrice) || 0;
-      const itemDisc = Number(item.discount) || 0;
-      sub += qty * price;
-      disc += itemDisc;
+      sub += (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+      disc += Number(item.discount) || 0;
     });
     return { subTotal: sub, totalDiscount: disc, grandTotal: sub - disc };
   }, [items]);
-
-  const handleProductSelect = (index: number, productId: string) => {
-    const product = products.find((p) => p.id === productId);
-    if (product) {
-      form.setValue(`items.${index}.productName`, product.name);
-      form.setValue(`items.${index}.unitPrice`, Number(product.basePrice));
-    }
-  };
 
   const handleClientSelect = (clientId: string) => {
     const client = clients.find((c) => c.id === clientId);
     if (client) setSelectedClient(client);
   };
 
-  const handleToggleNote = useCallback(
-    (categoryId: string, content: string) => {
-      const prevNotes = form.getValues("notes") || [];
-      const categoryIndex = prevNotes.findIndex(
-        (n) => n.categoryId === categoryId,
-      );
-      let newNotes = [...prevNotes];
-
-      if (categoryIndex === -1) {
-        newNotes.push({ categoryId, contents: [content] });
-      } else {
-        const contents = [...newNotes[categoryIndex].contents];
-        if (contents.includes(content)) {
-          const filtered = contents.filter((c) => c !== content);
-          if (filtered.length === 0) newNotes.splice(categoryIndex, 1);
-          else
-            newNotes[categoryIndex] = {
-              ...newNotes[categoryIndex],
-              contents: filtered,
-            };
-        } else {
-          newNotes[categoryIndex] = {
-            ...newNotes[categoryIndex],
-            contents: [...contents, content],
-          };
-        }
-      }
-      form.setValue("notes", newNotes, { shouldDirty: true });
-    },
-    [form],
-  );
-
-  // === ISOLATED WATCHERS (PENCEGAH LOOP) ===
-  const NoteBadgeWatcher = ({
-    control,
-    categoryId,
-  }: {
-    control: any;
-    categoryId: string;
-  }) => {
-    const notes = useWatch({ control, name: "notes" }) || [];
-    const count =
-      notes.find((n: any) => n.categoryId === categoryId)?.contents.length || 0;
-    return count > 0 ? (
-      <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
-        {count}
-      </Badge>
-    ) : null;
-  };
-
-  const NoteItemWatcher = ({ control, categoryId, content, children }: any) => {
-    const notes = useWatch({ control, name: "notes" }) || [];
-    const isSelected =
-      notes
-        .find((n: any) => n.categoryId === categoryId)
-        ?.contents.includes(content) || false;
-    return children(isSelected);
-  };
-
-  const renderNoteSelector = (isPublic: boolean, title: string, icon: any) => {
-    const filteredCategories = noteCategories.filter(
-      (c) => c.isPublic === isPublic,
-    );
-    return (
-      <Card className={!isPublic ? "bg-slate-50 border-slate-200" : ""}>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            {icon} {title}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-64 pr-4">
-            <Accordion type="multiple" className="w-full">
-              {filteredCategories.map((cat) => (
-                <AccordionItem
-                  key={cat.id}
-                  value={cat.id}
-                  className="border-b-0 mb-1">
-                  <AccordionTrigger className="py-2 px-3 text-sm hover:no-underline rounded-md border border-transparent data-[state=open]:bg-white">
-                    <div className="flex items-center gap-2">
-                      <span>{cat.name}</span>
-                      <NoteBadgeWatcher
-                        control={form.control}
-                        categoryId={cat.id}
-                      />
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pt-2 px-3 pb-2 bg-white/50">
-                    <div className="grid gap-2">
-                      {cat.templates?.map((tpl, tplIdx) => (
-                        <NoteItemWatcher
-                          key={`${cat.id}-${tplIdx}`}
-                          control={form.control}
-                          categoryId={cat.id}
-                          content={tpl.content}>
-                          {(isSelected: boolean) => (
-                            <NoteItem
-                              title={tpl.title}
-                              content={tpl.content}
-                              isSelected={isSelected}
-                              onToggle={() =>
-                                handleToggleNote(cat.id, tpl.content)
-                              }
-                            />
-                          )}
-                        </NoteItemWatcher>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-    );
-  };
   const handleSubmit = (data: QuotationFormValues) => {
     if (!data.isManualClient && !data.clientId) {
       form.setError("clientId", { message: "Please select a client" });
@@ -437,18 +567,20 @@ export default function QuotationForm({
       form.setError("manualClientName", { message: "Client Name is required" });
       return;
     }
-    onSubmit(data);
+    onSubmit({ ...data, notes: getEditNotesStore() });
   };
+
+  const notesSectionKey = initialData?.id ?? "new";
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-        {/* ... (HEADER & CLIENT SECTION TETAP SAMA SEPERTI SEBELUMNYA) ... */}
+        {/* QUOTATION DETAILS & CLIENT */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-muted-foreground" />
+                <CalendarIcon className="w-5 h-5 text-muted-foreground" />{" "}
                 Quotation Details
               </CardTitle>
             </CardHeader>
@@ -459,10 +591,7 @@ export default function QuotationForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select status" />
@@ -500,7 +629,7 @@ export default function QuotationForm({
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
-                            variant={"outline"}
+                            variant="outline"
                             className={cn(
                               "w-full pl-3 text-left font-normal",
                               !field.value && "text-muted-foreground",
@@ -519,7 +648,6 @@ export default function QuotationForm({
                           mode="single"
                           selected={field.value}
                           onSelect={field.onChange}
-                          disabled={(date) => date < new Date("1900-01-01")}
                           initialFocus
                         />
                       </PopoverContent>
@@ -538,7 +666,7 @@ export default function QuotationForm({
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
-                            variant={"outline"}
+                            variant="outline"
                             className={cn(
                               "w-full pl-3 text-left font-normal",
                               !field.value && "text-muted-foreground",
@@ -569,12 +697,11 @@ export default function QuotationForm({
             </CardContent>
           </Card>
 
-          {/* Client Selection */}
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
-                <User className="w-5 h-5 text-muted-foreground" />
-                Client Information
+                <User className="w-5 h-5 text-muted-foreground" /> Client
+                Information
               </CardTitle>
               <FormField
                 control={form.control}
@@ -609,7 +736,6 @@ export default function QuotationForm({
                               field.onChange(val);
                               handleClientSelect(val);
                             }}
-                            defaultValue={field.value}
                             value={field.value}
                             disabled={loadingData}>
                             <FormControl>
@@ -635,10 +761,8 @@ export default function QuotationForm({
                         </FormItem>
                       )}
                     />
-
-                    {/* === TAMPILAN DETAIL CLIENT DARI DATABASE === */}
                     {selectedClient && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 animate-in fade-in slide-in-from-top-1">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50">
                         <div className="space-y-3">
                           <div>
                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -664,26 +788,21 @@ export default function QuotationForm({
                               </Badge>
                             </div>
                           </div>
-
                           <div className="flex items-start gap-2 text-sm text-slate-600">
                             <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
                             <span>{selectedClient.address}</span>
                           </div>
                         </div>
-
                         <div className="space-y-3">
                           <div className="flex items-center gap-2 text-sm text-slate-600">
                             <Phone className="w-4 h-4 shrink-0" />
                             <span>{selectedClient.phone || "-"}</span>
                           </div>
-
-                          {/* Tampilkan PIC jika B2B */}
                           {selectedClient.type === "B2B" &&
-                            selectedClient.pics &&
-                            selectedClient.pics.length > 0 && (
+                            selectedClient.pics?.length > 0 && (
                               <div className="p-2 rounded bg-white border border-slate-200">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
-                                  Person in Charge (PIC)
+                                  Person in Charge
                                 </p>
                                 <div className="flex items-center gap-2">
                                   <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600">
@@ -707,7 +826,6 @@ export default function QuotationForm({
                   </div>
                 ) : (
                   <>
-                    {/* INPUT MANUAL TETAP SAMA */}
                     <FormField
                       control={form.control}
                       name="manualClientName"
@@ -787,12 +905,11 @@ export default function QuotationForm({
           </Card>
         </div>
 
-        {/* ... (ITEMS SECTION TETAP SAMA) ... */}
+        {/* ITEMS — pakai ItemRow yang sudah terisolasi */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Box className="w-5 h-5 text-muted-foreground" />
-              Items & Products
+          <CardHeader className="flex flex-row items-center justify-between border-b py-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Box className="w-4 h-4" /> Items & Products
             </CardTitle>
             <Button
               type="button"
@@ -800,7 +917,7 @@ export default function QuotationForm({
               size="sm"
               onClick={() =>
                 append({
-                  isManualProduct: false,
+                  isManualProduct: true,
                   productName: "",
                   quantity: 1,
                   unitPrice: 0,
@@ -810,165 +927,28 @@ export default function QuotationForm({
               <Plus className="h-4 w-4 mr-2" /> Add Item
             </Button>
           </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              {fields.map((field, index) => {
-                const isManual = form.getValues(
-                  `items.${index}.isManualProduct`,
-                );
-                return (
-                  <div
-                    key={field.id}
-                    className="grid grid-cols-12 gap-3 items-start border p-3 rounded-lg bg-slate-50/50">
-                    <div className="col-span-12 md:col-span-1 flex items-center justify-center pt-3">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.isManualProduct`}
-                        render={({ field }) => (
-                          <div className="flex flex-col items-center gap-1">
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              className="scale-75"
-                            />
-                            <span className="text-[10px] text-muted-foreground">
-                              {field.value ? "Manual" : "DB"}
-                            </span>
-                          </div>
-                        )}
-                      />
-                    </div>
-                    <div className="col-span-12 md:col-span-4">
-                      {isManual ? (
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.productName`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">
-                                Product Name
-                              </FormLabel>
-                              <FormControl>
-                                <Input {...field} placeholder="Item name" />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      ) : (
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.productId`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">
-                                Select Product
-                              </FormLabel>
-                              <Select
-                                onValueChange={(val) => {
-                                  field.onChange(val);
-                                  handleProductSelect(index, val);
-                                }}
-                                defaultValue={field.value}
-                                value={field.value}
-                                disabled={loadingData}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select product..." />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {products.map((p) => (
-                                    <SelectItem key={p.id} value={p.id}>
-                                      {p.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </FormItem>
-                          )}
-                        />
-                      )}
-                    </div>
-                    <div className="col-span-4 md:col-span-2">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.quantity`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-xs">Qty</FormLabel>
-                            <FormControl>
-                              <Input type="number" min={1} {...field} />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <div className="col-span-4 md:col-span-2">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.unitPrice`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-xs">
-                              Price (Rp)
-                            </FormLabel>
-                            <FormControl>
-                              <Input type="number" min={0} {...field} />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <div className="col-span-4 md:col-span-2">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.discount`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-xs">Disc (Rp)</FormLabel>
-                            <FormControl>
-                              <Input type="number" min={0} {...field} />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <div className="col-span-12 md:col-span-1 flex items-center justify-center pt-8">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => remove(index)}
-                        disabled={fields.length === 1}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+          <CardContent className="pt-4 space-y-3">
+            {fields.map((field, index) => (
+              <ItemRow
+                key={field.id}
+                index={index}
+                products={products}
+                form={form}
+                onRemove={() => remove(index)}
+                canRemove={fields.length > 1}
+              />
+            ))}
           </CardContent>
         </Card>
 
-        {/* === SUMMARY & NOTES (UPDATED WITH MULTI-SELECT) === */}
+        {/* NOTES & SUMMARY */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* BAGIAN NOTES BARU */}
-          <div className="space-y-6">
-            {/* 1. PUBLIC NOTES (Muncul di PDF) */}
-            {renderNoteSelector(
-              true,
-              "Notes to Client (Public)",
-              <FileText className="w-5 h-5 text-blue-600" />,
-            )}
-
-            {/* 2. INTERNAL NOTES (Hanya Tim) */}
-            {renderNoteSelector(
-              false,
-              "Internal Notes (Private)",
-              <Lock className="w-5 h-5 text-amber-600" />,
-            )}
-          </div>
+          {/* key memaksa remount saat initialData berubah — checkbox akan tercheck sesuai data */}
+          <NotesSection
+            key={notesSectionKey}
+            noteCategories={noteCategories}
+            initialNotes={initialNotes}
+          />
 
           <Card className="bg-slate-50 h-fit">
             <CardHeader>

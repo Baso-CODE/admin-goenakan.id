@@ -2,30 +2,38 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { ChevronDown, FileText, Lock } from "lucide-react";
 import React, { useState } from "react";
 
-interface NotesSectionProps {
-  noteCategories: any[];
-  onNotesChange: (notes: any[]) => void;
+// ============================================================
+// MODULE-LEVEL STORE — di luar React, tidak trigger render apapun
+// ============================================================
+let _notesStore: any[] = [];
+export function getNotesStore(): any[] {
+  return _notesStore;
+}
+export function resetNotesStore(): void {
+  _notesStore = [];
 }
 
+// ============================================================
+// COMPONENT
+// ============================================================
 export function QuotationNotesSection({
   noteCategories,
-  onNotesChange,
-}: NotesSectionProps) {
+}: {
+  noteCategories: any[];
+}) {
   const [selectedNotes, setSelectedNotes] = useState<any[]>([]);
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
-  console.log("NotesSection render");
+
   function toggleCat(catId: string) {
     setOpenCats((prev) => ({ ...prev, [catId]: !prev[catId] }));
   }
 
   function handleToggle(categoryId: string, content: string) {
-    // Hitung result dulu TANPA setState
     const next = selectedNotes.map((n) => ({
       ...n,
       contents: [...n.contents],
@@ -38,17 +46,14 @@ export function QuotationNotesSection({
     } else {
       const cat = next[idx];
       const ci = cat.contents.indexOf(content);
-      if (ci === -1) {
-        cat.contents.push(content);
-      } else {
-        cat.contents.splice(ci, 1);
-      }
+      if (ci === -1) cat.contents.push(content);
+      else cat.contents.splice(ci, 1);
       result =
         cat.contents.length === 0 ? next.filter((_, i) => i !== idx) : next;
     }
 
+    _notesStore = result;
     setSelectedNotes(result);
-    onNotesChange(result);
   }
 
   function isChecked(catId: string, content: string) {
@@ -119,9 +124,11 @@ export function QuotationNotesSection({
                               key={`${cat.id}-${i}`}
                               className="flex items-start space-x-2 border p-2 rounded-md bg-white hover:bg-slate-50 transition-colors cursor-pointer select-none"
                               onClick={() => handleToggle(cat.id, tpl.content)}>
-                              <Checkbox
+                              <input
+                                type="checkbox"
                                 checked={checked}
-                                className="mt-0.5 pointer-events-none"
+                                onChange={() => {}} // dikontrol via onClick div parent
+                                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 pointer-events-none"
                               />
                               <div className="grid gap-0.5 leading-none pointer-events-none">
                                 <span className="text-sm font-medium">
