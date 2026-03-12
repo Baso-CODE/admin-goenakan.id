@@ -6,14 +6,17 @@ import {
   Box,
   CalendarIcon,
   ChevronDown,
+  ImageIcon,
   Loader2,
   MapPin,
   Phone,
   Plus,
   Trash2,
   User,
+  UserCheck,
+  X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -66,6 +69,7 @@ const quotationSchema = z.object({
   status: z.enum(QUOTATION_STATUSES).default("DRAFT"),
   isManualClient: z.boolean().default(false),
   clientId: z.string().optional(),
+  picId: z.string().optional(),
   manualClientName: z.string().optional(),
   manualClientCompany: z.string().optional(),
   manualClientEmail: z.string().email().optional().or(z.literal("")),
@@ -89,6 +93,7 @@ const quotationSchema = z.object({
         quantity: z.coerce.number().min(1, "Min 1"),
         unitPrice: z.coerce.number().min(0),
         discount: z.coerce.number().min(0).default(0),
+        remarks: z.string().optional(),
       }),
     )
     .min(1, "Add at least one item"),
@@ -98,7 +103,6 @@ export type AddQuotationFormValues = z.infer<typeof quotationSchema>;
 
 // ============================================================
 // SUB-COMPONENT: ItemRow
-// form.watch hanya di dalam component ini — tidak bocor ke parent
 // ============================================================
 function ItemRow({
   index,
@@ -106,20 +110,37 @@ function ItemRow({
   form,
   onRemove,
   canRemove,
+  onImageChange,
+  imageFile,
 }: {
   index: number;
   products: ProductData[];
   form: any;
   onRemove: () => void;
   canRemove: boolean;
+  onImageChange: (index: number, file: File | null) => void;
+  imageFile: File | null;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isManualProduct = form.watch(`items.${index}.isManualProduct`);
 
+  useEffect(() => {
+    if (imageFile) {
+      const url = URL.createObjectURL(imageFile);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  }, [imageFile]);
+
   return (
-    <div className="border rounded-lg bg-white">
+    <div className="border rounded-lg bg-white shadow-sm">
+      {/* ROW UTAMA */}
       <div className="grid grid-cols-12 gap-2 items-center p-3">
-        {/* Switch Manual/DB */}
+        {/* Toggle Manual/DB */}
         <div className="col-span-1 flex flex-col items-center gap-1">
           <Switch
             checked={!!isManualProduct}
@@ -133,7 +154,7 @@ function ItemRow({
           </span>
         </div>
 
-        {/* Product */}
+        {/* Nama Produk */}
         <div className="col-span-4">
           {isManualProduct ? (
             <Input
@@ -170,29 +191,47 @@ function ItemRow({
 
         {/* Qty */}
         <div className="col-span-2">
-          <Input
-            type="number"
-            placeholder="Qty"
-            {...form.register(`items.${index}.quantity`)}
-          />
+          <div className="relative">
+            <Input
+              type="number"
+              placeholder="0"
+              className="pr-10"
+              {...form.register(`items.${index}.quantity`)}
+            />
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+              Qty
+            </span>
+          </div>
         </div>
 
         {/* Harga */}
         <div className="col-span-2">
-          <Input
-            type="number"
-            placeholder="Harga"
-            {...form.register(`items.${index}.unitPrice`)}
-          />
+          <div className="relative">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+              Rp
+            </span>
+            <Input
+              type="number"
+              placeholder="0"
+              className="pl-7"
+              {...form.register(`items.${index}.unitPrice`)}
+            />
+          </div>
         </div>
 
         {/* Diskon */}
         <div className="col-span-2">
-          <Input
-            type="number"
-            placeholder="Disc"
-            {...form.register(`items.${index}.discount`)}
-          />
+          <div className="relative">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+              Disc
+            </span>
+            <Input
+              type="number"
+              placeholder="0"
+              className="pl-9"
+              {...form.register(`items.${index}.discount`)}
+            />
+          </div>
         </div>
 
         {/* Actions */}
@@ -222,18 +261,82 @@ function ItemRow({
         </div>
       </div>
 
+      {/* EXPANDED SECTION */}
       {expanded && (
-        <div className="border-t bg-gray-50/50 px-4 pb-3 pt-2 rounded-b-lg">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
-            Product Specification
-          </label>
-          <Textarea
-            placeholder={
-              "Contoh:\nFabric: 100D Anti color moving fabric\nPrint: Full digital print\nShaft: 14mm black fiberglass shaft\nRibs: 4.0 and 5.0mm black fiberglass ribs\nHandle: Wooden handle, auto open manual close\nTips: Black plastic tips\nTop: Black plastic frosted top"
-            }
-            className="text-xs min-h-25 resize-none bg-white font-mono"
-            {...form.register(`items.${index}.description`)}
-          />
+        <div className="border-t bg-gray-50/50 px-4 pb-4 pt-3 rounded-b-lg space-y-4">
+          {/* Product Specification */}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+              Product Specification
+            </label>
+            <Textarea
+              placeholder={
+                "Contoh:\nFabric: 100D Anti color moving fabric\nPrint: Full digital print\nShaft: 14mm black fiberglass shaft\nRibs: 4.0 and 5.0mm black fiberglass ribs\nHandle: Wooden handle, auto open manual close\nTips: Black plastic tips\nTop: Black plastic frosted top"
+              }
+              className="text-xs min-h-[100px] resize-none bg-white font-mono"
+              {...form.register(`items.${index}.description`)}
+            />
+          </div>
+
+          {/* Remarks */}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+              Remarks / Catatan Item
+            </label>
+            <Input
+              placeholder="Contoh: Warna sesuai request client, konfirmasi ulang sebelum produksi..."
+              className="text-xs bg-white"
+              {...form.register(`items.${index}.remarks`)}
+            />
+          </div>
+
+          {/* Image Upload */}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+              Referensi Gambar (Opsional)
+            </label>
+            {!previewUrl ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-slate-200 rounded-lg p-4 flex flex-col items-center gap-2 text-slate-400 hover:border-blue-300 hover:text-blue-400 transition-colors bg-white cursor-pointer">
+                <ImageIcon className="w-6 h-6" />
+                <span className="text-xs">
+                  Klik untuk upload gambar referensi
+                </span>
+                <span className="text-[10px] text-slate-300">
+                  PNG, JPG, WEBP hingga 5MB
+                </span>
+              </button>
+            ) : (
+              <div className="relative w-fit">
+                <img
+                  src={previewUrl}
+                  alt="preview"
+                  className="h-28 w-28 object-cover rounded-lg border border-slate-200 shadow-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    onImageChange(index, null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 shadow">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onImageChange(index, file);
+              }}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -242,7 +345,6 @@ function ItemRow({
 
 // ============================================================
 // SUB-COMPONENT: OrderSummary
-// form.watch("items") hanya di sini — tidak bocor ke parent
 // ============================================================
 function OrderSummary({ form, isLoading }: { form: any; isLoading: boolean }) {
   const items = form.watch("items");
@@ -299,13 +401,12 @@ function OrderSummary({ form, isLoading }: { form: any; isLoading: boolean }) {
 
 // ============================================================
 // MAIN FORM
-// Tidak ada form.watch di sini kecuali isManualClient
 // ============================================================
 export default function QuotationAddForm({
   onSubmit,
   isLoading,
 }: {
-  onSubmit: (data: AddQuotationFormValues) => void;
+  onSubmit: (formData: FormData) => void;
   isLoading: boolean;
 }) {
   const [clients, setClients] = useState<ClientData[]>([]);
@@ -314,6 +415,7 @@ export default function QuotationAddForm({
   const [selectedClient, setSelectedClient] = useState<ClientData | null>(null);
   const [loadingMaster, setLoadingMaster] = useState(true);
   const [salesList, setSalesList] = useState<SalesData[]>([]);
+  const [itemImages, setItemImages] = useState<Record<number, File | null>>({});
 
   const form = useForm<AddQuotationFormValues>({
     resolver: zodResolver(quotationSchema) as Resolver<AddQuotationFormValues>,
@@ -321,7 +423,14 @@ export default function QuotationAddForm({
       date: new Date(),
       status: "DRAFT",
       salesId: "",
+      picId: "",
+      clientId: "",
       isManualClient: false,
+      manualClientName: "",
+      manualClientCompany: "",
+      manualClientEmail: "",
+      manualClientPhone: "",
+      manualClientAddress: "",
       items: [
         {
           isManualProduct: false,
@@ -329,6 +438,7 @@ export default function QuotationAddForm({
           quantity: 1,
           unitPrice: 0,
           discount: 0,
+          remarks: "",
         },
       ],
     },
@@ -339,15 +449,12 @@ export default function QuotationAddForm({
     name: "items",
   });
 
-  // Hanya watch isManualClient untuk toggle UI client
   const isManualClient = form.watch("isManualClient");
 
-  // Reset notes store saat component mount
   useEffect(() => {
     resetNotesStore();
   }, []);
 
-  // Fetch master data
   useEffect(() => {
     const fetchMaster = async () => {
       try {
@@ -376,13 +483,38 @@ export default function QuotationAddForm({
     fetchMaster();
   }, []);
 
+  const handleImageChange = (index: number, file: File | null) => {
+    setItemImages((prev) => ({ ...prev, [index]: file }));
+  };
+
   const handleFinalSubmit = (data: AddQuotationFormValues) => {
-    // Ambil notes dari module store — tidak ada state/props yang terlibat
-    const finalData = {
-      ...data,
-      notes: getNotesStore(),
+    const notes = getNotesStore();
+
+    // Semua data JSON dibungkus dalam satu field "data" — pola sama seperti sales
+    const jsonPayload = {
+      date: data.date,
+      status: data.status,
+      salesId: data.salesId || undefined,
+      clientId: data.clientId || undefined,
+      picId: data.picId || undefined,
+      manualClientName: data.manualClientName || undefined,
+      manualClientCompany: data.manualClientCompany || undefined,
+      manualClientEmail: data.manualClientEmail || undefined,
+      manualClientPhone: data.manualClientPhone || undefined,
+      manualClientAddress: data.manualClientAddress || undefined,
+      items: data.items,
+      notes: notes.length > 0 ? notes : undefined,
     };
-    onSubmit(finalData);
+
+    const formData = new FormData();
+    formData.append("data", JSON.stringify(jsonPayload));
+
+    // Append image per item dengan fieldname "items[N][image]"
+    Object.entries(itemImages).forEach(([idx, file]) => {
+      if (file) formData.append(`items[${idx}][image]`, file);
+    });
+
+    onSubmit(formData);
   };
 
   return (
@@ -462,7 +594,7 @@ export default function QuotationAddForm({
                     <FormLabel>PIC Sales</FormLabel>
                     <Select
                       onValueChange={field.onChange}
-                      value={field.value}
+                      value={field.value ?? ""}
                       disabled={loadingMaster}>
                       <FormControl>
                         <SelectTrigger className="bg-white">
@@ -512,6 +644,7 @@ export default function QuotationAddForm({
                           field.onChange(val);
                           setSelectedClient(null);
                           form.setValue("clientId", "");
+                          form.setValue("picId", "");
                         }}
                       />
                     </FormControl>
@@ -533,9 +666,12 @@ export default function QuotationAddForm({
                             onValueChange={(val) => {
                               field.onChange(val);
                               const client = clients.find((c) => c.id === val);
-                              if (client) setSelectedClient(client);
+                              if (client) {
+                                setSelectedClient(client);
+                                form.setValue("picId", "");
+                              }
                             }}
-                            value={field.value}
+                            value={field.value ?? ""}
                             disabled={loadingMaster}>
                             <FormControl>
                               <SelectTrigger className="bg-white">
@@ -560,67 +696,140 @@ export default function QuotationAddForm({
                         </FormItem>
                       )}
                     />
+
                     {selectedClient && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 animate-in fade-in slide-in-from-top-1">
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              Detail Client
-                            </p>
-                            <h3 className="text-lg font-bold text-blue-600">
-                              {selectedClient.name}
-                            </h3>
-                            <div className="flex gap-2 mt-1">
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px]">
-                                {selectedClient.custCode}
-                              </Badge>
-                              <Badge
-                                className={cn(
-                                  "text-[10px]",
-                                  selectedClient.type === "B2B"
-                                    ? "bg-purple-100 text-purple-700 hover:bg-purple-100"
-                                    : "bg-green-100 text-green-700 hover:bg-green-100",
-                                )}>
-                                {selectedClient.type}
-                              </Badge>
+                      <div className="rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 animate-in fade-in slide-in-from-top-1 overflow-hidden">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                          <div className="space-y-3">
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                Detail Client
+                              </p>
+                              <h3 className="text-lg font-bold text-blue-600">
+                                {selectedClient.name}
+                              </h3>
+                              <div className="flex gap-2 mt-1">
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px]">
+                                  {selectedClient.custCode}
+                                </Badge>
+                                <Badge
+                                  className={cn(
+                                    "text-[10px]",
+                                    selectedClient.type === "B2B"
+                                      ? "bg-purple-100 text-purple-700 hover:bg-purple-100"
+                                      : "bg-green-100 text-green-700 hover:bg-green-100",
+                                  )}>
+                                  {selectedClient.type}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2 text-sm text-slate-600">
+                              <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-slate-400" />
+                              <span>{selectedClient.address}</span>
                             </div>
                           </div>
-                          <div className="flex items-start gap-2 text-sm text-slate-600">
-                            <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-slate-400" />
-                            <span>{selectedClient.address}</span>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                              <Phone className="w-4 h-4 shrink-0 text-slate-400" />
+                              <span>{selectedClient.phone || "-"}</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-sm text-slate-600">
-                            <Phone className="w-4 h-4 shrink-0 text-slate-400" />
-                            <span>{selectedClient.phone || "-"}</span>
-                          </div>
-                          {selectedClient.type === "B2B" &&
-                            selectedClient.pics &&
-                            selectedClient.pics.length > 0 && (
-                              <div className="p-2 rounded bg-white border border-slate-200">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
-                                  Person in Charge (PIC)
-                                </p>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600">
-                                    {selectedClient.pics[0].name.charAt(0)}
-                                  </div>
-                                  <div className="text-xs">
-                                    <p className="font-semibold text-slate-800">
-                                      {selectedClient.pics[0].name}
-                                    </p>
-                                    <p className="text-muted-foreground text-[10px]">
-                                      {selectedClient.pics[0].phone ||
-                                        selectedClient.pics[0].email}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                        </div>
+
+                        {selectedClient.type === "B2B" &&
+                          selectedClient.pics &&
+                          selectedClient.pics.length > 0 && (
+                            <div className="border-t border-slate-200 bg-white px-4 py-3">
+                              <FormField
+                                control={form.control}
+                                name="picId"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                      <UserCheck className="w-3.5 h-3.5" />
+                                      Person in Charge (PIC)
+                                    </FormLabel>
+                                    <Select
+                                      onValueChange={field.onChange}
+                                      value={field.value ?? ""}>
+                                      <FormControl>
+                                        <SelectTrigger className="bg-white mt-1.5">
+                                          <SelectValue placeholder="Pilih PIC Client..." />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {selectedClient.pics.map((pic) => (
+                                          <SelectItem
+                                            key={pic.id}
+                                            value={pic.id}>
+                                            <div className="flex items-center gap-2">
+                                              <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600 shrink-0">
+                                                {pic.name.charAt(0)}
+                                              </div>
+                                              <div className="flex flex-col">
+                                                <span className="text-sm font-medium">
+                                                  {pic.name}
+                                                </span>
+                                                {(pic.position ||
+                                                  pic.phone ||
+                                                  pic.email) && (
+                                                  <span className="text-[10px] text-muted-foreground">
+                                                    {pic.position
+                                                      ? pic.position
+                                                      : pic.phone || pic.email}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              {form.watch("picId") &&
+                                (() => {
+                                  const pic = selectedClient.pics.find(
+                                    (p) => p.id === form.watch("picId"),
+                                  );
+                                  if (!pic) return null;
+                                  return (
+                                    <div className="mt-2 flex items-center gap-3 p-2 rounded-md bg-blue-50 border border-blue-100">
+                                      <div className="w-8 h-8 rounded-full bg-blue-200 flex items-center justify-center text-sm font-bold text-blue-700 shrink-0">
+                                        {pic.name.charAt(0)}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-slate-800 truncate">
+                                          {pic.name}
+                                        </p>
+                                        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                                          {pic.position && (
+                                            <span className="text-[11px] text-slate-500">
+                                              {pic.position}
+                                            </span>
+                                          )}
+                                          {pic.phone && (
+                                            <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                                              <Phone className="w-3 h-3" />
+                                              {pic.phone}
+                                            </span>
+                                          )}
+                                          {pic.email && (
+                                            <span className="text-[11px] text-slate-500 truncate">
+                                              {pic.email}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>
@@ -715,6 +924,21 @@ export default function QuotationAddForm({
             <CardTitle className="text-base flex items-center gap-2">
               <Box className="w-4 h-4" /> Produk & Jasa
             </CardTitle>
+            {/* Legend */}
+            <div className="hidden md:flex items-center gap-4 text-[11px] text-muted-foreground mr-auto ml-4">
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-slate-600">Qty</span> =
+                Jumlah
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-slate-600">Rp</span> = Harga
+                Satuan
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-slate-600">Disc</span> =
+                Diskon (Rp)
+              </span>
+            </div>
             <Button
               type="button"
               size="sm"
@@ -726,6 +950,7 @@ export default function QuotationAddForm({
                   quantity: 1,
                   unitPrice: 0,
                   discount: 0,
+                  remarks: "",
                 })
               }>
               <Plus className="w-4 h-4 mr-1" /> Tambah Baris
@@ -740,6 +965,8 @@ export default function QuotationAddForm({
                 form={form}
                 onRemove={() => remove(index)}
                 canRemove={fields.length > 1}
+                onImageChange={handleImageChange}
+                imageFile={itemImages[index] ?? null}
               />
             ))}
           </CardContent>
