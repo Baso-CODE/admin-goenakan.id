@@ -273,7 +273,7 @@ function ItemRow({
               placeholder={
                 "Contoh:\nFabric: 100D Anti color moving fabric\nPrint: Full digital print\nShaft: 14mm black fiberglass shaft\nRibs: 4.0 and 5.0mm black fiberglass ribs\nHandle: Wooden handle, auto open manual close\nTips: Black plastic tips\nTop: Black plastic frosted top"
               }
-              className="text-xs min-h-[100px] resize-none bg-white font-mono"
+              className="text-xs min-h-25 resize-none bg-white font-mono"
               {...form.register(`items.${index}.description`)}
             />
           </div>

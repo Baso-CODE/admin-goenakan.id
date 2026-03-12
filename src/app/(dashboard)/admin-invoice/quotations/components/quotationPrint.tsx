@@ -12,7 +12,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { apiUrl } from "@/helper/apiurl";
 
-// Helper Format Uang (Bisa disesuaikan jika ingin multi-currency)
 const formatCurrency = (amount: string | number) => {
   const numericAmount = Number(amount) || 0;
   return new Intl.NumberFormat("id-ID", {
@@ -27,12 +26,9 @@ export default function QuotationPrint() {
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   const [data, setData] = useState<any>(null);
-  console.log("ini adalah data", data);
-
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // FETCH DATA QUOTATION
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -47,7 +43,6 @@ export default function QuotationPrint() {
         if (!res.ok) throw new Error("Gagal mengambil data quotation");
 
         const result = await res.json();
-        // Tergantung response API, jika dibungkus "data", gunakan result.data
         setData(result.data || result);
       } catch (error) {
         console.error(error);
@@ -60,7 +55,6 @@ export default function QuotationPrint() {
     if (quotationId) fetchData();
   }, [quotationId]);
 
-  // === FUNCTION DOWNLOAD PDF ===
   const handleDownloadPDF = async () => {
     const element = invoiceRef.current;
     if (!element) return;
@@ -79,8 +73,6 @@ export default function QuotationPrint() {
       const pdf = new jsPDF("p", "mm", "a4");
 
       const pdfWidth = 210;
-      const pdfHeight = 297;
-
       const imgProps = pdf.getImageProperties(imgData);
       const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
@@ -109,16 +101,15 @@ export default function QuotationPrint() {
   if (!data) return <div>Data tidak ditemukan</div>;
 
   // =========================================================
-  // PREPARE DYNAMIC VARIABLES DARI API
+  // PREPARE VARIABLES
   // =========================================================
 
-  // 1. Sales Data
-  const salesName = data.order?.sales?.name || "Goenakan Admin";
-  const salesPhone = data.order?.sales?.phone || "+62 888-0370-1081";
-  const salesEmail = "goenakan.id@gmail.com"; // Email general atau opsional dari data user
-  const signatureUrl = data.order?.sales?.signatureUrl;
+  // ✅ Sales langsung dari quotation (bukan dari order)
+  const salesName = data.sales?.name || "Goenakan Admin";
+  const salesPhone = data.sales?.phone || "+62 888-0370-1081";
+  const salesEmail = "goenakan.id@gmail.com";
+  const signatureUrl = data.sales?.signatureUrl;
 
-  // 2. Client Data (Bisa dari B2B, B2C, atau Input Manual)
   let clientCompany = data.manualClientCompany || data.manualClientName || "-";
   let clientDept = "-";
   let clientPic = data.manualClientName || "-";
@@ -128,8 +119,10 @@ export default function QuotationPrint() {
     clientCompany = data.client.b2b.companyName;
     clientDept = data.client.b2b.department?.name || "-";
     clientAddress = data.client.b2b.fullAddress || clientAddress;
-    if (data.order?.pic) {
-      clientPic = `${data.order.pic.prefix ? data.order.pic.prefix + " " : ""}${data.order.pic.name}`;
+
+    if (data.pic) {
+      const prefix = data.pic.prefix ? `${data.pic.prefix} ` : "";
+      clientPic = `${prefix}${data.pic.name}`;
     }
   } else if (data.client?.b2c) {
     clientCompany = data.client.b2c.name;
@@ -168,9 +161,7 @@ export default function QuotationPrint() {
             flexDirection: "column",
           }}>
           <div className="flex-1">
-            {/* ========================================================= */}
-            {/* 1. KOP SURAT (IMAGE FULL WIDTH) */}
-            {/* ========================================================= */}
+            {/* 1. KOP SURAT */}
             <div className="w-full mb-8 border-b-2 border-gray-800 pb-4">
               <img
                 src="/images/quotation-header.png"
@@ -180,11 +171,9 @@ export default function QuotationPrint() {
               />
             </div>
 
-            {/* ========================================================= */}
-            {/* 2. HEADER INFO & TITLE */}
-            {/* ========================================================= */}
+            {/* 2. HEADER INFO */}
             <div className="flex justify-between items-start mb-6 text-[12px] text-gray-900">
-              <div className="flex flex-col ">
+              <div className="flex flex-col">
                 <table className="text-[12px] text-left">
                   <tbody>
                     <tr>
@@ -202,7 +191,7 @@ export default function QuotationPrint() {
                     <tr>
                       <td className="py-0.5 pr-4 align-top">Qtn Date</td>
                       <td className="py-0.5 align-top font-medium">
-                        :
+                        :{" "}
                         {data.date
                           ? format(new Date(data.date), "dd MMMM yyyy", {
                               locale: idLocale,
@@ -227,9 +216,7 @@ export default function QuotationPrint() {
               </div>
             </div>
 
-            {/* ========================================================= */}
             {/* 3. CUSTOMER INFO */}
-            {/* ========================================================= */}
             <div className="mb-8 w-[60%] border border-gray-300 p-4 rounded-sm bg-gray-50/50">
               <h2 className="text-[13px] font-bold text-gray-500 uppercase tracking-wide border-b border-gray-200 pb-1 mb-2">
                 Customer
@@ -257,9 +244,7 @@ export default function QuotationPrint() {
               </table>
             </div>
 
-            {/* ========================================================= */}
             {/* 4. PRODUCT TABLE */}
-            {/* ========================================================= */}
             <div className="mb-8">
               <table className="w-full border-collapse border border-[#94a3b8]">
                 <thead>
@@ -278,7 +263,7 @@ export default function QuotationPrint() {
                 </thead>
                 <tbody>
                   {data.items?.map((item: any) => {
-                    const imageUrl = item.product?.images?.[0]?.url;
+                    const imageUrl = item.imageUrl;
 
                     return (
                       <tr key={item.id} className="align-top text-[12px]">
@@ -304,10 +289,6 @@ export default function QuotationPrint() {
                             <div className="text-[11px] leading-relaxed whitespace-pre-line">
                               {item.description}
                             </div>
-                          ) : item.product?.description ? (
-                            <div className="text-[11px] leading-relaxed whitespace-pre-line text-gray-500">
-                              {item.product.description}
-                            </div>
                           ) : (
                             <span className="text-gray-400 italic text-[10px]">
                               -
@@ -327,9 +308,7 @@ export default function QuotationPrint() {
               </table>
             </div>
 
-            {/* ========================================================= */}
-            {/* 5. NOTES & TERMS */}
-            {/* ========================================================= */}
+            {/* 5. NOTES */}
             <div className="mb-10">
               <div className="font-bold text-[13px] uppercase mb-2 text-gray-800 border-b border-gray-800 inline-block pb-0.5">
                 Notes
@@ -350,17 +329,13 @@ export default function QuotationPrint() {
             </div>
           </div>
 
-          {/* ========================================================= */}
-          {/* 6. FOOTER (Tanda Tangan) */}
-          {/* ========================================================= */}
+          {/* 6. FOOTER */}
           <div className="mt-auto break-inside-avoid pt-4">
             <div className="flex justify-end text-center px-4">
               <div className="flex flex-col items-center">
                 <div className="mb-4 text-[12px] font-medium">
                   Best Regards,
                 </div>
-
-                {/* Space for Signature */}
                 <div className="h-20 w-32 flex items-center justify-center -mb-2">
                   {signatureUrl ? (
                     <img
@@ -373,7 +348,6 @@ export default function QuotationPrint() {
                     <div className="h-16 w-full"></div>
                   )}
                 </div>
-
                 <div className="font-bold text-[12px] underline mt-1">
                   {salesName}
                 </div>
