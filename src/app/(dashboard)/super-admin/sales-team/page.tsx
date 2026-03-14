@@ -468,7 +468,8 @@ const Sales = () => {
                         {formatDate(sale.createdAt, { style: "relative" })}
                       </TableCell>
                       <TableCell className="text-center space-x-2">
-                        <Link href={`/super-admin/sales/update/${sale.id}`}>
+                        <Link
+                          href={`/super-admin/sales-team/update/${sale.id}`}>
                           <Button
                             variant="outline"
                             size="sm"
@@ -476,7 +477,8 @@ const Sales = () => {
                             Edit
                           </Button>
                         </Link>
-                        <Link href={`/super-admin/sales/detail/${sale.id}`}>
+                        <Link
+                          href={`/super-admin/sales-team/detail/${sale.id}`}>
                           <Button
                             variant="secondary"
                             size="sm"
