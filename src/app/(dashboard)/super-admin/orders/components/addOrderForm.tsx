@@ -150,6 +150,9 @@ export default function AddOrderForm() {
   const [generatingPo, setGeneratingPo] = useState(false);
 
   const [clientOpen, setClientOpen] = useState(false);
+  const [vendorOpen, setVendorOpen] = useState(false);
+  const [vendorSearch, setVendorSearch] = useState("");
+
   // Watchers
   const selectedClientId = watch("clientId");
 
@@ -570,55 +573,113 @@ export default function AddOrderForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Vendors (Multiple)</FormLabel>
-                    <Select
-                      onValueChange={(val) => {
-                        const current = field.value || [];
-                        if (!current.includes(val)) {
-                          field.onChange([...current, val]);
-                        }
-                      }}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Add a vendor..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {vendors.map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {v.companyName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
 
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {field.value?.map((id) => {
-                        const vendor = vendors.find((v) => v.id === id);
-                        if (!vendor) return null;
-                        return (
-                          <div
-                            key={id}
-                            className="flex items-center gap-2 bg-white border px-3 py-1 rounded-full text-sm shadow-sm">
-                            <span>{vendor.companyName}</span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                field.onChange(
-                                  field.value.filter((vId) => vId !== id),
+                    {/* ✅ Searchable combobox — sama polanya dengan clientId */}
+                    <Popover open={vendorOpen} onOpenChange={setVendorOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="w-full justify-between font-normal">
+                            <span className="text-muted-foreground">
+                              {field.value?.length > 0
+                                ? `${field.value.length} vendor dipilih`
+                                : "Cari & tambah vendor..."}
+                            </span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput
+                            placeholder="Cari nama vendor..."
+                            value={vendorSearch}
+                            onValueChange={setVendorSearch}
+                          />
+                          <CommandList>
+                            <CommandEmpty>Vendor tidak ditemukan.</CommandEmpty>
+                            <CommandGroup>
+                              {vendors
+                                .filter((v) =>
+                                  v.companyName
+                                    .toLowerCase()
+                                    .includes(vendorSearch.toLowerCase()),
                                 )
-                              }
-                              className="text-red-500 hover:text-red-700 rounded-full p-0.5">
-                              <XIcon className="w-3 h-3" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                      {field.value?.length === 0 && (
-                        <p className="text-sm text-gray-400 italic">
-                          No vendors selected.
-                        </p>
-                      )}
-                    </div>
+                                .map((v) => {
+                                  const isSelected = field.value?.includes(
+                                    v.id,
+                                  );
+                                  return (
+                                    <CommandItem
+                                      key={v.id}
+                                      value={`${v.companyName}-${v.id}`}
+                                      onSelect={() => {
+                                        const current = field.value || [];
+                                        if (isSelected) {
+                                          // Deselect jika sudah dipilih
+                                          field.onChange(
+                                            current.filter((id) => id !== v.id),
+                                          );
+                                        } else {
+                                          // Select
+                                          field.onChange([...current, v.id]);
+                                        }
+                                      }}>
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          isSelected
+                                            ? "opacity-100"
+                                            : "opacity-0",
+                                        )}
+                                      />
+                                      {v.companyName}
+                                    </CommandItem>
+                                  );
+                                })}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* ✅ Tags vendor yang sudah dipilih */}
+                    {field.value?.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {field.value.map((id) => {
+                          const vendor = vendors.find((v) => v.id === id);
+                          if (!vendor) return null;
+                          return (
+                            <div
+                              key={id}
+                              className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-full text-sm shadow-sm">
+                              <span className="text-slate-700">
+                                {vendor.companyName}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  field.onChange(
+                                    field.value.filter((vId) => vId !== id),
+                                  )
+                                }
+                                className="text-slate-400 hover:text-red-500 transition-colors rounded-full">
+                                <XIcon className="w-3 h-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {field.value?.length === 0 && (
+                      <p className="text-sm text-gray-400 italic mt-1">
+                        Belum ada vendor yang dipilih.
+                      </p>
+                    )}
+
                     <FormMessage />
                   </FormItem>
                 )}

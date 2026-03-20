@@ -133,16 +133,7 @@ export function GenerateInvoiceDialog({
     (!isSplitMode && !invoiceCategory) ||
     (isSplitMode && selectedItems.length === 0);
   // Tambah sementara sebelum filter
-  console.log(
-    "Products:",
-    order.products.map((p) => ({
-      name: p.productName,
-      billedAmount: p.billedAmount,
-      remainingBilledAmount: p.remainingBilledAmount,
-      unitPrice: p.unitPrice,
-      quantity: p.quantity,
-    })),
-  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">

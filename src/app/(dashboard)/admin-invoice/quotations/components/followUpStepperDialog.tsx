@@ -111,7 +111,6 @@ export function FollowUpStepperDialog({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [expandedStep, setExpandedStep] = useState<number>(0);
-  console.log("ini adalah data dari", existingFollowUps);
 
   const existingFUCount = existingFollowUps.filter((f) =>
     f.name?.toLowerCase().startsWith("follow up"),

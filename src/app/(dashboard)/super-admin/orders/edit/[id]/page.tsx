@@ -128,7 +128,7 @@ export default function EditOrderForm() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
-    []
+    [],
   ); // State untuk channel
 
   const [loading, setLoading] = useState(true);
@@ -163,7 +163,7 @@ export default function EditOrderForm() {
         // Populate Form
         if (orderData) {
           const currentClient = c.find(
-            (cli: Client) => cli.id === orderData.clientId
+            (cli: Client) => cli.id === orderData.clientId,
           );
 
           // Backend service Anda sudah return 'formValues' yang rapi (vendorIds sudah array string)
@@ -180,7 +180,7 @@ export default function EditOrderForm() {
           // Logic tambahan: Jika ada PIC yang tersimpan, update no HP ke HP PIC
           if (orderData.clientB2BPICId && currentClient?.type === "B2B") {
             const selectedPic = currentClient.pics?.find(
-              (p: PIC) => p.id === orderData.clientB2BPICId
+              (p: PIC) => p.id === orderData.clientB2BPICId,
             );
             if (selectedPic?.phone) {
               setValue("phone", selectedPic.phone);
@@ -363,11 +363,11 @@ export default function EditOrderForm() {
                             role="combobox"
                             className={cn(
                               "w-full justify-between",
-                              !field.value && "text-muted-foreground"
+                              !field.value && "text-muted-foreground",
                             )}>
                             {field.value
                               ? clients.find(
-                                  (client) => client.id === field.value
+                                  (client) => client.id === field.value,
                                 )?.name
                               : "Select client..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -393,7 +393,7 @@ export default function EditOrderForm() {
                                     if (client.purchaseChannelId) {
                                       form.setValue(
                                         "purchaseChannelId",
-                                        client.purchaseChannelId
+                                        client.purchaseChannelId,
                                       );
                                     } else {
                                       form.setValue("purchaseChannelId", "");
@@ -406,7 +406,7 @@ export default function EditOrderForm() {
                                       "mr-2 h-4 w-4",
                                       client.id === field.value
                                         ? "opacity-100"
-                                        : "opacity-0"
+                                        : "opacity-0",
                                     )}
                                   />
                                   {client.name}
@@ -592,7 +592,7 @@ export default function EditOrderForm() {
                               type="button"
                               onClick={() =>
                                 field.onChange(
-                                  field.value.filter((vId) => vId !== id)
+                                  field.value.filter((vId) => vId !== id),
                                 )
                               }
                               className="text-red-500 hover:text-red-700 rounded-full p-0.5">
@@ -649,7 +649,7 @@ export default function EditOrderForm() {
                 {fields.map((field, index) => {
                   const currentProductId = watch(`products.${index}.productId`);
                   const selectedProduct = products.find(
-                    (p) => p.id === currentProductId
+                    (p) => p.id === currentProductId,
                   );
                   const isCustomProduct = selectedProduct?.isCustom;
                   const subtotal =
@@ -673,20 +673,20 @@ export default function EditOrderForm() {
                                     field.onChange(val);
                                     form.setValue(
                                       `products.${index}.variantId`,
-                                      ""
+                                      "",
                                     );
                                     const prod = products.find(
-                                      (p) => p.id === val
+                                      (p) => p.id === val,
                                     );
                                     if (prod && !prod.isCustom) {
                                       form.setValue(
                                         `products.${index}.price`,
-                                        prod.basePrice
+                                        prod.basePrice,
                                       );
                                     } else {
                                       form.setValue(
                                         `products.${index}.price`,
-                                        0
+                                        0,
                                       );
                                     }
                                   }}
@@ -728,12 +728,12 @@ export default function EditOrderForm() {
                                       field.onChange(val);
                                       const variant =
                                         selectedProduct?.productVariants.find(
-                                          (v) => v.id === val
+                                          (v) => v.id === val,
                                         );
                                       if (variant)
                                         form.setValue(
                                           `products.${index}.price`,
-                                          Number(variant.price)
+                                          Number(variant.price),
                                         );
                                     }}
                                     value={field.value}>
@@ -748,7 +748,7 @@ export default function EditOrderForm() {
                                           <SelectItem key={v.id} value={v.id}>
                                             {v.variantName}
                                           </SelectItem>
-                                        )
+                                        ),
                                       )}
                                     </SelectContent>
                                   </Select>
@@ -796,11 +796,17 @@ export default function EditOrderForm() {
                                     </span>
                                     <Input
                                       type="number"
+                                      min={0}
                                       {...field}
+                                      onChange={(e) => {
+                                        const val = e.target.valueAsNumber;
+                                        field.onChange(isNaN(val) ? 0 : val);
+                                      }}
                                       className="pl-9 text-right"
                                     />
                                   </div>
                                 </FormControl>
+                                <FormMessage />
                               </FormItem>
                             )}
                           />
