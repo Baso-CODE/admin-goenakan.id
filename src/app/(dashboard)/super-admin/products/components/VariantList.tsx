@@ -31,6 +31,10 @@ interface VariantListProps {
     price: number;
     isFeatured?: boolean;
     altText?: string;
+    weight?: number;
+    width?: number;
+    height?: number;
+    length?: number;
   }[];
   onUpdateVariantMeta: (index: number, field: string, value: any) => void;
   onChangeMeta: (filesMap: File[][]) => void;
@@ -133,7 +137,7 @@ export function VariantList({
   onChangeMeta,
 }: VariantListProps) {
   const [variantStates, setVariantStates] = useState<VariantState[]>(() =>
-    combinations.map((_, idx) => ({ variantIndex: idx, images: [] }))
+    combinations.map((_, idx) => ({ variantIndex: idx, images: [] })),
   );
 
   useEffect(() => {
@@ -204,7 +208,7 @@ export function VariantList({
   const handleUpdateImageMeta = (
     variantIdx: number,
     tempId: string,
-    updates: Partial<ImageMeta>
+    updates: Partial<ImageMeta>,
   ) => {
     setVariantStates((prev) =>
       prev.map((v) => {
@@ -212,10 +216,10 @@ export function VariantList({
         return {
           ...v,
           images: v.images.map((img) =>
-            img.tempId === tempId ? { ...img, ...updates } : img
+            img.tempId === tempId ? { ...img, ...updates } : img,
           ),
         };
-      })
+      }),
     );
   };
 
@@ -230,7 +234,7 @@ export function VariantList({
             isFeatured: img.tempId === tempId,
           })),
         };
-      })
+      }),
     );
   };
 
@@ -267,7 +271,8 @@ export function VariantList({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-              <div className="md:col-span-1 bg-white p-4 rounded-lg border shadow-sm">
+              {/* 🔥 MODIFIKASI: Kolom Kiri (Price & Dimensi) */}
+              <div className="md:col-span-1 bg-white p-4 rounded-lg border shadow-sm space-y-5">
                 <div className="space-y-2">
                   <Label className="text-xs font-bold text-gray-500 uppercase">
                     Variant Price (Rp)
@@ -286,8 +291,102 @@ export function VariantList({
                     Overrides Base Price.
                   </p>
                 </div>
+
+                {/* 🔥 TAMBAHAN: Form Dimensi & Berat */}
+                <div className="pt-4 border-t border-gray-100 space-y-3">
+                  <Label className="text-xs font-bold text-gray-500 uppercase">
+                    Dimensi & Berat
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground font-semibold">
+                        Berat (gram)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={meta?.weight ?? ""}
+                        onChange={(e) =>
+                          onUpdateVariantMeta(
+                            idx,
+                            "weight",
+                            e.target.value
+                              ? parseFloat(e.target.value)
+                              : undefined,
+                          )
+                        }
+                        className="h-8 text-xs bg-gray-50"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground font-semibold">
+                        Panjang (cm)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={meta?.length ?? ""}
+                        onChange={(e) =>
+                          onUpdateVariantMeta(
+                            idx,
+                            "length",
+                            e.target.value
+                              ? parseFloat(e.target.value)
+                              : undefined,
+                          )
+                        }
+                        className="h-8 text-xs bg-gray-50"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground font-semibold">
+                        Lebar (cm)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={meta?.width ?? ""}
+                        onChange={(e) =>
+                          onUpdateVariantMeta(
+                            idx,
+                            "width",
+                            e.target.value
+                              ? parseFloat(e.target.value)
+                              : undefined,
+                          )
+                        }
+                        className="h-8 text-xs bg-gray-50"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground font-semibold">
+                        Tinggi (cm)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={meta?.height ?? ""}
+                        onChange={(e) =>
+                          onUpdateVariantMeta(
+                            idx,
+                            "height",
+                            e.target.value
+                              ? parseFloat(e.target.value)
+                              : undefined,
+                          )
+                        }
+                        className="h-8 text-xs bg-gray-50"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
+              {/* Kolom Kanan (Images) */}
               <div className="md:col-span-2 space-y-4">
                 <Button
                   type="button"
@@ -335,9 +434,7 @@ export function VariantList({
                         </span>
                       )}
 
-                      {/* === UPDATE HOVER OVERLAY DISINI === */}
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300">
-                        {/* 1. Tombol Delete (Pojok Kanan Atas) */}
                         <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                           <button
                             type="button"
@@ -351,7 +448,6 @@ export function VariantList({
                           </button>
                         </div>
 
-                        {/* 2. Ikon Pencil (Tengah - Penanda Edit) */}
                         <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                           <div className="bg-white/20 backdrop-blur-sm p-2 rounded-full border border-white/50 text-white mb-1">
                             <Pencil className="w-5 h-5" />
@@ -361,7 +457,6 @@ export function VariantList({
                           </span>
                         </div>
                       </div>
-                      {/* === END OVERLAY === */}
                     </div>
                   ))}
                 </div>
@@ -379,7 +474,7 @@ export function VariantList({
             handleUpdateImageMeta(
               modalData.variantIdx,
               modalData.tempId,
-              updates
+              updates,
             )
           }
           onSetFeatured={(checked) =>

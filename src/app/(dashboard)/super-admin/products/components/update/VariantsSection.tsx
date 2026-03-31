@@ -38,10 +38,14 @@ const VariantSchema = z.object({
       variantName: z.string().min(1, "Name is required"),
       sku: z.string().optional(),
       price: z.coerce.number().min(0, "Price must be non-negative"),
+      weight: z.coerce.number().min(0).optional().nullable(),
+      width: z.coerce.number().min(0).optional().nullable(),
+      height: z.coerce.number().min(0).optional().nullable(),
+      length: z.coerce.number().min(0).optional().nullable(),
       _isDeleted: z.boolean().optional(),
       attributeValueIds: z.array(z.string()).optional(), // Penting untuk update
       images: z.array(ImageSchema).optional(),
-    })
+    }),
   ),
 });
 
@@ -84,6 +88,10 @@ export default function FormUpdateVariants({
           sku: v.sku ?? "",
           price: Number(v.price) ?? 0,
           _isDeleted: false,
+          weight: v.weight ? Number(v.weight) : undefined,
+          width: v.width ? Number(v.width) : undefined,
+          height: v.height ? Number(v.height) : undefined,
+          length: v.length ? Number(v.length) : undefined,
           // Pastikan attributeValueIds dimuat dari relasi
           attributeValueIds:
             v.attributeValues?.map((av: any) => av.attributeValueId) ?? [],
@@ -119,6 +127,10 @@ export default function FormUpdateVariants({
       variantName: "",
       sku: "",
       price: 0,
+      weight: undefined,
+      width: undefined,
+      height: undefined,
+      length: undefined,
       _isDeleted: false,
       images: [],
     });
@@ -156,7 +168,7 @@ export default function FormUpdateVariants({
     if (img?.id) {
       form.setValue(
         `variants.${variantIndex}.images.${imgIndex}._isDeleted`,
-        true
+        true,
       );
     } else {
       const imgs = form.getValues(`variants.${variantIndex}.images`);
@@ -299,6 +311,121 @@ export default function FormUpdateVariants({
                     />
                   </div>
 
+                  <div className="pt-4 border-t border-gray-200">
+                    <FormLabel className="mb-3 block text-gray-700">
+                      Dimensi & Berat (Opsional)
+                    </FormLabel>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <FormField
+                        control={form.control}
+                        name={`variants.${index}.weight`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs text-gray-500">
+                              Berat (gram)
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={(field.value as number) ?? ""}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    e.target.value === ""
+                                      ? null
+                                      : parseFloat(e.target.value),
+                                  )
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`variants.${index}.length`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs text-gray-500">
+                              Panjang (cm)
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={(field.value as number) ?? ""}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    e.target.value === ""
+                                      ? null
+                                      : parseFloat(e.target.value),
+                                  )
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`variants.${index}.width`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs text-gray-500">
+                              Lebar (cm)
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={(field.value as number) ?? ""}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    e.target.value === ""
+                                      ? null
+                                      : parseFloat(e.target.value),
+                                  )
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`variants.${index}.height`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs text-gray-500">
+                              Tinggi (cm)
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={(field.value as number) ?? ""}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    e.target.value === ""
+                                      ? null
+                                      : parseFloat(e.target.value),
+                                  )
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
                   {/* IMAGE SECTION */}
                   <div className="space-y-4 pt-4 border-t border-gray-200">
                     <div className="text-sm font-semibold flex items-center gap-2">
