@@ -493,6 +493,7 @@ export default function QuotationAddForm({
     // Semua data JSON dibungkus dalam satu field "data" — pola sama seperti sales
     const jsonPayload = {
       date: data.date,
+      validUntil: data.validUntil || undefined,
       status: data.status,
       salesId: data.salesId || undefined,
       clientId: data.clientId || undefined,
@@ -615,6 +616,49 @@ export default function QuotationAddForm({
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="validUntil"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Berlaku Hingga</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "justify-start font-normal",
+                            !field.value && "text-muted-foreground",
+                          )}>
+                          {field.value ? (
+                            format(field.value, "PPP")
+                          ) : (
+                            <span>Pilih Tanggal (Opsional)</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date < new Date()}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {field.value && (
+                      <button
+                        type="button"
+                        onClick={() => field.onChange(undefined)}
+                        className="text-[11px] text-red-400 hover:text-red-600 text-left">
+                        Hapus tanggal
+                      </button>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

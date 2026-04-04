@@ -110,6 +110,7 @@ export default function QuotationPrint() {
   const salesEmail = "goenakan.id@gmail.com";
   const signatureUrl = data.sales?.signatureUrl;
 
+  // ✅ Client Data
   let clientCompany = data.manualClientCompany || data.manualClientName || "-";
   let clientDept = "-";
   let clientPic = data.manualClientName || "-";
@@ -120,6 +121,7 @@ export default function QuotationPrint() {
     clientDept = data.client.b2b.department?.name || "-";
     clientAddress = data.client.b2b.fullAddress || clientAddress;
 
+    // ✅ PIC langsung dari quotation.pic (bukan dari order.pic)
     if (data.pic) {
       const prefix = data.pic.prefix ? `${data.pic.prefix} ` : "";
       clientPic = `${prefix}${data.pic.name}`;
@@ -199,6 +201,18 @@ export default function QuotationPrint() {
                           : "-"}
                       </td>
                     </tr>
+                    {/* 🔥 Valid Until */}
+                    <tr>
+                      <td className="py-0.5 pr-4 align-top">Valid Until</td>
+                      <td className="py-0.5 align-top font-medium">
+                        :{" "}
+                        {data.validUntil
+                          ? format(new Date(data.validUntil), "dd MMMM yyyy", {
+                              locale: idLocale,
+                            })
+                          : "-"}
+                      </td>
+                    </tr>
                     <tr>
                       <td className="py-0.5 pr-4 align-top">Qtn No.</td>
                       <td className="py-0.5 align-top font-bold">
@@ -263,6 +277,8 @@ export default function QuotationPrint() {
                 </thead>
                 <tbody>
                   {data.items?.map((item: any) => {
+                    // ✅ Pakai item.imageUrl langsung — sudah dinormalisasi di service
+                    // Covers both: item dari DB (product.images) dan item manual (imageUrl upload)
                     const imageUrl = item.imageUrl;
 
                     return (
@@ -293,6 +309,12 @@ export default function QuotationPrint() {
                             <span className="text-gray-400 italic text-[10px]">
                               -
                             </span>
+                          )}
+                          {/* 🔥 Remarks di bawah description */}
+                          {item.remarks && (
+                            <div className="mt-1.5 text-[10px] text-slate-500 italic border-t border-slate-100 pt-1">
+                              *{item.remarks}
+                            </div>
                           )}
                         </td>
                         <td className="border border-[#94a3b8] py-2 text-center font-semibold">

@@ -35,7 +35,6 @@ export default function EditQuotationPage() {
 
         const data = await res.json();
 
-        // === DATA TRANSFORMATION (API -> FORM) ===
         const formattedData: any = {
           date: new Date(data.date),
           validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
@@ -45,6 +44,8 @@ export default function EditQuotationPage() {
 
           isManualClient: !data.clientId,
           clientId: data.clientId || "",
+          // 🔥 Tambah picId dari data API
+          picId: data.picId || "",
           manualClientName: data.manualClientName || "",
           manualClientCompany: data.manualClientCompany || "",
           manualClientEmail: data.manualClientEmail || "",
@@ -59,6 +60,8 @@ export default function EditQuotationPage() {
             quantity: Number(item.quantity),
             unitPrice: Number(item.unitPrice),
             discount: Number(item.discount || 0),
+            // 🔥 Tambah remarks dari data API
+            remarks: item.remarks || "",
           })),
         };
 
@@ -81,7 +84,6 @@ export default function EditQuotationPage() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      // Gunakan helper yang sudah diupdate
       const payload = cleanQuotationPayload(data);
 
       const res = await fetch(`${apiUrl}/quotations/${id}`, {
@@ -100,8 +102,8 @@ export default function EditQuotationPage() {
       }
 
       toast.success("Quotation updated successfully!");
-      router.push("/admin-invoice/quotations"); // Sesuaikan dengan route list Anda
-      router.refresh(); // Paksa refresh data server
+      router.push("/admin-invoice/quotations");
+      router.refresh();
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : "Failed to update");

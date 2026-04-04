@@ -14,6 +14,7 @@ import {
   Plus,
   Trash2,
   User,
+  UserCheck, // 🔥
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Resolver, useFieldArray, useForm, useWatch } from "react-hook-form";
@@ -251,7 +252,7 @@ function NotesSection({
 }
 
 // ============================================================
-// ITEM ROW SUB-COMPONENT — form.watch terisolasi di sini
+// 🔥 ITEM ROW — tambah label Qty/Rp/Disc + Remarks
 // ============================================================
 function ItemRow({
   index,
@@ -270,7 +271,7 @@ function ItemRow({
   const isManualProduct = form.watch(`items.${index}.isManualProduct`);
 
   return (
-    <div className="border rounded-lg bg-white">
+    <div className="border rounded-lg bg-white shadow-sm">
       <div className="grid grid-cols-12 gap-2 items-center p-3">
         <div className="col-span-1 flex flex-col items-center gap-1">
           <Switch
@@ -317,27 +318,52 @@ function ItemRow({
             </Select>
           )}
         </div>
+
+        {/* 🔥 Qty dengan label */}
         <div className="col-span-2">
-          <Input
-            type="number"
-            placeholder="Qty"
-            {...form.register(`items.${index}.quantity`)}
-          />
+          <div className="relative">
+            <Input
+              type="number"
+              placeholder="0"
+              className="pr-10"
+              {...form.register(`items.${index}.quantity`)}
+            />
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+              Qty
+            </span>
+          </div>
         </div>
+
+        {/* 🔥 Harga dengan label */}
         <div className="col-span-2">
-          <Input
-            type="number"
-            placeholder="Harga"
-            {...form.register(`items.${index}.unitPrice`)}
-          />
+          <div className="relative">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+              Rp
+            </span>
+            <Input
+              type="number"
+              placeholder="0"
+              className="pl-7"
+              {...form.register(`items.${index}.unitPrice`)}
+            />
+          </div>
         </div>
+
+        {/* 🔥 Diskon dengan label */}
         <div className="col-span-2">
-          <Input
-            type="number"
-            placeholder="Disc"
-            {...form.register(`items.${index}.discount`)}
-          />
+          <div className="relative">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+              Disc
+            </span>
+            <Input
+              type="number"
+              placeholder="0"
+              className="pl-9"
+              {...form.register(`items.${index}.discount`)}
+            />
+          </div>
         </div>
+
         <div className="col-span-1 flex items-center justify-end gap-1">
           <Button
             type="button"
@@ -363,18 +389,33 @@ function ItemRow({
           </Button>
         </div>
       </div>
+
       {expanded && (
-        <div className="border-t bg-gray-50/50 px-4 pb-3 pt-2 rounded-b-lg">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
-            Product Specification
-          </label>
-          <Textarea
-            placeholder={
-              "Contoh:\nFabric: 100D Anti color moving fabric\nPrint: Full digital print\nShaft: 14mm black fiberglass shaft\nRibs: 4.0 and 5.0mm black fiberglass ribs\nHandle: Wooden handle, auto open manual close\nTips: Black plastic tips\nTop: Black plastic frosted top"
-            }
-            className="text-xs min-h-25 resize-none bg-white font-mono"
-            {...form.register(`items.${index}.description`)}
-          />
+        <div className="border-t bg-gray-50/50 px-4 pb-4 pt-3 rounded-b-lg space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+              Product Specification
+            </label>
+            <Textarea
+              placeholder={
+                "Contoh:\nFabric: 100D Anti color moving fabric\nPrint: Full digital print\nShaft: 14mm black fiberglass shaft\nRibs: 4.0 and 5.0mm black fiberglass ribs\nHandle: Wooden handle, auto open manual close\nTips: Black plastic tips\nTop: Black plastic frosted top"
+              }
+              className="text-xs min-h-25 resize-none bg-white font-mono"
+              {...form.register(`items.${index}.description`)}
+            />
+          </div>
+
+          {/* 🔥 Remarks */}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+              Remarks / Catatan Item
+            </label>
+            <Input
+              placeholder="Contoh: Warna sesuai request client, konfirmasi ulang sebelum produksi..."
+              className="text-xs bg-white"
+              {...form.register(`items.${index}.remarks`)}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -398,6 +439,8 @@ const quotationSchema = z.object({
   status: z.enum(QUOTATION_STATUSES).default("DRAFT"),
   isManualClient: z.boolean().default(false),
   clientId: z.string().optional(),
+  // 🔥 Tambah picId
+  picId: z.string().optional(),
   manualClientName: z.string().optional(),
   manualClientCompany: z.string().optional(),
   manualClientEmail: z.string().email().optional().or(z.literal("")),
@@ -413,6 +456,8 @@ const quotationSchema = z.object({
         quantity: z.coerce.number().min(1, "Qty min 1"),
         unitPrice: z.coerce.number().min(0, "Price min 0"),
         discount: z.coerce.number().min(0).default(0),
+        // 🔥 Tambah remarks
+        remarks: z.string().optional(),
       }),
     )
     .min(1, "Add at least one item"),
@@ -440,7 +485,6 @@ export default function QuotationForm({
   const [loadingData, setLoadingData] = useState(true);
   const [selectedClient, setSelectedClient] = useState<ClientData | null>(null);
 
-  // ✅ initialNotes dihitung synchronous via useMemo — sudah siap saat NotesSection mount
   const initialNotes = useMemo<
     { categoryId: string; contents: string[] }[]
   >(() => {
@@ -504,6 +548,8 @@ export default function QuotationForm({
         date: new Date(),
         status: "DRAFT" as const,
         isManualClient: false,
+        // 🔥 Tambah picId default
+        picId: "",
         items: [
           {
             isManualProduct: false,
@@ -511,6 +557,7 @@ export default function QuotationForm({
             quantity: 1,
             unitPrice: 0,
             discount: 0,
+            remarks: "",
           },
         ],
       };
@@ -520,6 +567,8 @@ export default function QuotationForm({
       validUntil: initialData.validUntil
         ? new Date(initialData.validUntil)
         : undefined,
+      // 🔥 Pastikan picId ter-populate dari initialData
+      picId: initialData.picId || "",
     };
   }, [initialData]);
 
@@ -529,8 +578,15 @@ export default function QuotationForm({
   });
 
   useEffect(() => {
-    if (initialData) form.reset(defaultValues);
-  }, [initialData, defaultValues, form]);
+    if (initialData) {
+      form.reset(defaultValues);
+      // 🔥 Set selectedClient dari initialData saat edit
+      if (initialData.clientId && clients.length > 0) {
+        const client = clients.find((c) => c.id === initialData.clientId);
+        if (client) setSelectedClient(client);
+      }
+    }
+  }, [initialData, defaultValues, form, clients]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -555,7 +611,11 @@ export default function QuotationForm({
 
   const handleClientSelect = (clientId: string) => {
     const client = clients.find((c) => c.id === clientId);
-    if (client) setSelectedClient(client);
+    if (client) {
+      setSelectedClient(client);
+      // 🔥 Reset picId saat ganti client
+      form.setValue("picId", "");
+    }
   };
 
   const handleSubmit = (data: QuotationFormValues) => {
@@ -674,7 +734,7 @@ export default function QuotationForm({
                             {field.value ? (
                               format(field.value, "PPP")
                             ) : (
-                              <span>Pick a date</span>
+                              <span>Pick a date (Optional)</span>
                             )}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
@@ -690,6 +750,15 @@ export default function QuotationForm({
                         />
                       </PopoverContent>
                     </Popover>
+                    {/* 🔥 Tombol hapus tanggal */}
+                    {field.value && (
+                      <button
+                        type="button"
+                        onClick={() => field.onChange(undefined)}
+                        className="text-[11px] text-red-400 hover:text-red-600 text-left">
+                        Hapus tanggal
+                      </button>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -697,6 +766,7 @@ export default function QuotationForm({
             </CardContent>
           </Card>
 
+          {/* 🔥 CLIENT CARD — lengkap dengan PIC selector */}
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -714,7 +784,13 @@ export default function QuotationForm({
                     <FormControl>
                       <Switch
                         checked={field.value}
-                        onCheckedChange={field.onChange}
+                        onCheckedChange={(val) => {
+                          field.onChange(val);
+                          // 🔥 Reset client & pic saat toggle
+                          setSelectedClient(null);
+                          form.setValue("clientId", "");
+                          form.setValue("picId", "");
+                        }}
                       />
                     </FormControl>
                   </FormItem>
@@ -736,7 +812,7 @@ export default function QuotationForm({
                               field.onChange(val);
                               handleClientSelect(val);
                             }}
-                            value={field.value}
+                            value={field.value ?? ""}
                             disabled={loadingData}>
                             <FormControl>
                               <SelectTrigger className="bg-white">
@@ -761,66 +837,143 @@ export default function QuotationForm({
                         </FormItem>
                       )}
                     />
+
                     {selectedClient && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50">
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              Client Detail
-                            </p>
-                            <h3 className="text-lg font-bold text-blue-600">
-                              {selectedClient.name}
-                            </h3>
-                            <div className="flex gap-2 mt-1">
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px]">
-                                {selectedClient.custCode}
-                              </Badge>
-                              <Badge
-                                className={cn(
-                                  "text-[10px]",
-                                  selectedClient.type === "B2B"
-                                    ? "bg-purple-100 text-purple-700"
-                                    : "bg-green-100 text-green-700",
-                                )}>
-                                {selectedClient.type}
-                              </Badge>
+                      <div className="rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 animate-in fade-in slide-in-from-top-1 overflow-hidden">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                          <div className="space-y-3">
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                Client Detail
+                              </p>
+                              <h3 className="text-lg font-bold text-blue-600">
+                                {selectedClient.name}
+                              </h3>
+                              <div className="flex gap-2 mt-1">
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px]">
+                                  {selectedClient.custCode}
+                                </Badge>
+                                <Badge
+                                  className={cn(
+                                    "text-[10px]",
+                                    selectedClient.type === "B2B"
+                                      ? "bg-purple-100 text-purple-700 hover:bg-purple-100"
+                                      : "bg-green-100 text-green-700 hover:bg-green-100",
+                                  )}>
+                                  {selectedClient.type}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2 text-sm text-slate-600">
+                              <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-slate-400" />
+                              <span>{selectedClient.address}</span>
                             </div>
                           </div>
-                          <div className="flex items-start gap-2 text-sm text-slate-600">
-                            <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
-                            <span>{selectedClient.address}</span>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                              <Phone className="w-4 h-4 shrink-0 text-slate-400" />
+                              <span>{selectedClient.phone || "-"}</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-sm text-slate-600">
-                            <Phone className="w-4 h-4 shrink-0" />
-                            <span>{selectedClient.phone || "-"}</span>
-                          </div>
-                          {selectedClient.type === "B2B" &&
-                            selectedClient.pics?.length > 0 && (
-                              <div className="p-2 rounded bg-white border border-slate-200">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
-                                  Person in Charge
-                                </p>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600">
-                                    {selectedClient.pics[0].name.charAt(0)}
-                                  </div>
-                                  <div className="text-xs">
-                                    <p className="font-semibold">
-                                      {selectedClient.pics[0].name}
-                                    </p>
-                                    <p className="text-muted-foreground">
-                                      {selectedClient.pics[0].phone ||
-                                        selectedClient.pics[0].email}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                        </div>
+
+                        {/* 🔥 PIC Selector — hanya untuk B2B dengan pics */}
+                        {selectedClient.type === "B2B" &&
+                          selectedClient.pics &&
+                          selectedClient.pics.length > 0 && (
+                            <div className="border-t border-slate-200 bg-white px-4 py-3">
+                              <FormField
+                                control={form.control}
+                                name="picId"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                      <UserCheck className="w-3.5 h-3.5" />
+                                      Person in Charge (PIC)
+                                    </FormLabel>
+                                    <Select
+                                      onValueChange={field.onChange}
+                                      value={field.value ?? ""}>
+                                      <FormControl>
+                                        <SelectTrigger className="bg-white mt-1.5">
+                                          <SelectValue placeholder="Pilih PIC Client..." />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {selectedClient.pics.map((pic) => (
+                                          <SelectItem
+                                            key={pic.id}
+                                            value={pic.id}>
+                                            <div className="flex items-center gap-2">
+                                              <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600 shrink-0">
+                                                {pic.name.charAt(0)}
+                                              </div>
+                                              <div className="flex flex-col">
+                                                <span className="text-sm font-medium">
+                                                  {pic.name}
+                                                </span>
+                                                {(pic.position ||
+                                                  pic.phone ||
+                                                  pic.email) && (
+                                                  <span className="text-[10px] text-muted-foreground">
+                                                    {pic.position
+                                                      ? pic.position
+                                                      : pic.phone || pic.email}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              {/* 🔥 Preview PIC yang dipilih */}
+                              {form.watch("picId") &&
+                                (() => {
+                                  const pic = selectedClient.pics.find(
+                                    (p) => p.id === form.watch("picId"),
+                                  );
+                                  if (!pic) return null;
+                                  return (
+                                    <div className="mt-2 flex items-center gap-3 p-2 rounded-md bg-blue-50 border border-blue-100">
+                                      <div className="w-8 h-8 rounded-full bg-blue-200 flex items-center justify-center text-sm font-bold text-blue-700 shrink-0">
+                                        {pic.name.charAt(0)}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-slate-800 truncate">
+                                          {pic.name}
+                                        </p>
+                                        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                                          {pic.position && (
+                                            <span className="text-[11px] text-slate-500">
+                                              {pic.position}
+                                            </span>
+                                          )}
+                                          {pic.phone && (
+                                            <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                                              <Phone className="w-3 h-3" />
+                                              {pic.phone}
+                                            </span>
+                                          )}
+                                          {pic.email && (
+                                            <span className="text-[11px] text-slate-500 truncate">
+                                              {pic.email}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>
@@ -905,12 +1058,27 @@ export default function QuotationForm({
           </Card>
         </div>
 
-        {/* ITEMS — pakai ItemRow yang sudah terisolasi */}
+        {/* 🔥 ITEMS — tambah legend Qty/Rp/Disc di header */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between border-b py-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Box className="w-4 h-4" /> Items & Products
             </CardTitle>
+            {/* 🔥 Legend */}
+            <div className="hidden md:flex items-center gap-4 text-[11px] text-muted-foreground mr-auto ml-4">
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-slate-600">Qty</span> =
+                Jumlah
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-slate-600">Rp</span> = Harga
+                Satuan
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-slate-600">Disc</span> =
+                Diskon (Rp)
+              </span>
+            </div>
             <Button
               type="button"
               variant="secondary"
@@ -922,6 +1090,8 @@ export default function QuotationForm({
                   quantity: 1,
                   unitPrice: 0,
                   discount: 0,
+                  // 🔥 Tambah remarks default
+                  remarks: "",
                 })
               }>
               <Plus className="h-4 w-4 mr-2" /> Add Item
@@ -943,7 +1113,6 @@ export default function QuotationForm({
 
         {/* NOTES & SUMMARY */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* key memaksa remount saat initialData berubah — checkbox akan tercheck sesuai data */}
           <NotesSection
             key={notesSectionKey}
             noteCategories={noteCategories}
