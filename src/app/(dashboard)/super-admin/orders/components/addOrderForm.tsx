@@ -51,7 +51,7 @@ import { toast } from "sonner";
 import { apiUrl } from "@/helper/apiurl";
 import { OrderFormValues, orderSchema } from "../order-schema";
 import { fetchWithToken, generatePoNumber, postOrder } from "../order-service";
-import { SampleFollowUpSection } from "./sampleFollowUpSection";
+import { SampleFollowUpSection, SampleStepItem } from "./sampleFollowUpSection";
 
 type PIC = {
   id: string;
@@ -75,14 +75,6 @@ type Client = {
   purchaseChannelId?: string;
 };
 
-export type SampleStepItem = {
-  name: string;
-  date: Date | null;
-  enabled: boolean;
-  method?: string;
-  notes?: string;
-  nextAction?: string;
-};
 type Sales = { id: string; name: string; phone: string };
 type Vendor = { id: string; companyName: string };
 

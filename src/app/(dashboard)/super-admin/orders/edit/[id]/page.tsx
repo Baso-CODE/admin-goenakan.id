@@ -49,6 +49,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import {
+  SampleFollowUpSection,
+  SampleStepItem,
+} from "../../components/sampleFollowUpSection";
 import { OrderFormValues, orderSchema } from "../../order-schema";
 import {
   fetchOrderById,
@@ -135,8 +139,11 @@ export default function EditOrderForm() {
   const [generatingPo, setGeneratingPo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
+  const [sampleSteps, setSampleSteps] = useState<SampleStepItem[]>([]);
+  const [initialFollowUps, setInitialFollowUps] = useState<any[]>([]);
 
   const selectedClientId = watch("clientId");
+  const salesCategory = watch("salesCategory");
 
   // === LOAD DATA ===
   useEffect(() => {
@@ -159,6 +166,8 @@ export default function EditOrderForm() {
         setVendors(v);
         setProducts(p);
         setPurchaseChannels(pc);
+
+        console.log("ini adalah order data", orderData);
 
         // Populate Form
         if (orderData) {
@@ -185,6 +194,12 @@ export default function EditOrderForm() {
             if (selectedPic?.phone) {
               setValue("phone", selectedPic.phone);
             }
+          }
+          if (
+            orderData.sampleFollowUps &&
+            orderData.sampleFollowUps.length > 0
+          ) {
+            setInitialFollowUps(orderData.sampleFollowUps);
           }
         }
       } catch (error) {
@@ -239,7 +254,17 @@ export default function EditOrderForm() {
       // Bersihkan string kosong agar Prisma disconnect (optional, backend sudah handle)
       if (!payload.clientB2BPICId) delete payload.clientB2BPICId;
       if (!payload.purchaseChannelId) delete payload.purchaseChannelId;
-
+      if (payload.salesCategory === "SAMPLE") {
+        (payload as any).sampleFollowUps = sampleSteps
+          .filter((s) => s.enabled && s.date)
+          .map((s) => ({
+            name: s.name,
+            date: s.date,
+            method: s.method || undefined,
+            notes: s.notes || undefined,
+            nextAction: s.nextAction || undefined,
+          }));
+      }
       await updateOrder(orderId, payload);
 
       toast.success("Order updated successfully");
@@ -313,6 +338,14 @@ export default function EditOrderForm() {
                   </FormItem>
                 )}
               />
+              {salesCategory === "SAMPLE" && (
+                <div className="md:col-span-2">
+                  <SampleFollowUpSection
+                    onChange={setSampleSteps}
+                    initialData={initialFollowUps}
+                  />
+                </div>
+              )}
 
               <FormField
                 control={control}

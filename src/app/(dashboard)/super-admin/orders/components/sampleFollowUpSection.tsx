@@ -79,25 +79,75 @@ const INITIAL_STEPS: SampleStep[] = [
   { kind: "followup", label: "Follow Up 3" },
   { kind: "convert_sales" },
 ];
+interface SampleFollowUpSectionProps {
+  onChange: (steps: SampleStepItem[]) => void;
+  initialData?: any[];
+}
 
 export function SampleFollowUpSection({
   onChange,
+  initialData,
 }: SampleFollowUpSectionProps) {
-  const [steps, setSteps] = useState<SampleStep[]>(INITIAL_STEPS);
+  console.log("ini adalah data", initialData);
+  const [steps, setSteps] = useState<SampleStep[]>(() => {
+    if (initialData && initialData.length > 0) {
+      const loadedSteps: SampleStep[] = initialData.map((d) => {
+        if (d.name === "Convert to Sales") return { kind: "convert_sales" };
+        return { kind: "followup", label: d.name };
+      });
+      if (!loadedSteps.some((s) => s.kind === "convert_sales")) {
+        loadedSteps.push({ kind: "convert_sales" });
+      }
+      return loadedSteps;
+    }
+    return INITIAL_STEPS;
+  });
 
   const [stepData, setStepData] = useState<Record<number, SampleStepData>>(
     () => {
       const init: Record<number, SampleStepData> = {};
-      INITIAL_STEPS.forEach((_, i) => {
-        // 🔥 UPDATE DEFAULT INITIAL STATE
-        init[i] = {
+      const baseSteps =
+        initialData && initialData.length > 0
+          ? initialData.map((d) => ({ kind: "followup", label: d.name }))
+          : INITIAL_STEPS;
+
+      baseSteps.forEach((step, i) => {
+        const found = initialData?.find(
+          (d) => d.name === getStepLabel(step as any),
+        );
+        if (found) {
+          init[i] = {
+            date: found.date ? new Date(found.date) : null,
+            enabled: true,
+            method: found.method || "",
+            notes: found.notes || "",
+            nextAction: found.nextAction || "",
+          };
+        } else {
+          init[i] = {
+            date: null,
+            enabled: true,
+            method: "",
+            notes: "",
+            nextAction: "",
+          };
+        }
+      });
+
+      if (
+        initialData &&
+        initialData.length > 0 &&
+        !initialData.some((d) => d.name === "Convert to Sales")
+      ) {
+        init[initialData.length] = {
           date: null,
           enabled: true,
           method: "",
           notes: "",
           nextAction: "",
         };
-      });
+      }
+
       return init;
     },
   );
