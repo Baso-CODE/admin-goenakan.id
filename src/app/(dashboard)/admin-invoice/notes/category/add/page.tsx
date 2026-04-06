@@ -35,10 +35,10 @@ const AddNoteCategoryPage = () => {
       }
 
       toast.success("Category created successfully!");
-      router.push("/super-admin/invoice-notes"); // Redirect balik ke list
+      router.push("/admin-invoice/notes"); // Redirect balik ke list
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to create category"
+        err instanceof Error ? err.message : "Failed to create category",
       );
     }
   };

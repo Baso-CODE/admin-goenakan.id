@@ -60,7 +60,7 @@ export default function EditNoteTemplatePage() {
       } catch (err) {
         console.error(err);
         toast.error("Failed to load data.");
-        router.push("/super-admin/invoice-notes");
+        router.push("/admin-invoice/notes");
       } finally {
         setIsLoading(false);
       }
@@ -91,7 +91,7 @@ export default function EditNoteTemplatePage() {
       }
 
       toast.success("Template updated successfully!");
-      router.push("/super-admin/invoice-notes");
+      router.push("/admin-invoice/notes");
     } catch (err: any) {
       toast.error(err.message);
     } finally {

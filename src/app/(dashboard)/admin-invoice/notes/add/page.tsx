@@ -58,7 +58,7 @@ export default function AddNoteTemplatePage() {
       }
 
       toast.success("Template created successfully!");
-      router.push("/super-admin/invoice-notes"); // Balik ke halaman utama notes
+      router.push("/admin-invoice/notes"); // Balik ke halaman utama notes
     } catch (err: any) {
       toast.error(err.message);
     }

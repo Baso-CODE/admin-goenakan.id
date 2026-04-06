@@ -51,12 +51,12 @@ const EditNoteCategoryPage = () => {
           isActive:
             data.isActive !== undefined
               ? data.isActive
-              : data.data?.isActive ?? true,
+              : (data.data?.isActive ?? true),
         });
       } catch (err) {
         console.error(err);
         toast.error("Failed to load category data.");
-        router.push("/super-admin/invoice-notes"); // Redirect if not found
+        router.push("/admin-invoice/notes"); // Redirect if not found
       } finally {
         setIsLoading(false);
       }
@@ -91,10 +91,10 @@ const EditNoteCategoryPage = () => {
       }
 
       toast.success("Category updated successfully!");
-      router.push("/super-admin/invoice-notes");
+      router.push("/admin-invoice/notes");
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to update category"
+        err instanceof Error ? err.message : "Failed to update category",
       );
     } finally {
       setIsSubmitting(false);
