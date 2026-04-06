@@ -411,6 +411,8 @@ export default function QuotationAddForm({
 }) {
   const [clients, setClients] = useState<ClientData[]>([]);
   const [products, setProducts] = useState<ProductData[]>([]);
+  console.log("ini adalah respon dari data product", products);
+
   const [noteCategories, setNoteCategories] = useState<NoteCategory[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClientData | null>(null);
   const [loadingMaster, setLoadingMaster] = useState(true);

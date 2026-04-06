@@ -75,6 +75,12 @@ interface GenerateInvoiceDialogProps {
   splitTotalAmount: number;
   updateItemQty: (productId: string, newQty: number) => void;
 
+
+  paymentDate?: string;
+  setPaymentDate: (v: string) => void;
+  paidAt?: string;
+  setPaidAt: (v: string) => void;
+
   // Notes
   noteCategories: NoteCategory[];
   invoiceNotes: InvoiceNote[];
@@ -119,6 +125,10 @@ export function GenerateInvoiceDialog({
   setSplitDpAmount,
   splitTotalAmount,
   updateItemQty,
+paymentDate,
+  setPaymentDate,
+  paidAt,
+  setPaidAt,
   noteCategories,
   invoiceNotes,
   manualInputs,
@@ -530,6 +540,39 @@ export function GenerateInvoiceDialog({
               </div>
             </div>
           )}
+
+          <div className="border-t pt-4 space-y-4 animate-in fade-in">
+            <h4 className="text-sm font-semibold text-gray-800">
+              Informasi Pembayaran (Opsional)
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="paymentDate">Tanggal Mulai Tagihan</Label>
+                <Input
+                  id="paymentDate"
+                  type="date"
+                  value={paymentDate || ""}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Tanggal invoice ini diterbitkan atau ditagihkan.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="paidAt">Tanggal Lunas (Paid At)</Label>
+                <Input
+                  id="paidAt"
+                  type="date"
+                  value={paidAt || ""}
+                  onChange={(e) => setPaidAt(e.target.value)}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Isi jika tagihan ini sudah dilunasi sebelumnya.
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* Notes */}
           <InvoiceNotesSelector
