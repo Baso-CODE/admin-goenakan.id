@@ -436,7 +436,7 @@ export default function DeliveryNotePrint() {
               <div className="flex flex-col items-center">
                 <div className="mb-4 text-[12px] font-bold">Hormat Kami,</div>
                 <div className="relative h-20 w-32 flex items-center justify-center -mb-2">
-                  {order.sales?.signatureUrl ? (
+                  {/* {order.sales?.signatureUrl ? (
                     <img
                       src={order.sales.signatureUrl}
                       alt="Signature"
@@ -445,7 +445,7 @@ export default function DeliveryNotePrint() {
                     />
                   ) : (
                     <div className="h-16 w-full"></div>
-                  )}
+                  )} */}
                 </div>
                 <div className="font-bold underline text-[12px] mt-1">
                   Goenakan Indonesia
