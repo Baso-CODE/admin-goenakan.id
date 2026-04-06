@@ -125,11 +125,13 @@ function ItemRow({
   const [expanded, setExpanded] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
   const isManualProduct = form.watch(`items.${index}.isManualProduct`);
   const selectedProductId = form.watch(`items.${index}.productId`);
   const selectedProduct = products.find((p: any) => p.id === selectedProductId);
   const isCustomProduct = selectedProduct?.isCustom;
   const productVariants = selectedProduct?.productVariants || [];
+
   useEffect(() => {
     if (imageFile) {
       const url = URL.createObjectURL(imageFile);
@@ -141,11 +143,13 @@ function ItemRow({
   }, [imageFile]);
 
   return (
-    <div className="border rounded-lg bg-white shadow-sm">
+    <div className="border rounded-lg bg-white shadow-sm transition-all duration-200">
       {/* ROW UTAMA */}
-      <div className="grid grid-cols-12 gap-2 items-center p-3">
+      {/* 🔥 PERBAIKAN 1: Ubah items-center menjadi items-start agar kolom input lain tetap di atas saat variant muncul */}
+      <div className="grid grid-cols-12 gap-3 items-start p-3">
         {/* Toggle Manual/DB */}
-        <div className="col-span-1 flex flex-col items-center gap-1">
+        {/* 🔥 Tambahkan mt-1.5 agar sejajar dengan input sebelahnya */}
+        <div className="col-span-1 flex flex-col items-center gap-1 mt-1.5">
           <Switch
             checked={!!isManualProduct}
             onCheckedChange={(v) =>
@@ -158,8 +162,9 @@ function ItemRow({
           </span>
         </div>
 
-        {/* Nama Produk */}
-        <div className="col-span-4">
+        {/* Nama Produk & Variant */}
+        {/* 🔥 PERBAIKAN 2: Bungkus dalam flex-col dengan gap yang rapi */}
+        <div className="col-span-4 flex flex-col gap-2">
           {isManualProduct ? (
             <Input
               placeholder="Nama barang/jasa..."
@@ -168,6 +173,7 @@ function ItemRow({
           ) : (
             <>
               <Select
+                value={selectedProductId || ""}
                 onValueChange={(v) => {
                   const p = products.find((x: any) => x.id === v);
                   if (p) {
@@ -195,33 +201,38 @@ function ItemRow({
                   ))}
                 </SelectContent>
               </Select>
+
+              {/* 🔥 PERBAIKAN 3: UI Variant dibuat menjorok ke dalam (indent) dengan garis penanda */}
               {isCustomProduct && (
-                <Select
-                  value={form.watch(`items.${index}.variantId`) || ""}
-                  onValueChange={(vid) => {
-                    form.setValue(`items.${index}.variantId`, vid);
-                    const variant = productVariants.find(
-                      (v: any) => v.id === vid,
-                    );
-                    // Update Harga berdasarkan harga Variant
-                    if (variant && variant.price) {
-                      form.setValue(
-                        `items.${index}.unitPrice`,
-                        Number(variant.price),
+                <div className="relative pl-4 mt-0.5 before:content-[''] before:absolute before:left-1.5 before:top-0 before:w-px before:h-4 before:bg-blue-300 before:border-l before:border-blue-300">
+                  <div className="absolute left-1.5 top-4 w-2.5 h-px bg-blue-300"></div>
+                  <Select
+                    value={form.watch(`items.${index}.variantId`) || ""}
+                    onValueChange={(vid) => {
+                      form.setValue(`items.${index}.variantId`, vid);
+                      const variant = productVariants.find(
+                        (v: any) => v.id === vid,
                       );
-                    }
-                  }}>
-                  <SelectTrigger className="h-8 bg-blue-50/50 border-blue-200 text-xs">
-                    <SelectValue placeholder="Pilih Variant Produk..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {productVariants.map((v: any) => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {v.variantName} {v.price ? `- Rp ${v.price}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      // Update Harga berdasarkan harga Variant
+                      if (variant && variant.price) {
+                        form.setValue(
+                          `items.${index}.unitPrice`,
+                          Number(variant.price),
+                        );
+                      }
+                    }}>
+                    <SelectTrigger className="h-8 bg-slate-50 border-slate-200 text-xs shadow-none">
+                      <SelectValue placeholder="Pilih Spesifikasi Variant..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {productVariants.map((v: any) => (
+                        <SelectItem key={v.id} value={v.id}>
+                          {v.variantName} {v.price ? `- Rp ${v.price}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
             </>
           )}
@@ -273,7 +284,8 @@ function ItemRow({
         </div>
 
         {/* Actions */}
-        <div className="col-span-1 flex items-center justify-end gap-1">
+        {/* 🔥 Tambahkan mt-1 agar align icon button pas dengan text input */}
+        <div className="col-span-1 flex items-center justify-end gap-1 mt-1">
           <Button
             type="button"
             variant="ghost"
@@ -291,7 +303,7 @@ function ItemRow({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 hover:bg-red-50"
             onClick={onRemove}
             disabled={!canRemove}>
             <Trash2 className="w-4 h-4 text-red-500" />
@@ -347,11 +359,11 @@ function ItemRow({
                 </span>
               </button>
             ) : (
-              <div className="relative w-fit">
+              <div className="relative w-fit group">
                 <img
                   src={previewUrl}
                   alt="preview"
-                  className="h-28 w-28 object-cover rounded-lg border border-slate-200 shadow-sm"
+                  className="h-28 w-28 object-cover rounded-lg border border-slate-200 shadow-sm transition-opacity group-hover:opacity-90"
                 />
                 <button
                   type="button"
@@ -359,7 +371,7 @@ function ItemRow({
                     onImageChange(index, null);
                     if (fileInputRef.current) fileInputRef.current.value = "";
                   }}
-                  className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 shadow">
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 shadow-md transform hover:scale-110 transition-transform">
                   <X className="w-3 h-3" />
                 </button>
               </div>
@@ -380,7 +392,6 @@ function ItemRow({
     </div>
   );
 }
-
 // ============================================================
 // SUB-COMPONENT: OrderSummary
 // ============================================================
