@@ -167,8 +167,6 @@ export default function EditOrderForm() {
         setProducts(p);
         setPurchaseChannels(pc);
 
-        console.log("ini adalah order data", orderData);
-
         // Populate Form
         if (orderData) {
           const currentClient = c.find(

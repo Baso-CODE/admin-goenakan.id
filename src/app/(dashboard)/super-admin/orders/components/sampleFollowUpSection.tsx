@@ -88,7 +88,6 @@ export function SampleFollowUpSection({
   onChange,
   initialData,
 }: SampleFollowUpSectionProps) {
-  console.log("ini adalah data", initialData);
   const [steps, setSteps] = useState<SampleStep[]>(() => {
     if (initialData && initialData.length > 0) {
       const loadedSteps: SampleStep[] = initialData.map((d) => {
