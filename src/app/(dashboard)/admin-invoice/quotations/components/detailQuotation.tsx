@@ -132,7 +132,7 @@ export default function QuotationDetail() {
       setData(result);
     } catch (error) {
       toast.error("Gagal memuat detail penawaran");
-      router.push("/super-admin/quotations");
+      router.push("/admin-invoice/quotations");
     } finally {
       setLoading(false);
     }
@@ -157,7 +157,7 @@ export default function QuotationDetail() {
       if (!res.ok) throw new Error("Failed to delete");
 
       toast.success("Penawaran berhasil dihapus");
-      router.push("/super-admin/quotations");
+      router.push("/admin-invoice/quotations");
     } catch (error) {
       toast.error("Gagal menghapus data");
     } finally {

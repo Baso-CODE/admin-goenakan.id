@@ -69,7 +69,7 @@ export default function EditQuotationPage() {
       } catch (error) {
         console.error(error);
         toast.error("Gagal memuat data penawaran");
-        router.push("/super-admin/quotations");
+        router.push("/admin-invoice/quotations");
       } finally {
         setIsLoading(false);
       }

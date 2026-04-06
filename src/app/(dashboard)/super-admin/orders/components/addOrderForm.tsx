@@ -75,12 +75,14 @@ type Client = {
   purchaseChannelId?: string;
 };
 
-type SampleStepItem = {
+export type SampleStepItem = {
   name: string;
   date: Date | null;
   enabled: boolean;
+  method?: string;
+  notes?: string;
+  nextAction?: string;
 };
-
 type Sales = { id: string; name: string; phone: string };
 type Vendor = { id: string; companyName: string };
 

@@ -7,12 +7,31 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+
+// 🔥 UPDATE INTERFACE
+export type SampleStepItem = {
+  name: string;
+  date: Date | null;
+  enabled: boolean;
+  method?: string;
+  notes?: string;
+  nextAction?: string;
+};
 
 type SampleStep =
   | { kind: "followup"; label: string }
@@ -21,12 +40,14 @@ type SampleStep =
 type SampleStepData = {
   date: Date | null;
   enabled: boolean;
+  // 🔥 TAMBAHAN FIELD
+  method: string;
+  notes: string;
+  nextAction: string;
 };
 
 interface SampleFollowUpSectionProps {
-  onChange: (
-    steps: Array<{ name: string; date: Date | null; enabled: boolean }>,
-  ) => void;
+  onChange: (steps: SampleStepItem[]) => void;
 }
 
 const getStepColor = (step: SampleStep) => {
@@ -63,11 +84,19 @@ export function SampleFollowUpSection({
   onChange,
 }: SampleFollowUpSectionProps) {
   const [steps, setSteps] = useState<SampleStep[]>(INITIAL_STEPS);
+
   const [stepData, setStepData] = useState<Record<number, SampleStepData>>(
     () => {
       const init: Record<number, SampleStepData> = {};
       INITIAL_STEPS.forEach((_, i) => {
-        init[i] = { date: null, enabled: true };
+        // 🔥 UPDATE DEFAULT INITIAL STATE
+        init[i] = {
+          date: null,
+          enabled: true,
+          method: "",
+          notes: "",
+          nextAction: "",
+        };
       });
       return init;
     },
@@ -78,19 +107,27 @@ export function SampleFollowUpSection({
     newSteps: SampleStep[],
     newData: Record<number, SampleStepData>,
   ) => {
+    // 🔥 KIRIM DATA LENGKAP SAAT ADA PERUBAHAN
     onChange(
       newSteps.map((step, i) => ({
         name: getStepLabel(step),
         date: newData[i]?.date ?? null,
         enabled: newData[i]?.enabled ?? true,
+        method: newData[i]?.method || undefined,
+        notes: newData[i]?.notes || undefined,
+        nextAction: newData[i]?.nextAction || undefined,
       })),
     );
   };
 
-  const updateDate = (idx: number, date: Date) => {
+  const updateStepField = <K extends keyof SampleStepData>(
+    idx: number,
+    field: K,
+    value: SampleStepData[K],
+  ) => {
     const updated = {
       ...stepData,
-      [idx]: { ...stepData[idx], date },
+      [idx]: { ...stepData[idx], [field]: value },
     };
     setStepData(updated);
     notify(steps, updated);
@@ -120,13 +157,19 @@ export function SampleFollowUpSection({
       ...steps.slice(convertIdx),
     ];
 
-    // Geser stepData: insert di convertIdx, geser convert ke bawah
     const newData: Record<number, SampleStepData> = {};
     newSteps.forEach((_, i) => {
       if (i < convertIdx) {
         newData[i] = stepData[i];
       } else if (i === convertIdx) {
-        newData[i] = { date: null, enabled: true };
+        // 🔥 DEFAULT UNTUK STEP BARU
+        newData[i] = {
+          date: null,
+          enabled: true,
+          method: "",
+          notes: "",
+          nextAction: "",
+        };
       } else {
         newData[i] = stepData[i - 1];
       }
@@ -143,19 +186,13 @@ export function SampleFollowUpSection({
         <p className="text-sm font-semibold text-blue-700">
           📋 Sample Follow Up Plan
         </p>
-        <button
-          type="button"
-          onClick={addFollowUp}
-          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium">
-          <Plus className="h-3.5 w-3.5" /> Tambah Follow Up
-        </button>
       </div>
 
-      {/* Vertical line */}
       <div className="relative">
-        <div className="absolute left-4.75 top-4 bottom-4 w-0.5 bg-gray-200 z-0" />
+        {/* Vertical line */}
+        <div className="absolute left-4.75 top-6 bottom-6 w-0.5 bg-gray-200 z-0" />
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           {steps.map((step, idx) => {
             const data = stepData[idx];
             const color = getStepColor(step);
@@ -167,7 +204,7 @@ export function SampleFollowUpSection({
                 {/* Step Row */}
                 <div
                   className={cn(
-                    "flex items-center gap-3 rounded-lg border p-2.5 cursor-pointer transition-all",
+                    "flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-all",
                     isEnabled
                       ? `${color.border} ${color.bg}`
                       : "border-gray-200 bg-gray-50",
@@ -176,11 +213,11 @@ export function SampleFollowUpSection({
                   {/* Dot */}
                   <div
                     className={cn(
-                      "h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-white text-xs font-bold",
+                      "h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-white text-xs font-bold",
                       isEnabled ? color.dot : "bg-gray-300",
                     )}>
                     {isEnabled ? (
-                      <Check className="h-3.5 w-3.5" />
+                      <Check className="h-4 w-4" />
                     ) : (
                       <span>{idx + 1}</span>
                     )}
@@ -188,7 +225,7 @@ export function SampleFollowUpSection({
 
                   {/* Label + date preview */}
                   <div className="flex-1 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div>
                       <span
                         className={cn(
                           "text-sm font-semibold",
@@ -196,17 +233,16 @@ export function SampleFollowUpSection({
                         )}>
                         {getStepLabel(step)}
                       </span>
-                      {data?.date && (
-                        <span className="text-[11px] text-muted-foreground">
-                          —{" "}
+                      {isEnabled && data?.date && (
+                        <span className="ml-2 text-[11px] text-muted-foreground">
                           {format(data.date, "dd MMM yyyy", {
                             locale: idLocale,
                           })}
                         </span>
                       )}
                       {!data?.date && isEnabled && (
-                        <span className="text-[10px] text-orange-400 italic">
-                          belum diisi
+                        <span className="ml-2 text-[10px] text-orange-400 italic">
+                          (Tanggal belum diset)
                         </span>
                       )}
                     </div>
@@ -233,35 +269,99 @@ export function SampleFollowUpSection({
                   </div>
                 </div>
 
-                {/* Expanded: Date Picker */}
-                {isExpanded && (
-                  <div className="ml-10 mt-1.5 p-3 border border-gray-100 rounded-lg bg-white shadow-sm">
-                    <p className="text-xs font-medium text-gray-500 mb-2">
-                      Tanggal Rencana
-                    </p>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-48 justify-start text-left font-normal h-8 text-xs">
-                          <CalendarIcon className="mr-2 h-3 w-3" />
-                          {data?.date
-                            ? format(data.date, "dd MMM yyyy", {
-                                locale: idLocale,
-                              })
-                            : "Pilih tanggal"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={data?.date ?? undefined}
-                          onSelect={(d) => d && updateDate(idx, d)}
-                          initialFocus
+                {/* 🔥 EXPANDED: FULL FORM SEPERTI DI DIALOG */}
+                {isExpanded && isEnabled && (
+                  <div className="ml-11 mt-2 space-y-3 border border-gray-100 rounded-lg p-4 bg-white shadow-sm">
+                    {/* Date & Method */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">
+                          Tanggal Rencana
+                        </label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full justify-start text-left font-normal h-8 text-xs">
+                              <CalendarIcon className="mr-2 h-3 w-3" />
+                              {data?.date
+                                ? format(data.date, "dd MMM yyyy", {
+                                    locale: idLocale,
+                                  })
+                                : "Pilih tanggal"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={data?.date ?? undefined}
+                              onSelect={(d) =>
+                                d && updateStepField(idx, "date", d)
+                              }
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">
+                          Metode
+                        </label>
+                        <Select
+                          value={data?.method}
+                          onValueChange={(v) =>
+                            updateStepField(idx, "method", v)
+                          }>
+                          <SelectTrigger className="h-8 text-xs bg-white">
+                            <SelectValue placeholder="Pilih metode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                            <SelectItem value="Email">Email</SelectItem>
+                            <SelectItem value="Phone Call">
+                              Phone Call
+                            </SelectItem>
+                            <SelectItem value="Meeting">
+                              Meeting / Visit
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Catatan / Hasil */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-gray-600">
+                        Topik / Catatan
+                      </label>
+                      <Textarea
+                        className="text-xs min-h-15 resize-none bg-white"
+                        placeholder="Contoh: Follow up progress sampel dan minta feedback..."
+                        value={data?.notes}
+                        onChange={(e) =>
+                          updateStepField(idx, "notes", e.target.value)
+                        }
+                      />
+                    </div>
+
+                    {/* Next Action */}
+                    {step.kind === "followup" && (
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">
+                          Tindakan Selanjutnya
+                        </label>
+                        <Input
+                          className="h-8 text-xs bg-white"
+                          placeholder="Contoh: Hubungi kembali jika barang sudah diuji coba..."
+                          value={data?.nextAction}
+                          onChange={(e) =>
+                            updateStepField(idx, "nextAction", e.target.value)
+                          }
                         />
-                      </PopoverContent>
-                    </Popover>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -269,6 +369,14 @@ export function SampleFollowUpSection({
           })}
         </div>
       </div>
+
+      {/* Add Button dipindah ke bawah */}
+      <button
+        type="button"
+        onClick={addFollowUp}
+        className="ml-11 mt-4 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium">
+        <Plus className="h-3.5 w-3.5" /> Tambah Follow Up Baru
+      </button>
     </div>
   );
 }
