@@ -48,6 +48,8 @@ type InvoiceDetail = {
   status: "UNPAID" | "PAID" | "OVERDUE" | "CANCELLED" | "DRAFT";
   createdAt: string;
   dueDate: string | null;
+  paymentDate: string | null;
+  paidAt: string | null;
   totalAmount: number;
   method?: string;
   order: {
@@ -116,6 +118,7 @@ export default function InvoiceDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
+  console.log("ini adalah data", invoice);
 
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -252,7 +255,11 @@ export default function InvoiceDetailPage() {
     invoice?.client?.b2b?.phone ||
     "-";
   const departmentName = isB2B ? invoice.client.b2b?.department?.name : null;
-  const invoiceDate = new Date(invoice.createdAt);
+
+  const createdDate = new Date(invoice.createdAt);
+  const paymentBillingDate = invoice.paymentDate
+    ? new Date(invoice.paymentDate)
+    : createdDate;
   const displayInvoiceNo = invoice.invoiceNumber || `INV/${invoice.id}`;
 
   const getStatusColor = (status: string) => {
@@ -366,15 +373,17 @@ export default function InvoiceDetailPage() {
                   <tr>
                     <td className="h-2"></td>
                   </tr>
+
                   <tr>
                     <td className="font-medium pr-2 text-left">Invoice Date</td>
                     <td className="text-left">
                       :{" "}
-                      {format(invoiceDate, "dd MMMM yyyy", {
+                      {format(createdDate, "dd MMMM yyyy", {
                         locale: idLocale,
                       })}
                     </td>
                   </tr>
+
                   {invoice.dueDate && (
                     <tr>
                       <td className="font-medium pr-2 text-left text-red-600">
@@ -405,6 +414,19 @@ export default function InvoiceDetailPage() {
                       </td>
                       <td className="text-left text-green-600 font-bold uppercase">
                         : {invoice.method.replace("_", " ")}
+                      </td>
+                    </tr>
+                  )}
+                  {invoice.status === "PAID" && invoice.paidAt && (
+                    <tr>
+                      <td className="font-medium pr-2 text-left text-green-600">
+                        Date Paid
+                      </td>
+                      <td className="text-left text-green-600 font-bold uppercase">
+                        :{" "}
+                        {format(new Date(invoice.paidAt), "dd MMMM yyyy", {
+                          locale: idLocale,
+                        })}
                       </td>
                     </tr>
                   )}
@@ -478,7 +500,7 @@ export default function InvoiceDetailPage() {
                       Total
                     </th>
                     <th className="border border-[#94a3b8] py-2 w-32.5">
-                      Total Order
+                      Total Billed
                     </th>
                   </tr>
                 </thead>
@@ -522,11 +544,34 @@ export default function InvoiceDetailPage() {
                         </td>
                         {isFirst && (
                           <td
-                            className="border border-[#94a3b8] py-2 text-right px-2 font-bold align-top pt-4 bg-[#f9fafb]"
+                            className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
                             rowSpan={rowCount}>
-                            {formatCurrency(Number(invoice.totalAmount))}
-                            <div className="mt-2 text-[10px] font-normal text-[#64748b] uppercase border p-1 rounded border-[#cbd5e1]">
-                              {invoice.category.replace("_", " ")}
+                            <div className="flex flex-col items-end">
+                              {/* Nominal Total */}
+                              <span className="font-bold text-[14px] text-gray-900">
+                                {formatCurrency(Number(invoice.totalAmount))}
+                              </span>
+
+                              {/* Garis Pemisah Tipis */}
+                              <div className="w-full border-t border-dashed border-[#cbd5e1] my-2"></div>
+
+                              {/* Badge Kategori */}
+                              <div className="text-[9px] font-bold text-[#475569] uppercase bg-white border border-[#cbd5e1] px-2 py-1 rounded shadow-sm mb-2.5">
+                                {invoice.category.replace("_", " ")}
+                              </div>
+
+                              {/* Tanggal Tagihan (Bill Date) */}
+                              <div className="text-right text-[10px] leading-tight">
+                                <span className="text-gray-400 font-normal">
+                                  Bill Date:
+                                </span>
+                                <br />
+                                <span className="font-semibold text-gray-700">
+                                  {format(paymentBillingDate, "dd MMM yyyy", {
+                                    locale: idLocale,
+                                  })}
+                                </span>
+                              </div>
                             </div>
                           </td>
                         )}
@@ -560,9 +605,9 @@ export default function InvoiceDetailPage() {
           </div>
 
           {/* BAGIAN BAWAH (Bank & TTD) */}
-          <div className="mt-auto border-t-2 border-gray-100 break-inside-avoid">
-            <div className="flex justify-between items-end">
-              <div className="text-[12px] leading-tight">
+          <div className="mt-auto  break-inside-avoid">
+            <div className="flex justify-end items-end">
+              {/* <div className="text-[12px] leading-tight">
                 <div className="font-bold mb-2 underline">Bank Account:</div>
                 <div className="space-y-1">
                   {salesData.bankAccounts &&
@@ -583,7 +628,7 @@ export default function InvoiceDetailPage() {
                     </div>
                   )}
                 </div>
-              </div>
+              </div> */}
 
               <div className="text-center mr-6">
                 <div className="mb-4 font-bold text-sm">Best Regards,</div>

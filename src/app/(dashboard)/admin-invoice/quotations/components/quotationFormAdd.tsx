@@ -88,6 +88,7 @@ const quotationSchema = z.object({
       z.object({
         isManualProduct: z.boolean().default(false),
         productId: z.string().optional(),
+        variantId: z.string().optional(),
         productName: z.string().min(1, "Product name is required"),
         description: z.string().optional(),
         quantity: z.coerce.number().min(1, "Min 1"),
@@ -125,7 +126,10 @@ function ItemRow({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isManualProduct = form.watch(`items.${index}.isManualProduct`);
-
+  const selectedProductId = form.watch(`items.${index}.productId`);
+  const selectedProduct = products.find((p: any) => p.id === selectedProductId);
+  const isCustomProduct = selectedProduct?.isCustom;
+  const productVariants = selectedProduct?.productVariants || [];
   useEffect(() => {
     if (imageFile) {
       const url = URL.createObjectURL(imageFile);
@@ -162,30 +166,64 @@ function ItemRow({
               {...form.register(`items.${index}.productName`)}
             />
           ) : (
-            <Select
-              onValueChange={(v) => {
-                const p = products.find((x: any) => x.id === v);
-                if (p) {
-                  form.setValue(`items.${index}.productId`, p.id);
-                  form.setValue(`items.${index}.productName`, p.name);
-                  form.setValue(`items.${index}.unitPrice`, p.basePrice);
-                  if (p.description) {
-                    form.setValue(`items.${index}.description`, p.description);
-                    setExpanded(true);
+            <>
+              <Select
+                onValueChange={(v) => {
+                  const p = products.find((x: any) => x.id === v);
+                  if (p) {
+                    form.setValue(`items.${index}.productId`, p.id);
+                    form.setValue(`items.${index}.productName`, p.name);
+                    form.setValue(`items.${index}.variantId`, undefined);
+                    form.setValue(`items.${index}.unitPrice`, p.basePrice);
+                    if (p.description) {
+                      form.setValue(
+                        `items.${index}.description`,
+                        p.description,
+                      );
+                      setExpanded(true);
+                    }
                   }
-                }
-              }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih Produk..." />
-              </SelectTrigger>
-              <SelectContent>
-                {products.map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih Produk..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isCustomProduct && (
+                <Select
+                  value={form.watch(`items.${index}.variantId`) || ""}
+                  onValueChange={(vid) => {
+                    form.setValue(`items.${index}.variantId`, vid);
+                    const variant = productVariants.find(
+                      (v: any) => v.id === vid,
+                    );
+                    // Update Harga berdasarkan harga Variant
+                    if (variant && variant.price) {
+                      form.setValue(
+                        `items.${index}.unitPrice`,
+                        Number(variant.price),
+                      );
+                    }
+                  }}>
+                  <SelectTrigger className="h-8 bg-blue-50/50 border-blue-200 text-xs">
+                    <SelectValue placeholder="Pilih Variant Produk..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productVariants.map((v: any) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.variantName} {v.price ? `- Rp ${v.price}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </>
           )}
         </div>
 

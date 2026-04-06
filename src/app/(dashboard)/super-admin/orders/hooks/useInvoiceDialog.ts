@@ -37,7 +37,8 @@ export function useInvoiceDialog({
   );
   const [splitDpPercent, setSplitDpPercent] = useState<number>(0);
   const [splitDpAmount, setSplitDpAmount] = useState<number>(0);
-
+  const [paymentDate, setPaymentDate] = useState<string>("");
+  const [paidAt, setPaidAt] = useState<string>("");
   // Notes
   const [invoiceNotes, setInvoiceNotes] = useState<InvoiceNote[]>([]);
   const [manualInputs, setManualInputs] = useState<Record<string, string>>({});
@@ -84,6 +85,8 @@ export function useInvoiceDialog({
     setInvoiceCategory("");
     setIsSplitMode(false);
     setSelectedItems([]);
+    setPaymentDate("");
+    setPaidAt("");
     setInvoiceDialogOpen(true);
   };
 
@@ -100,6 +103,8 @@ export function useInvoiceDialog({
     setCustomAmount(0);
     setInvoiceNotes([]);
     setManualInputs({});
+    setPaymentDate("");
+    setPaidAt("");
   };
 
   const handleCreateInvoice = async () => {
@@ -152,6 +157,8 @@ export function useInvoiceDialog({
         dpPercentage: finalDpPercentage,
         customAmount: finalCustomAmount,
         selectedItems: payloadSelectedItems,
+        paymentDate: paymentDate || undefined,
+        paidAt: paidAt || undefined,
         notes: invoiceNotes
           .filter((n) => n.contents.length > 0)
           .map((n) => ({ categoryId: n.categoryId, contents: n.contents })),
@@ -209,6 +216,10 @@ export function useInvoiceDialog({
     setSplitDpPercent,
     splitDpAmount,
     setSplitDpAmount,
+    paymentDate,
+    setPaymentDate,
+    paidAt,
+    setPaidAt,
     invoiceNotes,
     manualInputs,
     setManualInputs,

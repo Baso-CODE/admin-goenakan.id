@@ -26,6 +26,7 @@ export default function QuotationPrint() {
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   const [data, setData] = useState<any>(null);
+  console.log("Quotation Print - Data:", data);
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -116,20 +117,30 @@ export default function QuotationPrint() {
   let clientPic = data.manualClientName || "-";
   let clientAddress = data.manualClientAddress || "-";
 
+  let clientPhone = data.manualClientPhone || "-";
+
   if (data.client?.b2b) {
     clientCompany = data.client.b2b.companyName;
     clientDept = data.client.b2b.department?.name || "-";
     clientAddress = data.client.b2b.fullAddress || clientAddress;
+    // 🔥 TAMBAHAN: Ambil phone perusahaan B2B jika ada
+    clientPhone = data.client.b2b.phone || clientPhone;
 
     // ✅ PIC langsung dari quotation.pic (bukan dari order.pic)
     if (data.pic) {
       const prefix = data.pic.prefix ? `${data.pic.prefix} ` : "";
       clientPic = `${prefix}${data.pic.name}`;
+      // 🔥 TAMBAHAN: Jika PIC punya nomor telepon khusus, gunakan nomor PIC
+      if (data.pic.phone) {
+        clientPhone = data.pic.phone;
+      }
     }
   } else if (data.client?.b2c) {
     clientCompany = data.client.b2c.name;
     clientPic = "Personal";
     clientAddress = data.client.b2c.fullAddress || clientAddress;
+    // 🔥 TAMBAHAN: Ambil phone B2C
+    clientPhone = data.client.b2c.phone || clientPhone;
   }
 
   return (
@@ -201,7 +212,6 @@ export default function QuotationPrint() {
                           : "-"}
                       </td>
                     </tr>
-                    {/* 🔥 Valid Until */}
                     <tr>
                       <td className="py-0.5 pr-4 align-top">Valid Until</td>
                       <td className="py-0.5 align-top font-medium">
@@ -248,6 +258,12 @@ export default function QuotationPrint() {
                     <td className="py-0.5 align-top">
                       : {clientDept !== "-" ? `${clientDept} ` : ""}
                       {clientPic !== "-" ? `(UP: ${clientPic})` : ""}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 align-top">Phone</td>
+                    <td className="py-0.5 align-top font-medium">
+                      : {clientPhone}
                     </td>
                   </tr>
                   <tr>

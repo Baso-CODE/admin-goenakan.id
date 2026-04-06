@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -10,6 +11,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -25,8 +31,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/formatCurrency";
-import { Loader2 } from "lucide-react";
+import { format } from "date-fns";
+import { id as idLocale } from "date-fns/locale";
+import { CalendarIcon, Loader2 } from "lucide-react";
 import {
   InvoiceNote,
   NoteCategory,
@@ -34,7 +43,6 @@ import {
   SplitItem,
 } from "../../types/order.types";
 import { InvoiceNotesSelector } from "../invoiceNotesSelector";
-
 interface GenerateInvoiceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -74,7 +82,6 @@ interface GenerateInvoiceDialogProps {
   setSplitDpAmount: (v: number) => void;
   splitTotalAmount: number;
   updateItemQty: (productId: string, newQty: number) => void;
-
 
   paymentDate?: string;
   setPaymentDate: (v: string) => void;
@@ -125,7 +132,7 @@ export function GenerateInvoiceDialog({
   setSplitDpAmount,
   splitTotalAmount,
   updateItemQty,
-paymentDate,
+  paymentDate,
   setPaymentDate,
   paidAt,
   setPaidAt,
@@ -546,27 +553,79 @@ paymentDate,
               Informasi Pembayaran (Opsional)
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+              {/* --- TANGGAL MULAI TAGIHAN --- */}
+              <div className="space-y-2 flex flex-col">
                 <Label htmlFor="paymentDate">Tanggal Mulai Tagihan</Label>
-                <Input
-                  id="paymentDate"
-                  type="date"
-                  value={paymentDate || ""}
-                  onChange={(e) => setPaymentDate(e.target.value)}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="paymentDate"
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !paymentDate && "text-muted-foreground",
+                      )}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {paymentDate ? (
+                        format(new Date(paymentDate), "dd MMMM yyyy", {
+                          locale: idLocale,
+                        })
+                      ) : (
+                        <span>Pilih tanggal</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={paymentDate ? new Date(paymentDate) : undefined}
+                      onSelect={(date) => {
+                        // Ubah kembali ke format YYYY-MM-DD bawaan input asli
+                        setPaymentDate(date ? format(date, "yyyy-MM-dd") : "");
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
                 <p className="text-[10px] text-muted-foreground">
                   Tanggal invoice ini diterbitkan atau ditagihkan.
                 </p>
               </div>
 
-              <div className="space-y-2">
+              {/* --- TANGGAL LUNAS (PAID AT) --- */}
+              <div className="space-y-2 flex flex-col">
                 <Label htmlFor="paidAt">Tanggal Lunas (Paid At)</Label>
-                <Input
-                  id="paidAt"
-                  type="date"
-                  value={paidAt || ""}
-                  onChange={(e) => setPaidAt(e.target.value)}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="paidAt"
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !paidAt && "text-muted-foreground",
+                      )}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {paidAt ? (
+                        format(new Date(paidAt), "dd MMMM yyyy", {
+                          locale: idLocale,
+                        })
+                      ) : (
+                        <span>Pilih tanggal</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={paidAt ? new Date(paidAt) : undefined}
+                      onSelect={(date) => {
+                        // Ubah kembali ke format YYYY-MM-DD bawaan input asli
+                        setPaidAt(date ? format(date, "yyyy-MM-dd") : "");
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
                 <p className="text-[10px] text-muted-foreground">
                   Isi jika tagihan ini sudah dilunasi sebelumnya.
                 </p>

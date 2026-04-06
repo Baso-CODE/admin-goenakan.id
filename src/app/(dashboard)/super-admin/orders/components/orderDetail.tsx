@@ -234,6 +234,10 @@ export default function OrderDetailPage() {
         setSplitDpAmount={invoiceDialog.setSplitDpAmount}
         splitTotalAmount={splitTotalAmount}
         updateItemQty={invoiceDialog.updateItemQty}
+        paymentDate={invoiceDialog.paymentDate}
+        setPaymentDate={invoiceDialog.setPaymentDate}
+        paidAt={invoiceDialog.paidAt}
+        setPaidAt={invoiceDialog.setPaidAt}
         noteCategories={noteCategories}
         invoiceNotes={invoiceDialog.invoiceNotes}
         manualInputs={invoiceDialog.manualInputs}
