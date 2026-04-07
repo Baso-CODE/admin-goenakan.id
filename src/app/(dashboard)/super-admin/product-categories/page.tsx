@@ -19,6 +19,7 @@ import { FileDown, Loader2, Search } from "lucide-react"; // Import ikon baru
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmDeleteDialog } from "../../components/confirmDeleteDialog";
 
 // === Type definitions ===
 type ProductCategories = {
@@ -53,10 +54,14 @@ const ProductCategoriesPage = () => {
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
 
+  // --- STATE UNTUK DELETE ---
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // --- STATE UNTUK EXPORT FILTER ---
   const [exportStartDate, setExportStartDate] = useState<string>("");
   const [exportEndDate, setExportEndDate] = useState<string>("");
-  const [exporting, setExporting] = useState<boolean>(false); // State untuk loading button export
+  const [exporting, setExporting] = useState<boolean>(false);
 
   // --- FUNGSI FETCH DATA (Untuk Tabel) ---
   const fetchCategories = async () => {
@@ -91,7 +96,39 @@ const ProductCategoriesPage = () => {
       setLoading(false);
     }
   };
+  // --- FUNGSI HANDLE DELETE ---
+  const handleDelete = async () => {
+    if (!deleteId) return;
 
+    setIsDeleting(true);
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const res = await fetch(`${apiUrl}/product-categories/${deleteId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to delete category");
+      }
+
+      toast.success("Product Category berhasil dihapus!");
+      setDeleteId(null);
+      fetchCategories();
+    } catch (error) {
+      console.error("Delete Error:", error);
+      toast.error(
+        "Gagal menghapus Category. Pastikan kategori ini tidak sedang digunakan oleh data produk.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
   // --- FUNGSI HANDLE EXPORT (Implementasi Baru) ---
   const handleExportCategories = async () => {
     setExporting(true);
@@ -107,7 +144,7 @@ const ProductCategoriesPage = () => {
       };
 
       const queryString = new URLSearchParams(
-        exportFilters as Record<string, string>
+        exportFilters as Record<string, string>,
       ).toString();
 
       const exportUrl = `${apiUrl}/product-categories/export/excel?${queryString}`;
@@ -308,7 +345,8 @@ const ProductCategoriesPage = () => {
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="text-xs cursor-pointer">
+                        className="text-xs cursor-pointer"
+                        onClick={() => setDeleteId(data.id)}>
                         Delete
                       </Button>
                     </TableCell>
@@ -354,6 +392,13 @@ const ProductCategoriesPage = () => {
           </div>
         </div>
       )}
+      <ConfirmDeleteDialog
+        isOpen={deleteId !== null}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        isLoading={isDeleting}
+        warningMessage="Product Category tidak dapat dihapus jika sudah digunakan dalam data produk. Pastikan tidak ada produk yang menggunakan kategori ini sebelum menghapus."
+      />
     </div>
   );
 };

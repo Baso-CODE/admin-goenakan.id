@@ -44,7 +44,6 @@ export default function EditQuotationPage() {
 
           isManualClient: !data.clientId,
           clientId: data.clientId || "",
-          // 🔥 Tambah picId dari data API
           picId: data.picId || "",
           manualClientName: data.manualClientName || "",
           manualClientCompany: data.manualClientCompany || "",
@@ -55,13 +54,18 @@ export default function EditQuotationPage() {
           items: data.items.map((item: any) => ({
             isManualProduct: !item.productId,
             productId: item.productId || "",
+            variantId: item.variantId || "",
             productName: item.productName,
             description: item.description || "",
-            quantity: Number(item.quantity),
-            unitPrice: Number(item.unitPrice),
             discount: Number(item.discount || 0),
-            // 🔥 Tambah remarks dari data API
             remarks: item.remarks || "",
+            tiers:
+              item.tiers && item.tiers.length > 0
+                ? item.tiers.map((t: any) => ({
+                    quantity: Number(t.quantity),
+                    unitPrice: Number(t.unitPrice),
+                  }))
+                : [{ quantity: 1, unitPrice: 0 }],
           })),
         };
 

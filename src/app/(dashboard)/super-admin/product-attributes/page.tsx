@@ -21,6 +21,7 @@ import { FileDown, Loader2, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmDeleteDialog } from "../../components/confirmDeleteDialog";
 
 // === Type definitions ===
 type AttributeValue = {
@@ -59,6 +60,9 @@ export default function ProductAttributesPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
+
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // --- STATE BARU UNTUK EXPORT FILTER ---
   const [exportStartDate, setExportStartDate] = useState<string>("");
@@ -103,6 +107,39 @@ export default function ProductAttributesPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!deleteId) return;
+
+    setIsDeleting(true);
+    try {
+      const tokenRes = await fetch("/api/auth/token");
+      const { token } = await tokenRes.json();
+
+      const res = await fetch(`${apiUrl}/product-attributes/${deleteId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to delete attribute");
+      }
+
+      toast.success("Product Attribute berhasil dihapus!");
+      setDeleteId(null);
+      fetchAttributes();
+    } catch (error) {
+      console.error("Delete Error:", error);
+      toast.error(
+        "Gagal menghapus attribute. Pastikan data ini tidak sedang digunakan.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // --- FUNGSI HANDLE EXPORT (Implementasi Baru) ---
   const handleExportAttributes = async () => {
     setExporting(true);
@@ -120,7 +157,7 @@ export default function ProductAttributesPage() {
       };
 
       const queryString = new URLSearchParams(
-        exportFilters as Record<string, string>
+        exportFilters as Record<string, string>,
       ).toString();
 
       // Endpoint untuk export (Sesuaikan dengan endpoint backend Anda: /product-attributes/export/excel)
@@ -163,7 +200,7 @@ export default function ProductAttributesPage() {
     } catch (error) {
       console.error("Export Error:", error);
       toast.error(
-        "Gagal meng-export data. Pastikan endpoint backend sudah siap."
+        "Gagal meng-export data. Pastikan endpoint backend sudah siap.",
       );
     } finally {
       setExporting(false);
@@ -176,7 +213,7 @@ export default function ProductAttributesPage() {
   }, [page, debouncedSearch]);
 
   return (
-    <div className="space-y-4 w-auto mx-auto">
+    <div className="space-y-4 w-auto mx-auto ">
       {/* ================= HEADER & SEARCH/FILTER TABLE ================= */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -255,7 +292,7 @@ export default function ProductAttributesPage() {
           {/* Tombol Export */}
           <Button
             size="sm"
-            className="gap-2 bg-green-600 hover:bg-green-700" // Warna kustom untuk Attributes
+            className="gap-2 bg-green-600 hover:bg-green-700"
             onClick={handleExportAttributes}
             disabled={exporting}>
             {exporting ? (
@@ -288,7 +325,7 @@ export default function ProductAttributesPage() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell>
-                      <Skeleton className="h-4 w-[140px]" />
+                      <Skeleton className="h-4 w-35" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-4 w-50" />
@@ -348,7 +385,10 @@ export default function ProductAttributesPage() {
                         </Button>
                       </Link>
 
-                      <Button variant="destructive" size="sm">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setDeleteId(attr.id)}>
                         Delete
                       </Button>
                     </TableCell>
@@ -394,6 +434,13 @@ export default function ProductAttributesPage() {
           </div>
         </div>
       )}
+      <ConfirmDeleteDialog
+        isOpen={deleteId !== null}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        isLoading={isDeleting}
+        warningMessage="Product Attribute tidak dapat dihapus jika sudah digunakan dalam data produk. Pastikan tidak ada produk yang menggunakan atribut ini sebelum menghapus."
+      />
     </div>
   );
 }

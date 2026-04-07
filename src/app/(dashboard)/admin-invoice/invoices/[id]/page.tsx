@@ -338,8 +338,8 @@ export default function InvoiceDetailPage() {
           className="w-[210mm] h-[297mm] bg-[#ffffff] text-[#1e293b] p-10 flex flex-col font-sans text-[13px] leading-relaxed relative box-border transform scale-90 md:scale-100 origin-top"
           style={{
             width: "210mm",
-            minHeight: "297mm", // Gunakan minHeight agar bisa memanjang jika konten banyak (opsional, untuk print html2canvas lebih aman fix height)
-            height: "auto", // Auto agar fleksibel saat preview, tapi saat print PDF nanti diatur
+            minHeight: "297mm",
+            height: "auto",
             padding: "40px",
             display: "flex",
             flexDirection: "column",

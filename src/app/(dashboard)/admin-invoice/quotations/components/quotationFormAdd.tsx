@@ -7,6 +7,7 @@ import {
   CalendarIcon,
   ChevronDown,
   ImageIcon,
+  Layers,
   Loader2,
   MapPin,
   Phone,
@@ -91,10 +92,16 @@ const quotationSchema = z.object({
         variantId: z.string().optional(),
         productName: z.string().min(1, "Product name is required"),
         description: z.string().optional(),
-        quantity: z.coerce.number().min(1, "Min 1"),
-        unitPrice: z.coerce.number().min(0),
         discount: z.coerce.number().min(0).default(0),
         remarks: z.string().optional(),
+        tiers: z
+          .array(
+            z.object({
+              quantity: z.coerce.number().min(1, "Min 1"),
+              unitPrice: z.coerce.number().min(0),
+            }),
+          )
+          .min(1, "Minimal 1 opsi Qty/Harga harus diisi"),
       }),
     )
     .min(1, "Add at least one item"),
@@ -131,6 +138,14 @@ function ItemRow({
   const selectedProduct = products.find((p: any) => p.id === selectedProductId);
   const isCustomProduct = selectedProduct?.isCustom;
   const productVariants = selectedProduct?.productVariants || [];
+  const {
+    fields: tierFields,
+    append: appendTier,
+    remove: removeTier,
+  } = useFieldArray({
+    control: form.control,
+    name: `items.${index}.tiers`,
+  });
 
   useEffect(() => {
     if (imageFile) {
@@ -144,11 +159,7 @@ function ItemRow({
 
   return (
     <div className="border rounded-lg bg-white shadow-sm transition-all duration-200">
-      {/* ROW UTAMA */}
-      {/* 🔥 PERBAIKAN 1: Ubah items-center menjadi items-start agar kolom input lain tetap di atas saat variant muncul */}
       <div className="grid grid-cols-12 gap-3 items-start p-3">
-        {/* Toggle Manual/DB */}
-        {/* 🔥 Tambahkan mt-1.5 agar sejajar dengan input sebelahnya */}
         <div className="col-span-1 flex flex-col items-center gap-1 mt-1.5">
           <Switch
             checked={!!isManualProduct}
@@ -162,8 +173,6 @@ function ItemRow({
           </span>
         </div>
 
-        {/* Nama Produk & Variant */}
-        {/* 🔥 PERBAIKAN 2: Bungkus dalam flex-col dengan gap yang rapi */}
         <div className="col-span-4 flex flex-col gap-2">
           {isManualProduct ? (
             <Input
@@ -283,8 +292,6 @@ function ItemRow({
           </div>
         </div>
 
-        {/* Actions */}
-        {/* 🔥 Tambahkan mt-1 agar align icon button pas dengan text input */}
         <div className="col-span-1 flex items-center justify-end gap-1 mt-1">
           <Button
             type="button"
@@ -310,7 +317,71 @@ function ItemRow({
           </Button>
         </div>
       </div>
+      <div className="p-3 bg-white">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase flex items-center gap-1.5">
+            <Layers className="w-3 h-3" /> Opsi Kuantitas & Harga
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-6 text-[10px] px-2 py-0 border-dashed border-blue-300 text-blue-600 hover:bg-blue-50"
+            onClick={() => appendTier({ quantity: 1, unitPrice: 0 })}>
+            <Plus className="w-3 h-3 mr-1" /> Tambah Opsi Tier
+          </Button>
+        </div>
 
+        <div className="space-y-2">
+          {tierFields.map((tierField, tierIndex) => (
+            <div
+              key={tierField.id}
+              className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-2 rounded-md">
+              <span className="text-[10px] font-bold text-slate-400 w-4 text-center">
+                #{tierIndex + 1}
+              </span>
+
+              <div className="flex-1 relative">
+                <Input
+                  type="number"
+                  placeholder="100"
+                  className="pr-10 h-8 text-sm"
+                  {...form.register(
+                    `items.${index}.tiers.${tierIndex}.quantity`,
+                  )}
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+                  Qty
+                </span>
+              </div>
+
+              <div className="flex-1 relative">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+                  Rp
+                </span>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  className="pl-7 h-8 text-sm"
+                  {...form.register(
+                    `items.${index}.tiers.${tierIndex}.unitPrice`,
+                  )}
+                />
+              </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 hover:bg-red-50 shrink-0"
+                onClick={() => removeTier(tierIndex)}
+                disabled={tierFields.length <= 1}>
+                <X className="w-3.5 h-3.5 text-red-400" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
       {/* EXPANDED SECTION */}
       {expanded && (
         <div className="border-t bg-gray-50/50 px-4 pb-4 pt-3 rounded-b-lg space-y-4">
@@ -396,26 +467,31 @@ function ItemRow({
 // SUB-COMPONENT: OrderSummary
 // ============================================================
 function OrderSummary({ form, isLoading }: { form: any; isLoading: boolean }) {
-  const items = form.watch("items");
-  const subTotal = items.reduce(
-    (acc: number, item: any) =>
-      acc + Number(item.quantity) * Number(item.unitPrice),
-    0,
-  );
+  const items = form.watch("items") || [];
+
+  // 🟢 LOGIKA SUBTOTAL: Ambil harga dari TIER PERTAMA setiap item sebagai estimasi dasar
+  const subTotal = items.reduce((acc: number, item: any) => {
+    const firstTier = item.tiers?.[0];
+    const qty = Number(firstTier?.quantity) || 0;
+    const price = Number(firstTier?.unitPrice) || 0;
+    return acc + qty * price;
+  }, 0);
+
   const discount = items.reduce(
-    (acc: number, item: any) => acc + Number(item.discount),
+    (acc: number, item: any) => acc + Number(item.discount || 0),
     0,
   );
+
   const grandTotal = subTotal - discount;
 
   return (
     <Card className="bg-slate-50 border-blue-100 h-fit">
       <CardHeader>
-        <CardTitle className="text-base">Ringkasan Biaya</CardTitle>
+        <CardTitle className="text-base">Estimasi Biaya (Ops. 1)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
         <div className="flex justify-between">
-          <span>Subtotal</span>
+          <span>Estimasi Subtotal</span>
           <span>
             {new Intl.NumberFormat("id-ID", {
               style: "currency",
@@ -425,7 +501,7 @@ function OrderSummary({ form, isLoading }: { form: any; isLoading: boolean }) {
         </div>
         <Separator />
         <div className="flex justify-between text-lg font-bold">
-          <span>Total Penawaran</span>
+          <span>Estimasi Total</span>
           <span className="text-blue-600">
             {new Intl.NumberFormat("id-ID", {
               style: "currency",
@@ -433,6 +509,10 @@ function OrderSummary({ form, isLoading }: { form: any; isLoading: boolean }) {
             }).format(grandTotal)}
           </span>
         </div>
+        <p className="text-[10px] text-muted-foreground text-center mt-2 italic">
+          *Total di atas adalah estimasi menggunakan Opsi/Tier pertama. Harga
+          asli menyesuaikan pilihan Klien.
+        </p>
         <Button
           type="submit"
           className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
@@ -447,7 +527,6 @@ function OrderSummary({ form, isLoading }: { form: any; isLoading: boolean }) {
     </Card>
   );
 }
-
 // ============================================================
 // MAIN FORM
 // ============================================================
@@ -485,10 +564,9 @@ export default function QuotationAddForm({
         {
           isManualProduct: false,
           productName: "",
-          quantity: 1,
-          unitPrice: 0,
           discount: 0,
           remarks: "",
+          tiers: [{ quantity: 1, unitPrice: 0 }],
         },
       ],
     },
@@ -1041,10 +1119,9 @@ export default function QuotationAddForm({
                 append({
                   isManualProduct: true,
                   productName: "",
-                  quantity: 1,
-                  unitPrice: 0,
                   discount: 0,
                   remarks: "",
+                  tiers: [{ quantity: 1, unitPrice: 0 }],
                 })
               }>
               <Plus className="w-4 h-4 mr-1" /> Tambah Baris

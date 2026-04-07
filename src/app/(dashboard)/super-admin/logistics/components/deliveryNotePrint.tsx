@@ -208,7 +208,7 @@ export default function DeliveryNotePrint() {
             )}
 
             <div className="mb-6 flex flex-col items-start">
-              <div className="flex flex-col items-start w-[50%] mb-4">
+              <div className="flex flex-col items-start w-full mb-4">
                 <table className="text-[12px] text-left w-full">
                   <tbody>
                     <tr>
@@ -252,18 +252,17 @@ export default function DeliveryNotePrint() {
                       <td className="py-0.5 pr-4 align-top whitespace-nowrap">
                         Invoice No.
                       </td>
-                      <td className="py-0.5 align-top font-medium">
+                      <td className="py-0.5 align-top font-medium wrap-break-word">
                         :{" "}
                         {invoiceNumbers && invoiceNumbers.length > 0
-                          ? invoiceNumbers.join(", ")
+                          ? invoiceNumbers.join(" | ")
                           : "-"}
                       </td>
                     </tr>
-                    {/* ✅ Previous DO — whitespace-nowrap agar label tidak turun */}
                     {previousDO && (
                       <tr>
                         <td className="py-0.5 pr-4 align-top whitespace-nowrap">
-                          Previous DO No.
+                          Previous DN No.
                         </td>
                         <td className="py-0.5 align-top font-medium">
                           : {previousDO.deliveryNoteNumber || "-"}

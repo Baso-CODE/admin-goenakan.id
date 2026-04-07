@@ -10,7 +10,7 @@ import ProductCategoryForm, {
   ProductCategoryFormValues,
 } from "../../components/formCategoryProduct";
 
-const EditCategoryVendor = () => {
+export default function EditProductCategories() {
   const { id } = useParams();
   const [categoryData, setCategoryData] = useState<
     ProductCategoryFormValues | undefined
@@ -48,7 +48,7 @@ const EditCategoryVendor = () => {
   }, [id]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const handleUpdateCategoryProduct = async (
-    data: ProductCategoryFormValues
+    data: ProductCategoryFormValues,
   ) => {
     setIsSubmitting(true);
     try {
@@ -76,7 +76,7 @@ const EditCategoryVendor = () => {
       router.refresh();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to update category"
+        err instanceof Error ? err.message : "Failed to update category",
       );
     } finally {
       setIsSubmitting(false);
@@ -97,6 +97,4 @@ const EditCategoryVendor = () => {
       />
     </div>
   );
-};
-
-export default EditCategoryVendor;
+}

@@ -105,32 +105,26 @@ export default function QuotationPrint() {
   // PREPARE VARIABLES
   // =========================================================
 
-  // ✅ Sales langsung dari quotation (bukan dari order)
   const salesName = data.sales?.name || "Goenakan Admin";
   const salesPhone = data.sales?.phone || "+62 888-0370-1081";
   const salesEmail = "goenakan.id@gmail.com";
   const signatureUrl = data.sales?.signatureUrl;
 
-  // ✅ Client Data
   let clientCompany = data.manualClientCompany || data.manualClientName || "-";
   let clientDept = "-";
   let clientPic = data.manualClientName || "-";
   let clientAddress = data.manualClientAddress || "-";
-
   let clientPhone = data.manualClientPhone || "-";
 
   if (data.client?.b2b) {
     clientCompany = data.client.b2b.companyName;
     clientDept = data.client.b2b.department?.name || "-";
     clientAddress = data.client.b2b.fullAddress || clientAddress;
-    // 🔥 TAMBAHAN: Ambil phone perusahaan B2B jika ada
     clientPhone = data.client.b2b.phone || clientPhone;
 
-    // ✅ PIC langsung dari quotation.pic (bukan dari order.pic)
     if (data.pic) {
       const prefix = data.pic.prefix ? `${data.pic.prefix} ` : "";
       clientPic = `${prefix}${data.pic.name}`;
-      // 🔥 TAMBAHAN: Jika PIC punya nomor telepon khusus, gunakan nomor PIC
       if (data.pic.phone) {
         clientPhone = data.pic.phone;
       }
@@ -139,13 +133,11 @@ export default function QuotationPrint() {
     clientCompany = data.client.b2c.name;
     clientPic = "Personal";
     clientAddress = data.client.b2c.fullAddress || clientAddress;
-    // 🔥 TAMBAHAN: Ambil phone B2C
     clientPhone = data.client.b2c.phone || clientPhone;
   }
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center py-10">
-      {/* TOMBOL DOWNLOAD PDF */}
       <div className="fixed top-5 right-5 z-50">
         <Button
           onClick={handleDownloadPDF}
@@ -160,7 +152,6 @@ export default function QuotationPrint() {
         </Button>
       </div>
 
-      {/* KERTAS A4 */}
       <div className="flex justify-center overflow-auto px-4 pb-10 w-full">
         <div
           id="invoice-content"
@@ -274,7 +265,7 @@ export default function QuotationPrint() {
               </table>
             </div>
 
-            {/* 4. PRODUCT TABLE */}
+            {/* 4. PRODUCT TABLE DENGAN LOGIKA TIER */}
             <div className="mb-8">
               <table className="w-full border-collapse border border-[#94a3b8]">
                 <thead>
@@ -293,54 +284,76 @@ export default function QuotationPrint() {
                 </thead>
                 <tbody>
                   {data.items?.map((item: any) => {
-                    // ✅ Pakai item.imageUrl langsung — sudah dinormalisasi di service
-                    // Covers both: item dari DB (product.images) dan item manual (imageUrl upload)
                     const imageUrl = item.imageUrl;
+                    // 🟡 Pastikan tiers selalu ada dan minimal 1 (meskipun kosong, agar baris tetap ter-render)
+                    const tiers =
+                      item.tiers && item.tiers.length > 0 ? item.tiers : [{}];
+                    const rowSpanLength = tiers.length;
 
-                    return (
-                      <tr key={item.id} className="align-top text-[12px]">
-                        <td className="border border-[#94a3b8] py-2 px-3">
-                          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3">
-                            {imageUrl && (
-                              <div className="shrink-0">
-                                <img
-                                  src={imageUrl}
-                                  alt={item.productName}
-                                  className="w-14 h-14 object-cover rounded shadow-sm border border-gray-200"
-                                  crossOrigin="anonymous"
-                                />
+                    // 🟢 MAP TIER DI DALAM SETIAP ITEM
+                    return tiers.map((tier: any, index: number) => (
+                      <tr
+                        key={`${item.id}-${index}`}
+                        className="align-top text-[12px]">
+                        {/* 🟢 RENDER KOLOM KIRI (PRODUK & SPESIFIKASI) HANYA DI BARIS PERTAMA */}
+                        {index === 0 && (
+                          <>
+                            <td
+                              className="border border-[#94a3b8] py-2 px-3"
+                              rowSpan={rowSpanLength}>
+                              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3">
+                                {imageUrl && (
+                                  <div className="shrink-0">
+                                    <img
+                                      src={imageUrl}
+                                      alt={item.productName}
+                                      className="w-14 h-14 object-cover rounded shadow-sm border border-gray-200"
+                                      crossOrigin="anonymous"
+                                    />
+                                  </div>
+                                )}
+                                <div className="font-bold text-gray-800 mt-1">
+                                  {item.productName}
+                                  {item.variant?.variantName && (
+                                    <div className="text-[10px] text-blue-600 font-semibold mt-0.5">
+                                      ({item.variant.variantName})
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            )}
-                            <div className="font-bold text-gray-800 mt-1">
-                              {item.productName}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="border border-[#94a3b8] py-2 px-3 text-gray-700">
-                          {item.description ? (
-                            <div className="text-[11px] leading-relaxed whitespace-pre-line">
-                              {item.description}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 italic text-[10px]">
-                              -
-                            </span>
-                          )}
-                          {/* 🔥 Remarks di bawah description */}
-                          {item.remarks && (
-                            <div className="mt-1.5 text-[10px] text-slate-500 italic border-t border-slate-100 pt-1">
-                              *{item.remarks}
-                            </div>
-                          )}
-                        </td>
+                            </td>
+                            <td
+                              className="border border-[#94a3b8] py-2 px-3 text-gray-700"
+                              rowSpan={rowSpanLength}>
+                              {item.description ? (
+                                <div className="text-[11px] leading-relaxed whitespace-pre-line">
+                                  {item.description}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 italic text-[10px]">
+                                  -
+                                </span>
+                              )}
+                              {item.remarks && (
+                                <div className="mt-1.5 text-[10px] text-slate-500 italic border-t border-slate-100 pt-1">
+                                  *{item.remarks}
+                                </div>
+                              )}
+                            </td>
+                          </>
+                        )}
+
+                        {/* 🟢 RENDER KOLOM QTY & PRICE DI SETIAP BARIS */}
                         <td className="border border-[#94a3b8] py-2 text-center font-semibold">
-                          {item.quantity}
+                          {tier.quantity || "-"}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 text-right px-4 font-mono font-medium">
-                          {formatCurrency(item.unitPrice)}
+                        <td className="border border-[#94a3b8] py-2 text-right px-4 font-mono font-medium text-blue-700">
+                          {tier.unitPrice
+                            ? formatCurrency(tier.unitPrice)
+                            : "-"}
                         </td>
                       </tr>
-                    );
+                    ));
                   })}
                 </tbody>
               </table>

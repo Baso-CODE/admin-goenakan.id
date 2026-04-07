@@ -7,6 +7,7 @@ import {
   CalendarIcon,
   ChevronDown,
   FileText,
+  Layers,
   Loader2,
   Lock,
   MapPin,
@@ -14,7 +15,8 @@ import {
   Plus,
   Trash2,
   User,
-  UserCheck, // 🔥
+  UserCheck,
+  X, // 🔥
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Resolver, useFieldArray, useForm, useWatch } from "react-hook-form";
@@ -252,7 +254,7 @@ function NotesSection({
 }
 
 // ============================================================
-// 🔥 ITEM ROW — tambah label Qty/Rp/Disc + Remarks
+// ITEM ROW — LOGIKA TIERS
 // ============================================================
 function ItemRow({
   index,
@@ -270,101 +272,138 @@ function ItemRow({
   const [expanded, setExpanded] = useState(false);
   const isManualProduct = form.watch(`items.${index}.isManualProduct`);
 
+  const selectedProductId = form.watch(`items.${index}.productId`);
+  const selectedProduct = products.find((p: any) => p.id === selectedProductId);
+  const isCustomProduct = selectedProduct?.isCustom;
+  const productVariants = selectedProduct?.productVariants || [];
+
+  const {
+    fields: tierFields,
+    append: appendTier,
+    remove: removeTier,
+  } = useFieldArray({
+    control: form.control,
+    name: `items.${index}.tiers`,
+  });
+
   return (
-    <div className="border rounded-lg bg-white shadow-sm">
-      <div className="grid grid-cols-12 gap-2 items-center p-3">
-        <div className="col-span-1 flex flex-col items-center gap-1">
+    <div className="border rounded-lg bg-white shadow-sm transition-all duration-200">
+      <div className="grid grid-cols-12 gap-3 items-start p-3 bg-slate-50/50 rounded-t-lg border-b">
+        <div className="col-span-1 flex flex-col items-center gap-1 mt-1.5">
           <Switch
             checked={!!isManualProduct}
-            onCheckedChange={(v) =>
-              form.setValue(`items.${index}.isManualProduct`, v)
-            }
+            onCheckedChange={(v) => {
+              form.setValue(`items.${index}.isManualProduct`, v);
+              if (v) {
+                form.setValue(`items.${index}.productId`, "");
+                form.setValue(`items.${index}.productName`, "");
+              }
+            }}
             className="scale-75"
           />
           <span className="text-[10px] uppercase font-bold text-muted-foreground">
             {isManualProduct ? "Man" : "DB"}
           </span>
         </div>
-        <div className="col-span-4">
+
+        {/* Nama Produk & Variant */}
+        <div className="col-span-5 flex flex-col gap-2">
           {isManualProduct ? (
             <Input
               placeholder="Nama barang/jasa..."
               {...form.register(`items.${index}.productName`)}
             />
           ) : (
-            <Select
-              onValueChange={(v) => {
-                const p = products.find((x: any) => x.id === v);
-                if (p) {
-                  form.setValue(`items.${index}.productId`, p.id);
-                  form.setValue(`items.${index}.productName`, p.name);
-                  form.setValue(`items.${index}.unitPrice`, p.basePrice);
-                  if (p.description) {
-                    form.setValue(`items.${index}.description`, p.description);
-                    setExpanded(true);
+            <>
+              <Select
+                value={selectedProductId || ""}
+                onValueChange={(v) => {
+                  const p = products.find((x: any) => x.id === v);
+                  if (p) {
+                    form.setValue(`items.${index}.productId`, p.id);
+                    form.setValue(`items.${index}.productName`, p.name);
+                    form.setValue(`items.${index}.variantId`, undefined);
+
+                    if (tierFields.length > 0) {
+                      form.setValue(
+                        `items.${index}.tiers.0.unitPrice`,
+                        p.basePrice,
+                      );
+                    }
+
+                    if (p.description) {
+                      form.setValue(
+                        `items.${index}.description`,
+                        p.description,
+                      );
+                      setExpanded(true);
+                    }
                   }
-                }
-              }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih Produk..." />
-              </SelectTrigger>
-              <SelectContent>
-                {products.map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih Produk..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {isCustomProduct && (
+                <div className="relative pl-4 mt-0.5 before:content-[''] before:absolute before:left-1.5 before:top-0 before:w-px before:h-4 before:bg-blue-300 before:border-l before:border-blue-300">
+                  <div className="absolute left-1.5 top-4 w-2.5 h-px bg-blue-300"></div>
+                  <Select
+                    value={form.watch(`items.${index}.variantId`) || ""}
+                    onValueChange={(vid) => {
+                      form.setValue(`items.${index}.variantId`, vid);
+                      const variant = productVariants.find(
+                        (v: any) => v.id === vid,
+                      );
+
+                      if (variant && variant.price && tierFields.length > 0) {
+                        form.setValue(
+                          `items.${index}.tiers.0.unitPrice`,
+                          Number(variant.price),
+                        );
+                      }
+                    }}>
+                    <SelectTrigger className="h-8 bg-slate-50 border-slate-200 text-xs shadow-none">
+                      <SelectValue placeholder="Pilih Spesifikasi Variant..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {productVariants.map((v: any) => (
+                        <SelectItem key={v.id} value={v.id}>
+                          {v.variantName} {v.price ? `- Rp ${v.price}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        {/* 🔥 Qty dengan label */}
-        <div className="col-span-2">
+        {/* Diskon */}
+        <div className="col-span-3">
           <div className="relative">
-            <Input
-              type="number"
-              placeholder="0"
-              className="pr-10"
-              {...form.register(`items.${index}.quantity`)}
-            />
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
-              Qty
-            </span>
-          </div>
-        </div>
-
-        {/* 🔥 Harga dengan label */}
-        <div className="col-span-2">
-          <div className="relative">
-            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
-              Rp
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+              Disc (Total) Rp
             </span>
             <Input
               type="number"
               placeholder="0"
-              className="pl-7"
-              {...form.register(`items.${index}.unitPrice`)}
-            />
-          </div>
-        </div>
-
-        {/* 🔥 Diskon dengan label */}
-        <div className="col-span-2">
-          <div className="relative">
-            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
-              Disc
-            </span>
-            <Input
-              type="number"
-              placeholder="0"
-              className="pl-9"
+              className="pl-24"
               {...form.register(`items.${index}.discount`)}
             />
           </div>
         </div>
 
-        <div className="col-span-1 flex items-center justify-end gap-1">
+        {/* Actions */}
+        <div className="col-span-3 flex items-center justify-end gap-1 mt-1">
           <Button
             type="button"
             variant="ghost"
@@ -382,7 +421,7 @@ function ItemRow({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 hover:bg-red-50"
             onClick={onRemove}
             disabled={!canRemove}>
             <Trash2 className="w-4 h-4 text-red-500" />
@@ -390,6 +429,74 @@ function ItemRow({
         </div>
       </div>
 
+      {/* TIER SECTION (QTY & HARGA BERTINGKAT) */}
+      <div className="p-3 bg-white">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase flex items-center gap-1.5">
+            <Layers className="w-3 h-3" /> Opsi Kuantitas & Harga
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-6 text-[10px] px-2 py-0 border-dashed border-blue-300 text-blue-600 hover:bg-blue-50"
+            onClick={() => appendTier({ quantity: 1, unitPrice: 0 })}>
+            <Plus className="w-3 h-3 mr-1" /> Tambah Opsi Tier
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          {tierFields.map((tierField, tierIndex) => (
+            <div
+              key={tierField.id}
+              className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-2 rounded-md">
+              <span className="text-[10px] font-bold text-slate-400 w-4 text-center">
+                #{tierIndex + 1}
+              </span>
+
+              <div className="flex-1 relative">
+                <Input
+                  type="number"
+                  placeholder="100"
+                  className="pr-10 h-8 text-sm"
+                  {...form.register(
+                    `items.${index}.tiers.${tierIndex}.quantity`,
+                  )}
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+                  Qty
+                </span>
+              </div>
+
+              <div className="flex-1 relative">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+                  Rp
+                </span>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  className="pl-7 h-8 text-sm"
+                  {...form.register(
+                    `items.${index}.tiers.${tierIndex}.unitPrice`,
+                  )}
+                />
+              </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 hover:bg-red-50 shrink-0"
+                onClick={() => removeTier(tierIndex)}
+                disabled={tierFields.length <= 1}>
+                <X className="w-3.5 h-3.5 text-red-400" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* EXPANDED SECTION */}
       {expanded && (
         <div className="border-t bg-gray-50/50 px-4 pb-4 pt-3 rounded-b-lg space-y-4">
           <div>
@@ -398,14 +505,13 @@ function ItemRow({
             </label>
             <Textarea
               placeholder={
-                "Contoh:\nFabric: 100D Anti color moving fabric\nPrint: Full digital print\nShaft: 14mm black fiberglass shaft\nRibs: 4.0 and 5.0mm black fiberglass ribs\nHandle: Wooden handle, auto open manual close\nTips: Black plastic tips\nTop: Black plastic frosted top"
+                "Contoh:\nFabric: 100D Anti color moving fabric\nPrint: Full digital print..."
               }
               className="text-xs min-h-25 resize-none bg-white font-mono"
               {...form.register(`items.${index}.description`)}
             />
           </div>
 
-          {/* 🔥 Remarks */}
           <div>
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
               Remarks / Catatan Item
@@ -421,7 +527,6 @@ function ItemRow({
     </div>
   );
 }
-
 // === CONSTANTS & SCHEMA ===
 const QUOTATION_STATUSES = [
   "DRAFT",
@@ -439,7 +544,6 @@ const quotationSchema = z.object({
   status: z.enum(QUOTATION_STATUSES).default("DRAFT"),
   isManualClient: z.boolean().default(false),
   clientId: z.string().optional(),
-  // 🔥 Tambah picId
   picId: z.string().optional(),
   manualClientName: z.string().optional(),
   manualClientCompany: z.string().optional(),
@@ -451,13 +555,20 @@ const quotationSchema = z.object({
       z.object({
         isManualProduct: z.boolean().default(false),
         productId: z.string().optional(),
+        variantId: z.string().optional(),
         productName: z.string().min(1, "Product name is required"),
         description: z.string().optional(),
-        quantity: z.coerce.number().min(1, "Qty min 1"),
-        unitPrice: z.coerce.number().min(0, "Price min 0"),
         discount: z.coerce.number().min(0).default(0),
-        // 🔥 Tambah remarks
         remarks: z.string().optional(),
+
+        tiers: z
+          .array(
+            z.object({
+              quantity: z.coerce.number().min(1, "Min 1"),
+              unitPrice: z.coerce.number().min(0),
+            }),
+          )
+          .min(1, "Minimal 1 opsi Qty/Harga harus diisi"),
       }),
     )
     .min(1, "Add at least one item"),
@@ -548,16 +659,14 @@ export default function QuotationForm({
         date: new Date(),
         status: "DRAFT" as const,
         isManualClient: false,
-        // 🔥 Tambah picId default
         picId: "",
         items: [
           {
             isManualProduct: false,
             productName: "",
-            quantity: 1,
-            unitPrice: 0,
             discount: 0,
             remarks: "",
+            tiers: [{ quantity: 1, unitPrice: 0 }],
           },
         ],
       };
@@ -567,7 +676,6 @@ export default function QuotationForm({
       validUntil: initialData.validUntil
         ? new Date(initialData.validUntil)
         : undefined,
-      // 🔥 Pastikan picId ter-populate dari initialData
       picId: initialData.picId || "",
     };
   }, [initialData]);
@@ -580,7 +688,6 @@ export default function QuotationForm({
   useEffect(() => {
     if (initialData) {
       form.reset(defaultValues);
-      // 🔥 Set selectedClient dari initialData saat edit
       if (initialData.clientId && clients.length > 0) {
         const client = clients.find((c) => c.id === initialData.clientId);
         if (client) setSelectedClient(client);
@@ -602,10 +709,16 @@ export default function QuotationForm({
   const { subTotal, totalDiscount, grandTotal } = useMemo(() => {
     let sub = 0,
       disc = 0;
-    items.forEach((item) => {
-      sub += (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+
+    (items || []).forEach((item) => {
+      const firstTier = item.tiers?.[0];
+      const qty = Number(firstTier?.quantity) || 0;
+      const price = Number(firstTier?.unitPrice) || 0;
+
+      sub += qty * price;
       disc += Number(item.discount) || 0;
     });
+
     return { subTotal: sub, totalDiscount: disc, grandTotal: sub - disc };
   }, [items]);
 
@@ -613,7 +726,6 @@ export default function QuotationForm({
     const client = clients.find((c) => c.id === clientId);
     if (client) {
       setSelectedClient(client);
-      // 🔥 Reset picId saat ganti client
       form.setValue("picId", "");
     }
   };
@@ -750,7 +862,6 @@ export default function QuotationForm({
                         />
                       </PopoverContent>
                     </Popover>
-                    {/* 🔥 Tombol hapus tanggal */}
                     {field.value && (
                       <button
                         type="button"
@@ -766,7 +877,6 @@ export default function QuotationForm({
             </CardContent>
           </Card>
 
-          {/* 🔥 CLIENT CARD — lengkap dengan PIC selector */}
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -786,7 +896,6 @@ export default function QuotationForm({
                         checked={field.value}
                         onCheckedChange={(val) => {
                           field.onChange(val);
-                          // 🔥 Reset client & pic saat toggle
                           setSelectedClient(null);
                           form.setValue("clientId", "");
                           form.setValue("picId", "");
@@ -879,7 +988,6 @@ export default function QuotationForm({
                           </div>
                         </div>
 
-                        {/* 🔥 PIC Selector — hanya untuk B2B dengan pics */}
                         {selectedClient.type === "B2B" &&
                           selectedClient.pics &&
                           selectedClient.pics.length > 0 && (
@@ -934,7 +1042,6 @@ export default function QuotationForm({
                                 )}
                               />
 
-                              {/* 🔥 Preview PIC yang dipilih */}
                               {form.watch("picId") &&
                                 (() => {
                                   const pic = selectedClient.pics.find(
@@ -1058,27 +1165,12 @@ export default function QuotationForm({
           </Card>
         </div>
 
-        {/* 🔥 ITEMS — tambah legend Qty/Rp/Disc di header */}
+        {/* ITEMS */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between border-b py-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Box className="w-4 h-4" /> Items & Products
             </CardTitle>
-            {/* 🔥 Legend */}
-            <div className="hidden md:flex items-center gap-4 text-[11px] text-muted-foreground mr-auto ml-4">
-              <span className="flex items-center gap-1">
-                <span className="font-semibold text-slate-600">Qty</span> =
-                Jumlah
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="font-semibold text-slate-600">Rp</span> = Harga
-                Satuan
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="font-semibold text-slate-600">Disc</span> =
-                Diskon (Rp)
-              </span>
-            </div>
             <Button
               type="button"
               variant="secondary"
@@ -1087,11 +1179,9 @@ export default function QuotationForm({
                 append({
                   isManualProduct: true,
                   productName: "",
-                  quantity: 1,
-                  unitPrice: 0,
                   discount: 0,
-                  // 🔥 Tambah remarks default
                   remarks: "",
+                  tiers: [{ quantity: 1, unitPrice: 0 }],
                 })
               }>
               <Plus className="h-4 w-4 mr-2" /> Add Item
@@ -1121,11 +1211,13 @@ export default function QuotationForm({
 
           <Card className="bg-slate-50 h-fit">
             <CardHeader>
-              <CardTitle className="text-base">Financial Summary</CardTitle>
+              <CardTitle className="text-base">
+                Estimasi Biaya (Opsi 1)
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
+                <span className="text-muted-foreground">Estimasi Subtotal</span>
                 <span>
                   {new Intl.NumberFormat("id-ID", {
                     style: "currency",
@@ -1145,24 +1237,27 @@ export default function QuotationForm({
               </div>
               <Separator className="my-2" />
               <div className="flex justify-between text-lg font-bold">
-                <span>Grand Total</span>
-                <span>
+                <span>Estimasi Total</span>
+                <span className="text-blue-600">
                   {new Intl.NumberFormat("id-ID", {
                     style: "currency",
                     currency: "IDR",
                   }).format(grandTotal)}
                 </span>
               </div>
+              <p className="text-[10px] text-muted-foreground text-center mt-2 italic">
+                *Total di atas adalah estimasi menggunakan Opsi/Tier pertama.
+              </p>
               <Button
                 type="submit"
-                className="w-full mt-6"
+                className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white"
                 disabled={isLoading}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
                   </>
                 ) : (
-                  "Save Quotation"
+                  "Update Quotation"
                 )}
               </Button>
             </CardContent>

@@ -61,16 +61,23 @@ type QuotationFollowUp = {
   createdAt: string;
   updatedAt: string;
 };
+type QuotationItemTier = {
+  id: string;
+  quantity: number;
+  unitPrice: string | number;
+  totalPrice: string | number;
+};
 
 // === 2. Tambahkan Type Khusus Item (Opsional tapi disarankan) ===
 type QuotationItem = {
   id: string;
   productName: string;
   description: string | null;
-  quantity: number;
-  unitPrice: string | number;
-  totalPrice: string | number;
-  discount: string | number;
+  discount?: string | number;
+  variant?: {
+    variantName: string;
+  };
+  tiers: QuotationItemTier[];
 };
 
 type QuotationNote = {
@@ -325,34 +332,72 @@ export default function QuotationDetail() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="pl-6">Deskripsi Produk</TableHead>
-                    <TableHead className="text-center">Qty</TableHead>
-                    <TableHead className="text-right">Harga Satuan</TableHead>
-                    <TableHead className="text-right pr-6">Total</TableHead>
+                    <TableHead className="pl-6 w-1/2">
+                      Deskripsi Produk
+                    </TableHead>
+                    <TableHead className="text-center whitespace-nowrap">
+                      Opsi Qty
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      Harga Satuan
+                    </TableHead>
+                    <TableHead className="text-right pr-6 whitespace-nowrap">
+                      Total
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.items.map((item, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="pl-6">
-                        <div className="font-medium">{item.productName}</div>
-                        {item.description && (
-                          <div className="text-xs text-muted-foreground line-clamp-1 italic">
-                            {item.description}
-                          </div>
+                  {data.items.map((item, itemIdx) => {
+                    const tiers =
+                      item.tiers && item.tiers.length > 0 ? item.tiers : [];
+
+                    return tiers.map((tier, tierIdx) => (
+                      <TableRow key={tier.id || `${itemIdx}-${tierIdx}`}>
+                        {tierIdx === 0 && (
+                          <TableCell
+                            className="pl-6 align-top border-r border-slate-100"
+                            rowSpan={tiers.length}>
+                            <div className="font-bold text-blue-700">
+                              {item.productName}
+                            </div>
+
+                            {item.variant?.variantName && (
+                              <Badge
+                                variant="secondary"
+                                className="mt-1 text-[10px] bg-slate-100 text-slate-600">
+                                {item.variant.variantName}
+                              </Badge>
+                            )}
+
+                            {item.description && (
+                              <div className="text-xs text-muted-foreground whitespace-pre-wrap mt-2 leading-relaxed">
+                                {item.description}
+                              </div>
+                            )}
+                          </TableCell>
                         )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {item.quantity}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatIDR(item.unitPrice)}
-                      </TableCell>
-                      <TableCell className="text-right pr-6 font-semibold">
-                        {formatIDR(item.totalPrice)}
+                        <TableCell className="text-center font-medium">
+                          {tier.quantity}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatIDR(tier.unitPrice)}
+                        </TableCell>
+                        <TableCell className="text-right pr-6 font-semibold text-slate-700">
+                          {formatIDR(tier.totalPrice)}
+                        </TableCell>
+                      </TableRow>
+                    ));
+                  })}
+
+                  {data.items.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={4}
+                        className="text-center py-6 text-muted-foreground">
+                        Belum ada item produk.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

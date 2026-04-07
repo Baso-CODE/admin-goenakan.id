@@ -173,18 +173,14 @@ export default function EditOrderForm() {
             (cli: Client) => cli.id === orderData.clientId,
           );
 
-          // Backend service Anda sudah return 'formValues' yang rapi (vendorIds sudah array string)
-          // Jadi kita tinggal masukkan ke reset()
           reset({
             ...orderData,
-            // Pastikan field PIC dan Channel di-set (fallback ke empty string)
             clientB2BPICId: orderData.clientB2BPICId || "",
             purchaseChannelId: orderData.purchaseChannelId || "",
-            // Phone logic
+
             phone: currentClient?.phone || "",
           });
 
-          // Logic tambahan: Jika ada PIC yang tersimpan, update no HP ke HP PIC
           if (orderData.clientB2BPICId && currentClient?.type === "B2B") {
             const selectedPic = currentClient.pics?.find(
               (p: PIC) => p.id === orderData.clientB2BPICId,
@@ -217,11 +213,8 @@ export default function EditOrderForm() {
   const selectedClientData = clients.find((c) => c.id === selectedClientId);
   const isB2B = selectedClientData?.type === "B2B";
   const availablePics = selectedClientData?.pics || [];
-
-  // Effect: Update Phone saat PIC dipilih (User interaction)
   const selectedPicId = watch("clientB2BPICId");
   useEffect(() => {
-    // Jalankan hanya jika loading selesai agar tidak bentrok saat initial render
     if (!loading && isB2B && selectedPicId) {
       const pic = availablePics.find((p) => p.id === selectedPicId);
       if (pic && (pic as any).phone) {
@@ -248,8 +241,6 @@ export default function EditOrderForm() {
     try {
       setSubmitting(true);
       const { phone, ...payload } = data;
-
-      // Bersihkan string kosong agar Prisma disconnect (optional, backend sudah handle)
       if (!payload.clientB2BPICId) delete payload.clientB2BPICId;
       if (!payload.purchaseChannelId) delete payload.purchaseChannelId;
       if (payload.salesCategory === "SAMPLE") {

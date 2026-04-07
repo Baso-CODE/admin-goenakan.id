@@ -145,6 +145,11 @@ export default function SidebarRole({ ...props }) {
             icon: Tags,
           },
           {
+            title: "Product Tags",
+            url: "/super-admin/product-tags",
+            icon: Tags,
+          },
+          {
             title: "Product Attributes",
             url: "/super-admin/product-attributes",
             icon: AlignHorizontalDistributeStart,
