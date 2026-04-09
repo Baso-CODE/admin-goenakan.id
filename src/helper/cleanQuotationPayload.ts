@@ -22,17 +22,25 @@ export const cleanQuotationPayload = (data: QuotationPayloadInput) => {
 
   // 4. Logic Items
   payload.items = data.items.map((item) => {
+    // Pisahkan isManualProduct agar tidak ikut terkirim ke backend
     const { isManualProduct, ...cleanItem }: any = { ...item };
 
     if (!isManualProduct && item.productId) {
-      // Produk dari DB — biarkan productId
+      // Produk dari DB — biarkan productId (dan variantId jika ada)
     } else {
+      // Jika produk manual, kosongkan relasi ke DB
       cleanItem.productId = null;
+      cleanItem.variantId = null;
     }
 
-    cleanItem.quantity = Number(item.quantity);
-    cleanItem.unitPrice = Number(item.unitPrice);
     cleanItem.discount = Number(item.discount || 0);
+
+    if (item.tiers && item.tiers.length > 0) {
+      cleanItem.tiers = item.tiers.map((tier: any) => ({
+        quantity: Number(tier.quantity || 0),
+        unitPrice: Number(tier.unitPrice || 0),
+      }));
+    }
 
     return cleanItem;
   });
