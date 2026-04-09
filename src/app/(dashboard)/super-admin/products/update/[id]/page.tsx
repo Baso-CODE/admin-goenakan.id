@@ -17,6 +17,7 @@ import FormUpdateVariants, {
 
 const CLOUDINARY_CLOUD_NAME = "do9sfnf5k";
 const CLOUDINARY_UPLOAD_PRESET = "ml_default";
+
 export default function EditProductPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -159,15 +160,20 @@ export default function EditProductPage() {
           }
         });
 
-        // Tambahkan Data Varian ke DTO
         dtoVariants.push({
           variantId: v.id,
           variantName: v.variantName,
+          description: v.description,
           sku: v.sku,
           price: v.price,
-
           stock: 0,
-          attributeValueIds: [],
+
+          weight: v.weight,
+          width: v.width,
+          height: v.height,
+          length: v.length,
+          // ---------------------------------
+          attributeValueIds: v.attributeValueIds || [],
           images: variantImages,
         });
       });
@@ -192,7 +198,6 @@ export default function EditProductPage() {
       // 6. Penanganan Respons
       if (!res.ok) {
         const errorData = await res.json();
-        // Lemparkan pesan error yang lebih spesifik dari backend
         throw new Error(errorData.message || "Failed to update variants");
       }
 
@@ -200,10 +205,9 @@ export default function EditProductPage() {
 
       toast.success("Variants updated successfully");
 
-      // Perbarui data produk di state
       setProductData((prev: any) => ({
         ...prev,
-        variants: updated.variants, // Pastikan backend mengembalikan data varian terbaru
+        variants: updated.variants,
       }));
     } catch (err) {
       toast.error(

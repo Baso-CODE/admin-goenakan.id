@@ -148,6 +148,11 @@ export function useInvoiceDialog({
               throw new Error("Isi nominal DP terlebih dahulu");
             }
           }
+        } else if (invoiceCategory === "INSTALLMENT") {
+          if (customAmount <= 0) {
+            throw new Error("Isi nominal tagihan terlebih dahulu");
+          }
+          finalCustomAmount = customAmount;
         }
       }
 

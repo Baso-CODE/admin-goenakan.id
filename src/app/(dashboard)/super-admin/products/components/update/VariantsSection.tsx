@@ -16,6 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { VariantImageDetail } from "./VariantImageDetail";
 
 // --- SCHEMA & TYPE (Tetap Sama) ---
@@ -36,6 +37,7 @@ const VariantSchema = z.object({
     z.object({
       id: z.string().optional(),
       variantName: z.string().min(1, "Name is required"),
+      description: z.string().optional().nullable(),
       sku: z.string().optional(),
       price: z.coerce.number().min(0, "Price must be non-negative"),
       weight: z.coerce.number().min(0).optional().nullable(),
@@ -85,6 +87,7 @@ export default function FormUpdateVariants({
         variants: initialData.productVariants.map((v: any) => ({
           id: v.id,
           variantName: v.variantName ?? "",
+          description: v.description ?? "",
           sku: v.sku ?? "",
           price: Number(v.price) ?? 0,
           _isDeleted: false,
@@ -92,7 +95,7 @@ export default function FormUpdateVariants({
           width: v.width ? Number(v.width) : undefined,
           height: v.height ? Number(v.height) : undefined,
           length: v.length ? Number(v.length) : undefined,
-          // Pastikan attributeValueIds dimuat dari relasi
+
           attributeValueIds:
             v.attributeValues?.map((av: any) => av.attributeValueId) ?? [],
           images: v.images.map((img: any) => ({
@@ -125,6 +128,7 @@ export default function FormUpdateVariants({
     append({
       id: undefined,
       variantName: "",
+      description: "",
       sku: "",
       price: 0,
       weight: undefined,
@@ -311,6 +315,24 @@ export default function FormUpdateVariants({
                     />
                   </div>
 
+                  <FormField
+                    control={form.control}
+                    name={`variants.${index}.description`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Variant Description (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Deskripsi spesifik untuk varian ini..."
+                            className="resize-y min-h-20"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <div className="pt-4 border-t border-gray-200">
                     <FormLabel className="mb-3 block text-gray-700">
                       Dimensi & Berat (Opsional)

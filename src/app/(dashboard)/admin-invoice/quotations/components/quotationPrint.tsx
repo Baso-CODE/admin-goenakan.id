@@ -274,7 +274,7 @@ export default function QuotationPrint() {
                       Product Detail
                     </th>
                     <th className="border border-[#94a3b8] py-2">
-                      Product Specification
+                      Description & Specification
                     </th>
                     <th className="border border-[#94a3b8] py-2 w-20">Qty</th>
                     <th className="border border-[#94a3b8] py-2 w-32">
@@ -285,17 +285,13 @@ export default function QuotationPrint() {
                 <tbody>
                   {data.items?.map((item: any) => {
                     const imageUrl = item.imageUrl;
-                    // 🟡 Pastikan tiers selalu ada dan minimal 1 (meskipun kosong, agar baris tetap ter-render)
                     const tiers =
                       item.tiers && item.tiers.length > 0 ? item.tiers : [{}];
                     const rowSpanLength = tiers.length;
-
-                    // 🟢 MAP TIER DI DALAM SETIAP ITEM
                     return tiers.map((tier: any, index: number) => (
                       <tr
                         key={`${item.id}-${index}`}
                         className="align-top text-[12px]">
-                        {/* 🟢 RENDER KOLOM KIRI (PRODUK & SPESIFIKASI) HANYA DI BARIS PERTAMA */}
                         {index === 0 && (
                           <>
                             <td
@@ -325,25 +321,44 @@ export default function QuotationPrint() {
                             <td
                               className="border border-[#94a3b8] py-2 px-3 text-gray-700"
                               rowSpan={rowSpanLength}>
+                              {/* 1. PRODUCT DESCRIPTION */}
                               {item.description ? (
-                                <div className="text-[11px] leading-relaxed whitespace-pre-line">
+                                <div className="text-[11px] leading-relaxed whitespace-pre-line text-justify">
                                   {item.description}
                                 </div>
-                              ) : (
+                              ) : null}
+
+                              {/* 2. PRODUCT SPECIFICATION / CUSTOMIZATION */}
+                              {item.customization && (
+                                <div
+                                  className={`text-[10px] space-y-1 ${item.description ? "mt-3 pt-2 border-t border-gray-100" : ""}`}>
+                                  <div className="font-semibold text-gray-800 mb-1">
+                                    Specifications:
+                                  </div>
+                                  {item.customization}
+                                </div>
+                              )}
+
+                              {/* FALLBACK JIKA KEDUANYA KOSONG */}
+                              {!item.description && !item.customization && (
                                 <span className="text-gray-400 italic text-[10px]">
-                                  -
+                                  No description or specification provided.
                                 </span>
                               )}
+
+                              {/* 3. REMARKS / CATATAN KHUSUS */}
                               {item.remarks && (
-                                <div className="mt-1.5 text-[10px] text-slate-500 italic border-t border-slate-100 pt-1">
-                                  *{item.remarks}
+                                <div className="mt-2 text-[10px] text-slate-500 italic border-t border-slate-100 pt-1.5 bg-slate-50 p-1 rounded-sm">
+                                  <span className="font-semibold text-slate-700 not-italic">
+                                    Note:
+                                  </span>{" "}
+                                  {item.remarks}
                                 </div>
                               )}
                             </td>
                           </>
                         )}
 
-                        {/* 🟢 RENDER KOLOM QTY & PRICE DI SETIAP BARIS */}
                         <td className="border border-[#94a3b8] py-2 text-center font-semibold">
                           {tier.quantity || "-"}
                         </td>

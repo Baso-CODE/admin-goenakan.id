@@ -28,8 +28,6 @@ export default function OrderStats() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        // Mengarah ke endpoint statistik umum (bukan sample)
-        // Pastikan endpoint ini dibuat di backend (lihat instruksi di bawah)
         const res = await fetch(`${apiUrl}/orders/stats/general`, {
           headers: { Authorization: `Bearer ${token}` },
         });

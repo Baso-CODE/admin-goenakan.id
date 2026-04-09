@@ -69,11 +69,17 @@ const attributeSelectionSchema = z.object({
   valueIds: z.array(z.string()).min(1, "Choose at least one value"),
 });
 
+// Cari bagian ini di atas
 const variantMetaSchema = z.object({
   variantIndex: z.number(),
   isFeatured: z.boolean().optional(),
   price: z.number().min(0, "Price must be >= 0"),
   altText: z.string().optional(),
+  description: z.string().optional(),
+  weight: z.number().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  length: z.number().optional(),
 });
 
 // Video meta schema tetap sama
@@ -318,6 +324,11 @@ export default function ProductFormV2({
       price: currentBasePrice,
       isFeatured: false,
       altText: "",
+      description: "",
+      weight: undefined,
+      length: undefined,
+      width: undefined,
+      height: undefined,
     }));
 
     setVariantMetas(newVariantMetas);

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-// 1. TAMBAHKAN IMPORT PENCIL
 import { Check, Pencil, Plus, Star, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -29,6 +28,7 @@ interface VariantListProps {
   variantMetas: {
     variantIndex: number;
     price: number;
+    description?: string;
     isFeatured?: boolean;
     altText?: string;
     weight?: number;
@@ -270,9 +270,10 @@ export function VariantList({
               </h4>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-              {/* 🔥 MODIFIKASI: Kolom Kiri (Price & Dimensi) */}
-              <div className="md:col-span-1 bg-white p-4 rounded-lg border shadow-sm space-y-5">
+            {/* 🟢 UPDATE DISINI: Mengubah dari grid Kiri-Kanan menjadi Atas-Bawah (flex-col) */}
+            <div className="flex flex-col gap-6 items-start">
+              {/* BAGIAN ATAS: Informasi (Price, Dimensi, & Deskripsi) - Full Width */}
+              <div className="w-full bg-white p-4 rounded-lg border shadow-sm space-y-5">
                 <div className="space-y-2">
                   <Label className="text-xs font-bold text-gray-500 uppercase">
                     Variant Price (Rp)
@@ -284,7 +285,7 @@ export function VariantList({
                     onChange={(e) =>
                       onUpdateVariantMeta(idx, "price", e.target.valueAsNumber)
                     }
-                    className="font-mono font-medium text-lg"
+                    className="font-mono font-medium text-lg md:w-1/3" // Diberi batas lebar sedikit agar tidak terlalu panjang
                     placeholder="0"
                   />
                   <p className="text-[10px] text-muted-foreground">
@@ -292,12 +293,12 @@ export function VariantList({
                   </p>
                 </div>
 
-                {/* 🔥 TAMBAHAN: Form Dimensi & Berat */}
                 <div className="pt-4 border-t border-gray-100 space-y-3">
                   <Label className="text-xs font-bold text-gray-500 uppercase">
                     Dimensi & Berat
                   </Label>
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Grid ini akan 2 kolom di HP, dan 4 kolom berjajar di layar besar */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="space-y-1">
                       <Label className="text-[10px] text-muted-foreground font-semibold">
                         Berat (gram)
@@ -315,7 +316,7 @@ export function VariantList({
                               : undefined,
                           )
                         }
-                        className="h-8 text-xs bg-gray-50"
+                        className="h-9 text-sm bg-gray-50"
                         placeholder="0"
                       />
                     </div>
@@ -336,7 +337,7 @@ export function VariantList({
                               : undefined,
                           )
                         }
-                        className="h-8 text-xs bg-gray-50"
+                        className="h-9 text-sm bg-gray-50"
                         placeholder="0"
                       />
                     </div>
@@ -357,7 +358,7 @@ export function VariantList({
                               : undefined,
                           )
                         }
-                        className="h-8 text-xs bg-gray-50"
+                        className="h-9 text-sm bg-gray-50"
                         placeholder="0"
                       />
                     </div>
@@ -378,16 +379,30 @@ export function VariantList({
                               : undefined,
                           )
                         }
-                        className="h-8 text-xs bg-gray-50"
+                        className="h-9 text-sm bg-gray-50"
                         placeholder="0"
                       />
                     </div>
                   </div>
                 </div>
+
+                <div className="pt-4 border-t border-gray-100 space-y-2">
+                  <Label className="text-xs font-bold text-gray-500 uppercase">
+                    Description (Optional)
+                  </Label>
+                  <Textarea
+                    placeholder="Tulis deskripsi spesifik untuk varian ini..."
+                    value={meta?.description ?? ""}
+                    onChange={(e) =>
+                      onUpdateVariantMeta(idx, "description", e.target.value)
+                    }
+                    className="resize-y min-h-20 text-sm bg-gray-50 focus-visible:bg-white transition-colors placeholder:text-gray-400 focus-visible:ring-indigo-600 focus-visible:border-indigo-600"
+                  />
+                </div>
               </div>
 
-              {/* Kolom Kanan (Images) */}
-              <div className="md:col-span-2 space-y-4">
+              {/* BAGIAN BAWAH: Images - Full Width */}
+              <div className="w-full space-y-4">
                 <Button
                   type="button"
                   variant="outline"
@@ -410,9 +425,10 @@ export function VariantList({
                   }}
                 />
 
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                {/* Grid gambar di-adjust sedikit agar lebih banyak yang bisa tampil jika layarnya lebar */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                   {images.length === 0 && (
-                    <div className="col-span-full py-4 text-center text-sm text-gray-400 italic border-2 border-dashed rounded-lg">
+                    <div className="col-span-full py-4 text-center text-sm text-gray-400 italic border-2 border-dashed rounded-lg bg-white/50">
                       No images yet
                     </div>
                   )}

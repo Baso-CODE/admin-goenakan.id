@@ -54,6 +54,14 @@ type InvoiceDetail = {
   method?: string;
   order: {
     poNumber: string;
+    totalAmount?: number;
+    invoices?: {
+      id: number;
+      category: string;
+      status: string;
+      totalAmount: number;
+      paidAt: string | null;
+    }[];
     sales: {
       name: string;
       phone: string;
@@ -96,7 +104,6 @@ type InvoiceDetail = {
     product: { name: string; sku: string };
     variant?: { variantName: string; sku: string };
   }[];
-  // [UPDATE] Notes Field
   notes: {
     id: string;
     content: string;
@@ -276,6 +283,35 @@ export default function InvoiceDetailPage() {
 
   const salesData = invoice.order.sales;
 
+  const calculatedOrderTotal = invoice.items.reduce(
+    (acc, item) => acc + Number(item.price) * item.quantity,
+    0,
+  );
+  const orderTotal = invoice.order?.totalAmount ?? calculatedOrderTotal;
+
+  const isDP = invoice.category === "DP";
+  const isPelunasan =
+    invoice.category === "REMAINING_BALANCE" ||
+    invoice.category === "INSTALLMENT";
+
+  // Mencari DP dari history invoice milik order ini (untuk tabel cicilan/pelunasan)
+  const dpInvoice = invoice.order?.invoices?.find(
+    (inv) => inv.category === "DP",
+  );
+  const previousInvoices =
+    invoice.order?.invoices
+      ?.filter((inv) => inv.id !== invoice.id && inv.status !== "CANCELLED")
+      .sort((a, b) => a.id - b.id) || [];
+
+  const dpAmount = dpInvoice?.totalAmount ?? orderTotal - invoice.totalAmount;
+  const dpPaidAt = dpInvoice?.paidAt;
+
+  const isAllPreviousPaid =
+    previousInvoices.length > 0 &&
+    previousInvoices.every((inv) => inv.status === "PAID");
+  const latestPaidAt = previousInvoices
+    .map((inv) => (inv.paidAt ? new Date(inv.paidAt).getTime() : 0))
+    .sort((a, b) => b - a)[0]; // Ambil yang paling baru
   return (
     <div className="bg-gray-50 min-h-screen pb-20">
       {/* TOP BAR */}
@@ -482,25 +518,45 @@ export default function InvoiceDetailPage() {
               </table>
             </div>
 
-            {/* 4. PRODUCT TABLE */}
+            {/* 4. PRODUCT TABLE (WITH DYNAMIC COLUMNS) */}
             <div className="mb-4">
               <table className="w-full border-collapse border border-[#94a3b8]">
                 <thead>
                   <tr className="bg-[#f3f4f6] text-center font-bold">
-                    <th className="border border-[#94a3b8] py-2 w-10">No</th>
+                    <th className="border border-[#94a3b8] py-2 w-8">No</th>
                     <th className="border border-[#94a3b8] py-2">
                       Product Description
                     </th>
-                    <th className="border border-[#94a3b8] py-2 w-20">Qty</th>
-                    <th className="border border-[#94a3b8] py-2 w-32.5">
+                    <th className="border border-[#94a3b8] py-2 w-12">Qty</th>
+                    <th className="border border-[#94a3b8] py-2 w-28">
                       Unit Price
                     </th>
-                    <th className="border border-[#94a3b8] py-2 w-32.5">
-                      Total
-                    </th>
-                    <th className="border border-[#94a3b8] py-2 w-32.5">
-                      Total Billed
-                    </th>
+                    <th className="border border-[#94a3b8] py-2 w-28">Total</th>
+
+                    {/* Header Dinamis Berdasarkan Tipe Invoice */}
+                    {isDP ? (
+                      <>
+                        <th className="border border-[#94a3b8] py-2 w-32">
+                          Total Order
+                        </th>
+                        <th className="border border-[#94a3b8] py-2 w-32">
+                          Total DP
+                        </th>
+                      </>
+                    ) : isPelunasan ? (
+                      <>
+                        <th className="border border-[#94a3b8] py-2 w-32">
+                          Total DP
+                        </th>
+                        <th className="border border-[#94a3b8] py-2 w-32">
+                          Total Billed
+                        </th>
+                      </>
+                    ) : (
+                      <th className="border border-[#94a3b8] py-2 w-32">
+                        Total Billed
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -541,38 +597,223 @@ export default function InvoiceDetailPage() {
                         <td className="border border-[#94a3b8] py-2 text-right px-2 font-medium">
                           {formatCurrency(Number(item.price) * item.quantity)}
                         </td>
+
+                        {/* ========================================================= */}
+                        {/* 🟢 BLOK KOLOM DINAMIS (Hanya muncul di Baris Pertama) 🟢 */}
+                        {/* ========================================================= */}
                         {isFirst && (
-                          <td
-                            className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
-                            rowSpan={rowCount}>
-                            <div className="flex flex-col items-end">
-                              {/* Nominal Total */}
-                              <span className="font-bold text-[14px] text-gray-900">
-                                {formatCurrency(Number(invoice.totalAmount))}
-                              </span>
+                          <>
+                            {isDP ? (
+                              <>
+                                {/* KOLOM 1: TOTAL ORDER */}
+                                <td
+                                  className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
+                                  rowSpan={rowCount}>
+                                  <div className="flex flex-col items-end">
+                                    <span className="font-bold text-[14px] text-gray-900">
+                                      {formatCurrency(Number(orderTotal))}
+                                    </span>
+                                  </div>
+                                </td>
 
-                              {/* Garis Pemisah Tipis */}
-                              <div className="w-full border-t border-dashed border-[#cbd5e1] my-2"></div>
+                                {/* KOLOM 2: TOTAL DP */}
+                                <td
+                                  className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
+                                  rowSpan={rowCount}>
+                                  <div className="flex flex-col items-end w-full">
+                                    <span className="font-bold text-[14px] text-gray-900">
+                                      {formatCurrency(
+                                        Number(invoice.totalAmount),
+                                      )}
+                                    </span>
 
-                              {/* Badge Kategori */}
-                              <div className="text-[9px] font-bold text-[#475569] uppercase bg-white border border-[#cbd5e1] px-2 py-1 rounded shadow-sm mb-2.5">
-                                {invoice.category.replace("_", " ")}
-                              </div>
+                                    {invoice.status === "PAID" &&
+                                    invoice.paidAt ? (
+                                      <div className="w-full flex flex-col items-center mt-2 border-t border-dashed border-[#cbd5e1] pt-2">
+                                        <div className="bg-green-600 text-white font-bold tracking-wider text-[10px] w-full py-1 text-center rounded-sm">
+                                          PAID
+                                        </div>
+                                        <div className="text-[9px] text-gray-600 font-medium mt-1">
+                                          {format(
+                                            new Date(invoice.paidAt),
+                                            "dd MMM yyyy",
+                                            { locale: idLocale },
+                                          )}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="w-full flex flex-col items-end mt-2 border-t border-dashed border-[#cbd5e1] pt-2">
+                                        <div className="text-[9px] font-bold text-[#475569] uppercase bg-white border border-[#cbd5e1] px-2 py-1 rounded shadow-sm mb-1">
+                                          {invoice.category.replace("_", " ")}
+                                        </div>
+                                        <div className="text-right text-[9px] leading-tight mt-1">
+                                          <span className="text-gray-400 font-normal">
+                                            Bill Date:
+                                          </span>
+                                          <br />
+                                          <span className="font-semibold text-gray-700">
+                                            {format(
+                                              paymentBillingDate,
+                                              "dd MMM yyyy",
+                                              { locale: idLocale },
+                                            )}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </>
+                            ) : isPelunasan ? (
+                              <>
+                                {/* KOLOM 1: TOTAL DP (History Pembayaran Sebelumnya) */}
+                                <td
+                                  className="border border-[#94a3b8] py-4 px-2 align-top bg-[#f9fafb]"
+                                  rowSpan={rowCount}>
+                                  <div className="flex flex-col items-center justify-start w-full gap-5">
+                                    {previousInvoices.length > 0 ? (
+                                      previousInvoices.map((prevInv) => (
+                                        <div
+                                          key={prevInv.id}
+                                          className="flex flex-col items-center text-center leading-tight">
+                                          {/* NOMINAL PEMBAYARAN */}
+                                          <span className="font-bold text-[11px] text-gray-900">
+                                            {formatCurrency(
+                                              Number(prevInv.totalAmount),
+                                            )}
+                                          </span>
 
-                              {/* Tanggal Tagihan (Bill Date) */}
-                              <div className="text-right text-[10px] leading-tight">
-                                <span className="text-gray-400 font-normal">
-                                  Bill Date:
-                                </span>
-                                <br />
-                                <span className="font-semibold text-gray-700">
-                                  {format(paymentBillingDate, "dd MMM yyyy", {
-                                    locale: idLocale,
-                                  })}
-                                </span>
-                              </div>
-                            </div>
-                          </td>
+                                          {/* KETERANGAN (DP / CICILAN - PAID) */}
+                                          <span className="text-[9px] font-semibold text-gray-700 mt-1">
+                                            {prevInv.category === "DP"
+                                              ? "DP"
+                                              : "CICILAN"}{" "}
+                                            - {prevInv.status}
+                                          </span>
+
+                                          {/* TANGGAL PEMBAYARAN */}
+                                          {prevInv.status === "PAID" &&
+                                            prevInv.paidAt && (
+                                              <span className="text-[9px] text-gray-600 mt-0.5">
+                                                {format(
+                                                  new Date(prevInv.paidAt),
+                                                  "dd/MM/yyyy",
+                                                )}
+                                              </span>
+                                            )}
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="flex flex-col items-center text-center">
+                                        <span className="font-bold text-[11px] text-gray-900">
+                                          {formatCurrency(Number(dpAmount))}
+                                        </span>
+                                        <span className="text-[9px] text-gray-500 mt-1">
+                                          Belum ada data
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+
+                                {/* KOLOM 2: TOTAL BILLED (Tagihan Saat Ini) */}
+                                <td
+                                  className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
+                                  rowSpan={rowCount}>
+                                  <div className="flex flex-col items-end w-full">
+                                    <span className="font-bold text-[14px] text-gray-900">
+                                      {formatCurrency(
+                                        Number(invoice.totalAmount),
+                                      )}
+                                    </span>
+
+                                    {invoice.status === "PAID" &&
+                                    invoice.paidAt ? (
+                                      <div className="w-full flex flex-col items-center mt-2 border-t border-dashed border-[#cbd5e1] pt-2">
+                                        <div className="bg-green-600 text-white font-bold tracking-wider text-[10px] w-full py-1 text-center rounded-sm">
+                                          PAID
+                                        </div>
+                                        <div className="text-[9px] text-gray-600 font-medium mt-1">
+                                          {format(
+                                            new Date(invoice.paidAt),
+                                            "dd MMM yyyy",
+                                            { locale: idLocale },
+                                          )}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="w-full flex flex-col items-end mt-2 border-t border-dashed border-[#cbd5e1] pt-2">
+                                        <div className="text-[9px] font-bold text-[#475569] uppercase bg-white border border-[#cbd5e1] px-2 py-1 rounded shadow-sm mb-1">
+                                          {invoice.category.replace("_", " ")}
+                                        </div>
+                                        <div className="text-right text-[9px] leading-tight mt-1">
+                                          <span className="text-gray-400 font-normal">
+                                            Bill Date:
+                                          </span>
+                                          <br />
+                                          <span className="font-semibold text-gray-700">
+                                            {format(
+                                              paymentBillingDate,
+                                              "dd MMM yyyy",
+                                              { locale: idLocale },
+                                            )}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </>
+                            ) : (
+                              /* JIKA FULL PAYMENT STANDARD (1 KOLOM) */
+                              <td
+                                className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
+                                rowSpan={rowCount}>
+                                <div className="flex flex-col items-end w-full">
+                                  <span className="font-bold text-[14px] text-gray-900">
+                                    {formatCurrency(
+                                      Number(invoice.totalAmount),
+                                    )}
+                                  </span>
+
+                                  {invoice.status === "PAID" &&
+                                  invoice.paidAt ? (
+                                    <div className="w-full flex flex-col items-center mt-2 border-t border-dashed border-[#cbd5e1] pt-2">
+                                      <div className="bg-green-600 text-white font-bold tracking-wider text-[10px] w-full py-1 text-center rounded-sm">
+                                        PAID
+                                      </div>
+                                      <div className="text-[9px] text-gray-600 font-medium mt-1">
+                                        {format(
+                                          new Date(invoice.paidAt),
+                                          "dd MMM yyyy",
+                                          { locale: idLocale },
+                                        )}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="w-full flex flex-col items-end mt-2 border-t border-dashed border-[#cbd5e1] pt-2">
+                                      <div className="text-[9px] font-bold text-[#475569] uppercase bg-white border border-[#cbd5e1] px-2 py-1 rounded shadow-sm mb-1">
+                                        {invoice.category.replace("_", " ")}
+                                      </div>
+                                      <div className="text-right text-[9px] leading-tight mt-1">
+                                        <span className="text-gray-400 font-normal">
+                                          Bill Date:
+                                        </span>
+                                        <br />
+                                        <span className="font-semibold text-gray-700">
+                                          {format(
+                                            paymentBillingDate,
+                                            "dd MMM yyyy",
+                                            { locale: idLocale },
+                                          )}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            )}
+                          </>
                         )}
                       </tr>
                     );
@@ -606,29 +847,6 @@ export default function InvoiceDetailPage() {
           {/* BAGIAN BAWAH (Bank & TTD) */}
           <div className="mt-auto  break-inside-avoid">
             <div className="flex justify-end items-end">
-              {/* <div className="text-[12px] leading-tight">
-                <div className="font-bold mb-2 underline">Bank Account:</div>
-                <div className="space-y-1">
-                  {salesData.bankAccounts &&
-                  salesData.bankAccounts.length > 0 ? (
-                    salesData.bankAccounts.map((bank, i) => (
-                      <div key={i} className="flex gap-2">
-                        <span className="w-24 font-semibold">
-                          {bank.bankName}
-                        </span>
-                        <span>
-                          : {bank.accountNumber} a/n {bank.accountHolderName}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="italic text-gray-500">
-                      No bank account details available.
-                    </div>
-                  )}
-                </div>
-              </div> */}
-
               <div className="text-center mr-6">
                 <div className="mb-4 font-bold text-sm">Best Regards,</div>
                 <div className="relative h-20 w-37.5 flex items-center justify-center">
