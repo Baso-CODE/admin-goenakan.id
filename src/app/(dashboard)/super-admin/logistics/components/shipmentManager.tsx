@@ -135,14 +135,15 @@ export default function ShipmentManager({
   const [vendorId, setVendorId] = useState("");
   const [trackingNo, setTrackingNo] = useState("");
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const [arrivalDate, setArrivalDate] = useState<Date | undefined>(undefined);
   const [method, setMethod] = useState("LAND");
   const [origin, setOrigin] = useState(""); // Kota Asal
   const [destination, setDestination] = useState(""); // Kota Tujuan
+
   const [selectedItems, setSelectedItems] = useState<
-    { id: string; qty: number }[]
+    { id: string; qty: number; totalCarton: number }[]
   >([]);
 
-  // --- STATE NOTES (Multi-Select) ---
   const [selectedNotes, setSelectedNotes] = useState<Record<string, string[]>>(
     {},
   );
@@ -187,7 +188,10 @@ export default function ShipmentManager({
     if (checked) {
       const max = getRemainingQty(product.productId, product.quantity);
       if (max > 0) {
-        setSelectedItems((prev) => [...prev, { id: product.id, qty: max }]);
+        setSelectedItems((prev) => [
+          ...prev,
+          { id: product.id, qty: max, totalCarton: 0 },
+        ]);
       } else {
         toast.error("Item ini sudah terkirim semua (Quota habis)");
       }
@@ -203,6 +207,12 @@ export default function ShipmentManager({
     }
     setSelectedItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, qty: newQty } : i)),
+    );
+  };
+
+  const handleCartonChange = (id: string, newCarton: number) => {
+    setSelectedItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, totalCarton: newCarton } : i)),
     );
   };
 
@@ -253,9 +263,11 @@ export default function ShipmentManager({
         origin,
         destination,
         departureDate: date ? date.toISOString() : new Date().toISOString(),
+        arrivalDate: arrivalDate ? arrivalDate.toISOString() : undefined,
         items: selectedItems.map((i) => ({
           orderProductId: i.id,
           quantity: Number(i.qty),
+          totalCarton: Number(i.totalCarton),
         })),
         notes: getNotesPayload(),
       };
@@ -283,6 +295,7 @@ export default function ShipmentManager({
       setDestination("");
       setSelectedNotes({});
       setDate(new Date());
+      setArrivalDate(undefined);
     } catch (e) {
       toast.error("Gagal membuat pengiriman");
     } finally {
@@ -415,10 +428,10 @@ export default function ShipmentManager({
 
   // Helper untuk mendapatkan label status
   const getStatusLabel = (val: string) => {
-    const all = [...SHIPMENT_STATUSES.INBOUND, ...SHIPMENT_STATUSES.OUTBOUND];
-    return all.find((s) => s.value === val)?.label || val;
-  };
+    const currentStatuses = SHIPMENT_STATUSES[type];
 
+    return currentStatuses.find((s) => s.value === val)?.label || val;
+  };
   return (
     <div className="space-y-6">
       <Card
@@ -493,17 +506,20 @@ export default function ShipmentManager({
 
                     <div className="flex gap-2">
                       {/* Link Surat Jalan */}
-                      <Link
-                        href={`/super-admin/logistics/print/${ship.id}`}
-                        target="_blank">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-9 gap-2">
-                          <FileText className="h-3.5 w-3.5" />
-                          Doc
-                        </Button>
-                      </Link>
+                      {/* Link Surat Jalan HANYA MUNCUL DI OUTBOUND */}
+                      {type === "OUTBOUND" && (
+                        <Link
+                          href={`/super-admin/logistics/print/${ship.id}`}
+                          target="_blank">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-9 gap-2">
+                            <FileText className="h-3.5 w-3.5" />
+                            Doc
+                          </Button>
+                        </Link>
+                      )}
 
                       {/* TOMBOL UPDATE STATUS (Ganti Mark Arrived) */}
                       {!ship.status.includes("COMPLETED") && (
@@ -534,15 +550,22 @@ export default function ShipmentManager({
                         {ship.items.map((item: any) => (
                           <li
                             key={item.id}
-                            className="text-sm flex justify-between items-center bg-slate-50 p-2 rounded">
-                            <span className="line-clamp-1 text-slate-700">
-                              {item.orderProduct.product.name}
-                            </span>
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px] ml-2 shrink-0">
-                              {item.quantity} pcs
-                            </Badge>
+                            className="text-sm flex flex-col bg-slate-50 p-2 rounded">
+                            <div className="flex justify-between items-center w-full">
+                              <span className="line-clamp-1 text-slate-700">
+                                {item.orderProduct.product.name}
+                              </span>
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] ml-2 shrink-0">
+                                {item.quantity} pcs
+                              </Badge>
+                            </div>
+                            {item.totalCarton > 0 && (
+                              <div className="text-[10px] text-muted-foreground mt-1 text-right">
+                                {item.totalCarton} Karton
+                              </div>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -713,7 +736,7 @@ export default function ShipmentManager({
             </div>
 
             {/* 3. Method & Date */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Metode</Label>
                 <Select value={method} onValueChange={setMethod}>
@@ -736,7 +759,7 @@ export default function ShipmentManager({
                       className="w-full justify-start text-left font-normal">
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {date ? (
-                        format(date, "PPP", { locale: idLocale })
+                        format(date, "dd MMM yyyy", { locale: idLocale })
                       ) : (
                         <span>Pilih tanggal</span>
                       )}
@@ -752,6 +775,31 @@ export default function ShipmentManager({
                   </PopoverContent>
                 </Popover>
               </div>
+              <div className="space-y-2">
+                <Label>Perkiraan Tiba (Opsional)</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className="w-full justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {arrivalDate ? (
+                        format(arrivalDate, "dd MMM yyyy", { locale: idLocale })
+                      ) : (
+                        <span>Pilih tanggal</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={arrivalDate}
+                      onSelect={setArrivalDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
 
             <Separator />
@@ -760,7 +808,9 @@ export default function ShipmentManager({
 
             {/* 4. Items Table */}
             <div>
-              <Label className="mb-2 block font-semibold">Pilih Barang:</Label>
+              <Label className="mb-2 block font-semibold">
+                Pilih Barang & Detail Kemasan:
+              </Label>
               <div className="border rounded-md max-h-48 overflow-y-auto">
                 <Table>
                   <TableHeader>
@@ -768,7 +818,8 @@ export default function ShipmentManager({
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Produk</TableHead>
                       <TableHead>Sisa</TableHead>
-                      <TableHead>Qty</TableHead>
+                      <TableHead>Qty (Pcs)</TableHead>
+                      <TableHead>Karton (Dus)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -800,7 +851,7 @@ export default function ShipmentManager({
                             {isSelected ? (
                               <Input
                                 type="number"
-                                className="h-7 w-16 text-xs"
+                                className="h-7 w-20 text-xs"
                                 value={isSelected.qty}
                                 max={remaining}
                                 min={1}
@@ -809,6 +860,25 @@ export default function ShipmentManager({
                                     p.id,
                                     Number(e.target.value),
                                     remaining,
+                                  )
+                                }
+                              />
+                            ) : (
+                              "-"
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {isSelected ? (
+                              <Input
+                                type="number"
+                                className="h-7 w-20 text-xs"
+                                value={isSelected.totalCarton}
+                                min={0}
+                                placeholder="0"
+                                onChange={(e) =>
+                                  handleCartonChange(
+                                    p.id,
+                                    Number(e.target.value),
                                   )
                                 }
                               />

@@ -16,6 +16,7 @@ export default function DeliveryNotePrint() {
   const { shipmentId } = useParams();
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<any>(null);
+  console.log("ini adalah data", data);
 
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -98,6 +99,7 @@ export default function DeliveryNotePrint() {
   const {
     deliveryNoteNumber,
     departureDate,
+    arrivalDate,
     order,
     items,
     remarks,
@@ -107,6 +109,7 @@ export default function DeliveryNotePrint() {
     isFirstShipment,
     shipmentSequence,
     totalShipments,
+    type,
   } = data;
 
   // Setup Variabel Penerima & PIC
@@ -187,8 +190,7 @@ export default function DeliveryNotePrint() {
               </div>
             </div>
 
-            {/* Badge Partial Shipment */}
-            {totalShipments > 1 && (
+            {type === "OUTBOUND" && totalShipments > 1 && (
               <div className="mb-4 flex items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 bg-orange-50 border border-orange-300 text-orange-700 text-[11px] font-semibold px-3 py-1 rounded-full">
                   ⚠ Pengiriman Partial — Surat Jalan ke-{shipmentSequence} dari{" "}
@@ -259,7 +261,7 @@ export default function DeliveryNotePrint() {
                           : "-"}
                       </td>
                     </tr>
-                    {previousDO && (
+                    {previousDO && type === "OUTBOUND" && (
                       <tr>
                         <td className="py-0.5 pr-4 align-top whitespace-nowrap">
                           Previous DN No.
@@ -329,45 +331,117 @@ export default function DeliveryNotePrint() {
             {/* ========================================================= */}
             {/* 3. PRODUCT TABLE */}
             {/* ========================================================= */}
-            <div className="mb-6">
-              <table className="w-full border-collapse border border-[#94a3b8]">
+            <div className="mb-6 overflow-x-hidden">
+              <table className="w-full border-collapse border border-[#94a3b8] text-[10px]">
                 <thead>
-                  <tr className="bg-[#f3f4f6] text-center font-bold text-[11px] uppercase text-gray-700">
-                    <th className="border border-[#94a3b8] py-2 w-10">No</th>
-                    <th className="border border-[#94a3b8] py-2 w-32">
-                      Product Details
+                  <tr className="bg-[#f3f4f6] text-center font-bold uppercase text-gray-700 leading-tight">
+                    <th className="border border-[#94a3b8] py-2 w-8">No</th>
+                    <th className="border border-[#94a3b8] py-2 w-24">
+                      Product
+                      <br />
+                      Details
                     </th>
                     <th className="border border-[#94a3b8] py-2">
-                      Nama Barang / Deskripsi
+                      Nama Barang /<br />
+                      Deskripsi
                     </th>
-                    <th className="border border-[#94a3b8] py-2 w-28">
-                      Order Qty (pcs)
+                    <th className="border border-[#94a3b8] py-2 w-16">
+                      Ordered
+                      <br />
+                      (Pcs)
+                    </th>
+                    <th className="border border-[#94a3b8] py-2 w-16 bg-blue-50">
+                      Send
+                      <br />
+                      (Pcs)
+                    </th>
+                    <th className="border border-[#94a3b8] py-2 w-16">
+                      Delivered
+                      <br />
+                      (Pcs)
+                    </th>
+                    <th className="border border-[#94a3b8] py-2 w-16">
+                      In Process
+                      <br />
+                      (Pcs)
+                    </th>
+                    <th className="border border-[#94a3b8] py-2 w-16">
+                      Total
+                      <br />
+                      Carton
+                    </th>
+                    <th className="border border-[#94a3b8] py-2 w-20">
+                      Date
+                      <br />
+                      Received
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {items?.map((item: any, index: number) => {
                     const product = item.orderProduct.product;
+
+                    const orderedPcs = item.orderedPcs || 0;
+                    const sendPcs = item.sendPcs || 0;
+                    const deliveredPcs = item.deliveredPcs || "-";
+                    const inProcessPcs = item.inProcessPcs || "-";
+                    const totalCarton = item.totalCarton || "-";
+                    const dateReceived = arrivalDate
+                      ? format(new Date(arrivalDate), "dd/MM/yyyy")
+                      : "    /    /    ";
+
                     return (
-                      <tr key={item.id} className="align-top text-[12px]">
+                      <tr key={item.id} className="align-middle">
                         <td className="border border-[#94a3b8] py-2 text-center">
                           {index + 1}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 px-3 font-mono text-center">
+                        <td className="border border-[#94a3b8] py-2 px-2 font-mono text-center wrap-break-word">
                           {product.sku || "-"}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 px-3">
+                        <td className="border border-[#94a3b8] py-2 px-2">
+                          {/* 1. Nama Barang */}
                           <div className="font-bold text-gray-800">
                             {product.name}
                           </div>
+
+                          {/* 2. Nama Varian (Jika Ada) */}
+                          {item.orderProduct.variant?.variantName && (
+                            <div className="text-[10px] text-gray-700 font-semibold mt-0.5 leading-tight">
+                              Variant: {item.orderProduct.variant.variantName}
+                            </div>
+                          )}
+
+                          {/* 3. Deskripsi Produk Induk (Jika Ada) */}
+                          {product.description && (
+                            <div className="text-[9px] text-gray-600 mt-0.5 leading-tight">
+                              {product.description}
+                            </div>
+                          )}
+
+                          {/* 4. Catatan Customization / Spesifikasi Tambahan (Jika Ada) */}
                           {item.orderProduct.customization && (
-                            <div className="text-[10px] text-gray-500 mt-0.5 italic leading-tight">
+                            <div className="text-[9px] text-gray-500 mt-0.5 italic leading-tight">
                               Spec: {item.orderProduct.customization}
                             </div>
                           )}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 text-center">
-                          <span className="font-bold">{item.quantity}</span>
+                        <td className="border border-[#94a3b8] py-2 text-center text-gray-600">
+                          {orderedPcs}
+                        </td>
+                        <td className="border border-[#94a3b8] py-2 text-center font-bold text-blue-700 bg-blue-50/30">
+                          {sendPcs}
+                        </td>
+                        <td className="border border-[#94a3b8] py-2 text-center text-gray-500">
+                          {deliveredPcs}
+                        </td>
+                        <td className="border border-[#94a3b8] py-2 text-center text-gray-500">
+                          {inProcessPcs}
+                        </td>
+                        <td className="border border-[#94a3b8] py-2 text-center text-gray-500 font-semibold">
+                          {totalCarton}
+                        </td>
+                        <td className="border border-[#94a3b8] py-2 text-center text-gray-700">
+                          {dateReceived}
                         </td>
                       </tr>
                     );
@@ -435,16 +509,7 @@ export default function DeliveryNotePrint() {
               <div className="flex flex-col items-center">
                 <div className="mb-4 text-[12px] font-bold">Hormat Kami,</div>
                 <div className="relative h-20 w-32 flex items-center justify-center -mb-2">
-                  {/* {order.sales?.signatureUrl ? (
-                    <img
-                      src={order.sales.signatureUrl}
-                      alt="Signature"
-                      className="h-full w-auto object-contain opacity-80"
-                      crossOrigin="anonymous"
-                    />
-                  ) : (
-                    <div className="h-16 w-full"></div>
-                  )} */}
+                  {/* Kosongkan untuk tanda tangan basah / digital */}
                 </div>
                 <div className="font-bold underline text-[12px] mt-1">
                   Goenakan Indonesia

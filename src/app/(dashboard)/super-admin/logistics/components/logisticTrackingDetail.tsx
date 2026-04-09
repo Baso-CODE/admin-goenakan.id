@@ -212,7 +212,7 @@ export default function LogisticsTrackingDetail() {
             }
             products={order.products}
             couriers={couriers}
-            onUpdate={handleRefresh}
+            onUpdate={loadData}
           />
         </TabsContent>
 
@@ -226,7 +226,7 @@ export default function LogisticsTrackingDetail() {
             }
             products={order.products}
             couriers={couriers}
-            onUpdate={handleRefresh}
+            onUpdate={loadData}
           />
         </TabsContent>
       </Tabs>
