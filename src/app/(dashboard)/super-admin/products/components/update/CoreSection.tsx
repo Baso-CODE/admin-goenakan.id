@@ -18,6 +18,20 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
+import { Badge } from "@/components/ui/badge";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -27,6 +41,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { apiUrl } from "@/helper/apiurl";
+import { cn } from "@/lib/utils";
+import { CheckCheck, ChevronsUpDown, X } from "lucide-react";
 
 const FormCoreSchema = z.object({
   name: z.string().min(1, "Nama produk wajib diisi"),
@@ -39,6 +55,7 @@ const FormCoreSchema = z.object({
   isCustom: z.boolean().optional(),
   materialType: z.string().optional(),
   categoryId: z.string().min(1, "Kategori wajib dipilih"),
+  tagIds: z.array(z.string()).optional().default([]),
 
   weight: z.coerce.number().min(0).optional(),
   length: z.coerce.number().min(0).optional(),
@@ -57,8 +74,13 @@ export default function FormProductCore({
   onSubmit: (values: ProductCoreFormValues) => void;
   isSubmitting: boolean;
 }) {
+  console.log("ini adalah initial data", initialData);
+
   const [categories, setCategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [tags, setTags] = useState<any[]>([]);
+  const [tagSearchOpen, setTagSearchOpen] = useState(false);
+  const [tagSearchQuery, setTagSearchQuery] = useState("");
 
   const form = useForm<ProductCoreFormValues>({
     resolver: zodResolver(FormCoreSchema) as any,
@@ -87,6 +109,7 @@ export default function FormProductCore({
         isCustom: initialData.isCustom ?? false,
         materialType: initialData.materialType ?? "",
         categoryId: initialData.categoryId ?? "",
+        tagIds: initialData.tags ? initialData.tags.map((t: any) => t.id) : [],
         weight: initialData.weight ?? 0,
         length: initialData.length ?? 0,
         width: initialData.width ?? 0,
@@ -108,8 +131,13 @@ export default function FormProductCore({
         });
         if (!catRes.ok) throw new Error("Failed to fetch categories");
         const data = await catRes.json();
-
         setCategories(data);
+
+        const tagRes = await fetch(`${apiUrl}/product-tags/list`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const tagData = await tagRes.json();
+        setTags(tagData || []);
       } catch (error) {
         toast.error("Failed to load categories.");
       } finally {
@@ -264,6 +292,108 @@ export default function FormProductCore({
                 </p>
               </FormItem>
             )}
+          />
+
+          <FormField
+            control={form.control}
+            name="tagIds"
+            render={({ field }) => {
+              const selectedTags = field.value || [];
+              return (
+                <FormItem className="flex flex-col col-span-1 md:col-span-3">
+                  <FormLabel>Product Tags</FormLabel>
+                  <Popover open={tagSearchOpen} onOpenChange={setTagSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={tagSearchOpen}
+                          className={cn(
+                            "w-full justify-between h-auto min-h-10 text-left",
+                            selectedTags.length === 0 &&
+                              "text-muted-foreground",
+                          )}>
+                          <div className="flex flex-wrap gap-1 items-center">
+                            {selectedTags.length > 0
+                              ? selectedTags.map((tagId) => {
+                                  const tagInfo = tags.find(
+                                    (t) => t.id === tagId,
+                                  );
+                                  if (!tagInfo) return null;
+                                  return (
+                                    <Badge
+                                      key={tagId}
+                                      variant="secondary"
+                                      className="flex items-center gap-1 px-2 py-0.5">
+                                      {tagInfo.name}
+                                      <div
+                                        className="rounded-full hover:bg-red-200 p-0.5 transition-colors cursor-pointer"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const newTags = selectedTags.filter(
+                                            (id) => id !== tagId,
+                                          );
+                                          field.onChange(newTags);
+                                        }}>
+                                        <X className="h-3 w-3" />
+                                      </div>
+                                    </Badge>
+                                  );
+                                })
+                              : "Pilih tag produk..."}
+                          </div>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-100 p-0" align="start">
+                      <Command>
+                        <CommandInput
+                          placeholder="Cari tag..."
+                          value={tagSearchQuery}
+                          onValueChange={setTagSearchQuery}
+                        />
+                        <CommandList>
+                          <CommandEmpty>Tag tidak ditemukan.</CommandEmpty>
+                          <CommandGroup>
+                            {tags.map((tag) => {
+                              const isSelected = selectedTags.includes(tag.id);
+                              return (
+                                <CommandItem
+                                  key={tag.id}
+                                  value={tag.name}
+                                  onSelect={() => {
+                                    if (isSelected) {
+                                      field.onChange(
+                                        selectedTags.filter(
+                                          (id) => id !== tag.id,
+                                        ),
+                                      );
+                                    } else {
+                                      field.onChange([...selectedTags, tag.id]);
+                                    }
+                                    setTagSearchQuery("");
+                                  }}>
+                                  <CheckCheck
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      isSelected ? "opacity-100" : "opacity-0",
+                                    )}
+                                  />
+                                  {tag.name}
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
           />
         </div>
 
