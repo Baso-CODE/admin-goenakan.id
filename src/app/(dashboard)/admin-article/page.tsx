@@ -1,3 +1,9 @@
+import ArticlesSection from "./components/articlesPage";
+
 export default function AdminArticlePage() {
-  return <h1>Admin nih Senggol dong</h1>;
+  return (
+    <>
+      <ArticlesSection />
+    </>
+  );
 }

@@ -187,7 +187,7 @@ export default function SidebarRole({ ...props }) {
         url: "#",
         icon: FileText,
         items: [
-          { title: "All Articles", url: "/admin-article/articles" },
+          { title: "All Articles", url: "/admin-article" },
           { title: "Categories", url: "/admin-article/categories" },
         ],
       },

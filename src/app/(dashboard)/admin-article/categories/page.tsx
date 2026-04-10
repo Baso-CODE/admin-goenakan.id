@@ -1,3 +1,9 @@
-export default function AdminArticlePage() {
-  return <h1>Admin Article</h1>;
+import ArticleCategories from "./components/articleCategoriesPage";
+
+export default function ArticleCategoriesPage() {
+  return (
+    <>
+      <ArticleCategories />
+    </>
+  );
 }
