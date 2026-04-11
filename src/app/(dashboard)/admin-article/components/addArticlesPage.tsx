@@ -49,7 +49,7 @@ export default function AddArticle() {
       }
 
       toast.success("Artikel berhasil dibuat dan diunggah!");
-      router.push("/super-admin/articles");
+      router.push("/admin-article/");
       router.refresh();
     } catch (err: any) {
       console.error(err);

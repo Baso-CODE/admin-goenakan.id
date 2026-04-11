@@ -5,11 +5,14 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { useSession } from "next-auth/react";
 
 // === ICONS ===
+import { ThemeToggle } from "@/app/(dashboard)/components/themeToggle";
 import {
   AlignHorizontalDistributeStart,
   AudioWaveform,
@@ -268,6 +271,11 @@ export default function SidebarRole({ ...props }) {
       </SidebarContent>
 
       <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem className="px-2 py-1 flex justify-center group-data-[collapsible=icon]:justify-center md:justify-start">
+            <ThemeToggle />
+          </SidebarMenuItem>
+        </SidebarMenu>
         <NavUser user={data.user} />
       </SidebarFooter>
 

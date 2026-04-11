@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -26,7 +27,6 @@ import { Switch } from "@/components/ui/switch";
 import { apiUrl } from "@/helper/apiurl";
 import { FileImage, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
-import TiptapEditor from "./tiptapEditor";
 
 const articleSchema = z.object({
   title: z.string().min(5, "Judul minimal 5 karakter"),
@@ -34,7 +34,6 @@ const articleSchema = z.object({
   content: z.string().min(20, "Konten artikel terlalu pendek"),
   source: z.string().optional(),
   published: z.boolean().default(false),
-  // productIds kita skip dulu agar simpel, bisa ditambahkan nanti jika perlu
 });
 
 export type ArticleFormValues = z.infer<typeof articleSchema>;
@@ -93,9 +92,8 @@ export default function FormArticle({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-          {/* KIRI: Informasi Dasar */}
-          <div className="md:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start w-full">
+          <div className="md:col-span-2 space-y-6 min-w-0">
             <FormField
               control={form.control}
               name="title"
@@ -118,10 +116,12 @@ export default function FormArticle({
                 <FormItem>
                   <FormLabel>Konten Artikel</FormLabel>
                   <FormControl>
-                    <TiptapEditor
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
+                    <div className="w-full max-w-full overflow-hidden border rounded-xl bg-white shadow-sm">
+                      <SimpleEditor
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -130,7 +130,7 @@ export default function FormArticle({
           </div>
 
           {/* KANAN: Meta & Sidebar */}
-          <div className="space-y-6 p-5 border rounded-md bg-stone-50">
+          <div className="space-y-6 p-5 border rounded-md bg-stone-50 min-w-0 sticky top-4">
             {/* Kategori */}
             <FormField
               control={form.control}
@@ -143,7 +143,7 @@ export default function FormArticle({
                     onValueChange={field.onChange}
                     disabled={loadingCategories}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full bg-white">
                         <SelectValue placeholder="Pilih Kategori" />
                       </SelectTrigger>
                     </FormControl>
@@ -167,11 +167,13 @@ export default function FormArticle({
                 <Input
                   type="file"
                   accept="image/*"
+                  className="bg-white"
                   onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
                 />
                 {coverFile && (
-                  <p className="text-xs text-green-600 flex items-center gap-1">
-                    <FileImage className="w-3 h-3" /> {coverFile.name}
+                  <p className="text-xs text-green-600 flex items-center gap-1 truncate">
+                    <FileImage className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{coverFile.name}</span>
                   </p>
                 )}
               </div>
@@ -185,7 +187,11 @@ export default function FormArticle({
                 <FormItem>
                   <FormLabel>Sumber (Opsional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="URL sumber artikel..." {...field} />
+                    <Input
+                      placeholder="URL sumber artikel..."
+                      className="bg-white"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

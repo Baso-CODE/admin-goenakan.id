@@ -1,3 +1,6 @@
+@import "../styles/_variables.scss";
+@import "../styles/_keyframe-animations.scss";
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -43,6 +46,14 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
 :root {
   --radius: 0.625rem;
 
@@ -135,13 +146,4 @@
   --sidebar-accent-foreground: oklch(0.97 0.02 90);
   --sidebar-border: oklch(0.35 0.03 50);
   --sidebar-ring: oklch(0.7 0.12 45);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
 }
