@@ -1,7 +1,12 @@
 "use client";
 
 import { apiUrl } from "@/helper/apiurl";
-import { EditorContent, EditorContext, useEditor } from "@tiptap/react";
+import {
+  EditorContent,
+  EditorContext,
+  useCurrentEditor,
+  useEditor,
+} from "@tiptap/react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -16,6 +21,12 @@ import { Typography } from "@tiptap/extension-typography";
 import { Selection } from "@tiptap/extensions";
 import { StarterKit } from "@tiptap/starter-kit";
 
+// --- Tiptap Table Extensions ---
+
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
+import TableRow from "@tiptap/extension-table-row";
+
 // --- UI Primitives ---
 import { Button } from "@/components/tiptap-ui-primitive/button";
 import { Spacer } from "@/components/tiptap-ui-primitive/spacer";
@@ -24,6 +35,12 @@ import {
   ToolbarGroup,
   ToolbarSeparator,
 } from "@/components/tiptap-ui-primitive/toolbar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"; // Asumsi pakai shadcn tooltip
 
 // --- Tiptap Node (Bawaan Template) ---
 import "@/components/tiptap-node/blockquote-node/blockquote-node.scss";
@@ -60,6 +77,13 @@ import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button";
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon";
 import { HighlighterIcon } from "@/components/tiptap-icons/highlighter-icon";
 import { LinkIcon } from "@/components/tiptap-icons/link-icon";
+import {
+  ArrowDownToLine,
+  ArrowRightToLine,
+  MinusSquare,
+  Table as TableIcon,
+  Trash2,
+} from "lucide-react";
 
 // --- Hooks ---
 import { useCursorVisibility } from "@/hooks/use-cursor-visibility";
@@ -68,12 +92,117 @@ import { useWindowSize } from "@/hooks/use-window-size";
 
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss";
+import { Table } from "@tiptap/extension-table";
 
 // ─── TYPES PROPS ───
 interface SimpleEditorProps {
   value?: string;
   onChange?: (value: string) => void;
 }
+
+// ─── KOMPONEN TOMBOL TABEL KHUSUS ───
+// Kita buat komponen ini agar bisa mengakses hook `useCurrentEditor`
+const TableControls = () => {
+  const { editor } = useCurrentEditor();
+
+  if (!editor) return null;
+
+  const isTableActive = editor.isActive("table");
+
+  return (
+    <>
+      <ToolbarSeparator />
+      <ToolbarGroup>
+        {/* Tombol Insert Table (Selalu Aktif) */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="default"
+                className="h-8 w-8"
+                onClick={() =>
+                  editor
+                    .chain()
+                    .focus()
+                    .insertTable({ rows: 5, cols: 5, withHeaderRow: true })
+                    .run()
+                }>
+                <TableIcon className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Insert Table (5x5)</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        {/* Tombol Manipulasi Tabel (Hanya Aktif jika kursor ada di dalam tabel) */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="default"
+                className="h-8 w-8"
+                disabled={!isTableActive}
+                onClick={() => editor.chain().focus().addRowAfter().run()}>
+                <ArrowDownToLine className="h-4 w-4 text-blue-600" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add Row After</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="default"
+                className="h-8 w-8"
+                disabled={!isTableActive}
+                onClick={() => editor.chain().focus().addColumnAfter().run()}>
+                <ArrowRightToLine className="h-4 w-4 text-blue-600" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add Column After</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="default"
+                className="h-8 w-8"
+                disabled={!isTableActive}
+                onClick={() => editor.chain().focus().deleteRow().run()}>
+                <MinusSquare className="h-4 w-4 text-orange-500" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Delete Row</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="default"
+                className="h-8 w-8"
+                disabled={!isTableActive}
+                onClick={() => editor.chain().focus().deleteTable().run()}>
+                <Trash2 className="h-4 w-4 text-red-500" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Delete Table</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </ToolbarGroup>
+    </>
+  );
+};
 
 // ─── TOOLBAR COMPONENTS ───
 const MainToolbarContent = ({
@@ -128,6 +257,10 @@ const MainToolbarContent = ({
         <TextAlignButton align="right" />
         <TextAlignButton align="justify" />
       </ToolbarGroup>
+
+      {/* 🟢 TOMBOL TABEL DITAMBAHKAN DI SINI */}
+      <TableControls />
+
       <ToolbarSeparator />
       <ToolbarGroup>
         <ImageUploadButton text="Add Image" />
@@ -193,7 +326,7 @@ export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
 
       if (data.url) {
         toast.success("Gambar berhasil disisipkan!");
-        return data.url; // Mengembalikan URL aman dari Cloudinary ke editor
+        return data.url;
       }
       throw new Error("URL tidak ditemukan");
     } catch (error) {
@@ -243,10 +376,17 @@ export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
           toast.error("Gagal memproses gambar.");
         },
       }),
+
+      // 🟢 INISIALISASI EKSTENSI TABEL
+      Table.configure({
+        resizable: true,
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
     ],
-    content: value, // Mengambil initial value dari React Hook Form
+    content: value,
     onUpdate: ({ editor }) => {
-      // Melempar perubahan ke React Hook Form
       if (onChange) {
         onChange(editor.getHTML());
       }

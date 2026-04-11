@@ -147,3 +147,37 @@
   --sidebar-border: oklch(0.35 0.03 50);
   --sidebar-ring: oklch(0.7 0.12 45);
 }
+
+/* TIPTAP TABLE STYLES */
+.simple-editor table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+.simple-editor table td,
+.simple-editor table th {
+  min-width: 1em;
+  border: 1px solid #e5e7eb;
+  padding: 8px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+}
+.simple-editor table th {
+  font-weight: 600;
+  text-align: left;
+  background-color: #f9fafb;
+}
+.simple-editor table .selectedCell:after {
+  z-index: 2;
+  position: absolute;
+  content: "";
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(200, 200, 255, 0.4);
+  pointer-events: none;
+}
