@@ -192,6 +192,7 @@ export default function SidebarRole({ ...props }) {
         items: [
           { title: "All Articles", url: "/admin-article" },
           { title: "Categories", url: "/admin-article/categories" },
+          { title: "Banners", url: "/admin-article/banners" },
         ],
       },
       {

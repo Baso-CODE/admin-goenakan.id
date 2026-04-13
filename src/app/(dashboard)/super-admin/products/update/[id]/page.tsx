@@ -23,8 +23,6 @@ export default function EditProductPage() {
   const router = useRouter();
 
   const [productData, setProductData] = useState<any | undefined>();
-  console.log("ini adalah data product data", productData);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentSelections, setCurrentSelections] = useState<any[]>([]);
   const [currentFullList, setCurrentFullList] = useState<any[]>([]);

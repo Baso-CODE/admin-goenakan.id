@@ -74,8 +74,6 @@ export default function FormProductCore({
   onSubmit: (values: ProductCoreFormValues) => void;
   isSubmitting: boolean;
 }) {
-  console.log("ini adalah initial data", initialData);
-
   const [categories, setCategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [tags, setTags] = useState<any[]>([]);

@@ -34,19 +34,31 @@ const articleSchema = z.object({
   content: z.string().min(20, "Konten artikel terlalu pendek"),
   source: z.string().optional(),
   published: z.boolean().default(false),
+  productIds: z.array(z.string()).optional().default([]),
 });
 
 export type ArticleFormValues = z.infer<typeof articleSchema>;
+export interface ArticleInitialData extends ArticleFormValues {
+  coverImage?: string;
+}
 
 export default function FormArticle({
   onSubmit,
   isSubmitting,
+  initialData,
+  isEditing = false,
 }: {
   onSubmit: (values: ArticleFormValues, coverFile: File | null) => void;
   isSubmitting: boolean;
+  initialData?: ArticleInitialData | null;
+  isEditing?: boolean;
 }) {
   const [categories, setCategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+
+  const [products, setProducts] = useState<any[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+
   const [coverFile, setCoverFile] = useState<File | null>(null);
 
   const form = useForm<ArticleFormValues>({
@@ -57,16 +69,29 @@ export default function FormArticle({
       content: "",
       source: "",
       published: false,
+      productIds: [], // Default kosong
     },
   });
 
-  // Fetch Kategori Artikel untuk Dropdown
+  useEffect(() => {
+    if (initialData) {
+      form.reset({
+        title: initialData.title || "",
+        categoryId: initialData.categoryId || "",
+        content: initialData.content || "",
+        source: initialData.source || "",
+        published: initialData.published || false,
+        productIds: initialData.productIds || [],
+      });
+    }
+  }, [initialData, form]);
+
+  // Fetch Kategori Artikel
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
-
         const res = await fetch(`${apiUrl}/article-categories/list`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -80,9 +105,27 @@ export default function FormArticle({
     };
     fetchCategories();
   }, []);
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const tokenRes = await fetch("/api/auth/token");
+        const { token } = await tokenRes.json();
+        const res = await fetch(`${apiUrl}/products/order`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        setProducts(data.data || data || []);
+      } catch (error) {
+        toast.error("Gagal memuat daftar produk.");
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+    fetchProducts();
+  }, []);
 
   const handleSubmit = (values: ArticleFormValues) => {
-    if (!coverFile) {
+    if (!isEditing && !coverFile) {
       toast.error("Cover image wajib diunggah!");
       return;
     }
@@ -108,7 +151,6 @@ export default function FormArticle({
               )}
             />
 
-            {/* TIPTAP EDITOR */}
             <FormField
               control={form.control}
               name="content"
@@ -129,41 +171,52 @@ export default function FormArticle({
             />
           </div>
 
-          {/* KANAN: Meta & Sidebar */}
           <div className="space-y-6 p-5 border rounded-md bg-stone-50 min-w-0 sticky top-4">
-            {/* Kategori */}
             <FormField
               control={form.control}
               name="categoryId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Kategori</FormLabel>
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    disabled={loadingCategories}>
-                    <FormControl>
-                      <SelectTrigger className="w-full bg-white">
-                        <SelectValue placeholder="Pilih Kategori" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={String(cat.id)}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {loadingCategories ? (
+                    <div className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-stone-50 px-3 py-2 text-sm text-muted-foreground animate-pulse">
+                      Memuat kategori...
+                    </div>
+                  ) : (
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value ? String(field.value) : undefined}>
+                      <FormControl>
+                        <SelectTrigger className="w-full bg-white">
+                          <SelectValue placeholder="Pilih Kategori" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={String(cat.id)}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Cover Image */}
             <FormItem>
               <FormLabel>Cover Image</FormLabel>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
+                {isEditing && initialData?.coverImage && !coverFile && (
+                  <div className="relative w-full h-32 rounded-md overflow-hidden border">
+                    <img
+                      src={initialData.coverImage}
+                      alt="Current Cover"
+                      className="object-cover w-full h-full"
+                    />
+                  </div>
+                )}
                 <Input
                   type="file"
                   accept="image/*"
@@ -176,10 +229,14 @@ export default function FormArticle({
                     <span className="truncate">{coverFile.name}</span>
                   </p>
                 )}
+                {isEditing && !coverFile && (
+                  <p className="text-xs text-muted-foreground">
+                    Biarkan kosong jika tidak ingin mengubah cover.
+                  </p>
+                )}
               </div>
             </FormItem>
 
-            {/* Sumber Artikel (Opsional) */}
             <FormField
               control={form.control}
               name="source"
@@ -197,8 +254,74 @@ export default function FormArticle({
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="productIds"
+              render={() => (
+                <FormItem>
+                  <div className="mb-2">
+                    <FormLabel className="text-base">
+                      Produk Terkait (Opsional)
+                    </FormLabel>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Pilih produk yang akan direkomendasikan di sidebar artikel
+                      ini.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto p-3 border rounded-md bg-white">
+                    {loadingProducts ? (
+                      <p className="text-xs text-stone-500 animate-pulse">
+                        Memuat produk...
+                      </p>
+                    ) : products.length === 0 ? (
+                      <p className="text-xs text-stone-500">
+                        Tidak ada produk.
+                      </p>
+                    ) : (
+                      products.map((product) => (
+                        <FormField
+                          key={product.id}
+                          control={form.control}
+                          name="productIds"
+                          render={({ field }) => {
+                            return (
+                              <FormItem
+                                key={product.id}
+                                className="flex flex-row items-center space-x-3 space-y-0">
+                                <FormControl>
+                                  <input
+                                    type="checkbox"
+                                    className="w-4 h-4 rounded border-gray-300 text-stone-900 focus:ring-stone-900 cursor-pointer"
+                                    checked={field.value?.includes(product.id)}
+                                    onChange={(e) => {
+                                      return e.target.checked
+                                        ? field.onChange([
+                                            ...(field.value || []),
+                                            product.id,
+                                          ])
+                                        : field.onChange(
+                                            field.value?.filter(
+                                              (value) => value !== product.id,
+                                            ),
+                                          );
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormLabel className="font-normal text-sm cursor-pointer line-clamp-1 leading-snug">
+                                  {product.name}
+                                </FormLabel>
+                              </FormItem>
+                            );
+                          }}
+                        />
+                      ))
+                    )}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            {/* Publish Switch */}
             <FormField
               control={form.control}
               name="published"
@@ -226,7 +349,8 @@ export default function FormArticle({
                 </>
               ) : (
                 <>
-                  <Save className="mr-2 h-4 w-4" /> Simpan Artikel
+                  <Save className="mr-2 h-4 w-4" />{" "}
+                  {isEditing ? "Update Artikel" : "Simpan Artikel"}
                 </>
               )}
             </Button>

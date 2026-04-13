@@ -258,7 +258,7 @@ export default function ArticlesSection() {
 
                     {/* Actions */}
                     <TableCell className="text-center space-x-2">
-                      <Link href={`/super-admin/articles/edit/${data.id}`}>
+                      <Link href={`/admin-article/edit/${data.id}`}>
                         <Button
                           variant="outline"
                           size="sm"

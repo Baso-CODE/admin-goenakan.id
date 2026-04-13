@@ -258,7 +258,6 @@ const MainToolbarContent = ({
         <TextAlignButton align="justify" />
       </ToolbarGroup>
 
-      {/* 🟢 TOMBOL TABEL DITAMBAHKAN DI SINI */}
       <TableControls />
 
       <ToolbarSeparator />
@@ -397,6 +396,11 @@ export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
     editor,
     overlayHeight: toolbarRef.current?.getBoundingClientRect().height ?? 0,
   });
+  useEffect(() => {
+    if (editor && value && editor.getHTML() !== value) {
+      editor.commands.setContent(value);
+    }
+  }, [value, editor]);
 
   useEffect(() => {
     if (!isMobile && mobileView !== "main") {

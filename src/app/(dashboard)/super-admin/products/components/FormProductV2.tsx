@@ -385,7 +385,6 @@ export default function ProductFormV2({
         videos: null,
         variantImages: finalVariantFiles,
       };
-      console.log("📦 PAYLOAD YANG AKAN DIKIRIM:", payload);
       await onSubmit(payload, filesToSubmit);
     } catch (err) {
       console.error(err);
