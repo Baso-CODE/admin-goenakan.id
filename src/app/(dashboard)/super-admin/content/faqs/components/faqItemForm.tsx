@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -25,7 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { apiUrl } from "@/helper/apiurl";
 
 import {
@@ -84,7 +84,6 @@ export default function FaqItemForm({
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        // Menggunakan endpoint List yang ringan (id & name saja)
         const res = await fetch(`${apiUrl}/content/faqs/categories/list`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -173,7 +172,7 @@ export default function FaqItemForm({
                 />
               </div>
 
-              {/* === Answer === */}
+              {/* === Answer (MENGGUNAKAN TIPTAP EDITOR) === */}
               <div className="col-span-2">
                 <FormField
                   control={form.control}
@@ -185,13 +184,13 @@ export default function FaqItemForm({
                         Answer *
                       </FormLabel>
                       <FormControl>
-                        <Textarea
-                          placeholder="Type the answer here..."
-                          className="min-h-30 resize-y"
-                          {...field}
-                          value={field.value ?? ""}
-                          disabled={isLoading || isSubmitting}
-                        />
+                        <div
+                          className={`w-full max-w-full overflow-hidden border rounded-xl bg-white shadow-sm ${isLoading || isSubmitting ? "opacity-50 pointer-events-none" : ""}`}>
+                          <SimpleEditor
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

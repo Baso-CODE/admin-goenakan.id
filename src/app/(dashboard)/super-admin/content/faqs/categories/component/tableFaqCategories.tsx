@@ -25,12 +25,10 @@ import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
 
-import { FileDown, Loader2, Plus, Search, Trash2 } from "lucide-react"; // Added Plus & Trash2
+import { FileDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-
-// ✅ 1. Sesuaikan Type dengan Schema FaqCategory
 type FaqCategory = {
   id: string;
   name: string;
@@ -74,7 +72,6 @@ export default function FaqCategoryTable() {
   const [exporting, setExporting] = useState<boolean>(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // ✅ 2. Fetch Data dari endpoint /faqs/categories
   const fetchCategories = async () => {
     setLoading(true);
     setError(null);
@@ -117,7 +114,6 @@ export default function FaqCategoryTable() {
     fetchCategories();
   }, [page, debouncedSearch]);
 
-  // ✅ 3. Handle Export Excel
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -172,7 +168,6 @@ export default function FaqCategoryTable() {
     }
   };
 
-  // ✅ 4. Handle Delete (Tambahan fungsional)
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this category?")) return;
 
@@ -398,7 +393,7 @@ export default function FaqCategoryTable() {
                     {/* Actions */}
                     <TableCell className="text-right space-x-2">
                       <Link
-                        href={`/super-admin/faqs/categories/edit/${cat.id}`}>
+                        href={`/super-admin/content/faqs/categories/edit/${cat.id}`}>
                         <Button
                           variant="outline"
                           size="sm"
