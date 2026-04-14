@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import ClientLogoForm, { ClientLogoFormValues } from "./clientLogoForm";
+import ClientLogoForm from "../components/clientLogoForm";
 
 export default function EditClientLogo() {
   const { id } = useParams();
@@ -15,14 +15,14 @@ export default function EditClientLogo() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // === 1. FETCH DATA ===
+  // === 1. FETCH DATA EXISTING ===
   useEffect(() => {
     const fetchLogo = async () => {
       try {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        const res = await fetch(`${apiUrl}/content/client-logos/${id}`, {
+        const res = await fetch(`${apiUrl}/brand-clients/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -42,27 +42,13 @@ export default function EditClientLogo() {
   }, [id, router]);
 
   // === 2. HANDLE UPDATE ===
-  const handleUpdate = async (data: ClientLogoFormValues, file?: File) => {
+  const handleUpdate = async (formData: FormData) => {
     setIsSaving(true);
     try {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const formData = new FormData();
-
-      // Append Fields
-      formData.append("name", data.name);
-      if (data.altText) formData.append("altText", data.altText);
-      if (data.websiteUrl) formData.append("websiteUrl", data.websiteUrl);
-      formData.append("displayOrder", data.displayOrder.toString());
-      formData.append("isActive", data.isActive.toString());
-
-      // Append File HANYA JIKA user upload baru
-      if (file) {
-        formData.append("image", file);
-      }
-
-      const res = await fetch(`${apiUrl}/content/client-logos/${id}`, {
+      const res = await fetch(`${apiUrl}/brand-clients/${id}`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -71,15 +57,16 @@ export default function EditClientLogo() {
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || "Failed to update logo");
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || "Failed to update brand client");
       }
 
-      toast.success("Client logo updated!");
+      toast.success("Client logo updated successfully!");
       router.push("/super-admin/content/client-logo");
-    } catch (err) {
+      router.refresh();
+    } catch (err: any) {
       console.error(err);
-      toast.error("Failed to update logo");
+      toast.error(err.message || "Failed to update logo");
     } finally {
       setIsSaving(false);
     }
@@ -88,8 +75,10 @@ export default function EditClientLogo() {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-96 gap-4">
-        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-        <p className="text-muted-foreground">Loading data...</p>
+        <Loader2 className="h-10 w-10 animate-spin text-[#C4A48E]" />
+        <p className="text-muted-foreground animate-pulse text-sm uppercase tracking-widest">
+          Fetching Client Data...
+        </p>
       </div>
     );
   }
@@ -97,7 +86,7 @@ export default function EditClientLogo() {
   return (
     <div className="space-y-4 mx-auto py-6">
       <h1 className="text-2xl font-bold tracking-tight uppercase">
-        Edit Client Logo
+        Edit Brand Client
       </h1>
       {initialData && (
         <ClientLogoForm

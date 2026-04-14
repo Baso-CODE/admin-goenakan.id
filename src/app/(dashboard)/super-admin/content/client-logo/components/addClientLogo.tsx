@@ -4,43 +4,21 @@ import { apiUrl } from "@/helper/apiurl";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import ClientLogoForm, {
-  ClientLogoFormValues,
-} from "../components/clientLogoForm";
+import ClientLogoForm from "../components/clientLogoForm";
 
 export default function AddClientLogo() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleCreate = async (data: ClientLogoFormValues, file?: File) => {
-    // 1. Validasi File: Wajib ada saat Create
-    if (!file) {
-      toast.error("Please select a logo image.");
-      return;
-    }
-
+  const handleCreate = async (formData: FormData) => {
     setIsSubmitting(true);
 
     try {
+      // 1. Ambil Auth Token
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
       if (!token) throw new Error("No auth token found");
-
-      // 2. Gunakan FormData (Karena ada file upload)
-      const formData = new FormData();
-
-      // Append Text Fields
-      formData.append("name", data.name);
-      if (data.altText) formData.append("altText", data.altText);
-      if (data.websiteUrl) formData.append("websiteUrl", data.websiteUrl);
-
-      formData.append("displayOrder", data.displayOrder.toString());
-      formData.append("isActive", data.isActive.toString());
-
-      formData.append("image", file);
-
-      // 3. Hit API
-      const res = await fetch(`${apiUrl}/content/client-logos`, {
+      const res = await fetch(`${apiUrl}/brand-clients`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -49,17 +27,15 @@ export default function AddClientLogo() {
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        try {
-          const errJson = JSON.parse(errText);
-          throw new Error(errJson.message || "Failed to create logo");
-        } catch {
-          throw new Error(errText || "Unknown error occurred");
-        }
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || "Failed to create client logo");
       }
 
       toast.success("Client logo added successfully!");
+
+      // 3. Redirect ke halaman list
       router.push("/super-admin/content/client-logo");
+      router.refresh();
     } catch (err) {
       console.error(err);
       toast.error(
@@ -71,9 +47,9 @@ export default function AddClientLogo() {
   };
 
   return (
-    <div className="space-y-4 mx-auto  py-6">
+    <div className="space-y-4 mx-auto py-6">
       <h1 className="text-2xl font-bold tracking-tight uppercase">
-        Add New Client Logo
+        Add New Brand Client
       </h1>
       <ClientLogoForm onSubmit={handleCreate} isSubmitting={isSubmitting} />
     </div>

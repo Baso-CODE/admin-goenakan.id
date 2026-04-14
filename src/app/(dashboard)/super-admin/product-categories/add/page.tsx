@@ -2,15 +2,16 @@
 
 import { apiUrl } from "@/helper/apiurl";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { toast } from "sonner";
-import ProductCategoryForm, {
-  ProductCategoryFormValues,
-} from "../components/formCategoryProduct";
+import ProductCategoryForm from "../components/formCategoryProduct";
 
 const AddCategoryProduct = () => {
   const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleAddCategoryProduct = async (data: ProductCategoryFormValues) => {
+  const handleAddCategoryProduct = async (formData: FormData) => {
+    setIsSubmitting(true);
     try {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
@@ -20,30 +21,37 @@ const AddCategoryProduct = () => {
       const res = await fetch(`${apiUrl}/product-categories`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(data),
+        body: formData,
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText);
+        const errData = await res
+          .json()
+          .catch(() => ({ message: "Failed to create" }));
+        throw new Error(errData.message || "Failed to create category");
       }
 
       toast.success("Product Category created successfully!");
       router.push("/super-admin/product-categories");
       router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error || "Failed to create category");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create category");
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
   return (
-    <div className="space-y-4 ">
+    <div className="space-y-4">
       <h2 className="text-xl font-semibold tracking-tight uppercase">
         Add Category Product
       </h2>
-      <ProductCategoryForm onSubmit={handleAddCategoryProduct} />
+      <ProductCategoryForm
+        onSubmit={handleAddCategoryProduct}
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
 };

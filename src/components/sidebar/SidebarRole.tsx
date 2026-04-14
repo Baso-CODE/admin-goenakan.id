@@ -202,7 +202,7 @@ export default function SidebarRole({ ...props }) {
         items: [
           { title: "Hero Images", url: "/super-admin/content/heros" },
           { title: "Banner Pop-Up", url: "/super-admin/content/banner-popup" },
-          { title: "Client Logo", url: "/super-admin/content/client-logo" },
+          { title: "Brand Client", url: "/super-admin/content/client-logo" },
           {
             title: "Testimonials & Photos",
             url: "/super-admin/content/testimonials",
@@ -210,6 +210,10 @@ export default function SidebarRole({ ...props }) {
           {
             title: "Faqs",
             url: "/super-admin/content/faqs",
+          },
+          {
+            title: "Portfolios",
+            url: "/super-admin/content/portfolios",
           },
         ],
       },

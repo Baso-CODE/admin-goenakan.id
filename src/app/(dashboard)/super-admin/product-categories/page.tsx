@@ -96,6 +96,7 @@ const ProductCategoriesPage = () => {
       setLoading(false);
     }
   };
+
   // --- FUNGSI HANDLE DELETE ---
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -129,6 +130,7 @@ const ProductCategoriesPage = () => {
       setIsDeleting(false);
     }
   };
+
   // --- FUNGSI HANDLE EXPORT (Implementasi Baru) ---
   const handleExportCategories = async () => {
     setExporting(true);
@@ -190,7 +192,6 @@ const ProductCategoriesPage = () => {
       setExporting(false);
     }
   };
-  // --- END FUNGSI HANDLE EXPORT ---
 
   useEffect(() => {
     fetchCategories();
