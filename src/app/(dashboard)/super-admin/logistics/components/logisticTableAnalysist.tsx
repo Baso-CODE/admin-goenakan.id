@@ -31,18 +31,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiUrl } from "@/helper/apiurl";
-import { useDebounce } from "@/helper/debounce"; // Pastikan path ini benar
+import { useDebounce } from "@/helper/debounce";
 
 // === TYPES ===
 type LogisticsData = {
   orderId: string;
   poNumber: string;
   clientName: string;
-  waktuPenyelesaian: string; // "12 Hari"
-  waktuProduksi: string; // "6 Hari"
-  inboundTime: string; // "3 Hari"
-  outboundTime: string; // "3 Hari"
-  currentStatus: string; // "Inbound: OTW ke HO"
+  waktuPenyelesaian: string;
+  waktuProduksi: string;
+  inboundTime: string;
+  outboundTime: string;
+  currentStatus: string;
 };
 
 type Meta = {
@@ -57,6 +57,7 @@ type Meta = {
 export default function LogisticTableAnalysist() {
   // === STATE ===
   const [data, setData] = useState<LogisticsData[]>([]);
+
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -83,12 +84,11 @@ export default function LogisticTableAnalysist() {
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
-      // Endpoint sesuai Controller Analytics
       const res = await fetch(
         `${apiUrl}/logistics/analytics/summary?${params}`,
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
 
       if (!res.ok) throw new Error("Gagal mengambil data logistik");

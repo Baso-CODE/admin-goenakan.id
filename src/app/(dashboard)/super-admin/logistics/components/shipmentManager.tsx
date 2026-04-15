@@ -69,23 +69,16 @@ import { cn } from "@/lib/utils";
 // --- KONFIGURASI STATUS (Sesuai DTO Backend) ---
 const SHIPMENT_STATUSES = {
   INBOUND: [
-    { value: "DISPATCHED", label: "Dispatched (Baru Berangkat)" },
-    {
-      value: "ARRIVED_ORIGIN_WAREHOUSE",
-      label: "Sampai Gudang Asal (Luar Negeri)",
-    },
-    { value: "DEPARTED_ORIGIN", label: "Keluar Negara Asal (OTW)" },
-    { value: "IN_TRANSIT", label: "In Transit (Laut/Udara)" },
-    { value: "AT_CUSTOMS", label: "Di Bea Cukai (Customs)" },
-    { value: "RELEASED_FROM_CUSTOMS", label: "Lolos Bea Cukai" },
-    { value: "ARRIVED_DESTINATION", label: "Sampai Gudang Tujuan (Final)" },
+    { value: "PREPARED", label: "Prepared (Disiapkan)" },
+    { value: "DISPATCHED", label: "Dispatched (Berangkat/OTW)" },
+    { value: "ARRIVED", label: "Arrived (Sampai Tujuan Step Ini)" },
+    { value: "CANCELLED", label: "Cancelled (Dibatalkan)" },
   ],
   OUTBOUND: [
-    { value: "DISPATCHED", label: "Dispatched (Diproses)" },
-    { value: "PICKED_UP", label: "Diambil Kurir" },
-    { value: "IN_TRANSIT", label: "Dalam Perjalanan" },
-    { value: "ARRIVED_CITY", label: "Sampai Kota Tujuan" },
-    { value: "ARRIVED_DESTINATION", label: "Diterima Client (Final)" },
+    { value: "PREPARED", label: "Prepared (Disiapkan)" },
+    { value: "DISPATCHED", label: "Dispatched (Dikirim)" },
+    { value: "ARRIVED", label: "Arrived (Diterima Client/Tujuan)" },
+    { value: "CANCELLED", label: "Cancelled (Dibatalkan)" },
   ],
 };
 
@@ -137,8 +130,9 @@ export default function ShipmentManager({
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [arrivalDate, setArrivalDate] = useState<Date | undefined>(undefined);
   const [method, setMethod] = useState("LAND");
-  const [origin, setOrigin] = useState(""); // Kota Asal
-  const [destination, setDestination] = useState(""); // Kota Tujuan
+  const [origin, setOrigin] = useState("");
+  const [destination, setDestination] = useState("");
+  const [step, setStep] = useState<number>(1);
 
   const [selectedItems, setSelectedItems] = useState<
     { id: string; qty: number; totalCarton: number }[]
@@ -172,28 +166,38 @@ export default function ShipmentManager({
   }, [isOpen, updateStatusId]);
 
   // === HELPER FUNCTIONS ===
-  const getRemainingQty = (productId: string, totalOrderQty: number) => {
-    let shippedCount = 0;
+  // === HELPER FUNCTIONS ===
+
+  // 🔄 UPDATE: Menambahkan parameter currentStep
+  const getRemainingQty = (
+    productId: string,
+    totalOrderQty: number,
+    currentStep: number,
+  ) => {
+    let shippedInThisStep = 0;
+
     shipments.forEach((ship) => {
-      ship.items.forEach((item: any) => {
-        if (item.orderProduct.productId === productId) {
-          shippedCount += item.quantity;
-        }
-      });
+      if (ship.step === currentStep) {
+        ship.items.forEach((item: any) => {
+          if (item.orderProduct.productId === productId) {
+            shippedInThisStep += item.quantity;
+          }
+        });
+      }
     });
-    return Math.max(0, totalOrderQty - shippedCount);
+    return Math.max(0, totalOrderQty - shippedInThisStep);
   };
 
   const handleToggleItem = (checked: boolean, product: any) => {
     if (checked) {
-      const max = getRemainingQty(product.productId, product.quantity);
+      const max = getRemainingQty(product.productId, product.quantity, step);
       if (max > 0) {
         setSelectedItems((prev) => [
           ...prev,
           { id: product.id, qty: max, totalCarton: 0 },
         ]);
       } else {
-        toast.error("Item ini sudah terkirim semua (Quota habis)");
+        toast.error("Item ini sudah mencapai batas maksimal di step ini.");
       }
     } else {
       setSelectedItems((prev) => prev.filter((i) => i.id !== product.id));
@@ -257,6 +261,7 @@ export default function ShipmentManager({
       const payload = {
         orderId,
         type,
+        step: Number(step),
         vendorId,
         trackingNumber: trackingNo,
         method,
@@ -295,6 +300,7 @@ export default function ShipmentManager({
       setDestination("");
       setSelectedNotes({});
       setDate(new Date());
+      setStep(1);
       setArrivalDate(undefined);
     } catch (e) {
       toast.error("Gagal membuat pengiriman");
@@ -454,7 +460,14 @@ export default function ShipmentManager({
             </CardDescription>
           </div>
           <Button
-            onClick={() => setIsOpen(true)}
+            onClick={() => {
+              const maxStep =
+                shipments.length > 0
+                  ? Math.max(...shipments.map((s) => s.step || 1))
+                  : 0;
+              setStep(maxStep + 1);
+              setIsOpen(true);
+            }}
             className="bg-primary hover:bg-primary/90">
             <Plus className="mr-2 h-4 w-4" /> Buat Pengiriman
           </Button>
@@ -478,8 +491,13 @@ export default function ShipmentManager({
                         <Badge variant="outline" className="font-mono bg-white">
                           {ship.method}
                         </Badge>
-                        <h3 className="font-bold text-lg">
+                        <h3 className="font-bold text-lg flex items-center gap-2">
                           {ship.trackingNumber || "No Resi"}
+                          <Badge
+                            variant="secondary"
+                            className="bg-slate-200 text-slate-700 text-xs">
+                            Step {ship.step || 1}
+                          </Badge>
                         </h3>
                         <Badge
                           className={cn(
@@ -505,8 +523,6 @@ export default function ShipmentManager({
                     </div>
 
                     <div className="flex gap-2">
-                      {/* Link Surat Jalan */}
-                      {/* Link Surat Jalan HANYA MUNCUL DI OUTBOUND */}
                       {type === "OUTBOUND" && (
                         <Link
                           href={`/super-admin/logistics/print/${ship.id}`}
@@ -515,14 +531,12 @@ export default function ShipmentManager({
                             size="sm"
                             variant="outline"
                             className="h-9 gap-2">
-                            <FileText className="h-3.5 w-3.5" />
-                            Doc
+                            <FileText className="h-3.5 w-3.5" /> Doc
                           </Button>
                         </Link>
                       )}
 
-                      {/* TOMBOL UPDATE STATUS (Ganti Mark Arrived) */}
-                      {!ship.status.includes("COMPLETED") && (
+                      {!["ARRIVED", "CANCELLED"].includes(ship.status) && (
                         <Button
                           size="sm"
                           className="h-9 gap-2 bg-blue-600 hover:bg-blue-700 text-white"
@@ -683,13 +697,33 @@ export default function ShipmentManager({
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
-            {/* 1. Header Info */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-blue-50/50 p-3 rounded-lg border border-blue-100">
               <div className="space-y-2">
+                <Label className="text-blue-800 font-bold">
+                  Langkah Pengiriman (Step)
+                </Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min={1}
+                    value={step}
+                    onChange={(e) => setStep(Number(e.target.value))}
+                    className="pl-14 bg-white border-blue-200 focus-visible:ring-blue-500 font-bold"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-600">
+                    Step
+                  </span>
+                </div>
+                <p className="text-[10px] text-blue-600">
+                  1 (Awal), 2 (Transit), dst.
+                </p>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
                 <Label>Ekspedisi / Vendor</Label>
                 <Select value={vendorId} onValueChange={setVendorId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih..." />
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Pilih Kurir/Vendor..." />
                   </SelectTrigger>
                   <SelectContent>
                     {couriers.map((c) => (
@@ -699,6 +733,26 @@ export default function ShipmentManager({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            {/* ROUTE & RESI */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Kota Asal (Origin)</Label>
+                <Input
+                  value={origin}
+                  onChange={(e) => setOrigin(e.target.value)}
+                  placeholder="Contoh: Shenzhen"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Kota Tujuan (Dest)</Label>
+                <Input
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
+                  placeholder="Contoh: Jakarta"
+                />
               </div>
               <div className="space-y-2">
                 <Label>
@@ -710,32 +764,12 @@ export default function ShipmentManager({
                 <Input
                   value={trackingNo}
                   onChange={(e) => setTrackingNo(e.target.value)}
-                  placeholder="Isi jika sudah ada resi Contoh: INV/JP/2023"
+                  placeholder="Misal: JNT12345"
                 />
               </div>
             </div>
 
-            {/* 2. Route Info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Kota Asal (Origin)</Label>
-                <Input
-                  value={origin}
-                  onChange={(e) => setOrigin(e.target.value)}
-                  placeholder="Misal: Guangzhou / Osaka"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Kota Tujuan (Dest)</Label>
-                <Input
-                  value={destination}
-                  onChange={(e) => setDestination(e.target.value)}
-                  placeholder="Misal: Jakarta / Surabaya"
-                />
-              </div>
-            </div>
-
-            {/* 3. Method & Date */}
+            {/* METHOD & DATE */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Metode</Label>
@@ -761,7 +795,7 @@ export default function ShipmentManager({
                       {date ? (
                         format(date, "dd MMM yyyy", { locale: idLocale })
                       ) : (
-                        <span>Pilih tanggal</span>
+                        <span>Pilih</span>
                       )}
                     </Button>
                   </PopoverTrigger>
@@ -776,7 +810,7 @@ export default function ShipmentManager({
                 </Popover>
               </div>
               <div className="space-y-2">
-                <Label>Perkiraan Tiba (Opsional)</Label>
+                <Label>Perkiraan Tiba</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -786,7 +820,7 @@ export default function ShipmentManager({
                       {arrivalDate ? (
                         format(arrivalDate, "dd MMM yyyy", { locale: idLocale })
                       ) : (
-                        <span>Pilih tanggal</span>
+                        <span className="text-muted-foreground">Opsional</span>
                       )}
                     </Button>
                   </PopoverTrigger>
@@ -808,8 +842,11 @@ export default function ShipmentManager({
 
             {/* 4. Items Table */}
             <div>
-              <Label className="mb-2 block font-semibold">
-                Pilih Barang & Detail Kemasan:
+              <Label className="mb-2 block font-semibold  items-center gap-2">
+                Pilih Barang yang Dikirim
+                <span className="text-xs font-normal text-muted-foreground">
+                  (Validasi kuantitas Step dilakukan otomatis oleh sistem)
+                </span>
               </Label>
               <div className="border rounded-md max-h-48 overflow-y-auto">
                 <Table>
@@ -817,9 +854,9 @@ export default function ShipmentManager({
                     <TableRow>
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Produk</TableHead>
-                      <TableHead>Sisa</TableHead>
-                      <TableHead>Qty (Pcs)</TableHead>
-                      <TableHead>Karton (Dus)</TableHead>
+                      <TableHead>Maks Qty / Order</TableHead>
+                      <TableHead>Qty Dikirim</TableHead>
+                      <TableHead>Karton</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -827,10 +864,12 @@ export default function ShipmentManager({
                       const remaining = getRemainingQty(
                         p.productId,
                         p.quantity,
+                        step,
                       );
                       const isSelected = selectedItems.find(
                         (i) => i.id === p.id,
                       );
+
                       if (remaining === 0 && !isSelected) return null;
                       return (
                         <TableRow key={p.id}>
@@ -894,11 +933,15 @@ export default function ShipmentManager({
               </div>
             </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsOpen(false)}>
               Batal
             </Button>
-            <Button onClick={handleSubmit} disabled={loading}>
+            <Button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700">
               {loading ? "Memproses..." : "Buat Pengiriman"}
             </Button>
           </DialogFooter>

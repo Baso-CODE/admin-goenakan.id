@@ -27,7 +27,6 @@ export default function LogisticsTrackingDetail() {
   const pathname = usePathname();
   const [order, setOrder] = useState<any>(null);
 
-  // 🔄 UPDATE: Sekarang hanya menggunakan satu state vendor untuk semua tipe
   const [vendors, setVendors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,13 +36,7 @@ export default function LogisticsTrackingDetail() {
   const handleTabChange = (value: string) => {
     const newParams = new URLSearchParams(searchParams.toString());
     newParams.set("tab", value);
-
     router.replace(`${pathname}?${newParams.toString()}`);
-  };
-
-  // 3. FUNGSI UPDATE DATA
-  const handleRefresh = () => {
-    router.refresh();
   };
 
   // FETCH DATA
