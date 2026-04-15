@@ -3,13 +3,12 @@ import { QuotationFormValues } from "@/app/(dashboard)/admin-invoice/quotations/
 type QuotationPayloadInput = QuotationFormValues & { notes?: any[] };
 
 export const cleanQuotationPayload = (data: QuotationPayloadInput) => {
-  // 1. Clone data
   const payload: any = { ...data };
 
-  // 2. Buang field UI State
+  // 1. Buang field UI State
   delete payload.isManualClient;
 
-  // 3. Logic Hybrid Client
+  // 2. Logic Hybrid Client
   if (!data.isManualClient && data.clientId) {
     delete payload.manualClientName;
     delete payload.manualClientCompany;
@@ -20,31 +19,48 @@ export const cleanQuotationPayload = (data: QuotationPayloadInput) => {
     payload.clientId = null;
   }
 
-  // 4. Logic Items
+  // 3. 🔥 Logic Items — preserve tiers, buang field UI only
   payload.items = data.items.map((item) => {
-    // Pisahkan isManualProduct agar tidak ikut terkirim ke backend
     const { isManualProduct, ...cleanItem }: any = { ...item };
 
+    // productId: null jika manual product
     if (!isManualProduct && item.productId) {
-      // Produk dari DB — biarkan productId (dan variantId jika ada)
+      // dari DB — biarkan productId
     } else {
-      // Jika produk manual, kosongkan relasi ke DB
       cleanItem.productId = null;
-      cleanItem.variantId = null;
+      cleanItem.variantId = null; // 🔥 manual product tidak punya variant
     }
 
     cleanItem.discount = Number(item.discount || 0);
 
-    if (item.tiers && item.tiers.length > 0) {
-      cleanItem.tiers = item.tiers.map((tier: any) => ({
-        quantity: Number(tier.quantity || 0),
-        unitPrice: Number(tier.unitPrice || 0),
+    // 🔥 Normalize tiers — pastikan semua field numerik ter-cast dengan benar
+    if (cleanItem.tiers && cleanItem.tiers.length > 0) {
+      cleanItem.tiers = cleanItem.tiers.map((tier: any) => ({
+        minQuantity: Number(tier.minQuantity) || 1,
+        maxQuantity: tier.maxQuantity ? Number(tier.maxQuantity) : undefined,
+        quantityLabel: tier.quantityLabel || null,
+        unitPrice: Number(tier.unitPrice) || 0,
       }));
+    } else {
+      // 🔥 Fallback: jika tiers kosong, buat minimal 1 tier
+      cleanItem.tiers = [
+        {
+          minQuantity: 1,
+          maxQuantity: undefined,
+          quantityLabel: "Pcs",
+          unitPrice: 0,
+        },
+      ];
     }
+
+    // 🔥 Hapus field lama yang tidak relevan di schema baru
+    delete cleanItem.quantity;
+    delete cleanItem.unitPrice;
 
     return cleanItem;
   });
 
+  // 4. Notes dari store
   payload.notes = data.notes || [];
 
   return payload;

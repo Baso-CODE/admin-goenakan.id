@@ -27,8 +27,8 @@ export default function LogisticsTrackingDetail() {
   const pathname = usePathname();
   const [order, setOrder] = useState<any>(null);
 
+  // 🔄 UPDATE: Sekarang hanya menggunakan satu state vendor untuk semua tipe
   const [vendors, setVendors] = useState<any[]>([]);
-  const [couriers, setCouriers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const activeTab = searchParams.get("tab") || "production";
@@ -60,23 +60,11 @@ export default function LogisticsTrackingDetail() {
       const result = await orderRes.json();
       setOrder(result.data);
 
-      // 2. Fetch Vendor (Product = Pabrik, Service = Kurir)
-      const vProdRes = await fetch(
-        `${apiUrl}/vendors/by-order/${orderId}?type=PRODUCT`,
-        { headers },
-      );
-
-      // Ambil Vendor Kurir yg terkait order ini
-      const vServRes = await fetch(
-        `${apiUrl}/vendors/by-order/${orderId}?type=SERVICE`,
-        { headers },
-      );
-
-      const vProd = await vProdRes.json();
-      const vServ = await vServRes.json();
-
-      setVendors(vProd.data || []);
-      setCouriers(vServ.data || []);
+      const vendorRes = await fetch(`${apiUrl}/vendors/by-order/${orderId}`, {
+        headers,
+      });
+      const vData = await vendorRes.json();
+      setVendors(vData.data || []);
     } catch (error) {
       toast.error("Gagal memuat data tracking");
     } finally {
@@ -211,7 +199,7 @@ export default function LogisticsTrackingDetail() {
               order.shipments?.filter((s: any) => s.type === "INBOUND") || []
             }
             products={order.products}
-            couriers={couriers}
+            couriers={vendors}
             onUpdate={loadData}
           />
         </TabsContent>
@@ -225,7 +213,7 @@ export default function LogisticsTrackingDetail() {
               order.shipments?.filter((s: any) => s.type === "OUTBOUND") || []
             }
             products={order.products}
-            couriers={couriers}
+            couriers={vendors}
             onUpdate={loadData}
           />
         </TabsContent>

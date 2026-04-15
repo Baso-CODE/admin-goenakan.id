@@ -1,7 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { prisma } from "./prisma";
 import { comparePassword } from "./argon";
+import { prisma } from "./prisma";
 
 export const authOptions: NextAuthOptions = {
   // === PROVIDER ===
@@ -18,13 +18,15 @@ export const authOptions: NextAuthOptions = {
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         });
-
+        // LOG 1: Cek apakah user ada di DB
+        console.log("DEBUG: User ditemukan di DB ->", user ? "YA" : "TIDAK");
         if (!user) return null;
 
         const isValid = await comparePassword(
           credentials.password,
-          user.password
+          user.password,
         );
+        console.log("DEBUG: Password Valid ->", isValid);
         if (!isValid) return null;
 
         return {

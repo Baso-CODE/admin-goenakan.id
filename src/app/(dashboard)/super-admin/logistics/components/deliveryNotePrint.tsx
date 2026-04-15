@@ -440,7 +440,10 @@ export default function DeliveryNotePrint() {
                           {totalCarton}
                         </td>
                         <td className="border border-[#94a3b8] py-2 text-center text-gray-700">
-                          {dateReceived}
+                          <span className="text-xs font-medium text-muted-foreground">
+                            (ETA)
+                          </span>
+                          {dateReceived} ✨
                         </td>
                       </tr>
                     );

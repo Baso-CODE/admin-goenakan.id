@@ -360,7 +360,13 @@ export default function QuotationPrint() {
                         )}
 
                         <td className="border border-[#94a3b8] py-2 text-center font-semibold">
-                          {tier.quantity || "-"}
+                          {tier.minQuantity || "0"}
+                          {tier.maxQuantity ? ` - ${tier.maxQuantity}` : ""}
+                          {tier.quantityLabel && (
+                            <span className="ml-1 text-[10px] font-normal text-gray-500 uppercase">
+                              {tier.quantityLabel}
+                            </span>
+                          )}
                         </td>
                         <td className="border border-[#94a3b8] py-2 text-right px-4 font-mono font-medium text-blue-700">
                           {tier.unitPrice

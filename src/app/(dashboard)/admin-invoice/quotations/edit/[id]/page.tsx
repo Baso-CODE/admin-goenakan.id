@@ -62,10 +62,21 @@ export default function EditQuotationPage() {
             tiers:
               item.tiers && item.tiers.length > 0
                 ? item.tiers.map((t: any) => ({
-                    quantity: Number(t.quantity),
+                    minQuantity: Number(t.minQuantity),
+                    maxQuantity: t.maxQuantity
+                      ? Number(t.maxQuantity)
+                      : undefined,
+                    quantityLabel: t.quantityLabel || "",
                     unitPrice: Number(t.unitPrice),
                   }))
-                : [{ quantity: 1, unitPrice: 0 }],
+                : [
+                    {
+                      minQuantity: 1,
+                      maxQuantity: undefined,
+                      quantityLabel: "Pcs",
+                      unitPrice: 0,
+                    },
+                  ],
           })),
         };
 

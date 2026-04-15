@@ -440,7 +440,14 @@ function ItemRow({
             variant="outline"
             size="sm"
             className="h-6 text-[10px] px-2 py-0 border-dashed border-blue-300 text-blue-600 hover:bg-blue-50"
-            onClick={() => appendTier({ quantity: 1, unitPrice: 0 })}>
+            onClick={() =>
+              appendTier({
+                minQuantity: 1,
+                maxQuantity: undefined,
+                quantityLabel: "Pcs",
+                unitPrice: 0,
+              })
+            }>
             <Plus className="w-3 h-3 mr-1" /> Tambah Opsi Tier
           </Button>
         </div>
@@ -449,33 +456,61 @@ function ItemRow({
           {tierFields.map((tierField, tierIndex) => (
             <div
               key={tierField.id}
-              className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-2 rounded-md">
+              className="flex items-center gap-2 bg-slate-50 border border-slate-100 p-2 rounded-md">
               <span className="text-[10px] font-bold text-slate-400 w-4 text-center">
                 #{tierIndex + 1}
               </span>
 
-              <div className="flex-1 relative">
+              {/* ✨ Min Qty */}
+              <div className="w-24 relative">
                 <Input
                   type="number"
-                  placeholder="100"
-                  className="pr-10 h-8 text-sm"
+                  placeholder="Min"
+                  className="pr-7 h-8 text-xs"
                   {...form.register(
-                    `items.${index}.tiers.${tierIndex}.quantity`,
+                    `items.${index}.tiers.${tierIndex}.minQuantity`,
                   )}
                 />
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
-                  Qty
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">
+                  Min
                 </span>
               </div>
 
+              {/* ✨ Max Qty */}
+              <div className="w-24 relative">
+                <Input
+                  type="number"
+                  placeholder="Max"
+                  className="pr-7 h-8 text-xs"
+                  {...form.register(
+                    `items.${index}.tiers.${tierIndex}.maxQuantity`,
+                  )}
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">
+                  Max
+                </span>
+              </div>
+
+              {/* ✨ Label */}
+              <div className="w-20">
+                <Input
+                  placeholder="Pcs"
+                  className="h-8 text-xs"
+                  {...form.register(
+                    `items.${index}.tiers.${tierIndex}.quantityLabel`,
+                  )}
+                />
+              </div>
+
+              {/* ✨ Unit Price */}
               <div className="flex-1 relative">
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground">
                   Rp
                 </span>
                 <Input
                   type="number"
-                  placeholder="0"
-                  className="pl-7 h-8 text-sm"
+                  placeholder="Harga"
+                  className="pl-7 h-8 text-xs"
                   {...form.register(
                     `items.${index}.tiers.${tierIndex}.unitPrice`,
                   )}
@@ -560,11 +595,12 @@ const quotationSchema = z.object({
         description: z.string().optional(),
         discount: z.coerce.number().min(0).default(0),
         remarks: z.string().optional(),
-
         tiers: z
           .array(
             z.object({
-              quantity: z.coerce.number().min(1, "Min 1"),
+              minQuantity: z.coerce.number().min(1, "Min 1"),
+              maxQuantity: z.coerce.number().optional(),
+              quantityLabel: z.string().optional(),
               unitPrice: z.coerce.number().min(0),
             }),
           )
@@ -666,7 +702,14 @@ export default function QuotationForm({
             productName: "",
             discount: 0,
             remarks: "",
-            tiers: [{ quantity: 1, unitPrice: 0 }],
+            tiers: [
+              {
+                minQuantity: 1,
+                maxQuantity: undefined,
+                quantityLabel: "Pcs",
+                unitPrice: 0,
+              },
+            ],
           },
         ],
       };
@@ -712,7 +755,7 @@ export default function QuotationForm({
 
     (items || []).forEach((item) => {
       const firstTier = item.tiers?.[0];
-      const qty = Number(firstTier?.quantity) || 0;
+      const qty = Number(firstTier?.minQuantity) || 0;
       const price = Number(firstTier?.unitPrice) || 0;
 
       sub += qty * price;
@@ -1171,22 +1214,51 @@ export default function QuotationForm({
             <CardTitle className="text-base flex items-center gap-2">
               <Box className="w-4 h-4" /> Items & Products
             </CardTitle>
+
+            {/* ✨ NEW: Menambahkan Legend agar user tidak bingung dengan 4 input di bagian tier */}
+            <div className="hidden md:flex items-center gap-4 text-[11px] text-muted-foreground mr-auto ml-4">
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-slate-600">
+                  Min/Max Qty
+                </span>{" "}
+                = Rentang
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-slate-600">Label</span> =
+                Satuan
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-slate-600">Rp</span> = Harga
+                Satuan
+              </span>
+            </div>
+
             <Button
               type="button"
               variant="secondary"
               size="sm"
               onClick={() =>
+                // 🔄 UPDATE: Mengubah struktur append agar sesuai dengan schema tier baru
                 append({
                   isManualProduct: true,
                   productName: "",
                   discount: 0,
                   remarks: "",
-                  tiers: [{ quantity: 1, unitPrice: 0 }],
+                  // ✨ Pastikan field nama sesuai dengan yang ada di ItemRow (minQuantity, dkk)
+                  tiers: [
+                    {
+                      minQuantity: 1,
+                      maxQuantity: undefined,
+                      quantityLabel: "Pcs",
+                      unitPrice: 0,
+                    },
+                  ],
                 })
               }>
               <Plus className="h-4 w-4 mr-2" /> Add Item
             </Button>
           </CardHeader>
+
           <CardContent className="pt-4 space-y-3">
             {fields.map((field, index) => (
               <ItemRow
