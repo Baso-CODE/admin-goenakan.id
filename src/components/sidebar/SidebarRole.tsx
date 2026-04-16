@@ -223,6 +223,10 @@ export default function SidebarRole({ ...props }) {
         icon: Megaphone,
         items: [
           { title: "Campaigns", url: "/super-admin/marketing/campaigns" },
+          {
+            title: "Contact Message Client",
+            url: "/super-admin/marketing/contact-messages",
+          },
         ],
       },
     ],

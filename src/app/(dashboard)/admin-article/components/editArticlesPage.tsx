@@ -48,6 +48,7 @@ export default function EditArticle() {
           source: article.source || "",
           published: article.published,
           coverImage: article.coverImage,
+          coverImageAlt: article.coverImageAlt,
           productIds: existingProductIds,
         });
       } catch (error) {
@@ -79,6 +80,7 @@ export default function EditArticle() {
       formData.append("content", values.content);
       formData.append("categoryId", values.categoryId);
       formData.append("published", String(values.published));
+      formData.append("coverImageAlt", values.coverImageAlt || "");
 
       if (values.source) {
         formData.append("source", values.source);

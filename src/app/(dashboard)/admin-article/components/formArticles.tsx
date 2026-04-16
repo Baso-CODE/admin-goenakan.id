@@ -28,6 +28,7 @@ import { apiUrl } from "@/helper/apiurl";
 import { FileImage, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
+// ✨ UPDATE: Menambahkan `coverImageAlt` di Zod Schema
 const articleSchema = z.object({
   title: z.string().min(5, "Judul minimal 5 karakter"),
   categoryId: z.string().min(1, "Kategori wajib dipilih"),
@@ -35,6 +36,7 @@ const articleSchema = z.object({
   source: z.string().optional(),
   published: z.boolean().default(false),
   productIds: z.array(z.string()).optional().default([]),
+  coverImageAlt: z.string().optional(), // Opsional
 });
 
 export type ArticleFormValues = z.infer<typeof articleSchema>;
@@ -69,7 +71,8 @@ export default function FormArticle({
       content: "",
       source: "",
       published: false,
-      productIds: [], // Default kosong
+      productIds: [],
+      coverImageAlt: "", // ✨ Initial value
     },
   });
 
@@ -82,11 +85,11 @@ export default function FormArticle({
         source: initialData.source || "",
         published: initialData.published || false,
         productIds: initialData.productIds || [],
+        coverImageAlt: initialData.coverImageAlt || "", // ✨ Set initial data
       });
     }
   }, [initialData, form]);
 
-  // Fetch Kategori Artikel
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -105,6 +108,7 @@ export default function FormArticle({
     };
     fetchCategories();
   }, []);
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -135,8 +139,10 @@ export default function FormArticle({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start w-full">
-          <div className="md:col-span-2 space-y-6 min-w-0">
+        {/* 🔄 UPDATE: Layout Atas (Informasi & Pengaturan) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start w-full">
+          {/* KOLOM KIRI */}
+          <div className="space-y-6">
             <FormField
               control={form.control}
               name="title"
@@ -151,27 +157,6 @@ export default function FormArticle({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="content"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Konten Artikel</FormLabel>
-                  <FormControl>
-                    <div className="w-full max-w-full overflow-hidden border rounded-xl bg-white shadow-sm">
-                      <SimpleEditor
-                        value={field.value}
-                        onChange={field.onChange}
-                      />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="space-y-6 p-5 border rounded-md bg-stone-50 min-w-0 sticky top-4">
             <FormField
               control={form.control}
               name="categoryId"
@@ -205,11 +190,55 @@ export default function FormArticle({
               )}
             />
 
+            <FormField
+              control={form.control}
+              name="source"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sumber Referensi (Opsional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="URL sumber artikel..."
+                      className="bg-white"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="published"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 bg-stone-50">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">
+                      Publish Langsung?
+                    </FormLabel>
+                    <p className="text-[11px] text-muted-foreground">
+                      Aktifkan untuk mempublikasikan artikel saat disimpan.
+                    </p>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* KOLOM KANAN */}
+          <div className="space-y-6">
             <FormItem>
               <FormLabel>Cover Image</FormLabel>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 p-4 border rounded-md bg-stone-50">
                 {isEditing && initialData?.coverImage && !coverFile && (
-                  <div className="relative w-full h-32 rounded-md overflow-hidden border">
+                  <div className="relative w-full h-32 rounded-md overflow-hidden border bg-white">
                     <img
                       src={initialData.coverImage}
                       alt="Current Cover"
@@ -237,23 +266,29 @@ export default function FormArticle({
               </div>
             </FormItem>
 
+            {/* ✨ NEW: Field Alt Image (Teks Alternatif) */}
             <FormField
               control={form.control}
-              name="source"
+              name="coverImageAlt"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Sumber (Opsional)</FormLabel>
+                  <FormLabel>Alt Text Gambar (Opsional)</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="URL sumber artikel..."
+                      placeholder="Contoh: Ilustrasi tumpukan kardus untuk pengiriman barang"
                       className="bg-white"
                       {...field}
                     />
                   </FormControl>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Membantu SEO (Pencarian Google) dan aksesibilitas untuk
+                    pembaca layar.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
               name="productIds"
@@ -268,7 +303,7 @@ export default function FormArticle({
                       ini.
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto p-3 border rounded-md bg-white">
+                  <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-3 border rounded-md bg-stone-50">
                     {loadingProducts ? (
                       <p className="text-xs text-stone-500 animate-pulse">
                         Memuat produk...
@@ -321,40 +356,54 @@ export default function FormArticle({
                 </FormItem>
               )}
             />
-
-            <FormField
-              control={form.control}
-              name="published"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 bg-white">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">
-                      Publish Langsung?
-                    </FormLabel>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Menyimpan...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />{" "}
-                  {isEditing ? "Update Artikel" : "Simpan Artikel"}
-                </>
-              )}
-            </Button>
           </div>
+        </div>
+
+        <div className="pt-6 border-t">
+          <FormField
+            control={form.control}
+            name="content"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-lg font-semibold">
+                  Konten Artikel
+                </FormLabel>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Tuliskan isi dari artikel kamu di sini. Gunakan *toolbar*
+                  untuk memformat teks.
+                </p>
+                <FormControl>
+                  <div className="w-full max-w-full overflow-hidden border rounded-xl bg-white shadow-sm min-h-100">
+                    <SimpleEditor
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* 🔄 UPDATE: Tombol Simpan (Full Width di Paling Bawah) */}
+        <div className="pt-4">
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full font-bold text-md"
+            disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Menyimpan...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-5 w-5" />{" "}
+                {isEditing ? "Update Artikel" : "Simpan Artikel"}
+              </>
+            )}
+          </Button>
         </div>
       </form>
     </Form>

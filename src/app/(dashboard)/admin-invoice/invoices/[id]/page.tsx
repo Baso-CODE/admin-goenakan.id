@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
-import html2canvas from "html2canvas-pro";
+import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import {
   ArrowLeft,
@@ -14,6 +14,7 @@ import {
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { fetchWithToken } from "@/app/(dashboard)/super-admin/orders/order-service";
 import { Badge } from "@/components/ui/badge";
@@ -35,9 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiUrl } from "@/helper/apiurl";
-import { renderCustomization } from "@/helper/renderCustomizationProduct";
-import { toast } from "sonner";
+import { apiUrl } from "@/helper/apiurl"; // Sesuaikan path jika error
 
 // === TYPES UPDATE ===
 type InvoiceDetail = {
@@ -52,11 +51,23 @@ type InvoiceDetail = {
   paidAt: string | null;
   totalAmount: number;
   method?: string;
+
+  previousInvoice?: {
+    id: number;
+    invoiceNumber: string | null;
+    totalAmount: number;
+    status: string;
+    category: string;
+    paidAt: string | null;
+  } | null;
+  totalPreviousPaid?: number;
+
   order: {
     poNumber: string;
     totalAmount?: number;
     invoices?: {
       id: number;
+      invoiceNumber: string | null;
       category: string;
       status: string;
       totalAmount: number;
@@ -121,10 +132,16 @@ const formatCurrency = (amount: number) => {
     .replace("Rp", "Rp");
 };
 
+// ... (Sisa fungsi helper seperti renderCustomization jika ada, letakkan di sini) ...
+const renderCustomization = (customization: any) => {
+  return null; // Sesuaikan dengan logika render customization kamu
+};
+
 export default function InvoiceDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
+  console.log("Ini adalah data invoice", invoice);
 
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -294,24 +311,16 @@ export default function InvoiceDetailPage() {
     invoice.category === "REMAINING_BALANCE" ||
     invoice.category === "INSTALLMENT";
 
-  // Mencari DP dari history invoice milik order ini (untuk tabel cicilan/pelunasan)
   const dpInvoice = invoice.order?.invoices?.find(
     (inv) => inv.category === "DP",
   );
   const previousInvoices =
     invoice.order?.invoices
-      ?.filter((inv) => inv.id !== invoice.id && inv.status !== "CANCELLED")
+      ?.filter((inv) => inv.id < invoice.id && inv.status !== "CANCELLED")
       .sort((a, b) => a.id - b.id) || [];
 
   const dpAmount = dpInvoice?.totalAmount ?? orderTotal - invoice.totalAmount;
-  const dpPaidAt = dpInvoice?.paidAt;
 
-  const isAllPreviousPaid =
-    previousInvoices.length > 0 &&
-    previousInvoices.every((inv) => inv.status === "PAID");
-  const latestPaidAt = previousInvoices
-    .map((inv) => (inv.paidAt ? new Date(inv.paidAt).getTime() : 0))
-    .sort((a, b) => b - a)[0]; // Ambil yang paling baru
   return (
     <div className="bg-gray-50 min-h-screen pb-20">
       {/* TOP BAR */}
@@ -392,8 +401,8 @@ export default function InvoiceDetailPage() {
             </div>
 
             {/* 2. CONTACT INFO & INVOICE META */}
-            <div className="mb-8">
-              <table className="">
+            <div className="mb-8 w-full">
+              <table className=" w-full">
                 <tbody>
                   <tr>
                     <td className="w-25 font-medium pr-2 text-left">Phone</td>
@@ -438,6 +447,35 @@ export default function InvoiceDetailPage() {
                       : {displayInvoiceNo}
                     </td>
                   </tr>
+
+                  {previousInvoices.length > 0 && (
+                    <tr>
+                      <td className="font-medium pr-2 text-left text-slate-700 align-top">
+                        Prev. Invoice
+                      </td>
+                      <td className="text-left uppercase text-slate-700 font-medium">
+                        <div className="flex">
+                          <span className="whitespace-pre mr-1">: </span>
+                          <div className="flex-1 leading-relaxed">
+                            {previousInvoices.map((prevInv, index) => (
+                              <span key={prevInv.id} className="inline-block">
+                                {prevInv.invoiceNumber || `INV/${prevInv.id}`}
+                                <span className="text-[10px] ml-1 text-slate-400 normal-case">
+                                  ({prevInv.category.replace("_", " ")})
+                                </span>
+                                {index < previousInvoices.length - 1 && (
+                                  <span className="mx-2 text-slate-300 font-normal">
+                                    |
+                                  </span>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+
                   <tr>
                     <td className="font-medium pr-2 text-left">Currency</td>
                     <td className="text-left">: IDR</td>
@@ -518,7 +556,7 @@ export default function InvoiceDetailPage() {
               </table>
             </div>
 
-            {/* 4. PRODUCT TABLE (WITH DYNAMIC COLUMNS) */}
+            {/* 4. PRODUCT TABLE */}
             <div className="mb-4">
               <table className="w-full border-collapse border border-[#94a3b8]">
                 <thead>
@@ -533,7 +571,6 @@ export default function InvoiceDetailPage() {
                     </th>
                     <th className="border border-[#94a3b8] py-2 w-28">Total</th>
 
-                    {/* Header Dinamis Berdasarkan Tipe Invoice */}
                     {isDP ? (
                       <>
                         <th className="border border-[#94a3b8] py-2 w-32">
@@ -598,14 +635,10 @@ export default function InvoiceDetailPage() {
                           {formatCurrency(Number(item.price) * item.quantity)}
                         </td>
 
-                        {/* ========================================================= */}
-                        {/* 🟢 BLOK KOLOM DINAMIS (Hanya muncul di Baris Pertama) 🟢 */}
-                        {/* ========================================================= */}
                         {isFirst && (
                           <>
                             {isDP ? (
                               <>
-                                {/* KOLOM 1: TOTAL ORDER */}
                                 <td
                                   className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
                                   rowSpan={rowCount}>
@@ -616,7 +649,6 @@ export default function InvoiceDetailPage() {
                                   </div>
                                 </td>
 
-                                {/* KOLOM 2: TOTAL DP */}
                                 <td
                                   className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
                                   rowSpan={rowCount}>
@@ -666,38 +698,41 @@ export default function InvoiceDetailPage() {
                               </>
                             ) : isPelunasan ? (
                               <>
-                                {/* KOLOM 1: TOTAL DP (History Pembayaran Sebelumnya) */}
                                 <td
                                   className="border border-[#94a3b8] py-4 px-2 align-top bg-[#f9fafb]"
                                   rowSpan={rowCount}>
-                                  <div className="flex flex-col items-center justify-start w-full gap-5">
+                                  <div className="flex flex-col items-center justify-start w-full gap-3">
                                     {previousInvoices.length > 0 ? (
                                       previousInvoices.map((prevInv) => (
                                         <div
                                           key={prevInv.id}
-                                          className="flex flex-col items-center text-center leading-tight">
-                                          {/* NOMINAL PEMBAYARAN */}
+                                          className="flex flex-col items-center w-full text-center leading-tight border-b border-dashed border-slate-300 pb-3 last:border-0 last:pb-0">
+                                          {/* Nominal Pembayaran */}
                                           <span className="font-bold text-[11px] text-gray-900">
                                             {formatCurrency(
                                               Number(prevInv.totalAmount),
                                             )}
                                           </span>
 
-                                          {/* KETERANGAN (DP / CICILAN - PAID) */}
+                                          {/* Category - Status */}
                                           <span className="text-[9px] font-semibold text-gray-700 mt-1">
                                             {prevInv.category === "DP"
                                               ? "DP"
-                                              : "CICILAN"}{" "}
+                                              : prevInv.category.replace(
+                                                  "_",
+                                                  " ",
+                                                )}{" "}
                                             - {prevInv.status}
                                           </span>
 
-                                          {/* TANGGAL PEMBAYARAN */}
+                                          {/* Tanggal Pembayaran */}
                                           {prevInv.status === "PAID" &&
                                             prevInv.paidAt && (
-                                              <span className="text-[9px] text-gray-600 mt-0.5">
+                                              <span className="text-[9px] text-gray-500 mt-1 italic">
                                                 {format(
                                                   new Date(prevInv.paidAt),
-                                                  "dd/MM/yyyy",
+                                                  "dd MMM yyyy",
+                                                  { locale: idLocale },
                                                 )}
                                               </span>
                                             )}
@@ -716,7 +751,6 @@ export default function InvoiceDetailPage() {
                                   </div>
                                 </td>
 
-                                {/* KOLOM 2: TOTAL BILLED (Tagihan Saat Ini) */}
                                 <td
                                   className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
                                   rowSpan={rowCount}>
@@ -765,7 +799,6 @@ export default function InvoiceDetailPage() {
                                 </td>
                               </>
                             ) : (
-                              /* JIKA FULL PAYMENT STANDARD (1 KOLOM) */
                               <td
                                 className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
                                 rowSpan={rowCount}>
@@ -822,7 +855,7 @@ export default function InvoiceDetailPage() {
               </table>
             </div>
 
-            {/* 5. [NEW] INVOICE NOTES SECTION */}
+            {/* 5. NOTES SECTION */}
             {invoice.notes && invoice.notes.length > 0 && (
               <div className="mb-8 mt-6">
                 <div className="font-bold mb-2 text-sm uppercase tracking-wide border-b pb-1 border-[#e2e8f0]">
@@ -845,7 +878,7 @@ export default function InvoiceDetailPage() {
           </div>
 
           {/* BAGIAN BAWAH (Bank & TTD) */}
-          <div className="mt-auto  break-inside-avoid">
+          <div className="mt-auto break-inside-avoid">
             <div className="flex justify-end items-end">
               <div className="text-center mr-6">
                 <div className="mb-4 font-bold text-sm">Best Regards,</div>

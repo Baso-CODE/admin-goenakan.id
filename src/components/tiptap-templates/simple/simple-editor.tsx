@@ -80,6 +80,7 @@ import { LinkIcon } from "@/components/tiptap-icons/link-icon";
 import {
   ArrowDownToLine,
   ArrowRightToLine,
+  Captions,
   MinusSquare,
   Table as TableIcon,
   Trash2,
@@ -92,6 +93,16 @@ import { useWindowSize } from "@/hooks/use-window-size";
 
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Table } from "@tiptap/extension-table";
 
 // ─── TYPES PROPS ───
@@ -101,7 +112,6 @@ interface SimpleEditorProps {
 }
 
 // ─── KOMPONEN TOMBOL TABEL KHUSUS ───
-// Kita buat komponen ini agar bisa mengakses hook `useCurrentEditor`
 const TableControls = () => {
   const { editor } = useCurrentEditor();
 
@@ -263,6 +273,7 @@ const MainToolbarContent = ({
       <ToolbarSeparator />
       <ToolbarGroup>
         <ImageUploadButton text="Add Image" />
+        <ImageControls />
       </ToolbarGroup>
       <Spacer />
     </>
@@ -296,6 +307,95 @@ const MobileToolbarContent = ({
   </>
 );
 
+// ─── KOMPONEN IMAGE ALT TEXT CONTROLS ───
+const ImageControls = () => {
+  const { editor } = useCurrentEditor();
+
+  // State untuk mengontrol Modal dan Input Value
+  const [isOpen, setIsOpen] = useState(false);
+  const [altInput, setAltInput] = useState("");
+
+  if (!editor) return null;
+
+  // Tombol hanya aktif jika kursor sedang memilih gambar
+  const isImageActive = editor.isActive("image");
+
+  const handleOpenDialog = () => {
+    // Ambil alt text yang sudah ada (jika ada) lalu masukkan ke state
+    const currentAlt = editor.getAttributes("image").alt || "";
+    setAltInput(currentAlt);
+    setIsOpen(true); // Buka Modal
+  };
+
+  const handleSaveAlt = () => {
+    // Update attribute image di Tiptap
+    editor.chain().focus().updateAttributes("image", { alt: altInput }).run();
+    setIsOpen(false); // Tutup Modal
+  };
+
+  return (
+    <>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="default"
+              className="h-8 w-8"
+              disabled={!isImageActive}
+              onClick={handleOpenDialog}>
+              <Captions
+                className={`h-4 w-4 ${isImageActive ? "text-green-600" : "text-gray-400"}`}
+              />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Set Image Alt Text</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      {/* MODAL DIALOG SHADCN */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-106.25">
+          <DialogHeader>
+            <DialogTitle>Set Alt Text Gambar</DialogTitle>
+            <DialogDescription>
+              Masukkan teks alternatif untuk gambar ini. Sangat berguna untuk
+              SEO dan Aksesibilitas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="alt-text">Alt Text</Label>
+              <Input
+                id="alt-text"
+                value={altInput}
+                onChange={(e) => setAltInput(e.target.value)}
+                placeholder="Contoh: Ilustrasi tumpukan kardus pengiriman"
+                onKeyDown={(e) => {
+                  // Tekan Enter untuk langsung simpan
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSaveAlt();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              onClick={handleSaveAlt}
+              className="bg-blue-600 hover:bg-blue-700 text-white">
+              Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
 // ─── MAIN EDITOR COMPONENT ───
 export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
   const isMobile = useIsBreakpoint();
