@@ -28,14 +28,14 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Layers, Loader2, PlusCircle, Trash2 } from "lucide-react";
 import { useEffect } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 
 // Schema validasi untuk Price Tier
 const priceTierSchema = z.object({
-  minQuantity: z.number().min(1, "Min qty wajib diisi"),
-  maxQuantity: z.number().min(1).nullable().optional(),
-  price: z.number().min(0, "Harga tidak boleh negatif"),
+  minQuantity: z.coerce.number().min(1, "Min qty wajib diisi"),
+  maxQuantity: z.coerce.number().min(1).nullable().optional(),
+  price: z.coerce.number().min(0, "Harga tidak boleh negatif"),
 });
 
 const formSchema = z.object({
@@ -57,7 +57,7 @@ export default function FormUpdatePriceTiers({
 }: FormUpdatePriceTiersProps) {
   // Inisialisasi Form
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as Resolver<FormValues>,
     defaultValues: {
       priceTiers: [],
     },
@@ -184,7 +184,7 @@ export default function FormUpdatePriceTiers({
                                         onChange={(e) => {
                                           const val = e.target.value;
                                           field.onChange(
-                                            val === "" ? null : parseInt(val)
+                                            val === "" ? null : parseInt(val),
                                           );
                                         }}
                                       />
@@ -292,7 +292,7 @@ export default function FormUpdatePriceTiers({
                                   onChange={(e) => {
                                     const val = e.target.value;
                                     field.onChange(
-                                      val === "" ? null : parseInt(val)
+                                      val === "" ? null : parseInt(val),
                                     );
                                   }}
                                 />

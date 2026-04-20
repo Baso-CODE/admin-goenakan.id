@@ -15,16 +15,17 @@ import {
 import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 import { formatDate } from "@/utils/formatDate";
-import { FileDown, Loader2, Search } from "lucide-react"; // Import ikon baru
+import { FileDown, Loader2, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "../../components/confirmDeleteDialog";
 
-// === Type definitions ===
 type ProductCategories = {
   id: string;
-  name: string;
+  name?: string;
+  name_id?: string;
+  name_en?: string;
   slug: string;
   createdAt: string;
 };
@@ -41,7 +42,7 @@ type Meta = {
 interface CategoryExportQuery {
   startDate?: string;
   endDate?: string;
-  search?: string; // Tambahkan search agar bisa memfilter data yang diekspor
+  search?: string;
 }
 
 const ProductCategoriesPage = () => {
@@ -207,7 +208,7 @@ const ProductCategoriesPage = () => {
           </CardTitle>
 
           <div className="flex gap-3 w-full md:w-auto">
-            {/* SEARCH (Untuk Tabel) */}
+            {/* SEARCH */}
             <div className="relative flex-1 md:w-64">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -218,7 +219,6 @@ const ProductCategoriesPage = () => {
                 className="pl-8"
               />
             </div>
-            {/* Tidak ada filter status di sini karena skema tidak memilikinya */}
           </div>
         </CardHeader>
       </Card>
@@ -230,7 +230,6 @@ const ProductCategoriesPage = () => {
             Export Filter (opsional, berdasarkan Created Date):
           </h3>
 
-          {/* Filter Tanggal Mulai (Untuk Export) */}
           <div className="flex flex-col">
             <label className="text-xs font-medium text-muted-foreground mb-1">
               Start Date
@@ -243,7 +242,6 @@ const ProductCategoriesPage = () => {
             />
           </div>
 
-          {/* Filter Tanggal Akhir (Untuk Export) */}
           <div className="flex flex-col">
             <label className="text-xs font-medium text-muted-foreground mb-1">
               End Date
@@ -256,17 +254,15 @@ const ProductCategoriesPage = () => {
             />
           </div>
 
-          {/* Tombol Add Category */}
           <Link href="/super-admin/product-categories/add" className="ml-auto">
             <Button size="sm" className="gap-2 cursor-pointer">
               + Add Category
             </Button>
           </Link>
 
-          {/* Tombol Export */}
           <Button
             size="sm"
-            className="gap-2 bg-green-600 hover:bg-green-700" // Ubah warna untuk membedakan
+            className="gap-2 bg-green-600 hover:bg-green-700"
             onClick={handleExportCategories}
             disabled={exporting}>
             {exporting ? (
@@ -278,7 +274,6 @@ const ProductCategoriesPage = () => {
           </Button>
         </div>
       </Card>
-      {/* --- END FILTER DAN EXPORT BARU --- */}
 
       {/* === TABLE === */}
       <Card className="w-full">
@@ -286,54 +281,69 @@ const ProductCategoriesPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-62.5">Category Name</TableHead>
-                <TableHead>Slug</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="">Actions</TableHead>
+                {/* 🔄 2. UPDATE: Pisah menjadi kolom ID dan EN */}
+                <TableHead className="w-[20%]">Category Name (ID)</TableHead>
+                <TableHead className="w-[20%]">Category Name (EN)</TableHead>
+                <TableHead className="w-[20%]">Slug</TableHead>
+                <TableHead className="w-[20%]">Created</TableHead>
+                <TableHead className="w-[20%]">Actions</TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
               {loading ? (
-                /* Penanganan Loading menggunakan Skeleton */
+                /* Skeleton Loader */
                 Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={index}>
-                    <TableCell className="h-12 w-[30%]">
-                      <Skeleton className="h-4 w-37.5" />
+                    <TableCell className="h-12">
+                      <Skeleton className="h-4 w-3/4" />
                     </TableCell>
-                    <TableCell className="h-12 w-[30%]">
-                      <Skeleton className="h-4 w-50" />
+                    <TableCell className="h-12">
+                      <Skeleton className="h-4 w-3/4" />
                     </TableCell>
-                    <TableCell className="h-12 w-[20%]">
-                      <Skeleton className="h-4 w-25" />
+                    <TableCell className="h-12">
+                      <Skeleton className="h-4 w-full" />
                     </TableCell>
-                    <TableCell className="h-12 w-[20%] ">
+                    <TableCell className="h-12">
+                      <Skeleton className="h-4 w-2/3" />
+                    </TableCell>
+                    <TableCell className="h-12">
                       <div className="flex space-x-2">
-                        <Skeleton className="h-8 w-12.5" />
-                        <Skeleton className="h-8 w-15" />
+                        <Skeleton className="h-8 w-12" />
+                        <Skeleton className="h-8 w-16" />
                       </div>
                     </TableCell>
                   </TableRow>
                 ))
               ) : error ? (
-                /* Penanganan Error */
+                /* Error State */
                 <TableRow>
+                  {/* 🔄 3. Update colSpan dari 4 menjadi 5 karena ada tambahan kolom */}
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="text-center text-red-500 py-6">
                     Error: {"Failed to load categories."}
                   </TableCell>
                 </TableRow>
               ) : categories.length > 0 ? (
-                /* Menampilkan Data Category */
+                /* Data Rendering */
                 categories.map((data) => (
                   <TableRow key={data.id}>
-                    <TableCell className="font-medium">{data.name}</TableCell>
+                    {/* 🔄 4. Tampilkan Bahasa Indonesia (name_id atau fallback name) */}
+                    <TableCell className="font-medium text-gray-900">
+                      {data.name_id || data.name || "-"}
+                    </TableCell>
+
+                    {/* 🔄 5. Tampilkan Bahasa Inggris (name_en) */}
+                    <TableCell className="text-gray-500 italic">
+                      {data.name_en || "-"}
+                    </TableCell>
+
                     <TableCell>{data.slug}</TableCell>
                     <TableCell>
                       {formatDate(data.createdAt, { style: "relative" })}
                     </TableCell>
-                    <TableCell className=" space-x-2">
+                    <TableCell className="space-x-2">
                       <Link
                         href={`/super-admin/product-categories/edit/${data.id}`}>
                         <Button
@@ -354,10 +364,11 @@ const ProductCategoriesPage = () => {
                   </TableRow>
                 ))
               ) : (
-                /* Data Kosong */
+                /* Empty State */
                 <TableRow>
+                  {/* 🔄 3. Update colSpan dari 4 menjadi 5 */}
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="text-center py-6 text-muted-foreground">
                     No categories found.
                   </TableCell>

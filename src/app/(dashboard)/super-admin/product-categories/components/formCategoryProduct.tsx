@@ -16,14 +16,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { ClipboardList, ImageIcon, Loader2, Tag, X } from "lucide-react";
+import { ClipboardList, Globe, ImageIcon, Loader2, Tag, X } from "lucide-react";
 import Image from "next/image";
 
 // === SCHEMA ===
 const productCategorySchema = z.object({
-  name: z
+  name_id: z
     .string()
-    .min(2, { message: "Category name must be at least 2 characters." }),
+    .min(2, { message: "Nama Kategori (ID) minimal 2 karakter." }),
+  name_en: z.string().optional(),
   image: z.any().optional(), // Menampung file gambar
 });
 
@@ -45,13 +46,17 @@ export default function ProductCategoryForm({
   const form = useForm<ProductCategoryFormValues>({
     resolver: zodResolver(productCategorySchema),
     defaultValues: {
-      name: initialData?.name || "",
+      name_id: initialData?.name_id || initialData?.name || "",
+      name_en: initialData?.name_en || "",
     },
   });
 
   useEffect(() => {
     if (initialData) {
-      form.reset({ name: initialData.name });
+      form.reset({
+        name_id: initialData.name_id || initialData.name || "",
+        name_en: initialData.name_en || "",
+      });
       if (initialData.image) setPreview(initialData.image);
     }
   }, [initialData, form]);
@@ -71,7 +76,10 @@ export default function ProductCategoryForm({
 
   const handleSubmit = (values: ProductCategoryFormValues) => {
     const formData = new FormData();
-    formData.append("name", values.name);
+    formData.append("name_id", values.name_id);
+    if (values.name_en) {
+      formData.append("name_en", values.name_en);
+    }
     if (values.image instanceof File) {
       formData.append("image", values.image);
     }
@@ -92,26 +100,52 @@ export default function ProductCategoryForm({
             className="space-y-6">
             <div className="grid grid-cols-1 gap-6">
               {/* === Category Name === */}
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <Tag className="h-4 w-4 text-muted-foreground" />
-                      Category Name
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter category name"
-                        {...field}
-                        disabled={isLoading || isSubmitting}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* === Category Name (Indonesian) === */}
+                <FormField
+                  control={form.control}
+                  name="name_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Tag className="h-4 w-4 text-muted-foreground" />
+                        Category Name (Indonesian) *
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Masukkan nama kategori (ID)"
+                          {...field}
+                          disabled={isLoading || isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* === Category Name (English) === */}
+                <FormField
+                  control={form.control}
+                  name="name_en"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Globe className="h-4 w-4 text-muted-foreground" />
+                        Category Name (English)
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter category name (EN)"
+                          {...field}
+                          value={field.value || ""} // Menghindari warning nilai undefined
+                          disabled={isLoading || isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               {/* === Category Image === */}
               <FormField
