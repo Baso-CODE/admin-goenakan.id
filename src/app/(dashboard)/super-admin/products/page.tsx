@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -19,6 +20,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiUrl } from "@/helper/apiurl";
+import { useDebounce } from "@/helper/debounce";
+import { formatCurrency } from "@/utils/formatCurrency";
+import { formatDate } from "@/utils/formatDate";
 import {
   FileDown,
   Loader2,
@@ -31,12 +36,6 @@ import {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-// Asumsi Anda memiliki utilitas ini di proyek Anda
-import { Skeleton } from "@/components/ui/skeleton";
-import { apiUrl } from "@/helper/apiurl";
-import { useDebounce } from "@/helper/debounce";
-import { formatCurrency } from "@/utils/formatCurrency";
-import { formatDate } from "@/utils/formatDate";
 
 // === Type definitions for Product (Berdasarkan Skema Baru) ===
 type Product = {
@@ -47,7 +46,10 @@ type Product = {
   isCustom: boolean;
   createdAt: string;
   category?: {
-    name: string;
+    // ✨ 1. Update tipe kategori di dalam produk
+    name?: string;
+    name_id?: string;
+    name_en?: string;
   };
 
   images?: {
@@ -58,7 +60,10 @@ type Product = {
 
 type Category = {
   id: string;
-  name: string;
+  // ✨ 2. Update tipe Kategori utama
+  name?: string;
+  name_id?: string;
+  name_en?: string;
 };
 
 type Meta = {
@@ -76,8 +81,10 @@ interface ProductExportQuery {
   categoryId?: string;
   isCustom?: "true" | "false" | "ALL";
 }
+
 const Products = () => {
   const [products, setProducts] = useState<Product[]>([]);
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
@@ -136,7 +143,6 @@ const Products = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      // Ganti endpoint ke /products
       const res = await fetch(`${apiUrl}/products?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -171,18 +177,14 @@ const Products = () => {
   const handleExport = async () => {
     setExporting(true);
     try {
-      // 1. Ambil Token Autentikasi
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      // 2. Kumpulkan Filter Export
       const exportFilters: ProductExportQuery = {};
 
       if (exportStartDate) exportFilters.startDate = exportStartDate;
       if (exportEndDate) exportFilters.endDate = exportEndDate;
 
-      // Filter yang berasal dari filter tampilan utama juga dapat digunakan (opsional)
-      // Disini kita menggunakan filter Export yang terpisah
       if (exportIsCustomFilter !== "ALL")
         exportFilters.isCustom = exportIsCustomFilter as "true" | "false";
       if (exportCategoryId !== "ALL")
@@ -190,11 +192,9 @@ const Products = () => {
       if (exportSearch.trim()) exportFilters.search = exportSearch.trim();
 
       const queryString = new URLSearchParams(
-        exportFilters as Record<string, string>
+        exportFilters as Record<string, string>,
       ).toString();
 
-      // PASTIKAN URL INI SESUAI DENGAN ROUTE BACKEND ANDA!
-      // Endpoint: /products/export/excel
       const exportUrl = `${apiUrl}/products/export/excel?${queryString}`;
 
       const response = await fetch(exportUrl, {
@@ -208,35 +208,32 @@ const Products = () => {
         throw new Error("Export failed. Server responded with an error.");
       }
 
-      // 3. Proses File Binary (Blob)
       const blob = await response.blob();
-      // Coba ambil nama file dari header, default jika tidak ada
       const filename =
         response.headers
           .get("Content-Disposition")
           ?.match(/filename="(.+)"/)?.[1] || "products_export.xlsx";
 
-      // Membuat URL objek untuk file yang akan diunduh
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename; // Nama file download
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url); // Bersihkan URL
+      window.URL.revokeObjectURL(url);
 
       toast.success("Data Products berhasil di-export ke Excel!");
     } catch (error) {
       console.error("Export Error:", error);
       toast.error(
-        "Gagal meng-export data. Pastikan filter sudah benar dan Anda memiliki akses."
+        "Gagal meng-export data. Pastikan filter sudah benar dan Anda memiliki akses.",
       );
     } finally {
       setExporting(false);
     }
   };
-  // === RENDER ===
+
   return (
     <div className="space-y-4 overflow-x-hidden w-full mx-auto">
       {/* === Header === */}
@@ -248,7 +245,6 @@ const Products = () => {
           </CardTitle>
 
           <div className="flex flex-wrap gap-3">
-            {/* Filter Type */}
             <Select
               value={isCustomFilter}
               onValueChange={(val) => {
@@ -265,7 +261,6 @@ const Products = () => {
               </SelectContent>
             </Select>
 
-            {/* Filter Category */}
             <Select
               value={categoryFilter}
               onValueChange={(val) => {
@@ -279,13 +274,13 @@ const Products = () => {
                 <SelectItem value="ALL">All Categories</SelectItem>
                 {categories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
+                    {/* 🔄 3. Tampilkan nama kategori yang benar di Filter */}
+                    {cat.name_id || cat.name || "Unnamed"}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            {/* Search */}
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -302,14 +297,13 @@ const Products = () => {
 
       <hr />
 
-      {/* === FILTER DAN EXPORT BARU (Sama seperti Vendor Items) === */}
+      {/* === FILTER DAN EXPORT BARU === */}
       <Card className="p-4">
         <div className="flex flex-wrap items-end gap-4">
           <h3 className="w-full text-sm font-semibold text-muted-foreground">
             Export Filters:
           </h3>
 
-          {/* Filter Type untuk Export */}
           <Select
             value={exportIsCustomFilter}
             onValueChange={setExportIsCustomFilter}>
@@ -323,7 +317,6 @@ const Products = () => {
             </SelectContent>
           </Select>
 
-          {/* Filter Category ID untuk Export */}
           <Select value={exportCategoryId} onValueChange={setExportCategoryId}>
             <SelectTrigger className="w-50">
               <SelectValue placeholder="Export Category" />
@@ -332,13 +325,13 @@ const Products = () => {
               <SelectItem value="ALL">All Categories</SelectItem>
               {categories.map((cat) => (
                 <SelectItem key={cat.id} value={cat.id}>
-                  {cat.name}
+                  {/* 🔄 4. Tampilkan nama kategori yang benar di Export Filter */}
+                  {cat.name_id || cat.name || "Unnamed"}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          {/* Filter Tanggal Mulai */}
           <div className="flex flex-col">
             <label className="text-xs font-medium text-muted-foreground mb-1">
               Start Date
@@ -351,7 +344,6 @@ const Products = () => {
             />
           </div>
 
-          {/* Filter Tanggal Akhir */}
           <div className="flex flex-col">
             <label className="text-xs font-medium text-muted-foreground mb-1">
               End Date
@@ -364,7 +356,6 @@ const Products = () => {
             />
           </div>
 
-          {/* Search Export (Menggunakan debouncedSearch dari filter utama) */}
           <div className="flex flex-col">
             <label className="text-xs font-medium text-muted-foreground mb-1">
               Search Text
@@ -372,13 +363,12 @@ const Products = () => {
             <Input
               type="text"
               placeholder="Uses current search"
-              value={exportSearch} // Tampilkan nilai debounced
+              value={exportSearch}
               onChange={(e) => setExportSearch(e.target.value)}
               className="w-50"
             />
           </div>
 
-          {/* Tombol Export */}
           <Button
             size="sm"
             className="gap-2 bg-green-600 hover:bg-green-700 ml-auto"
@@ -393,7 +383,7 @@ const Products = () => {
           </Button>
         </div>
       </Card>
-      {/* === Button Add Product === */}
+
       <div className="p-1 flex justify-start">
         <Link href="/super-admin/products/add">
           <Button size="sm" className="gap-2">
@@ -419,38 +409,30 @@ const Products = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* Penanganan Loading menggunakan Skeleton */}
                 {loading ? (
                   Array.from({ length: 7 }).map((_, index) => (
                     <TableRow key={index}>
-                      {/* 1. Name */}
                       <TableCell className="h-14">
                         <div className="flex items-center gap-2">
                           <Skeleton className="h-10 w-10 rounded" />
                           <Skeleton className="h-4 w-45" />
                         </div>
                       </TableCell>
-                      {/* 2. SKU */}
                       <TableCell>
                         <Skeleton className="h-4 w-25" />
                       </TableCell>
-                      {/* 3. Category */}
                       <TableCell>
                         <Skeleton className="h-4 w-20" />
                       </TableCell>
-                      {/* 4. Price */}
                       <TableCell className="text-right">
                         <Skeleton className="h-4 w-25 ml-auto" />
                       </TableCell>
-                      {/* 5. Type */}
                       <TableCell className="text-center">
                         <Skeleton className="h-5 w-20 mx-auto" />
                       </TableCell>
-                      {/* 6. Created */}
                       <TableCell>
                         <Skeleton className="h-4 w-25" />
                       </TableCell>
-                      {/* 7. Actions */}
                       <TableCell className="text-center">
                         <div className="flex justify-center space-x-2">
                           <Skeleton className="h-8 w-12.5" />
@@ -460,10 +442,9 @@ const Products = () => {
                     </TableRow>
                   ))
                 ) : error ? (
-                  /* Penanganan Error */
                   <TableRow>
                     <TableCell
-                      colSpan={7} // Sesuaikan colSpan
+                      colSpan={7}
                       className="text-center text-red-500 py-6">
                       Error: {error || "Failed to load products."}
                     </TableCell>
@@ -495,7 +476,19 @@ const Products = () => {
                         <TableCell className="font-mono text-sm text-muted-foreground">
                           {product.sku}
                         </TableCell>
-                        <TableCell>{product.category?.name || "N/A"}</TableCell>
+                        <TableCell>
+                          {/* 🔄 5. Tampilkan nama kategori di dalam Tabel */}
+                          {product.category?.name_id ||
+                            product.category?.name ||
+                            "N/A"}
+
+                          {/* Opsional: Jika admin juga mau lihat nama Inggrisnya */}
+                          {product.category?.name_en && (
+                            <span className="block text-xs text-gray-400 italic font-normal mt-0.5">
+                              {product.category.name_en}
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right font-semibold">
                           {formatCurrency(product.basePrice)}
                         </TableCell>
@@ -535,9 +528,7 @@ const Products = () => {
                           <Button
                             variant="destructive"
                             size="sm"
-                            className="text-xs cursor-pointer"
-                            // onClick={() => handleDelete(product.id)}
-                          >
+                            className="text-xs cursor-pointer">
                             <Trash2 className="h-3 w-3 mr-1" /> Delete
                           </Button>
                         </TableCell>
@@ -545,10 +536,9 @@ const Products = () => {
                     );
                   })
                 ) : (
-                  /* Data Kosong */
                   <TableRow>
                     <TableCell
-                      colSpan={7} // Sesuaikan colSpan
+                      colSpan={7}
                       className="text-center py-6 text-muted-foreground">
                       No products found.
                     </TableCell>
