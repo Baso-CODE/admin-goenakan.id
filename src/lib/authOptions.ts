@@ -1,3 +1,4 @@
+import { sign } from "jsonwebtoken";
 import { NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { comparePassword } from "./argon";
@@ -58,21 +59,33 @@ export const authOptions: NextAuthOptions = {
   // === CALLBACKS ===
   callbacks: {
     async jwt({ token, user }) {
-      // simpan data user ke dalam token
       if (user) {
         token.id = user.id;
         token.role = user.role;
         token.email = user.email;
+
+        // ✨ 2. BUAT ACCESS TOKEN MANUAL UNTUK BACKEND
+        // Ini kunci agar Admin bisa menembak API Express
+        token.accessToken = sign(
+          {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+          },
+          process.env.NEXTAUTH_SECRET!,
+          { expiresIn: "1d" },
+        );
       }
       return token;
     },
 
     async session({ session, token }) {
-      // kirim data token ke session agar bisa diakses di client
       if (token && session.user) {
         session.user.id = token.id;
         session.user.role = token.role;
         session.user.email = token.email as string;
+
+        session.user.accessToken = token.accessToken as string;
       }
       return session;
     },
