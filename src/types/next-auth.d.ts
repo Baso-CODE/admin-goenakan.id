@@ -1,4 +1,4 @@
-import NextAuth, { DefaultSession, DefaultUser } from "next-auth";
+import "next-auth";
 
 declare module "next-auth" {
   interface Session {
@@ -8,6 +8,7 @@ declare module "next-auth" {
       name: string;
       email: string;
       role: "SUPER_ADMIN" | "ADMIN_INVOICE" | "ADMIN_ARTICLE";
+      accessToken: string;
     };
   }
   interface User {
