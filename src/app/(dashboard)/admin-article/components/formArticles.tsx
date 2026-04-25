@@ -28,7 +28,6 @@ import { apiUrl } from "@/helper/apiurl";
 import { FileImage, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
-// ✨ UPDATE: Menambahkan `coverImageAlt` di Zod Schema
 const articleSchema = z.object({
   title: z.string().min(5, "Judul minimal 5 karakter"),
   categoryId: z.string().min(1, "Kategori wajib dipilih"),

@@ -1,4 +1,4 @@
-import AddArticle from "../components/addArticlesPage";
+import AddArticle from "../../components/addArticlesPage";
 
 export default function ArticleAddPage() {
   return (

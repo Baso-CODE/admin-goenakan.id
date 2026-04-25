@@ -1,23 +1,30 @@
+import type { Role } from "@prisma/client";
 import "next-auth";
+import "next-auth/jwt";
 
 declare module "next-auth" {
   interface Session {
-    accessToken?: string;
     user: {
       id: string;
       name: string;
       email: string;
-      role: "SUPER_ADMIN" | "ADMIN_INVOICE" | "ADMIN_ARTICLE";
+      role: Role; // ✨ Gunakan Enum Role
       accessToken: string;
     };
   }
+
   interface User {
-    role: "SUPER_ADMIN" | "ADMIN_INVOICE" | "ADMIN_ARTICLE";
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    role: Role; // ✨ Gunakan Enum Role
   }
 }
+
 declare module "next-auth/jwt" {
   interface JWT {
     id: string;
-    role: "SUPER_ADMIN" | "ADMIN_INVOICE" | "ADMIN_ARTICLE";
+    role: Role; // ✨ Gunakan Enum Role
+    accessToken?: string;
   }
 }

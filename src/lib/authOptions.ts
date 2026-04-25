@@ -5,7 +5,6 @@ import { comparePassword } from "./argon";
 import { prisma } from "./prisma";
 
 export const authOptions: NextAuthOptions = {
-  // === PROVIDER ===
   providers: [
     Credentials({
       name: "Credentials",
@@ -19,15 +18,16 @@ export const authOptions: NextAuthOptions = {
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         });
-        // LOG 1: Cek apakah user ada di DB
-        console.log("DEBUG: User ditemukan di DB ->", user ? "YA" : "TIDAK");
-        if (!user) return null;
+
+        if (!user || !user.password) {
+          return null;
+        }
 
         const isValid = await comparePassword(
           credentials.password,
           user.password,
         );
-        console.log("DEBUG: Password Valid ->", isValid);
+
         if (!isValid) return null;
 
         return {
@@ -40,23 +40,19 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
 
-  // === SESSION STRATEGY: JWT ===
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 hari
+    maxAge: 30 * 24 * 60 * 60,
   },
 
-  // === JWT CONFIG ===
   jwt: {
     secret: process.env.NEXTAUTH_SECRET,
   },
 
-  // === CUSTOM PAGE ===
   pages: {
     signIn: "/login",
   },
 
-  // === CALLBACKS ===
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
@@ -64,15 +60,19 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role;
         token.email = user.email;
 
-        // ✨ 2. BUAT ACCESS TOKEN MANUAL UNTUK BACKEND
-        // Ini kunci agar Admin bisa menembak API Express
+        // ✨ Tambahkan proteksi agar secret tidak undefined
+        const secret = process.env.NEXTAUTH_SECRET;
+        if (!secret) {
+          throw new Error("NEXTAUTH_SECRET is not defined");
+        }
+
         token.accessToken = sign(
           {
             id: user.id,
             email: user.email,
             role: user.role,
           },
-          process.env.NEXTAUTH_SECRET!,
+          secret,
           { expiresIn: "1d" },
         );
       }
@@ -81,16 +81,14 @@ export const authOptions: NextAuthOptions = {
 
     async session({ session, token }) {
       if (token && session.user) {
-        session.user.id = token.id;
-        session.user.role = token.role;
+        session.user.id = token.id as string;
+        session.user.role = token.role as any;
         session.user.email = token.email as string;
-
         session.user.accessToken = token.accessToken as string;
       }
       return session;
     },
   },
 
-  // === SECRET ===
   secret: process.env.NEXTAUTH_SECRET,
 };
