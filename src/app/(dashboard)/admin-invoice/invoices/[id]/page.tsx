@@ -135,12 +135,19 @@ const renderCustomization = (customization: any) => {
   return null;
 };
 
+// Helper untuk format (1st, 2nd, 3rd, 4th)
+const getOrdinal = (n: number) => {
+  if (n === 1) return "1st";
+  if (n === 2) return "2nd";
+  if (n === 3) return "3rd";
+  return `${n}th`;
+};
+
 export default function InvoiceDetailPage() {
   const { fetchApi, status } = useApi();
   const { id } = useParams();
   const router = useRouter();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
-  console.log("Ini adalah data invoice", invoice);
 
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -172,6 +179,7 @@ export default function InvoiceDetailPage() {
       setLoading(false);
     }
   }, [id, status, fetchApi]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -222,13 +230,11 @@ export default function InvoiceDetailPage() {
     }
   };
 
-  // --- FUNGSI UPDATE PEMBAYARAN (MARK AS PAID) ---
   const handleMarkAsPaid = async () => {
     if (!invoice || status !== "authenticated") return;
     setIsPaying(true);
 
     try {
-      // ✨ 3. Ganti fetch manual dengan fetchApi
       const res = await fetchApi(`/invoices/${invoice.id}/pay`, {
         method: "POST",
         body: JSON.stringify({
@@ -244,7 +250,7 @@ export default function InvoiceDetailPage() {
 
       toast.success("Invoice berhasil ditandai LUNAS");
       setIsPayDialogOpen(false);
-      loadData(); // Refresh data setelah bayar
+      loadData();
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Terjadi kesalahan saat update pembayaran");
@@ -282,9 +288,6 @@ export default function InvoiceDetailPage() {
   const departmentName = isB2B ? invoice.client.b2b?.department?.name : null;
 
   const createdDate = new Date(invoice.createdAt);
-  const paymentBillingDate = invoice.paymentDate
-    ? new Date(invoice.paymentDate)
-    : createdDate;
   const displayInvoiceNo = invoice.invoiceNumber || `INV/${invoice.id}`;
 
   const getStatusColor = (status: string) => {
@@ -308,20 +311,10 @@ export default function InvoiceDetailPage() {
   );
   const orderTotal = invoice.order?.totalAmount ?? calculatedOrderTotal;
 
-  const isDP = invoice.category === "DP";
-  const isPelunasan =
-    invoice.category === "REMAINING_BALANCE" ||
-    invoice.category === "INSTALLMENT";
-
-  const dpInvoice = invoice.order?.invoices?.find(
-    (inv) => inv.category === "DP",
-  );
   const previousInvoices =
     invoice.order?.invoices
       ?.filter((inv) => inv.id < invoice.id && inv.status !== "CANCELLED")
       .sort((a, b) => a.id - b.id) || [];
-
-  const dpAmount = dpInvoice?.totalAmount ?? orderTotal - invoice.totalAmount;
 
   return (
     <div className="bg-gray-50 min-h-screen pb-20">
@@ -559,7 +552,7 @@ export default function InvoiceDetailPage() {
             </div>
 
             {/* 4. PRODUCT TABLE */}
-            <div className="mb-4">
+            <div className="mb-6">
               <table className="w-full border-collapse border border-[#94a3b8]">
                 <thead>
                   <tr className="bg-[#f3f4f6] text-center font-bold">
@@ -568,296 +561,276 @@ export default function InvoiceDetailPage() {
                       Product Description
                     </th>
                     <th className="border border-[#94a3b8] py-2 w-12">Qty</th>
-                    <th className="border border-[#94a3b8] py-2 w-28">
+                    <th className="border border-[#94a3b8] py-2 w-32">
                       Unit Price
                     </th>
-                    <th className="border border-[#94a3b8] py-2 w-28">Total</th>
-
-                    {isDP ? (
-                      <>
-                        <th className="border border-[#94a3b8] py-2 w-32">
-                          Total Order
-                        </th>
-                        <th className="border border-[#94a3b8] py-2 w-32">
-                          Total DP
-                        </th>
-                      </>
-                    ) : isPelunasan ? (
-                      <>
-                        <th className="border border-[#94a3b8] py-2 w-32">
-                          Total DP
-                        </th>
-                        <th className="border border-[#94a3b8] py-2 w-32">
-                          Total Billed
-                        </th>
-                      </>
-                    ) : (
-                      <th className="border border-[#94a3b8] py-2 w-32">
-                        Total Billed
-                      </th>
-                    )}
+                    <th className="border border-[#94a3b8] py-2 w-36">
+                      Total Amount
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {invoice.items.map((item, index) => {
-                    const isFirst = index === 0;
-                    const rowCount = invoice.items.length;
-                    return (
-                      <tr key={item.id} className="text-center align-top h-15">
-                        <td className="border border-[#94a3b8] py-2">
-                          {index + 1}
-                        </td>
-                        <td className="border border-[#94a3b8] py-2 px-3 text-left">
-                          <div className="font-bold mb-1">
-                            {item.product.name}
-                          </div>
-                          <div className="text-[#475569] text-[11px] space-y-1">
-                            {item.product.sku && (
-                              <div>SKU: {item.product.sku}</div>
-                            )}
-                            {item.variant && (
-                              <div>Variant: {item.variant.variantName}</div>
-                            )}
-                            {item.customization &&
-                              renderCustomization(item.customization)}
-                            {item.remarks && (
-                              <div className="italic text-gray-500">
-                                Note: {item.remarks}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="border border-[#94a3b8] py-2">
-                          {item.quantity}
-                        </td>
-                        <td className="border border-[#94a3b8] py-2 text-right px-2">
-                          {formatCurrency(Number(item.price))}
-                        </td>
-                        <td className="border border-[#94a3b8] py-2 text-right px-2 font-medium">
-                          {formatCurrency(Number(item.price) * item.quantity)}
-                        </td>
+                  {invoice.items.map((item, index) => (
+                    <tr key={item.id} className="text-center align-top h-15">
+                      <td className="border border-[#94a3b8] py-2">
+                        {index + 1}
+                      </td>
+                      <td className="border border-[#94a3b8] py-2 px-3 text-left">
+                        <div className="font-bold mb-1">
+                          {item.product.name}
+                        </div>
+                        <div className="text-[#475569] text-[11px] space-y-1">
+                          {item.product.sku && (
+                            <div>SKU: {item.product.sku}</div>
+                          )}
+                          {item.variant && (
+                            <div>Variant: {item.variant.variantName}</div>
+                          )}
+                          {item.customization &&
+                            renderCustomization(item.customization)}
+                          {item.remarks && (
+                            <div className="italic text-gray-500">
+                              Note: {item.remarks}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="border border-[#94a3b8] py-2">
+                        {item.quantity}
+                      </td>
+                      <td className="border border-[#94a3b8] py-2 text-right px-2">
+                        {formatCurrency(Number(item.price))}
+                      </td>
+                      <td className="border border-[#94a3b8] py-2 text-right px-2 font-medium">
+                        {formatCurrency(Number(item.price) * item.quantity)}
+                      </td>
+                    </tr>
+                  ))}
 
-                        {isFirst && (
-                          <>
-                            {isDP ? (
-                              <>
-                                <td
-                                  className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
-                                  rowSpan={rowCount}>
-                                  <div className="flex flex-col items-end">
-                                    <span className="font-bold text-[14px] text-gray-900">
-                                      {formatCurrency(Number(orderTotal))}
-                                    </span>
-                                  </div>
-                                </td>
-
-                                <td
-                                  className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
-                                  rowSpan={rowCount}>
-                                  <div className="flex flex-col items-end w-full">
-                                    <span className="font-bold text-[14px] text-gray-900">
-                                      {formatCurrency(
-                                        Number(invoice.totalAmount),
-                                      )}
-                                    </span>
-
-                                    {invoice.status === "PAID" &&
-                                    invoice.paidAt ? (
-                                      <div className="w-full flex flex-col items-center mt-2 border-t border-dashed border-[#cbd5e1] pt-2">
-                                        <div className="bg-green-600 text-white font-bold tracking-wider text-[10px] w-full py-1 text-center rounded-sm">
-                                          PAID
-                                        </div>
-                                        <div className="text-[9px] text-gray-600 font-medium mt-1">
-                                          {format(
-                                            new Date(invoice.paidAt),
-                                            "dd MMM yyyy",
-                                            { locale: idLocale },
-                                          )}
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="w-full flex flex-col items-end mt-2 border-t border-dashed border-[#cbd5e1] pt-2">
-                                        <div className="text-[9px] font-bold text-[#475569] uppercase bg-white border border-[#cbd5e1] px-2 py-1 rounded shadow-sm mb-1">
-                                          {invoice.category.replace("_", " ")}
-                                        </div>
-                                        <div className="text-right text-[9px] leading-tight mt-1">
-                                          <span className="text-gray-400 font-normal">
-                                            Bill Date:
-                                          </span>
-                                          <br />
-                                          <span className="font-semibold text-gray-700">
-                                            {format(
-                                              paymentBillingDate,
-                                              "dd MMM yyyy",
-                                              { locale: idLocale },
-                                            )}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                              </>
-                            ) : isPelunasan ? (
-                              <>
-                                <td
-                                  className="border border-[#94a3b8] py-4 px-2 align-top bg-[#f9fafb]"
-                                  rowSpan={rowCount}>
-                                  <div className="flex flex-col items-center justify-start w-full gap-3">
-                                    {previousInvoices.length > 0 ? (
-                                      previousInvoices.map((prevInv) => (
-                                        <div
-                                          key={prevInv.id}
-                                          className="flex flex-col items-center w-full text-center leading-tight border-b border-dashed border-slate-300 pb-3 last:border-0 last:pb-0">
-                                          {/* Nominal Pembayaran */}
-                                          <span className="font-bold text-[11px] text-gray-900">
-                                            {formatCurrency(
-                                              Number(prevInv.totalAmount),
-                                            )}
-                                          </span>
-
-                                          {/* Category - Status */}
-                                          <span className="text-[9px] font-semibold text-gray-700 mt-1">
-                                            {prevInv.category === "DP"
-                                              ? "DP"
-                                              : prevInv.category.replace(
-                                                  "_",
-                                                  " ",
-                                                )}{" "}
-                                            - {prevInv.status}
-                                          </span>
-
-                                          {/* Tanggal Pembayaran */}
-                                          {prevInv.status === "PAID" &&
-                                            prevInv.paidAt && (
-                                              <span className="text-[9px] text-gray-500 mt-1 italic">
-                                                {format(
-                                                  new Date(prevInv.paidAt),
-                                                  "dd MMM yyyy",
-                                                  { locale: idLocale },
-                                                )}
-                                              </span>
-                                            )}
-                                        </div>
-                                      ))
-                                    ) : (
-                                      <div className="flex flex-col items-center text-center">
-                                        <span className="font-bold text-[11px] text-gray-900">
-                                          {formatCurrency(Number(dpAmount))}
-                                        </span>
-                                        <span className="text-[9px] text-gray-500 mt-1">
-                                          Belum ada data
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-
-                                <td
-                                  className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
-                                  rowSpan={rowCount}>
-                                  <div className="flex flex-col items-end w-full">
-                                    <span className="font-bold text-[14px] text-gray-900">
-                                      {formatCurrency(
-                                        Number(invoice.totalAmount),
-                                      )}
-                                    </span>
-
-                                    {invoice.status === "PAID" &&
-                                    invoice.paidAt ? (
-                                      <div className="w-full flex flex-col items-center mt-2 border-t border-dashed border-[#cbd5e1] pt-2">
-                                        <div className="bg-green-600 text-white font-bold tracking-wider text-[10px] w-full py-1 text-center rounded-sm">
-                                          PAID
-                                        </div>
-                                        <div className="text-[9px] text-gray-600 font-medium mt-1">
-                                          {format(
-                                            new Date(invoice.paidAt),
-                                            "dd MMM yyyy",
-                                            { locale: idLocale },
-                                          )}
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="w-full flex flex-col items-end mt-2 border-t border-dashed border-[#cbd5e1] pt-2">
-                                        <div className="text-[9px] font-bold text-[#475569] uppercase bg-white border border-[#cbd5e1] px-2 py-1 rounded shadow-sm mb-1">
-                                          {invoice.category.replace("_", " ")}
-                                        </div>
-                                        <div className="text-right text-[9px] leading-tight mt-1">
-                                          <span className="text-gray-400 font-normal">
-                                            Bill Date:
-                                          </span>
-                                          <br />
-                                          <span className="font-semibold text-gray-700">
-                                            {format(
-                                              paymentBillingDate,
-                                              "dd MMM yyyy",
-                                              { locale: idLocale },
-                                            )}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                              </>
-                            ) : (
-                              <td
-                                className="border border-[#94a3b8] py-3 px-3 align-top bg-[#f9fafb]"
-                                rowSpan={rowCount}>
-                                <div className="flex flex-col items-end w-full">
-                                  <span className="font-bold text-[14px] text-gray-900">
-                                    {formatCurrency(
-                                      Number(invoice.totalAmount),
-                                    )}
-                                  </span>
-
-                                  {invoice.status === "PAID" &&
-                                  invoice.paidAt ? (
-                                    <div className="w-full flex flex-col items-center mt-2 border-t border-dashed border-[#cbd5e1] pt-2">
-                                      <div className="bg-green-600 text-white font-bold tracking-wider text-[10px] w-full py-1 text-center rounded-sm">
-                                        PAID
-                                      </div>
-                                      <div className="text-[9px] text-gray-600 font-medium mt-1">
-                                        {format(
-                                          new Date(invoice.paidAt),
-                                          "dd MMM yyyy",
-                                          { locale: idLocale },
-                                        )}
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="w-full flex flex-col items-end mt-2 border-t border-dashed border-[#cbd5e1] pt-2">
-                                      <div className="text-[9px] font-bold text-[#475569] uppercase bg-white border border-[#cbd5e1] px-2 py-1 rounded shadow-sm mb-1">
-                                        {invoice.category.replace("_", " ")}
-                                      </div>
-                                      <div className="text-right text-[9px] leading-tight mt-1">
-                                        <span className="text-gray-400 font-normal">
-                                          Bill Date:
-                                        </span>
-                                        <br />
-                                        <span className="font-semibold text-gray-700">
-                                          {format(
-                                            paymentBillingDate,
-                                            "dd MMM yyyy",
-                                            { locale: idLocale },
-                                          )}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            )}
-                          </>
-                        )}
-                      </tr>
-                    );
-                  })}
+                  {/* Jika lebih dari 1 produk, tambahkan Amount Due (Total Order) di bawah tabel item */}
+                  {invoice.items.length > 1 && (
+                    <tr className="text-center bg-[#f9fafb]">
+                      <td
+                        colSpan={4}
+                        className="border border-[#94a3b8] py-2 text-right px-3 font-bold text-gray-700">
+                        Total Amount Due
+                      </td>
+                      <td className="border border-[#94a3b8] py-2 text-right px-2 font-bold text-gray-900">
+                        {formatCurrency(calculatedOrderTotal)}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
 
-            {/* 5. NOTES SECTION */}
+            {/* 5. PAYMENT SUMMARY */}
+            <div className="mb-6 p-4 border border-[#94a3b8] bg-[#f8fafc] rounded-sm text-[12px]">
+              <div className="font-bold mb-3 uppercase border-b pb-1.5 border-[#cbd5e1] text-[#1e293b]">
+                Payment Summary
+              </div>
+              <div className="flex flex-col gap-2 text-gray-800">
+                <div className="flex items-start">
+                  <span className="w-4 mr-2">-</span>
+                  <div className="flex-1">
+                    <span className="font-semibold">
+                      Total Purchase Order Value:{" "}
+                    </span>
+                    <span>{formatCurrency(orderTotal)}</span>
+                  </div>
+                </div>
+
+                {/* RENDER DYNAMIC PAYMENT SUMMARY BASED ON CATEGORY */}
+                {(() => {
+                  const allOrderInvoices = (invoice.order?.invoices || [])
+                    .filter((inv) => inv.status !== "CANCELLED")
+                    .sort((a, b) => a.id - b.id);
+                  const currentIndex = allOrderInvoices.findIndex(
+                    (inv) => inv.id === invoice.id,
+                  );
+                  const history =
+                    currentIndex !== -1
+                      ? allOrderInvoices.slice(0, currentIndex)
+                      : previousInvoices;
+                  const sumHistory = history.reduce(
+                    (acc, inv) => acc + Number(inv.totalAmount),
+                    0,
+                  );
+                  const remainingAfterThis =
+                    orderTotal - sumHistory - invoice.totalAmount;
+                  const isFinal = remainingAfterThis <= 0;
+
+                  // === SCENARIO: DP ===
+                  if (invoice.category === "DP") {
+                    return (
+                      <>
+                        <div className="flex items-start">
+                          <span className="w-4 mr-2">-</span>
+                          <div className="flex-1">
+                            <span className="font-semibold">
+                              Down Payment:{" "}
+                            </span>
+                            <span className="font-bold">
+                              {formatCurrency(invoice.totalAmount)}
+                            </span>
+                            <span className="italic text-gray-600">
+                              {" "}
+                              (Due: Immediately)
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-start">
+                          <span className="w-4 mr-2">-</span>
+                          <div className="flex-1">
+                            <span className="font-semibold">
+                              Remaining Balance:{" "}
+                            </span>
+                            <span>
+                              {formatCurrency(
+                                remainingAfterThis > 0 ? remainingAfterThis : 0,
+                              )}
+                            </span>
+                            <span className="italic text-gray-600">
+                              {" "}
+                              (Due: Upon delivery or completion)
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  }
+
+                  // === SCENARIO: BP (REMAINING_BALANCE / FULL_PAYMENT) ===
+                  if (
+                    invoice.category === "REMAINING_BALANCE" ||
+                    invoice.category === "FULL_PAYMENT"
+                  ) {
+                    return (
+                      <>
+                        {history.map((prev, i) => (
+                          <div key={prev.id} className="flex items-start">
+                            <span className="w-4 mr-2">-</span>
+                            <div className="flex-1">
+                              <span className="font-semibold">
+                                {prev.category === "DP"
+                                  ? "Down Payment"
+                                  : "Previous Payment"}
+                                :{" "}
+                              </span>
+                              <span>{formatCurrency(prev.totalAmount)}</span>
+                              <span className="italic text-gray-600">
+                                {prev.paidAt
+                                  ? ` (Paid on ${format(new Date(prev.paidAt), "dd MMM yyyy", { locale: idLocale })})`
+                                  : " (Unpaid)"}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="flex items-start">
+                          <span className="w-4 mr-2">-</span>
+                          <div className="flex-1">
+                            <span className="font-semibold">
+                              Balance Payment:{" "}
+                            </span>
+                            <span className="font-bold">
+                              {formatCurrency(invoice.totalAmount)}
+                            </span>
+                            <span className="italic text-gray-600">
+                              {" "}
+                              (Due: Immediately)
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-start">
+                          <span className="w-4 mr-2">-</span>
+                          <div className="flex-1">
+                            <span className="font-semibold">
+                              Remaining Balance:{" "}
+                            </span>
+                            <span>Rp 0,-</span>
+                            <span className="italic text-gray-600">
+                              {" "}
+                              (Fully Paid upon this settlement)
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  }
+
+                  // === SCENARIO: INSTALLMENT (CICILAN) ===
+                  if (invoice.category === "INSTALLMENT") {
+                    return (
+                      <>
+                        {history.map((prev, i) => {
+                          const isFirst = i === 0;
+                          const label = isFirst
+                            ? "1st Installment (Down Payment)"
+                            : `${getOrdinal(i + 1)} Installment`;
+                          return (
+                            <div key={prev.id} className="flex items-start">
+                              <span className="w-4 mr-2">-</span>
+                              <div className="flex-1">
+                                <span className="font-semibold">{label}: </span>
+                                <span>{formatCurrency(prev.totalAmount)}</span>
+                                <span className="italic text-gray-600">
+                                  {prev.paidAt
+                                    ? ` (Paid on ${format(new Date(prev.paidAt), "dd MMM yyyy", { locale: idLocale })})`
+                                    : " (Unpaid)"}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Current Installment */}
+                        <div className="flex items-start">
+                          <span className="w-4 mr-2">-</span>
+                          <div className="flex-1">
+                            <span className="font-semibold">
+                              {isFinal
+                                ? "Final Installment (Balance Payment)"
+                                : `${getOrdinal(history.length + 1)} Installment`}
+                              :{" "}
+                            </span>
+                            <span className="font-bold">
+                              {formatCurrency(invoice.totalAmount)}
+                            </span>
+                            <span className="italic text-gray-600">
+                              {" "}
+                              (Due: Immediately)
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Remaining Balance */}
+                        <div className="flex items-start">
+                          <span className="w-4 mr-2">-</span>
+                          <div className="flex-1">
+                            <span className="font-semibold">
+                              Remaining Balance:{" "}
+                            </span>
+                            <span>
+                              {isFinal
+                                ? "Rp 0,-"
+                                : formatCurrency(remainingAfterThis)}
+                            </span>
+                            <span className="italic text-gray-600">
+                              {isFinal
+                                ? " (Fully Paid upon this settlement)"
+                                : " (Due: As per Agreement)"}
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            </div>
+
+            {/* 6. NOTES SECTION */}
             {invoice.notes && invoice.notes.length > 0 && (
               <div className="mb-8 mt-6">
                 <div className="font-bold mb-2 text-sm uppercase tracking-wide border-b pb-1 border-[#e2e8f0]">
