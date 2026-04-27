@@ -63,9 +63,7 @@ export default function ArticlesSection() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   // --- FUNGSI FETCH DATA ---
-  // ✨ 2. Gunakan useCallback agar aman dipanggil di useEffect dan handleDelete
   const fetchArticles = useCallback(async () => {
-    // 🛑 Jangan jalan jika token belum siap
     if (status === "loading" || status === "unauthenticated") return;
 
     setLoading(true);
@@ -80,7 +78,6 @@ export default function ArticlesSection() {
         params.append("search", debouncedSearch.trim());
       }
 
-      // ✨ 3. Lihat betapa pendeknya sekarang! URL & Token diurus otomatis.
       const res = await fetchApi(`/articles?${params}`);
 
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);

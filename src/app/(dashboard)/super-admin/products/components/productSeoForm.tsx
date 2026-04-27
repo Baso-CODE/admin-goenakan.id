@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { apiBaseUrl } from "next-auth/client/_utils";
+import { useApi } from "@/hooks/useApi";
 
 // Tipe Data untuk Form (Sesuai DTO Backend)
 interface SeoFormValues {
@@ -45,6 +45,7 @@ interface ProductSeoFormProps {
 }
 
 export function ProductSeoForm({ productId }: ProductSeoFormProps) {
+  const { fetchApi, status } = useApi();
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -64,17 +65,14 @@ export function ProductSeoForm({ productId }: ProductSeoFormProps) {
   // 1. Fetch Existing SEO Data
   useEffect(() => {
     const fetchSeo = async () => {
-      try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+      if (status !== "authenticated") return;
 
-        const res = await fetch(`${apiBaseUrl}/products/${productId}/seo`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+      try {
+        setLoading(true);
+        const res = await fetchApi(`/products/${productId}/seo`);
 
         if (res.ok) {
           const data = await res.json();
-          // Reset form dengan data yang ada (jika ada)
           if (data) {
             form.reset({
               metaTitle: data.metaTitle || "",
@@ -89,7 +87,7 @@ export function ProductSeoForm({ productId }: ProductSeoFormProps) {
           }
         }
       } catch (error) {
-        console.error("Failed to fetch SEO data", error);
+        console.error("❌ Failed to fetch SEO data:", error);
       } finally {
         setLoading(false);
       }
@@ -98,34 +96,34 @@ export function ProductSeoForm({ productId }: ProductSeoFormProps) {
     if (productId) {
       fetchSeo();
     }
-  }, [productId, form]);
+  }, [productId, status, fetchApi, form]); // Tambahkan dependensi status & fetchApi
 
   // 2. Handle Submit (Save/Update)
   const onSubmit = async (values: SeoFormValues) => {
+    // 🛑 Guard autentikasi
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${apiBaseUrl}/products/${productId}/seo`, {
-        method: "PUT", // Kita pakai PUT sesuai endpoint backend
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+      // ✨ Gunakan fetchApi dengan metode PUT
+      const res = await fetchApi(`/products/${productId}/seo`, {
+        method: "PUT",
         body: JSON.stringify(values),
       });
 
       if (!res.ok) {
-        throw new Error("Failed to save SEO data");
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to save SEO data");
       }
 
       toast.success("SEO data updated successfully!");
-    } catch (error) {
-      console.error(error);
-      toast.error("Gagal menyimpan data SEO.");
+    } catch (error: any) {
+      console.error("❌ Save SEO Error:", error);
+      toast.error(error.message || "Gagal menyimpan data SEO.");
     } finally {
       setIsSubmitting(false);
     }
   };
-
   if (loading) {
     return (
       <Card>

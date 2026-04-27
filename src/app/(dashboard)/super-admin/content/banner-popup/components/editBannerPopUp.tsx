@@ -53,8 +53,6 @@ export default function EditPopupBanner() {
   ) => {
     setIsSaving(true);
     try {
-      if (!token) throw new Error("No token found");
-
       // Gunakan FormData untuk mengirim File + Text
       const formData = new FormData();
 

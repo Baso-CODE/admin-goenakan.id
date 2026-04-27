@@ -79,7 +79,6 @@ const ArticleBanners = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      // ✨ 3. Panggil API tanpa urusan token manual
       const res = await fetchApi(`/articles-banners?${params}`);
 
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);

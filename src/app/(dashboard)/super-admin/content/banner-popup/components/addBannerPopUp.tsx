@@ -25,8 +25,6 @@ export default function AddPopupBanner() {
     setIsSubmitting(true);
 
     try {
-      if (!token) throw new Error("No auth token found");
-
       const formData = new FormData();
 
       // --- Text Fields ---
