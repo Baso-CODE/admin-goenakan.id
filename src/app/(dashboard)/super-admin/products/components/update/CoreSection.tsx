@@ -40,7 +40,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { CheckCheck, ChevronsUpDown, X } from "lucide-react";
 
@@ -74,6 +74,8 @@ export default function FormProductCore({
   onSubmit: (values: ProductCoreFormValues) => void;
   isSubmitting: boolean;
 }) {
+  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status
+
   const [categories, setCategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [tags, setTags] = useState<any[]>([]);
@@ -116,27 +118,29 @@ export default function FormProductCore({
     }
   }, [initialData, categories, form]);
 
-  // Fetch kategori
+  // Fetch kategori & tags
   useEffect(() => {
     const fetchCategories = async () => {
+      // 🛑 Jangan jalan jika sesi belum siap
+      if (status === "loading" || status === "unauthenticated") return;
+
       setLoadingCategories(true);
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        // ✨ Parallel Fetching menggunakan fetchApi (Otomatis handle Base URL & Token)
+        const [catRes, tagRes] = await Promise.all([
+          fetchApi("/product-categories/list"),
+          fetchApi("/product-tags/list"),
+        ]);
 
-        const catRes = await fetch(`${apiUrl}/product-categories/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
         if (!catRes.ok) throw new Error("Failed to fetch categories");
-        const data = await catRes.json();
-        setCategories(data);
 
-        const tagRes = await fetch(`${apiUrl}/product-tags/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const data = await catRes.json();
         const tagData = await tagRes.json();
+
+        setCategories(data);
         setTags(tagData || []);
       } catch (error) {
+        console.error(error);
         toast.error("Failed to load categories.");
       } finally {
         setLoadingCategories(false);
@@ -144,7 +148,7 @@ export default function FormProductCore({
     };
 
     fetchCategories();
-  }, []);
+  }, [status, fetchApi]); // Tambahkan dependensi agar sinkron dengan hook useApi
 
   return (
     <Form {...form}>

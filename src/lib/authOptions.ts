@@ -1,26 +1,32 @@
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { sign } from "jsonwebtoken";
 import { NextAuthOptions } from "next-auth";
-import Credentials from "next-auth/providers/credentials";
-import { comparePassword } from "./argon";
-import { prisma } from "./prisma";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { comparePassword } from "./argon"; // Pastikan path ini benar di project Admin
+import { prisma } from "./prisma"; // Pastikan path ini benar di project Admin
 
 export const authOptions: NextAuthOptions = {
+  // ✨ 1. Tambahkan PrismaAdapter agar konsisten dengan Client
+  adapter: PrismaAdapter(prisma),
+
   providers: [
-    Credentials({
+    CredentialsProvider({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "text", placeholder: "m@example.com" },
+        email: { label: "Email", type: "email", placeholder: "m@example.com" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Email dan password wajib diisi");
+        }
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         });
 
         if (!user || !user.password) {
-          return null;
+          throw new Error("Email tidak ditemukan");
         }
 
         const isValid = await comparePassword(
@@ -28,7 +34,9 @@ export const authOptions: NextAuthOptions = {
           user.password,
         );
 
-        if (!isValid) return null;
+        if (!isValid) {
+          throw new Error("Password salah");
+        }
 
         return {
           id: user.id,
@@ -40,39 +48,20 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
 
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
-  },
-
-  jwt: {
-    secret: process.env.NEXTAUTH_SECRET,
-  },
-
-  pages: {
-    signIn: "/login",
-  },
-
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
-        token.email = user.email;
 
-        // ✨ Tambahkan proteksi agar secret tidak undefined
-        const secret = process.env.NEXTAUTH_SECRET;
-        if (!secret) {
-          throw new Error("NEXTAUTH_SECRET is not defined");
-        }
-
+        // ✨ 2. Hasilkan accessToken dengan struktur payload yang persis sama
         token.accessToken = sign(
           {
             id: user.id,
             email: user.email,
             role: user.role,
           },
-          secret,
+          process.env.NEXTAUTH_SECRET!,
           { expiresIn: "1d" },
         );
       }
@@ -80,14 +69,22 @@ export const authOptions: NextAuthOptions = {
     },
 
     async session({ session, token }) {
-      if (token && session.user) {
+      if (session.user) {
+        // ✨ 3. Map token ke session persis seperti di Client
         session.user.id = token.id as string;
         session.user.role = token.role as any;
-        session.user.email = token.email as string;
         session.user.accessToken = token.accessToken as string;
       }
       return session;
     },
+  },
+
+  session: {
+    strategy: "jwt",
+  },
+
+  pages: {
+    signIn: "/login",
   },
 
   secret: process.env.NEXTAUTH_SECRET,

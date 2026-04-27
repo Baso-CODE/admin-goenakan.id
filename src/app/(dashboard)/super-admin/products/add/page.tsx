@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ type FileUploads = {
 };
 
 export default function AddProductPage() {
+  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
@@ -20,6 +21,11 @@ export default function AddProductPage() {
     data: ProductFormValues,
     files: FileUploads,
   ) => {
+    if (status !== "authenticated") {
+      toast.error("Sesi berakhir, silakan login kembali.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -46,12 +52,8 @@ export default function AddProductPage() {
       const productDataJson = JSON.stringify(data);
       formData.append("data", productDataJson);
 
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/products`, {
+      const res = await fetchApi("/products", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
@@ -70,7 +72,6 @@ export default function AddProductPage() {
       setIsSubmitting(false);
     }
   };
-
   return (
     <div className="w-full max-w-full space-y-6">
       <h2 className="text-xl font-semibold tracking-tight uppercase">

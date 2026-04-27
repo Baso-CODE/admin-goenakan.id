@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { countries } from "@/lib/countries";
 import {
   Barcode,
@@ -130,7 +130,9 @@ const initialFormData: ClientFormData = {
   b2b_pics: [{ prefix: "", name: "", email: "", phone: "" }],
 };
 
-export default function zClientEditForm() {
+export default function ClientEditForm() {
+  const { fetchApi, status } = useApi();
+
   const [formData, setFormData] = useState<ClientFormData>(initialFormData);
 
   const [clientType, setClientType] = useState<ClientType>("");
@@ -160,24 +162,20 @@ export default function zClientEditForm() {
 
   useEffect(() => {
     const fetchMasterData = async () => {
+      if (status === "loading" || status === "unauthenticated") return;
+
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        const [pcRes, depRes] = await Promise.all([
+          fetchApi("/purchase-channels/list"),
+          fetchApi("/departments/list"),
+        ]);
 
-        if (!token) throw new Error("No token found");
+        if (!pcRes.ok || !depRes.ok) throw new Error("Failed to fetch data");
 
-        // Fetch purchase channels
-        const pcRes = await fetch(`${apiUrl}/purchase-channels/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
         const pcData = await pcRes.json();
-        setPurchaseChannels(pcData);
-
-        // Fetch departments
-        const depRes = await fetch(`${apiUrl}/departments/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
         const depData = await depRes.json();
+
+        setPurchaseChannels(pcData);
         setDepartments(depData);
       } catch (err) {
         console.error("❌ Failed to fetch master data:", err);
@@ -186,7 +184,7 @@ export default function zClientEditForm() {
     };
 
     fetchMasterData();
-  }, []);
+  }, [status, fetchApi]);
   // === FETCH PROVINCE ===
   useEffect(() => {
     fetch("https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json")
@@ -303,23 +301,15 @@ export default function zClientEditForm() {
 
   useEffect(() => {
     const fetchClient = async () => {
-      try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+      if (status === "loading" || status === "unauthenticated" || !clientId)
+        return;
 
-        const res = await fetch(`${apiUrl}/clients/${clientId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+      try {
+        const res = await fetchApi(`/clients/${clientId}`);
 
         if (!res.ok) throw new Error("Gagal mengambil data klien");
 
         const data = await res.json();
-
-        setFormData((prev) => ({
-          ...initialFormData,
-          custCode: data.custCode || "",
-          type: data.type || "",
-        }));
 
         // === HANDLE B2B ===
         if (data.type === "B2B" && data.b2b) {
@@ -377,9 +367,7 @@ export default function zClientEditForm() {
             custCode: data.custCode || "",
             type: "B2C",
 
-            // ============================
-            // B2C FIELDS (LENGKAP)
-            // ============================
+            // B2C FIELDS
             b2c_prefix: data.b2c.prefix || "",
             b2c_name: data.b2c.name || "",
             b2c_phone: data.b2c.phone || "",
@@ -409,7 +397,7 @@ export default function zClientEditForm() {
     };
 
     fetchClient();
-  }, [clientId]);
+  }, [clientId, status, fetchApi]); // Dependensi lengkap
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -487,14 +475,15 @@ export default function zClientEditForm() {
         };
       }
 
-      await fetch(`${apiUrl}/clients/${clientId}`, {
+      const res = await fetchApi(`/clients/${clientId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal memperbarui client");
+      }
 
       toast.success("Klien berhasil diperbarui!");
       router.push("/super-admin/clients");

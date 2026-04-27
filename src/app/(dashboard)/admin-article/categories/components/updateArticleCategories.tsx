@@ -1,15 +1,16 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import ArticleCategoryForm, {
   ArticleCategoryFormValues,
 } from "./formArticleCategories";
 
 export default function EditArticleCategory() {
+  const { fetchApi, status } = useApi();
   const { id } = useParams();
   const router = useRouter();
 
@@ -20,57 +21,48 @@ export default function EditArticleCategory() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // === FETCH EXISTING DATA ===
+  const fetchData = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated") return;
+
+    setIsLoading(true);
+    try {
+      const res = await fetchApi(`/article-categories/${id}`);
+
+      if (!res.ok) throw new Error("Failed to fetch category data");
+
+      const response = await res.json();
+      const data = response.data || response;
+
+      setCategoryData({
+        name: data.name,
+        description: data.description || "",
+        isActive: data.isActive ?? true,
+      });
+    } catch (err) {
+      console.error("❌ Failed to load data:", err);
+      setCategoryData(undefined);
+      toast.error("Failed to load category data.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id, status, fetchApi]);
+
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const tokenRes = await fetch("/api/auth/token");
-        if (!tokenRes.ok) throw new Error("Failed to get token");
-        const { token } = await tokenRes.json();
-
-        const res = await fetch(`${apiUrl}/article-categories/${id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch category data");
-
-        const data = await res.json();
-
-        // Memasukkan data dari database ke dalam state Form
-        setCategoryData({
-          name: data.name,
-          description: data.description || "", // Antisipasi null dari DB
-          isActive: data.isActive ?? true,
-        });
-      } catch (err) {
-        console.error("❌ Failed to load data:", err);
-        setCategoryData(undefined);
-        toast.error("Failed to load category data.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     if (id) fetchData();
-  }, [id]);
+  }, [fetchData]);
 
   // === SUBMIT UPDATE DATA ===
   const handleUpdateCategory = async (data: ArticleCategoryFormValues) => {
+    if (status !== "authenticated") {
+      toast.error("Sesi berakhir, silakan login kembali.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
-      const res = await fetch(`${apiUrl}/article-categories/${id}`, {
+      // ✨ Gunakan fetchApi dengan method PATCH
+      const res = await fetchApi(`/article-categories/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
@@ -80,7 +72,7 @@ export default function EditArticleCategory() {
       }
 
       toast.success("Article Category updated successfully!");
-      router.push("/super-admin/article-categories");
+      router.push("/admin-article/categories");
       router.refresh();
     } catch (err: any) {
       toast.error(err.message || "Failed to update category");
@@ -88,6 +80,15 @@ export default function EditArticleCategory() {
       setIsSubmitting(false);
     }
   };
+
+  // Render loading state jika session atau data sedang dimuat
+  if (status === "loading" || isLoading) {
+    return (
+      <div className="p-8 text-center text-muted-foreground animate-pulse">
+        Memuat data kategori...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

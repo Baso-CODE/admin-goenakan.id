@@ -6,11 +6,11 @@ import html2canvas from "html2canvas-pro";
 import jsPDF from "jspdf";
 import { FileDown, Loader2 } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 
 const formatCurrency = (amount: string | number) => {
   const numericAmount = Number(amount) || 0;
@@ -22,6 +22,8 @@ const formatCurrency = (amount: string | number) => {
 };
 
 export default function QuotationPrint() {
+  const { fetchApi, status } = useApi();
+
   const { quotationId } = useParams();
   const invoiceRef = useRef<HTMLDivElement>(null);
 
@@ -30,31 +32,26 @@ export default function QuotationPrint() {
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+  const fetchData = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated" || !quotationId)
+      return;
 
-        const res = await fetch(`${apiUrl}/quotations/print/${quotationId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+    try {
+      setLoading(true);
 
-        if (!res.ok) throw new Error("Gagal mengambil data quotation");
+      const res = await fetchApi(`/quotations/print/${quotationId}`);
 
-        const result = await res.json();
-        setData(result.data || result);
-      } catch (error) {
-        console.error(error);
-        toast.error("Gagal memuat data");
-      } finally {
-        setLoading(false);
-      }
-    };
+      if (!res.ok) throw new Error("Gagal mengambil data quotation");
 
-    if (quotationId) fetchData();
-  }, [quotationId]);
+      const result = await res.json();
+      setData(result.data || result);
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal memuat data");
+    } finally {
+      setLoading(false);
+    }
+  }, [quotationId, status, fetchApi]);
 
   const handleDownloadPDF = async () => {
     const element = invoiceRef.current;

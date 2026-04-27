@@ -64,6 +64,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 
 // --- KONFIGURASI STATUS (Sesuai DTO Backend) ---
@@ -106,6 +107,8 @@ export default function ShipmentManager({
   couriers,
   onUpdate,
 }: ShipmentManagerProps) {
+  const { fetchApi, status } = useApi();
+
   // === STATE MANAGEMENT ===
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -142,15 +145,14 @@ export default function ShipmentManager({
     {},
   );
 
-  // === FETCH CATEGORIES ===
   useEffect(() => {
     const fetchCategories = async () => {
+      if (status !== "authenticated") return;
+
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-        const res = await fetch(`${apiUrl}/shipment-notes-categories`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        const res = await fetchApi("/shipment-notes-categories");
+
         if (res.ok) {
           const data = await res.json();
           setNoteCategories(data);
@@ -163,9 +165,8 @@ export default function ShipmentManager({
     if (isOpen || updateStatusId) {
       fetchCategories();
     }
-  }, [isOpen, updateStatusId]);
+  }, [isOpen, updateStatusId, status, fetchApi]); // Tambahkan dependensi lengkap
 
-  // === HELPER FUNCTIONS ===
   // === HELPER FUNCTIONS ===
 
   // 🔄 UPDATE: Menambahkan parameter currentStep
@@ -252,11 +253,9 @@ export default function ShipmentManager({
     if (selectedItems.length === 0) return toast.error("Pilih minimal 1 item");
     if (!vendorId) return toast.error("Pilih Vendor");
     if (!origin || !destination) return toast.error("Isi Kota Asal & Tujuan");
-
+    if (status !== "authenticated") return;
     try {
       setLoading(true);
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
       const payload = {
         orderId,
@@ -276,17 +275,15 @@ export default function ShipmentManager({
         })),
         notes: getNotesPayload(),
       };
-
-      const res = await fetch(`${apiUrl}/logistics/shipments`, {
+      const res = await fetchApi("/logistics/shipments", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to create shipment");
+      }
 
       toast.success("Pengiriman berhasil dibuat!");
       setIsOpen(false);

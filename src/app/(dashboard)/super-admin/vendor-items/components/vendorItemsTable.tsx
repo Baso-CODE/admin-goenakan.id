@@ -21,8 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import { FileDown, Loader2, Search } from "lucide-react";
 import Link from "next/link";
@@ -61,6 +61,8 @@ interface ItemExportQuery {
   categoryId?: string;
 }
 const VendorItemsTable = () => {
+  const { fetchApi, status } = useApi();
+
   const [items, setItems] = useState<VendorItem[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
@@ -81,20 +83,18 @@ const VendorItemsTable = () => {
   const [endDate, setEndDate] = useState<string>("");
   const [exportCategoryId, setExportCategoryId] = useState<string>("ALL");
 
+  // === FETCH CATEGORY OPTIONS ===
   const fetchCategoryOptions = async () => {
-    try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-      const res = await fetch(
-        `${apiUrl}/vendor-categories?take=1000&isActive=true`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-      const result = await res.json();
+    // 🛑 Guard: Jangan eksekusi jika belum terautentikasi
+    if (status !== "authenticated") return;
 
+    try {
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi("/vendor-categories?take=1000&isActive=true");
+
+      if (!res.ok) throw new Error("Gagal mengambil kategori");
+
+      const result = await res.json();
       setCategoryOptions(
         result.data.map((cat: any) => ({ id: cat.id, name: cat.name })) || [],
       );
@@ -103,33 +103,38 @@ const VendorItemsTable = () => {
     }
   };
 
-  // === FETCH DATA DARI BACKEND ===
+  // === FETCH ITEMS ===
   const fetchItems = async () => {
+    // 🛑 Guard: Jangan eksekusi jika belum terautentikasi
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
         isActive: statusFilter,
       });
+
       if (debouncedSearch.trim()) {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(`${apiUrl}/vendor-items?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi(`/vendor-items?${params}`);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to load vendor items");
+      }
 
       const result = await res.json();
       setItems(result.data || []);
       setMeta(result.meta);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Unknown error");
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      setError(msg);
       toast.error("Failed to load vendor items");
     } finally {
       setLoading(false);
@@ -139,7 +144,8 @@ const VendorItemsTable = () => {
   useEffect(() => {
     fetchItems();
     fetchCategoryOptions();
-  }, [page, debouncedSearch, statusFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, debouncedSearch, statusFilter, status, fetchApi]); // Tambahkan dependensi auth
 
   const handleExport = async () => {
     setExporting(true);
@@ -166,22 +172,21 @@ const VendorItemsTable = () => {
       ).toString();
 
       // PASTIKAN URL INI SESUAI DENGAN ROUTE BACKEND ANDA!
-      const exportUrl = `${apiUrl}/vendor-items/export/excel?${queryString}`;
-
-      const response = await fetch(exportUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetchApi(
+        `/vendor-items/export/excel?${queryString}`,
+        {
+          method: "GET",
         },
-      });
+      );
 
       if (!response.ok) {
-        throw new Error("Export failed. Server responded with an error.");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(
+          errData.message || "Export failed. Server responded with an error.",
+        );
       }
-
       // 3. Proses File Binary (Blob)
       const blob = await response.blob();
-      // Coba ambil nama file dari header, default jika tidak ada
       const filename =
         response.headers
           .get("Content-Disposition")
@@ -213,21 +218,14 @@ const VendorItemsTable = () => {
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const response = await fetch(`${apiUrl}/vendor-items/${deleteId}`, {
+      const response = await fetchApi(`/vendor-items/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || "Gagal menghapus kategori");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal menghapus item vendor");
       }
-
       toast.success("Item berhasil dihapus");
       setPage(1);
       fetchItems();

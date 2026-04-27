@@ -1,17 +1,18 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { ArrowLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import NoteTemplateForm, {
   NoteTemplateFormValues,
 } from "../../components/notesTemplateForm";
 
 export default function EditNoteTemplatePage() {
-  const { id } = useParams(); // Menggunakan ID (bukan slug) untuk template
+  const { fetchApi, status } = useApi();
+  const { id } = useParams();
   const router = useRouter();
 
   const [initialData, setInitialData] = useState<
@@ -22,66 +23,58 @@ export default function EditNoteTemplatePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 1. Fetch Data Template & Categories
+  const fetchData = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated" || !id) return;
+
+    try {
+      setIsLoading(true);
+
+      const [templateRes, catRes] = await Promise.all([
+        fetchApi(`/invoice-notes/templates/${id}`),
+        fetchApi("/invoice-notes/categories/list"),
+      ]);
+
+      if (!templateRes.ok) throw new Error("Failed to fetch template");
+
+      const templateData = await templateRes.json();
+      const catData = await catRes.json();
+
+      const template = templateData.data || templateData;
+
+      setInitialData({
+        categoryId: template.categoryId,
+        title: template.title,
+        content: template.content,
+        isActive: template.isActive ?? true,
+      });
+
+      setCategories(catData.data || catData);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load data.");
+      router.push("/admin-invoice/notes");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id, status, fetchApi, router]);
+
   useEffect(() => {
-    const fetchData = async () => {
-      if (!id) return;
-      try {
-        setIsLoading(true);
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-        const headers = { Authorization: `Bearer ${token}` };
-
-        // Parallel Fetching agar lebih cepat
-        const [templateRes, catRes] = await Promise.all([
-          fetch(`${apiUrl}/invoice-notes/templates/${id}`, {
-            headers,
-          }),
-          fetch(`${apiUrl}/invoice-notes/categories/list`, {
-            headers,
-          }),
-        ]);
-
-        if (!templateRes.ok) throw new Error("Failed to fetch template");
-
-        const templateData = await templateRes.json();
-        const catData = await catRes.json();
-
-        // Backend biasanya membungkus dalam object { data: ... }
-        const template = templateData.data || templateData;
-
-        setInitialData({
-          categoryId: template.categoryId,
-          title: template.title,
-          content: template.content,
-          isActive: template.isActive,
-        });
-
-        setCategories(catData);
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to load data.");
-        router.push("/admin-invoice/notes");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchData();
-  }, [id, router]);
+  }, [fetchData]);
 
   // 2. Handle Update
   const handleUpdateTemplate = async (formValues: NoteTemplateFormValues) => {
+    if (status !== "authenticated") {
+      toast.error("Sesi berakhir, silakan login kembali.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
-      const res = await fetch(`${apiUrl}/invoice-notes/templates/${id}`, {
+      // ✨ Gunakan fetchApi dengan method PATCH
+      const res = await fetchApi(`/invoice-notes/templates/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(formValues),
       });
 
@@ -92,6 +85,7 @@ export default function EditNoteTemplatePage() {
 
       toast.success("Template updated successfully!");
       router.push("/admin-invoice/notes");
+      router.refresh();
     } catch (err: any) {
       toast.error(err.message);
     } finally {

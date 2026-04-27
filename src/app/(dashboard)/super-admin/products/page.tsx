@@ -20,8 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { formatDate } from "@/utils/formatDate";
 import {
@@ -83,6 +83,8 @@ interface ProductExportQuery {
 }
 
 const Products = () => {
+  const { fetchApi, status } = useApi();
+
   const [products, setProducts] = useState<Product[]>([]);
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -107,14 +109,8 @@ const Products = () => {
   // === Fetch Categories ===
   const fetchCategories = async () => {
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/product-categories/list`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi("/product-categories/list");
       const data = await res.json();
       setCategories(data);
     } catch (error) {
@@ -124,12 +120,12 @@ const Products = () => {
 
   // === Fetch data dari backend ===
   const fetchProducts = async () => {
+    // 🛑 Jangan jalan jika sesi belum siap
+    if (status === "loading") return;
+
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -143,11 +139,8 @@ const Products = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(`${apiUrl}/products?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi(`/products?${params}`);
 
       const result = await res.json();
 
@@ -167,12 +160,12 @@ const Products = () => {
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [fetchApi]); // Tambahkan dependensi fetchApi
 
   useEffect(() => {
     fetchProducts();
     setExportSearch(debouncedSearch);
-  }, [page, debouncedSearch, isCustomFilter, categoryFilter]);
+  }, [page, debouncedSearch, isCustomFilter, categoryFilter, status, fetchApi]); // Tambahkan status dan fetchApi
 
   const handleExport = async () => {
     setExporting(true);
@@ -195,13 +188,8 @@ const Products = () => {
         exportFilters as Record<string, string>,
       ).toString();
 
-      const exportUrl = `${apiUrl}/products/export/excel?${queryString}`;
-
-      const response = await fetch(exportUrl, {
+      const response = await fetchApi(`/products/export/excel?${queryString}`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {

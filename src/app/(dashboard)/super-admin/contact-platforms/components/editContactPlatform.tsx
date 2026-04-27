@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -9,6 +9,8 @@ import ContactPlatformForm, {
 } from "./FormContactPlatform";
 
 export default function EditContactPlatform() {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams();
   const router = useRouter();
 
@@ -20,21 +22,17 @@ export default function EditContactPlatform() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!id || status === "loading") return;
+
       setIsLoading(true);
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-
-        const res = await fetch(`${apiUrl}/contact-platforms/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetchApi(`/contact-platforms/${id}`);
 
         if (!res.ok) throw new Error("Failed to fetch platform data");
 
         const data = await res.json();
         setPlatformData({
           name: data.name,
-
           icon: data.icon,
           isActive: data.isActive,
         });
@@ -45,23 +43,17 @@ export default function EditContactPlatform() {
         setIsLoading(false);
       }
     };
-    if (id) fetchData();
-  }, [id]);
+
+    fetchData();
+  }, [id, status, fetchApi]); // Tambahkan dependensi lengkap
 
   const handleUpdateContactPlatform = async (
-    data: ContactPlatformFormValues
+    data: ContactPlatformFormValues,
   ) => {
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/contact-platforms/${id}`, {
+      const res = await fetchApi(`/contact-platforms/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
@@ -75,7 +67,9 @@ export default function EditContactPlatform() {
       router.refresh();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to update contact platform"
+        err instanceof Error
+          ? err.message
+          : "Failed to update contact platform",
       );
     } finally {
       setIsSubmitting(false);

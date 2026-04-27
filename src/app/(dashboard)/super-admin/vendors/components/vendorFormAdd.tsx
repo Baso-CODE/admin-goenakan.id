@@ -38,7 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import {
   Check,
@@ -84,6 +84,8 @@ export default function AddVendorForm({
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
+  const { fetchApi, status } = useApi();
+
   const [categoryTypes] = useState([
     { id: "SERVICE", name: "Service" },
     { id: "PRODUCT", name: "Product" },
@@ -133,27 +135,37 @@ export default function AddVendorForm({
   // === API CALLS ===
   useEffect(() => {
     const fetchDependencies = async () => {
-      try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-        const headers = { Authorization: `Bearer ${token}` };
+      if (status !== "authenticated") return;
 
-        // Parallel Fetch
+      try {
         const [platformsRes, catsRes, itemsRes] = await Promise.all([
-          fetch(`${apiUrl}/contact-platforms/active`, { headers }),
-          fetch(`${apiUrl}/vendor-categories/active`, { headers }),
-          fetch(`${apiUrl}/vendor-items/active`, { headers }),
+          fetchApi("/contact-platforms/active"),
+          fetchApi("/vendor-categories/active"),
+          fetchApi("/vendor-items/active"),
         ]);
 
-        if (platformsRes.ok) setContactPlatforms(await platformsRes.json());
-        if (catsRes.ok) setVendorCategories(await catsRes.json());
-        if (itemsRes.ok) setVendorItems(await itemsRes.json());
+        // Parsing data secara aman jika response OK
+        if (platformsRes.ok) {
+          const platformsData = await platformsRes.json();
+          setContactPlatforms(platformsData);
+        }
+
+        if (catsRes.ok) {
+          const catsData = await catsRes.json();
+          setVendorCategories(catsData);
+        }
+
+        if (itemsRes.ok) {
+          const itemsData = await itemsRes.json();
+          setVendorItems(itemsData);
+        }
       } catch (error) {
-        console.error("Failed loading form dependencies");
+        console.error("Failed loading form dependencies:", error);
       }
     };
+
     fetchDependencies();
-  }, []);
+  }, [status, fetchApi]); // Tambahkan dependensi lengkap
 
   const handleSubmit = (values: AddVendorFormValues) => {
     const payload = {

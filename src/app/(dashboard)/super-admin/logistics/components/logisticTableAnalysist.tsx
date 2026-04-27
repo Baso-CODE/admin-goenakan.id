@@ -30,8 +30,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 
 // === TYPES ===
 type LogisticsData = {
@@ -55,6 +55,8 @@ type Meta = {
 };
 
 export default function LogisticTableAnalysist() {
+  const { fetchApi, status } = useApi();
+
   // === STATE ===
   const [data, setData] = useState<LogisticsData[]>([]);
 
@@ -72,8 +74,7 @@ export default function LogisticTableAnalysist() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+      if (status !== "authenticated") return;
 
       const params = new URLSearchParams({
         page: page.toString(),
@@ -84,12 +85,7 @@ export default function LogisticTableAnalysist() {
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
-      const res = await fetch(
-        `${apiUrl}/logistics/analytics/summary?${params}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const res = await fetchApi(`/logistics/analytics/summary?${params}`);
 
       if (!res.ok) throw new Error("Gagal mengambil data logistik");
 

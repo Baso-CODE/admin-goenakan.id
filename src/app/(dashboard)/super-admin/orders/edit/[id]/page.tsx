@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -54,12 +54,7 @@ import {
   SampleStepItem,
 } from "../../components/sampleFollowUpSection";
 import { OrderFormValues, orderSchema } from "../../order-schema";
-import {
-  fetchOrderById,
-  fetchWithToken,
-  generatePoNumber,
-  updateOrder,
-} from "../../order-service";
+import { generatePoNumber, updateOrder } from "../../order-service";
 
 // === TYPES ===
 type PIC = {
@@ -99,6 +94,8 @@ type Product = {
 };
 
 export default function EditOrderForm() {
+  const { fetchApi, status } = useApi();
+
   const params = useParams();
   const router = useRouter();
   const orderId = params.id as string;
@@ -148,18 +145,45 @@ export default function EditOrderForm() {
   // === LOAD DATA ===
   useEffect(() => {
     async function loadData() {
+      // 🛑 Guard: Tunggu hingga status 'authenticated' dan pastikan orderId ada
+      if (status !== "authenticated" || !orderId) return;
+
       try {
         setLoading(true);
 
-        const [c, s, v, p, pc, orderData] = await Promise.all([
-          fetchWithToken(`${apiUrl}/clients/order`),
-          fetchWithToken(`${apiUrl}/sales/order`),
-          fetchWithToken(`${apiUrl}/vendors/order/add`),
-          fetchWithToken(`${apiUrl}/products/order`),
-          // Load Master Purchase Channel
-          fetchWithToken(`${apiUrl}/purchase-channels/list`),
-          fetchOrderById(orderId),
+        // ✨ Gunakan fetchApi secara paralel
+        const [resC, resS, resV, resP, resPC, resOrder] = await Promise.all([
+          fetchApi("/clients/order"),
+          fetchApi("/sales/order"),
+          fetchApi("/vendors/order/add"),
+          fetchApi("/products/order"),
+          fetchApi("/purchase-channels/list"),
+          fetchApi(`/orders/${orderId}`), // Menggantikan fetchOrderById
         ]);
+
+        // Validasi response
+        if (
+          !resC.ok ||
+          !resS.ok ||
+          !resV.ok ||
+          !resP.ok ||
+          !resPC.ok ||
+          !resOrder.ok
+        ) {
+          throw new Error("Gagal mengambil data master atau data order");
+        }
+
+        // Parsing JSON secara paralel
+        const [c, s, v, p, pc, orderResult] = await Promise.all([
+          resC.json(),
+          resS.json(),
+          resV.json(),
+          resP.json(),
+          resPC.json(),
+          resOrder.json(),
+        ]);
+
+        const orderData = orderResult; // Sesuaikan jika data order dibungkus result.data
 
         setClients(c);
         setSales(s);
@@ -177,7 +201,6 @@ export default function EditOrderForm() {
             ...orderData,
             clientB2BPICId: orderData.clientB2BPICId || "",
             purchaseChannelId: orderData.purchaseChannelId || "",
-
             phone: currentClient?.phone || "",
           });
 
@@ -189,6 +212,7 @@ export default function EditOrderForm() {
               setValue("phone", selectedPic.phone);
             }
           }
+
           if (
             orderData.sampleFollowUps &&
             orderData.sampleFollowUps.length > 0
@@ -204,10 +228,8 @@ export default function EditOrderForm() {
       }
     }
 
-    if (orderId) {
-      loadData();
-    }
-  }, [orderId, reset, setValue]);
+    loadData();
+  }, [orderId, reset, setValue, status, fetchApi]); // Tambahkan dependensi lengkap
 
   // === LOGIC CLIENT & PIC ===
   const selectedClientData = clients.find((c) => c.id === selectedClientId);
@@ -227,7 +249,7 @@ export default function EditOrderForm() {
   const handleGeneratePO = async () => {
     try {
       setGeneratingPo(true);
-      const newPo = await generatePoNumber();
+      const newPo = await generatePoNumber(fetchApi);
       setValue("poNumber", newPo);
       toast.success("PO Number generated");
     } catch (e) {
@@ -254,8 +276,7 @@ export default function EditOrderForm() {
             nextAction: s.nextAction || undefined,
           }));
       }
-      await updateOrder(orderId, payload);
-
+      await updateOrder(fetchApi, orderId, payload);
       toast.success("Order updated successfully");
       router.push("/super-admin/orders");
     } catch {

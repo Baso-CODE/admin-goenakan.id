@@ -21,13 +21,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import { Eye, FileText, Filter, Plus, Search } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 // === TYPES ===
@@ -159,6 +159,7 @@ const renderFollowUpProgress = (
 };
 
 export default function QuotationsTable() {
+  const { fetchApi, status } = useApi();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
@@ -168,19 +169,24 @@ export default function QuotationsTable() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
-  const fetchQuotations = async () => {
+  // === FETCH DATA ===
+  const fetchQuotations = useCallback(async () => {
+    // 🛑 Jangan jalan jika sesi belum siap
+    if (status === "loading" || status === "unauthenticated") return;
+
     setLoading(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+      // Build Query Params
+      const params = new URLSearchParams({
+        page: page.toString(),
+        take: "10",
+      });
 
-      const params = new URLSearchParams({ page: page.toString(), take: "10" });
       if (debouncedSearch) params.append("search", debouncedSearch);
       if (statusFilter !== "ALL") params.append("status", statusFilter);
 
-      const res = await fetch(`${apiUrl}/quotations?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // ✨ 3. Gunakan fetchApi (Otomatis handle Token & Base URL)
+      const res = await fetchApi(`/quotations?${params}`);
 
       if (!res.ok) throw new Error("Failed to fetch quotations");
 
@@ -188,15 +194,16 @@ export default function QuotationsTable() {
       setQuotations(result.data || []);
       setMeta(result.meta);
     } catch (error) {
+      console.error(error);
       toast.error("Gagal memuat data penawaran");
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debouncedSearch, statusFilter, status, fetchApi]);
 
   useEffect(() => {
     fetchQuotations();
-  }, [page, debouncedSearch, statusFilter]);
+  }, [fetchQuotations]);
 
   return (
     <div className="space-y-6 w-full mx-auto pb-10">

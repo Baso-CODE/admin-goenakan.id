@@ -34,7 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 
 type ProductionTracker = {
@@ -72,6 +72,8 @@ export default function ProductionTab({
   vendors,
   onUpdate,
 }: ProductionTabProps) {
+  const { fetchApi, status } = useApi();
+
   const [isStartOpen, setIsStartOpen] = useState(false);
   const [isCompleteOpen, setIsCompleteOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -89,9 +91,10 @@ export default function ProductionTab({
 
   const handleStartProduction = async () => {
     try {
+      // 🛑 Guard: Jangan jalan jika sesi belum siap
+      if (status !== "authenticated") return;
+
       setLoading(true);
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
       const payload = {
         orderId,
@@ -103,23 +106,21 @@ export default function ProductionTab({
         remarks: remarks || `Tahap Produksi ${step}`,
       };
 
-      const res = await fetch(`${apiUrl}/logistics/production/start`, {
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
+      const res = await fetchApi("/logistics/production/start", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const errData = await res.json();
+        const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || "Gagal memulai tahap produksi");
       }
 
       toast.success("Tahap produksi baru ditambahkan!");
       setIsStartOpen(false);
 
+      // Reset Form
       setSelectedProduct("");
       setSelectedVendor("");
       setQty(0);
@@ -128,6 +129,7 @@ export default function ProductionTab({
 
       onUpdate();
     } catch (error: any) {
+      console.error(error);
       toast.error(error.message || "Error start production");
     } finally {
       setLoading(false);
@@ -136,34 +138,34 @@ export default function ProductionTab({
 
   const handleCompleteProduction = async () => {
     try {
+      if (status !== "authenticated") return;
+
       setLoading(true);
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
       const payload = {
         endDate: new Date(date).toISOString(),
         remarks: "Selesai",
       };
 
-      const res = await fetch(
-        `${apiUrl}/logistics/production/${activeTrackerId}/complete`,
+      const res = await fetchApi(
+        `/logistics/production/${activeTrackerId}/complete`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
           body: JSON.stringify(payload),
         },
       );
 
-      if (!res.ok) throw new Error("Gagal menyelesaikan tahapan");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal menyelesaikan tahapan");
+      }
 
       toast.success("Tahapan produksi ditandai selesai!");
       setIsCompleteOpen(false);
       onUpdate();
-    } catch (error) {
-      toast.error("Error complete production");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Error complete production");
     } finally {
       setLoading(false);
     }

@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { Package, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -34,20 +34,20 @@ const formatIDR = (amount: number) => {
 };
 
 export default function TopSellingProducts() {
+  const { fetchApi, status } = useApi();
+
   const [products, setProducts] = useState<TopProduct[]>([]);
 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (status === "loading" || status === "unauthenticated") return;
+
     const fetchTopProducts = async () => {
       try {
         setLoading(true);
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
 
-        const res = await fetch(`${apiUrl}/products/top-selling?limit=5`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetchApi(`/products/top-selling?limit=5`);
 
         if (!res.ok) throw new Error("Gagal mengambil data produk terlaris");
 
@@ -55,14 +55,13 @@ export default function TopSellingProducts() {
         setProducts(result.data || []);
       } catch (error) {
         console.error(error);
-        // toast.error("Gagal memuat Top Products"); // Optional: hide toast agar tidak spam saat init
       } finally {
         setLoading(false);
       }
     };
 
     fetchTopProducts();
-  }, []);
+  }, [fetchApi, status]);
 
   return (
     <Card className="shadow-sm h-full border-l-4 border-l-blue-500">

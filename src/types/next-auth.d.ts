@@ -6,9 +6,9 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
-      name: string;
-      email: string;
-      role: Role; // ✨ Gunakan Enum Role
+      name?: string | null;
+      email?: string | null;
+      role: Role;
       accessToken: string;
     };
   }
@@ -17,14 +17,14 @@ declare module "next-auth" {
     id: string;
     name?: string | null;
     email?: string | null;
-    role: Role; // ✨ Gunakan Enum Role
+    role: Role;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
     id: string;
-    role: Role; // ✨ Gunakan Enum Role
-    accessToken?: string;
+    role: Role;
+    accessToken: string;
   }
 }

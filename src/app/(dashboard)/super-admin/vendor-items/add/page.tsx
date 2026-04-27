@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import VendorItemForm, {
@@ -8,29 +8,21 @@ import VendorItemForm, {
 } from "../components/formItemVendor";
 
 const AddItemVendor = () => {
+  const { fetchApi, status } = useApi();
+
   const router = useRouter();
-
   const handleAddItemVendor = async (data: VendorItemFormValues) => {
+    if (status !== "authenticated") return;
+
     try {
-      // Ambil token login
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
-      // Kirim data ke backend Express
-      const res = await fetch(`${apiUrl}/vendor-items`, {
+      const res = await fetchApi("/vendor-items", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `Error: ${res.statusText}`);
       }
 
       toast.success("Vendor Item created successfully!");
@@ -39,7 +31,7 @@ const AddItemVendor = () => {
     } catch (err) {
       console.error("❌ Failed to create vendor item:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to create vendor item"
+        err instanceof Error ? err.message : "Failed to create vendor item",
       );
     }
   };

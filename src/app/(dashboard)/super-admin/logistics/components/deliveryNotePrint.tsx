@@ -10,9 +10,11 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 
 export default function DeliveryNotePrint() {
+  const { fetchApi, status } = useApi();
+
   const { shipmentId } = useParams();
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<any>(null);
@@ -23,16 +25,17 @@ export default function DeliveryNotePrint() {
   // FETCH DATA SHIPMENT
   useEffect(() => {
     const fetchData = async () => {
+      // 🛑 Guard: Jangan jalan jika ID tidak ada atau sesi belum siap
+      if (!shipmentId || status !== "authenticated") return;
+
       try {
         setLoading(true);
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
 
-        const res = await fetch(`${apiUrl}/logistics/shipments/${shipmentId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        const res = await fetchApi(`/logistics/shipments/${shipmentId}`);
 
         if (!res.ok) throw new Error("Gagal mengambil data surat jalan");
+
         const result = await res.json();
         setData(result.data);
       } catch (error) {
@@ -43,8 +46,8 @@ export default function DeliveryNotePrint() {
       }
     };
 
-    if (shipmentId) fetchData();
-  }, [shipmentId]);
+    fetchData();
+  }, [shipmentId, status, fetchApi]); // Tambahkan dependensi lengkap
 
   // === FUNCTION DOWNLOAD PDF ===
   const handleDownloadPDF = async () => {

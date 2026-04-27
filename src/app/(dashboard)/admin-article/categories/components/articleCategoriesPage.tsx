@@ -19,14 +19,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/utils/formatDate";
 import { format } from "date-fns";
 import { CalendarIcon, FileDown, Loader2, Search } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 // === Type definitions ===
@@ -55,6 +55,7 @@ interface CategoryExportQuery {
 }
 
 const ArticleCategories = () => {
+  const { fetchApi, status } = useApi();
   // --- STATE UNTUK TABLE ---
   const [categories, setCategories] = useState<ArticleCategory[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -74,12 +75,12 @@ const ArticleCategories = () => {
   const [exporting, setExporting] = useState<boolean>(false);
 
   // --- FUNGSI FETCH DATA (Untuk Tabel) ---
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated") return;
+
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -89,11 +90,9 @@ const ArticleCategories = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(`${apiUrl}/article-categories?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // ✨ 3. Panggil API tanpa fetch token manual
+      const res = await fetchApi(`/article-categories?${params}`);
+
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
 
       const result = await res.json();
@@ -105,7 +104,7 @@ const ArticleCategories = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debouncedSearch, status, fetchApi]);
 
   // --- FUNGSI HANDLE DELETE ---
   const handleDelete = async () => {
@@ -113,14 +112,9 @@ const ArticleCategories = () => {
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/article-categories/${deleteId}`, {
+      // ✨ 4. DELETE menggunakan fetchApi
+      const res = await fetchApi(`/article-categories/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!res.ok) {
@@ -143,12 +137,11 @@ const ArticleCategories = () => {
 
   // --- FUNGSI HANDLE EXPORT ---
   const handleExportCategories = async () => {
+    if (status !== "authenticated") return;
+
     setExporting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const exportFilters: CategoryExportQuery = {
+      const exportFilters = {
         ...(exportStartDate && { startDate: exportStartDate }),
         ...(exportEndDate && { endDate: exportEndDate }),
       };
@@ -157,18 +150,12 @@ const ArticleCategories = () => {
         exportFilters as Record<string, string>,
       ).toString();
 
-      const exportUrl = `${apiUrl}/article-categories/export/excel?${queryString}`;
-
-      const response = await fetch(exportUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // ✨ 5. Export menggunakan fetchApi
+      const response = await fetchApi(
+        `/article-categories/export/excel?${queryString}`,
+      );
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Server Error:", errorText);
         throw new Error("Export failed. Server responded with an error.");
       }
 
@@ -178,9 +165,7 @@ const ArticleCategories = () => {
       const filenameMatch = contentDisposition?.match(/filename="(.+?)"/i);
       const filename = filenameMatch
         ? filenameMatch[1]
-        : `article_categories_export_${new Date()
-            .toISOString()
-            .slice(0, 10)}.xlsx`;
+        : `article_categories_export_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -191,15 +176,14 @@ const ArticleCategories = () => {
       a.remove();
       window.URL.revokeObjectURL(url);
 
-      toast.success("Data Article Categories berhasil di-export ke Excel!");
+      toast.success("Data Article Categories berhasil di-export!");
     } catch (error) {
       console.error("Export Error:", error);
-      toast.error("Gagal meng-export data. Pastikan filter tanggal benar.");
+      toast.error("Gagal meng-export data.");
     } finally {
       setExporting(false);
     }
   };
-
   useEffect(() => {
     fetchCategories();
   }, [page, debouncedSearch]);

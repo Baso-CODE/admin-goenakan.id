@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 
 // === SCHEMA ===
 const templateSchema = z.object({
@@ -65,7 +65,7 @@ export function QuotationNoteForm({
   onSuccess,
 }: QuotationNoteFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const { fetchApi, status } = useApi();
   // === INIT FORM ===
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as Resolver<FormValues>,
@@ -106,29 +106,26 @@ export function QuotationNoteForm({
 
   // === SUBMIT HANDLER ===
   const onSubmit = async (values: FormValues) => {
+    if (status !== "authenticated") {
+      toast.error("Sesi berakhir, silakan login kembali.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // URL Endpoint Quotation Note Categories
-      const url = initialData
-        ? `${apiUrl}/quotation-notes-categories/${initialData.id}`
-        : `${apiUrl}/quotation-notes-categories`;
+      const endpoint = initialData
+        ? `/quotation-notes-categories/${initialData.id}`
+        : `/quotation-notes-categories`;
 
       const method = initialData ? "PATCH" : "POST";
 
-      const res = await fetch(url, {
+      const res = await fetchApi(endpoint, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(values),
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         throw new Error(err.message || "Gagal menyimpan data");
       }
 
@@ -142,7 +139,7 @@ export function QuotationNoteForm({
       onClose();
     } catch (error: any) {
       console.error(error);
-      toast.error(error.message);
+      toast.error(error.message || "Terjadi kesalahan pada server");
     } finally {
       setIsSubmitting(false);
     }

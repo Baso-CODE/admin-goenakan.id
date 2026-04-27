@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import {
   ArrowUpRight,
   BadgeDollarSign,
@@ -19,6 +19,8 @@ interface StatsData {
 }
 
 export default function SampleStats() {
+  const { fetchApi, status } = useApi();
+
   // 1. STATE INTERNAL
   const [stats, setStats] = useState<StatsData>({
     totalCount: 0,
@@ -30,16 +32,17 @@ export default function SampleStats() {
   // 2. FETCH DATA OTOMATIS SAAT COMPONENT MUNCUL
   useEffect(() => {
     const fetchStats = async () => {
+      if (status !== "authenticated") return;
+
       try {
         setIsLoading(true);
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
 
-        const res = await fetch(`${apiUrl}/orders/stats/sample`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetchApi("/orders/stats/sample");
 
-        if (!res.ok) throw new Error("Gagal mengambil data statistik");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Gagal mengambil data statistik");
+        }
 
         const result = await res.json();
 
@@ -56,7 +59,7 @@ export default function SampleStats() {
     };
 
     fetchStats();
-  }, []);
+  }, [status, fetchApi]); // Tambahkan dependensi lengkap
 
   // Helper Format Currency
   const formatIDR = (amount: number) => {

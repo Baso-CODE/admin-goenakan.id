@@ -190,7 +190,7 @@ export default function SidebarRole({ ...props }) {
         url: "#",
         icon: FileText,
         items: [
-          { title: "All Articles", url: "/admin-article" },
+          { title: "All Articles", url: "/admin-article/article" },
           { title: "Categories", url: "/admin-article/categories" },
           { title: "Banners", url: "/admin-article/banners" },
         ],

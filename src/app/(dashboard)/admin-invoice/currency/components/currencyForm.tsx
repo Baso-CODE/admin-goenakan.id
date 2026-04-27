@@ -9,7 +9,7 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -58,9 +58,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
 
+import { useApi } from "@/hooks/useApi";
 import { z } from "zod";
 
 export const currencySchema = z.object({
@@ -81,6 +81,7 @@ export type Currency = {
   name: string;
 };
 export default function CurrencyForm() {
+  const { fetchApi, status } = useApi();
   // === STATE ===
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -110,18 +111,16 @@ export default function CurrencyForm() {
   });
 
   // === FETCH DATA ===
-  const fetchCurrencies = async () => {
+  const fetchCurrencies = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated") return;
+
     setIsLoading(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const params = new URLSearchParams();
       if (debouncedSearch) params.append("search", debouncedSearch);
 
-      const res = await fetch(`${apiUrl}/currencies?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // ✨ Gunakan fetchApi
+      const res = await fetchApi(`/currencies?${params}`);
 
       if (!res.ok) throw new Error("Failed to fetch");
 
@@ -133,11 +132,11 @@ export default function CurrencyForm() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [debouncedSearch, status, fetchApi]);
 
   useEffect(() => {
     fetchCurrencies();
-  }, [debouncedSearch]);
+  }, [fetchCurrencies]);
 
   // === HANDLERS ===
   const handleOpenCreate = () => {
@@ -163,24 +162,19 @@ export default function CurrencyForm() {
     setIsAlertOpen(true);
   };
 
+  // === SUBMIT (CREATE & UPDATE) ===
   const onSubmit = async (values: CurrencyFormValues) => {
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const url = isEditMode
-        ? `${apiUrl}/currencies/${selectedCurrency?.code}`
-        : `${apiUrl}/currencies`;
-
+      const endpoint = isEditMode
+        ? `/currencies/${selectedCurrency?.code}`
+        : `/currencies`;
       const method = isEditMode ? "PATCH" : "POST";
 
-      const res = await fetch(url, {
+      const res = await fetchApi(endpoint, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(values),
       });
 
@@ -201,15 +195,13 @@ export default function CurrencyForm() {
     }
   };
 
+  // === DELETE ===
   const handleDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+    if (!deleteTarget || status !== "authenticated") return;
 
-      const res = await fetch(`${apiUrl}/currencies/${deleteTarget}`, {
+    try {
+      const res = await fetchApi(`/currencies/${deleteTarget}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!res.ok) {
@@ -224,7 +216,6 @@ export default function CurrencyForm() {
       toast.error(error.message);
     }
   };
-
   return (
     <div className="space-y-6  mx-auto py-6">
       {/* Header */}

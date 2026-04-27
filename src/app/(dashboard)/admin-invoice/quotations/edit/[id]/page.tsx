@@ -1,16 +1,16 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
 import { cleanQuotationPayload } from "@/helper/cleanQuotationPayload";
-import { Loader2 } from "lucide-react";
+import { useApi } from "@/hooks/useApi";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import QuotationForm, {
   QuotationFormValues,
 } from "../../components/quotationForm";
 
 export default function EditQuotationPage() {
+  const { fetchApi, status } = useApi();
   const { id } = useParams();
   const router = useRouter();
 
@@ -20,93 +20,95 @@ export default function EditQuotationPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  // ============================
+  // FETCH DATA
+  // ============================
+  const fetchQuotation = useCallback(async () => {
+    // 🛑 Jangan jalan jika sesi belum siap atau ID tidak ada
+    if (status === "loading" || status === "unauthenticated" || !id) return;
+
+    try {
+      setIsLoading(true);
+
+      // ✨ Gunakan fetchApi (GET otomatis)
+      const res = await fetchApi(`/quotations/${id}`);
+
+      if (!res.ok) throw new Error("Failed to fetch quotation details");
+
+      const data = await res.json();
+
+      // Mapping data tetap sama sesuai kebutuhan form Anda
+      const formattedData: any = {
+        date: new Date(data.date),
+        validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
+        status: data.status,
+        notes: data.notes || [],
+        isManualClient: !data.clientId,
+        clientId: data.clientId || "",
+        picId: data.picId || "",
+        manualClientName: data.manualClientName || "",
+        manualClientCompany: data.manualClientCompany || "",
+        manualClientEmail: data.manualClientEmail || "",
+        manualClientPhone: data.manualClientPhone || "",
+        manualClientAddress: data.manualClientAddress || "",
+        items: data.items.map((item: any) => ({
+          isManualProduct: !item.productId,
+          productId: item.productId || "",
+          variantId: item.variantId || "",
+          productName: item.productName,
+          description: item.description || "",
+          discount: Number(item.discount || 0),
+          remarks: item.remarks || "",
+          tiers:
+            item.tiers && item.tiers.length > 0
+              ? item.tiers.map((t: any) => ({
+                  minQuantity: Number(t.minQuantity),
+                  maxQuantity: t.maxQuantity
+                    ? Number(t.maxQuantity)
+                    : undefined,
+                  quantityLabel: t.quantityLabel || "",
+                  unitPrice: Number(t.unitPrice),
+                }))
+              : [
+                  {
+                    minQuantity: 1,
+                    maxQuantity: undefined,
+                    quantityLabel: "Pcs",
+                    unitPrice: 0,
+                  },
+                ],
+        })),
+      };
+
+      setInitialData(formattedData);
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal memuat data penawaran");
+      router.push("/admin-invoice/quotations");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id, status, fetchApi, router]);
 
   useEffect(() => {
-    const fetchQuotation = async () => {
-      try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+    fetchQuotation();
+  }, [fetchQuotation]);
 
-        const res = await fetch(`${apiUrl}/quotations/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch quotation details");
-
-        const data = await res.json();
-
-        const formattedData: any = {
-          date: new Date(data.date),
-          validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
-          status: data.status,
-
-          notes: data.notes || [],
-
-          isManualClient: !data.clientId,
-          clientId: data.clientId || "",
-          picId: data.picId || "",
-          manualClientName: data.manualClientName || "",
-          manualClientCompany: data.manualClientCompany || "",
-          manualClientEmail: data.manualClientEmail || "",
-          manualClientPhone: data.manualClientPhone || "",
-          manualClientAddress: data.manualClientAddress || "",
-
-          items: data.items.map((item: any) => ({
-            isManualProduct: !item.productId,
-            productId: item.productId || "",
-            variantId: item.variantId || "",
-            productName: item.productName,
-            description: item.description || "",
-            discount: Number(item.discount || 0),
-            remarks: item.remarks || "",
-            tiers:
-              item.tiers && item.tiers.length > 0
-                ? item.tiers.map((t: any) => ({
-                    minQuantity: Number(t.minQuantity),
-                    maxQuantity: t.maxQuantity
-                      ? Number(t.maxQuantity)
-                      : undefined,
-                    quantityLabel: t.quantityLabel || "",
-                    unitPrice: Number(t.unitPrice),
-                  }))
-                : [
-                    {
-                      minQuantity: 1,
-                      maxQuantity: undefined,
-                      quantityLabel: "Pcs",
-                      unitPrice: 0,
-                    },
-                  ],
-          })),
-        };
-
-        setInitialData(formattedData);
-      } catch (error) {
-        console.error(error);
-        toast.error("Gagal memuat data penawaran");
-        router.push("/admin-invoice/quotations");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (id) fetchQuotation();
-  }, [id, router]);
-
+  // ============================
+  // UPDATE DATA
+  // ============================
   const handleUpdate = async (data: QuotationFormValues) => {
+    if (status !== "authenticated") {
+      toast.error("Sesi berakhir, silakan login kembali.");
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const payload = cleanQuotationPayload(data);
 
-      const res = await fetch(`${apiUrl}/quotations/${id}`, {
+      const res = await fetchApi(`/quotations/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
 
@@ -127,11 +129,11 @@ export default function EditQuotationPage() {
     }
   };
 
-  if (isLoading) {
+  // Render loading state awal
+  if (status === "loading" || isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-96 gap-4">
-        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-        <p className="text-muted-foreground">Memuat data penawaran...</p>
+      <div className="p-8 text-center text-muted-foreground animate-pulse">
+        Memuat data quotation...
       </div>
     );
   }

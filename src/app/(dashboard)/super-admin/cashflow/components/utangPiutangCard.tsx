@@ -2,9 +2,9 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const formatIDR = (amount: number) => {
   return new Intl.NumberFormat("id-ID", {
@@ -15,33 +15,35 @@ const formatIDR = (amount: number) => {
 };
 
 export default function UtangPiutangCard() {
+  const { fetchApi, status } = useApi();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const fetchData = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated") return;
+
+    try {
+      setLoading(true);
+      const res = await fetchApi("/finance/debt-receivables");
+
+      if (!res.ok) throw new Error("Failed to fetch data");
+
+      const json = await res.json();
+      setData(json.data || json);
+    } catch (error) {
+      console.error("Gagal load utang piutang", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [status, fetchApi]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-
-        const res = await fetch(`${apiUrl}/finance/debt-receivables`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const json = await res.json();
-        setData(json.data);
-      } catch (error) {
-        console.error("Gagal load utang piutang", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
-  }, []);
+  }, [fetchData]);
 
-  if (loading) {
+  // Handle Loading State (NextAuth loading atau API loading)
+  if (status === "loading" || loading) {
     return <Skeleton className="h-40 w-full rounded-xl" />;
   }
-
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {/* CARD PIUTANG (Uang Masuk Tertunda) */}

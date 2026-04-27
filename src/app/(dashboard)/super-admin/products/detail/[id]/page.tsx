@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import {
   Boxes,
   GalleryHorizontal,
@@ -80,6 +80,7 @@ interface ProductDetail {
 }
 
 export default function ProductDetailPage() {
+  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status dari hook
   const { id } = useParams();
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,18 +88,18 @@ export default function ProductDetailPage() {
   // Fetch Data Product
   useEffect(() => {
     const fetchProduct = async () => {
-      try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+      if (status === "loading" || status === "unauthenticated" || !id) return;
 
-        const res = await fetch(`${apiUrl}/products/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
+      try {
+        setLoading(true);
+
+        const res = await fetchApi(`/products/${id}`, {
           cache: "no-store",
         });
 
         if (!res.ok) throw new Error("Failed to fetch product");
         const data = await res.json();
-        setProduct(data);
+        setProduct(data.data || data);
       } catch (error) {
         console.error(error);
       } finally {
@@ -107,10 +108,10 @@ export default function ProductDetailPage() {
     };
 
     fetchProduct();
-  }, [id]);
+  }, [id, status, fetchApi]); // Dependensi lengkap
 
-  // Loading State
-  if (loading) {
+  // Loading State (Menunggu session atau data)
+  if (status === "loading" || loading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />
@@ -119,19 +120,21 @@ export default function ProductDetailPage() {
       </div>
     );
   }
-
   // No Product Found
   if (!product) {
     return <p className="text-muted-foreground">Produk tidak ditemukan.</p>;
   }
 
   // Grouping Attributes
-  const groupedAttributes = product.attributeValues.reduce((acc, current) => {
-    const attrName = current.attributeValue.attribute.name;
-    if (!acc[attrName]) acc[attrName] = [];
-    acc[attrName].push(current.attributeValue.value);
-    return acc;
-  }, {} as Record<string, string[]>);
+  const groupedAttributes = product.attributeValues.reduce(
+    (acc, current) => {
+      const attrName = current.attributeValue.attribute.name;
+      if (!acc[attrName]) acc[attrName] = [];
+      acc[attrName].push(current.attributeValue.value);
+      return acc;
+    },
+    {} as Record<string, string[]>,
+  );
 
   return (
     <div className="space-y-8">

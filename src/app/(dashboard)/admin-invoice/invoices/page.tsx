@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import { CalendarIcon, Eye, FileText, NotebookPen, Search } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -33,8 +33,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 
 type Invoice = {
@@ -84,6 +84,7 @@ const getStatusBadgeVariant = (status: string) => {
 };
 
 export default function InvoicesPage() {
+  const { fetchApi, status } = useApi();
   // === STATE ===
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
@@ -100,14 +101,12 @@ export default function InvoicesPage() {
   const [endDate, setEndDate] = useState<string>("");
 
   // === FETCH INVOICES ===
-  const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated") return;
+
     setLoading(true);
     try {
-      // 1. Get Token
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // 2. Build Query Params
+      // Build Query Params
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -119,10 +118,7 @@ export default function InvoicesPage() {
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
-      // 3. Fetch API
-      const res = await fetch(`${apiUrl}/invoices?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchApi(`/invoices?${params}`);
 
       if (!res.ok) throw new Error("Failed to fetch invoices");
 
@@ -135,11 +131,20 @@ export default function InvoicesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    page,
+    debouncedSearch,
+    statusFilter,
+    categoryFilter,
+    startDate,
+    endDate,
+    status,
+    fetchApi,
+  ]);
 
   useEffect(() => {
     fetchInvoices();
-  }, [page, debouncedSearch, statusFilter, categoryFilter, startDate, endDate]);
+  }, [fetchInvoices]);
 
   // === RENDER ===
   return (

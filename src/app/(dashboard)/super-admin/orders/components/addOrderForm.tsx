@@ -48,9 +48,9 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 // Import Schema & Type dari file schema kamu
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { OrderFormValues, orderSchema } from "../order-schema";
-import { fetchWithToken, generatePoNumber, postOrder } from "../order-service";
+import { generatePoNumber, postOrder } from "../order-service";
 import { SampleFollowUpSection, SampleStepItem } from "./sampleFollowUpSection";
 
 type PIC = {
@@ -100,6 +100,8 @@ type Product = {
 };
 
 export default function AddOrderForm() {
+  const { fetchApi, status } = useApi();
+
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderSchema),
     defaultValues: {
@@ -156,14 +158,31 @@ export default function AddOrderForm() {
   // Load Initial Data
   useEffect(() => {
     async function load() {
+      if (status !== "authenticated") return;
+
       try {
         setLoading(true);
+
+        const [resC, resS, resV, resP, resPC] = await Promise.all([
+          fetchApi("/clients/order"),
+          fetchApi("/sales/order"),
+          fetchApi("/vendors/order/add"),
+          fetchApi("/products/order"),
+          fetchApi("/purchase-channels/list"),
+        ]);
+
+        // Validasi semua response
+        if (!resC.ok || !resS.ok || !resV.ok || !resP.ok || !resPC.ok) {
+          throw new Error("Gagal mengambil beberapa data master");
+        }
+
+        // Parsing data JSON secara paralel
         const [c, s, v, p, pc] = await Promise.all([
-          fetchWithToken(`${apiUrl}/clients/order`),
-          fetchWithToken(`${apiUrl}/sales/order`),
-          fetchWithToken(`${apiUrl}/vendors/order/add`),
-          fetchWithToken(`${apiUrl}/products/order`),
-          fetchWithToken(`${apiUrl}/purchase-channels/list`),
+          resC.json(),
+          resS.json(),
+          resV.json(),
+          resP.json(),
+          resPC.json(),
         ]);
 
         setClients(c);
@@ -171,14 +190,16 @@ export default function AddOrderForm() {
         setVendors(v);
         setProducts(p);
         setPurchaseChannels(pc);
-      } catch {
+      } catch (error) {
+        console.error(error);
         toast.error("Failed to load master data");
       } finally {
         setLoading(false);
       }
     }
+
     load();
-  }, []);
+  }, [status, fetchApi]);
 
   // === LOGIC: Tentukan Client Terpilih & PIC ===
   const selectedClientData = clients.find((c) => c.id === selectedClientId);
@@ -219,7 +240,7 @@ export default function AddOrderForm() {
   const handleGeneratePO = async () => {
     try {
       setGeneratingPo(true);
-      const newPo = await generatePoNumber();
+      const newPo = await generatePoNumber(fetchApi);
       setValue("poNumber", newPo);
       toast.success("PO Number generated");
     } catch (e) {
@@ -235,7 +256,7 @@ export default function AddOrderForm() {
       // Remove phone from payload
       const { phone, ...payload } = data;
 
-      await postOrder({
+      await postOrder(fetchApi, {
         ...payload,
 
         sampleFollowUps: sampleSteps

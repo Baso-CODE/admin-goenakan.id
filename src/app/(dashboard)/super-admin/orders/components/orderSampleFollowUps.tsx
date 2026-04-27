@@ -6,7 +6,7 @@ import { Check, ClipboardList } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -53,31 +53,34 @@ export function OrderSampleFollowUps({
   followUps,
   onUpdate,
 }: OrderSampleFollowUpsProps) {
+  const { fetchApi, status } = useApi();
+
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const handleToggleDone = async (fu: SampleFollowUp) => {
+    if (status !== "authenticated") return;
+
     try {
       setLoadingId(fu.id);
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
-      const res = await fetch(
-        `${apiUrl}/orders/${orderId}/sample-followups/${fu.id}`,
+      const res = await fetchApi(
+        `/orders/${orderId}/sample-followups/${fu.id}`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
           body: JSON.stringify({ isDone: !fu.isDone }),
         },
       );
 
-      if (!res.ok) throw new Error("Gagal update");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal update");
+      }
+
       toast.success(fu.isDone ? "Ditandai belum selesai" : "Ditandai selesai");
       onUpdate();
-    } catch {
-      toast.error("Gagal mengupdate status");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Gagal mengupdate status");
     } finally {
       setLoadingId(null);
     }

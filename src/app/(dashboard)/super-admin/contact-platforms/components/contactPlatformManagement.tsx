@@ -21,8 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import * as LucideIcons from "lucide-react";
 import { Search } from "lucide-react";
@@ -50,6 +50,7 @@ type Meta = {
 // ----------------------------------------
 
 export default function ContactPlatformsManagement() {
+  const { fetchApi, status } = useApi();
   const [platforms, setPlatforms] = useState<ContactPlatform[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
@@ -73,34 +74,32 @@ export default function ContactPlatformsManagement() {
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+      // 🛑 Jangan jalan jika sesi belum siap
+      if (status === "loading") return;
+
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
       });
+
       if (debouncedSearch.trim()) {
         params.append("search", debouncedSearch.trim());
       }
+
       // PENTING: Tambahkan filter Status Aktif untuk tampilan tabel
       if (isActiveFilter !== "ALL") {
         params.append("isActive", isActiveFilter);
       }
 
-      // Anda juga bisa menambahkan filter tanggal di sini jika mau
-      // if (startDate) params.append("startDate", startDate);
-      // if (endDate) params.append("endDate", endDate);
-
-      const res = await fetch(`${apiUrl}/contact-platforms?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi(`/contact-platforms?${params}`);
 
       const result = await res.json();
+
       if (!res.ok) {
         throw new Error(result.message || "Failed to fetch data");
       }
+
       setPlatforms(result.data || []);
       setMeta(result.meta);
     } catch (error) {
@@ -119,10 +118,6 @@ export default function ContactPlatformsManagement() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      // 1. Ambil Token Autentikasi
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       // 2. Kumpulkan Filter untuk Export
       const exportFilters: Record<string, string> = {};
 
@@ -140,15 +135,14 @@ export default function ContactPlatformsManagement() {
       // if (debouncedSearch.trim()) exportFilters.search = debouncedSearch.trim();
 
       const queryString = new URLSearchParams(exportFilters).toString();
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      const response = await fetchApi(`/contact-platforms?${queryString}`);
 
-      const exportUrl = `${apiUrl}/contact-platforms/export/excel?${queryString}`;
+      const result = await response.json();
 
-      const response = await fetch(exportUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to fetch data");
+      }
 
       if (!response.ok) {
         const errorBody = await response
@@ -197,15 +191,12 @@ export default function ContactPlatformsManagement() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const response = await fetch(`${apiUrl}/vendor-items/${deleteId}`, {
+      const response = await fetchApi(`/vendor-items/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {
-        const errData = await response.json();
+        const errData = await response.json().catch(() => ({}));
         throw new Error(errData.message || "Gagal menghapus kategori");
       }
 

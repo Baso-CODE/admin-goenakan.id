@@ -1,30 +1,28 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { useApi } from "@/hooks/useApi";
 import AddVendorForm, {
   AddVendorFormValues,
 } from "../components/vendorFormAdd";
 
 export default function AddVendorPage() {
+  const { fetchApi, status } = useApi();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const handleAddVendor = async (data: AddVendorFormValues) => {
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const tokenJson = await tokenRes.json();
-      const token = tokenJson?.token;
+      if (status !== "authenticated") {
+        throw new Error("Sesi tidak valid, silakan coba lagi.");
+      }
 
-      const res = await fetch(`${apiUrl}/vendors`, {
+      const res = await fetchApi("/vendors", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           companyName: data.companyName,
           picName: data.picName,
@@ -46,8 +44,14 @@ export default function AddVendorPage() {
         }),
       });
 
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal menambahkan vendor");
+      }
+
       toast.success("Vendor created successfully!");
       router.push("/super-admin/vendors");
+      router.refresh();
     } catch (err) {
       console.error("❌ Error add vendor:", err);
       toast.error(err instanceof Error ? err.message : "Failed to add vendor");

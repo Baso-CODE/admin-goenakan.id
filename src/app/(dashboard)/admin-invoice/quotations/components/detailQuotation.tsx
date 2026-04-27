@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -45,7 +45,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { FollowUpStepperDialog } from "./followUpStepperDialog";
 
 // === TYPES (Sesuai Schema Database) ===
@@ -113,6 +113,7 @@ type QuotationDetail = {
 };
 
 export default function QuotationDetail() {
+  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status
   const { id } = useParams();
   const router = useRouter();
   const [data, setData] = useState<QuotationDetail | null>(null);
@@ -124,54 +125,53 @@ export default function QuotationDetail() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   // === FETCH DATA ===
-  const fetchDetail = async () => {
+  const fetchDetail = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated" || !id) return;
+
     try {
       setLoading(true);
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/quotations/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchApi(`/quotations/${id}`);
 
       if (!res.ok) throw new Error("Quotation not found");
+
       const result = await res.json();
-      setData(result);
+      setData(result.data || result);
     } catch (error) {
+      console.error(error);
       toast.error("Gagal memuat detail penawaran");
       router.push("/admin-invoice/quotations");
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, status, fetchApi, router]);
 
   useEffect(() => {
-    if (id) fetchDetail();
-  }, [id]);
+    fetchDetail();
+  }, [fetchDetail]);
 
   // === DELETE HANDLER ===
   const handleDelete = async () => {
+    if (status !== "authenticated") return;
+
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/quotations/${id}`, {
+      // ✨ Gunakan fetchApi dengan method DELETE
+      const res = await fetchApi(`/quotations/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!res.ok) throw new Error("Failed to delete");
 
       toast.success("Penawaran berhasil dihapus");
       router.push("/admin-invoice/quotations");
+      router.refresh();
     } catch (error) {
+      console.error(error);
       toast.error("Gagal menghapus data");
     } finally {
       setIsDeleting(false);
     }
   };
-
   // === UTILS ===
   const formatIDR = (val: string | number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -508,29 +508,26 @@ export default function QuotationDetail() {
             <History className="h-5 w-5 text-muted-foreground" />
             Riwayat Follow Up
           </CardTitle>
-
-          {/* ✅ GANTI dialog lama dengan ini */}
           <FollowUpStepperDialog
             quotationId={data.id}
             existingFollowUps={data.followUps || []}
             onSuccess={() => fetchDetail()}
             onSubmit={async (payload) => {
-              const tokenRes = await fetch("/api/auth/token");
-              const { token } = await tokenRes.json();
+              if (status !== "authenticated") {
+                toast.error("Sesi berakhir, silakan login kembali.");
+                return;
+              }
 
-              const res = await fetch(
-                `${apiUrl}/quotations/${data.id}/follow-up`,
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify(payload),
-                },
-              );
+              const res = await fetchApi(`/quotations/${data.id}/follow-up`, {
+                method: "POST",
+                body: JSON.stringify(payload),
+              });
 
-              if (!res.ok) throw new Error("Failed");
+              if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.message || "Gagal mencatat follow up");
+              }
+
               toast.success("Follow up berhasil dicatat");
             }}
           />

@@ -1,4 +1,4 @@
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useState } from "react";
 import { InvoiceNote, OrderDetail, SplitItem } from "../types/order.types";
 
@@ -17,7 +17,9 @@ export function useInvoiceDialog({
   splitTotalAmount,
   onSuccess,
 }: UseInvoiceDialogProps) {
-  // Dialog open state
+  // Dialog open
+  const { fetchApi, status } = useApi();
+
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
 
   // Standard mode
@@ -112,9 +114,6 @@ export function useInvoiceDialog({
     setIsCreatingInvoice(true);
 
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       let finalDpPercentage: number | undefined = undefined;
       let finalCustomAmount: number | undefined = undefined;
       let payloadSelectedItems: any[] | undefined = undefined;
@@ -169,17 +168,13 @@ export function useInvoiceDialog({
           .map((n) => ({ categoryId: n.categoryId, contents: n.contents })),
       };
 
-      const res = await fetch(`${apiUrl}/invoices`, {
+      const res = await fetchApi("/invoices", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         throw new Error(err.message || "Gagal membuat invoice");
       }
 

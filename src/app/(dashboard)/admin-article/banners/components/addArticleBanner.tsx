@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -9,24 +9,22 @@ import FormArticleBanner, {
 } from "./formArticleBanner";
 
 const AddArticleBanner = () => {
+  const { fetchApi, status } = useApi();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddBanner = async (data: ArticleBannerFormValues) => {
+    // 🛑 Jangan kirim jika sesi belum siap
+    if (status !== "authenticated") {
+      toast.error("Sesi berakhir, silakan login kembali.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
-      if (!token) throw new Error("No token found");
-
-      // Asumsi route backend Anda bernama /article-banners
-      const res = await fetch(`${apiUrl}/articles-banners`, {
+      const res = await fetchApi("/articles-banners", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 

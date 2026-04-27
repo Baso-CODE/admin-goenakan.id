@@ -13,10 +13,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { fetchWithToken } from "@/app/(dashboard)/super-admin/orders/order-service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiUrl } from "@/helper/apiurl"; // Sesuaikan path jika error
+import { useApi } from "@/hooks/useApi";
 
 // === TYPES UPDATE ===
 type InvoiceDetail = {
@@ -132,12 +131,12 @@ const formatCurrency = (amount: number) => {
     .replace("Rp", "Rp");
 };
 
-// ... (Sisa fungsi helper seperti renderCustomization jika ada, letakkan di sini) ...
 const renderCustomization = (customization: any) => {
-  return null; // Sesuaikan dengan logika render customization kamu
+  return null;
 };
 
 export default function InvoiceDetailPage() {
+  const { fetchApi, status } = useApi();
   const { id } = useParams();
   const router = useRouter();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
@@ -155,22 +154,27 @@ export default function InvoiceDetailPage() {
 
   const invoiceRef = useRef<HTMLDivElement>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated") return;
+
     try {
       setLoading(true);
-      const res = await fetchWithToken(`${apiUrl}/invoices/${id}`);
-      setInvoice(res);
+      const res = await fetchApi(`/invoices/${id}`);
+
+      if (!res.ok) throw new Error("Gagal memuat data");
+
+      const data = await res.json();
+      setInvoice(data);
     } catch (error) {
       console.error(error);
       toast.error("Gagal memuat data invoice");
     } finally {
       setLoading(false);
     }
-  };
-
+  }, [id, status, fetchApi]);
   useEffect(() => {
     loadData();
-  }, [id]);
+  }, [loadData]);
 
   const handleDownloadPDF = async () => {
     const element = invoiceRef.current;
@@ -218,34 +222,32 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  // --- FUNGSI UPDATE PEMBAYARAN (MARK AS PAID) ---
   const handleMarkAsPaid = async () => {
-    if (!invoice) return;
+    if (!invoice || status !== "authenticated") return;
     setIsPaying(true);
 
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/invoices/${invoice.id}/pay`, {
+      // ✨ 3. Ganti fetch manual dengan fetchApi
+      const res = await fetchApi(`/invoices/${invoice.id}/pay`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           method: paymentMethod,
           paymentDate: new Date(paymentDate).toISOString(),
         }),
       });
 
-      if (!res.ok) throw new Error("Gagal memproses pembayaran");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal memproses pembayaran");
+      }
 
       toast.success("Invoice berhasil ditandai LUNAS");
       setIsPayDialogOpen(false);
-      loadData();
-    } catch (error) {
+      loadData(); // Refresh data setelah bayar
+    } catch (error: any) {
       console.error(error);
-      toast.error("Terjadi kesalahan saat update pembayaran");
+      toast.error(error.message || "Terjadi kesalahan saat update pembayaran");
     } finally {
       setIsPaying(false);
     }

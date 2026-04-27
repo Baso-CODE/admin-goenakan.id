@@ -1,12 +1,14 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import VendorForm, { VendorFormValues } from "../../components/VendorForm";
 
 export default function EditVendorPage() {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams();
   const router = useRouter();
 
@@ -27,13 +29,12 @@ export default function EditVendorPage() {
         const tokenRes = await fetch("/api/auth/token");
         const { token } = await tokenRes.json();
 
-        // Panggil endpoint getById yang baru kita update
-        const res = await fetch(`${apiUrl}/vendors/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetchApi(`/vendors/${id}`);
 
-        if (!res.ok) throw new Error("Vendor not found");
-
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Vendor not found");
+        }
         const data = await res.json();
 
         // 1. SIAPKAN EXISTING ITEMS (PENTING AGAR BADGE MUNCUL)
@@ -99,16 +100,15 @@ export default function EditVendorPage() {
         contacts: [{ platformId: data.platformId, contactId: data.contactId }],
       };
 
-      const res = await fetch(`${apiUrl}/vendors/${id}`, {
+      const res = await fetchApi(`/vendors/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Failed to update");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to update vendor");
+      }
 
       toast.success("Vendor updated successfully!");
       router.push("/super-admin/vendors");

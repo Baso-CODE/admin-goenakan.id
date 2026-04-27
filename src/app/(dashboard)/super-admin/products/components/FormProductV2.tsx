@@ -35,6 +35,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, ChevronsUpDown, Loader2, RefreshCw, X } from "lucide-react";
@@ -147,6 +148,8 @@ export default function ProductFormV2({
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
+  const { fetchApi, status } = useApi();
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<{ id: string; name: string }[]>([]);
   const [isGeneratingSku, setIsGeneratingSku] = useState(false);
@@ -155,31 +158,31 @@ export default function ProductFormV2({
 
   useEffect(() => {
     const fetchCategories = async () => {
-      try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+      // 🛑 Jangan jalan jika sesi belum siap
+      if (status === "loading" || status === "unauthenticated") return;
 
-        const catRes = await fetch(`${apiUrl}/product-categories/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+      try {
+        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        const catRes = await fetchApi("/product-categories/list");
+
         if (!catRes.ok) throw new Error("Failed to fetch categories");
         const data = await catRes.json();
         setCategories(data);
 
-        const tagRes = await fetch(`${apiUrl}/product-tags/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const tagRes = await fetchApi("/product-tags/list");
+
         if (tagRes.ok) {
           const tagData = await tagRes.json();
           setTags(tagData);
         }
       } catch (error) {
+        console.error(error);
         toast.error("Failed to load categories.");
       }
     };
-    fetchCategories();
-  }, []);
 
+    fetchCategories();
+  }, [status, fetchApi]); // Tambahkan dependensi fetchApi dan status
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema) as any,
     defaultValues: {

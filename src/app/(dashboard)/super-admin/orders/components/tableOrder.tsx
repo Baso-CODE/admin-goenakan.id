@@ -43,8 +43,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 
 // === TYPES ===
@@ -85,6 +85,8 @@ const formatCurrency = (amount: number) => {
 };
 
 export default function TableOrder() {
+  const { fetchApi, status } = useApi();
+
   // === STATE ===
   const [orders, setOrders] = useState<Order[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -98,16 +100,14 @@ export default function TableOrder() {
   const [salesCategory, setSalesCategory] = useState<string>("ALL");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-
   // === FETCH ORDERS ===
   const fetchOrders = async () => {
+    // 🛑 Guard: Jangan eksekusi jika sesi belum siap atau belum terautentikasi
+    if (status !== "authenticated") return;
+
     setLoading(true);
     try {
-      // 1. Get Token (Mocking auth logic)
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // 2. Build Query Params
+      // 1. Build Query Params
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -119,13 +119,13 @@ export default function TableOrder() {
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
-      // 3. Fetch API
-      // Endpoint ini mengarah ke OrderController.getAllOrders
-      const res = await fetch(`${apiUrl}/orders/all?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // 2. Fetch API menggunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi(`/orders/all?${params}`);
 
-      if (!res.ok) throw new Error("Failed to fetch orders");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to fetch orders");
+      }
 
       const result = await res.json();
       setOrders(result.data || []);
@@ -142,15 +142,19 @@ export default function TableOrder() {
   useEffect(() => {
     fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, salesCategory, startDate, endDate]);
-
+  }, [
+    page,
+    debouncedSearch,
+    salesCategory,
+    startDate,
+    endDate,
+    status,
+    fetchApi,
+  ]);
   // === HANDLER EXPORT ===
   const handleExport = async () => {
     setExporting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const exportFilters: OrderExportQuery = {};
       if (startDate) exportFilters.startDate = startDate;
       if (endDate) exportFilters.endDate = endDate;
@@ -161,15 +165,14 @@ export default function TableOrder() {
         exportFilters as Record<string, string>,
       ).toString();
 
-      // Endpoint ini mengarah ke OrderController.exportOrders
-      const response = await fetch(
-        `${apiUrl}/orders/export/excel?${queryString}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const response = await fetchApi(`/orders/export/excel?${queryString}`, {
+        method: "GET",
+      });
 
-      if (!response.ok) throw new Error("Export failed");
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Export failed");
+      }
 
       // Download Blob Logic
       const blob = await response.blob();

@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import VendorCategoryForm, {
@@ -11,6 +11,8 @@ import VendorCategoryForm, {
 } from "../../components/formCategoryVendor";
 
 const EditCategoryVendor = () => {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams();
   const [categoryData, setCategoryData] = useState<
     VendorCategoryFormValues | undefined
@@ -21,17 +23,17 @@ const EditCategoryVendor = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      setIsLoading(true); // Mulai loading
+      if (!id || status !== "authenticated") return;
+
+      setIsLoading(true);
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        if (!tokenRes.ok) throw new Error("Failed to get token");
-        const { token } = await tokenRes.json();
-        const res = await fetch(`${apiUrl}/vendor-categories/${id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!res.ok) throw new Error("Failed to fetch category data");
+        const res = await fetchApi(`/vendor-categories/${id}`);
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to fetch category data");
+        }
+
         const data = await res.json();
         setCategoryData({
           name: data.name,
@@ -42,34 +44,29 @@ const EditCategoryVendor = () => {
       } catch (err) {
         console.error("❌ Failed to load data:", err);
         setCategoryData(undefined);
-        toast.error("Failed to load category data. Using default values.");
+        toast.error("Failed to load category data.");
       } finally {
         setIsLoading(false);
       }
     };
-    if (id) fetchData();
-  }, [id]);
+
+    fetchData();
+  }, [id, status, fetchApi]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleUpdateCategoryVendor = async (data: VendorCategoryFormValues) => {
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
-      const res = await fetch(`${apiUrl}/vendor-categories/${id}`, {
+      const res = await fetchApi(`/vendor-categories/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal memperbarui kategori");
       }
 
       toast.success("Vendor Category updated successfully!");
@@ -77,13 +74,12 @@ const EditCategoryVendor = () => {
       router.refresh();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to update category"
+        err instanceof Error ? err.message : "Failed to update category",
       );
     } finally {
       setIsSubmitting(false);
     }
   };
-
   return (
     <div className="space-y-4 ">
       <h2 className="text-xl font-semibold tracking-tight uppercase">

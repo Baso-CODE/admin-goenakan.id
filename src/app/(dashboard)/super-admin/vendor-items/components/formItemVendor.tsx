@@ -36,9 +36,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 
-// --- ✅ ZOD VALIDATION SCHEMA ---
 const vendorItemSchema = z.object({
   name: z
     .string()
@@ -61,6 +60,8 @@ export default function VendorItemForm({
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
+  const { fetchApi, status } = useApi();
+
   const form = useForm<VendorItemFormValues>({
     resolver: zodResolver(vendorItemSchema),
     defaultValues: initialData || {
@@ -79,20 +80,16 @@ export default function VendorItemForm({
   // === Fetch kategori dari backend ===
   useEffect(() => {
     const fetchCategories = async () => {
+      if (status !== "authenticated") return;
+
       setLoadingCategories(true);
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        const res = await fetchApi("/vendor-categories/active");
 
-        if (!token) throw new Error("No token found");
-
-        const res = await fetch(`${apiUrl}/vendor-categories/active`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch categories");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to fetch categories");
+        }
 
         const data = await res.json();
         setVendorCategories(data);
@@ -105,12 +102,11 @@ export default function VendorItemForm({
     };
 
     fetchCategories();
-  }, []);
+  }, [status, fetchApi]); // Tambahkan dependensi lengkap
 
   useEffect(() => {
     if (initialData) form.reset(initialData);
   }, [initialData, form]);
-
   const handleSubmit = (values: VendorItemFormValues) => {
     onSubmit(values);
   };

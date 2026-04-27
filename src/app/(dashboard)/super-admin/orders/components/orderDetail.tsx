@@ -11,9 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useInvoiceDialog } from "../hooks/useInvoiceDialog";
-import { fetchWithToken } from "../order-service";
 import { NoteCategory, OrderDetail } from "../types/order.types";
 import { FinancialSummaryCard } from "./financialSummaryCard";
 import { GenerateInvoiceDialog } from "./helper/GenerateInvoiceDialog";
@@ -28,6 +27,8 @@ import {
 } from "./orderSidebarCards";
 
 export default function OrderDetailPage() {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams();
   const router = useRouter();
 
@@ -37,12 +38,18 @@ export default function OrderDetailPage() {
 
   // === FETCH ORDER ===
   const loadOrder = async () => {
-    if (!id) return;
+    if (!id || status !== "authenticated") return;
+
     try {
       setLoading(true);
-      const data = await fetchWithToken(`${apiUrl}/orders/${id}`);
+      const res = await fetchApi(`/orders/${id}`);
+
+      if (!res.ok) throw new Error("Gagal memuat detail order");
+
+      const data = await res.json();
       setOrder(data);
     } catch (error) {
+      console.error(error);
       toast.error("Gagal memuat detail order");
     } finally {
       setLoading(false);
@@ -51,26 +58,28 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     loadOrder();
-  }, [id]);
-
+  }, [id, status, fetchApi]); // Tambahkan dependensi lengkap
   // === FETCH NOTE CATEGORIES ===
   useEffect(() => {
     const fetchNoteCategories = async () => {
+      // 🛑 Guard: Tunggu hingga status 'authenticated'
+      if (status !== "authenticated") return;
+
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-        const res = await fetch(`${apiUrl}/invoice-notes/categories/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        const res = await fetchApi("/invoice-notes/categories/list");
+
+        if (!res.ok) throw new Error("Failed to fetch");
+
         const data = await res.json();
         setNoteCategories(data || []);
-      } catch {
-        console.error("Failed to load note categories");
+      } catch (error) {
+        console.error("Failed to load note categories", error);
       }
     };
-    fetchNoteCategories();
-  }, []);
 
+    fetchNoteCategories();
+  }, [status, fetchApi]); // Tambahkan dependensi lengkap
   // === FINANCIAL CALCULATIONS ===
   const totalOrderAmount = order ? Number(order.totalAmount) : 0;
 

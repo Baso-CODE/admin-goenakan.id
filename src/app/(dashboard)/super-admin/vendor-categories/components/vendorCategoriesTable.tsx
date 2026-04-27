@@ -21,8 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import { FileDown, Loader2, Search } from "lucide-react";
 import Link from "next/link";
@@ -47,6 +47,8 @@ type Meta = {
 };
 
 const VendorCategoriesTable = () => {
+  const { fetchApi, status } = useApi();
+
   const [categories, setCategories] = useState<VendorCategory[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
@@ -65,33 +67,38 @@ const VendorCategoriesTable = () => {
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
   // === FETCH DATA DARI BACKEND ===
   const fetchCategories = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+      // 1. Build Query Params
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
         type: typeFilter,
       });
+
       if (debouncedSearch.trim()) {
         params.append("search", debouncedSearch.trim());
       }
-      const res = await fetch(`${apiUrl}/vendor-categories?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+
+      // 2. Fetch API menggunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi(`/vendor-categories?${params}`);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to load vendor categories");
+      }
 
       const result = await res.json();
       setCategories(result.data || []);
       setMeta(result.meta);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Unknown error");
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      setError(msg);
       toast.error("Failed to load vendor categories");
     } finally {
       setLoading(false);
@@ -100,14 +107,12 @@ const VendorCategoriesTable = () => {
 
   useEffect(() => {
     fetchCategories();
-  }, [page, debouncedSearch, typeFilter]);
+  }, [page, debouncedSearch, typeFilter, status, fetchApi]);
 
   const handleExport = async () => {
     setExporting(true);
     try {
       // 1. Ambil Token Autentikasi
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
       // 2. Kumpulkan Filter
       const exportFilters: Record<string, string> = {};
@@ -122,17 +127,18 @@ const VendorCategoriesTable = () => {
 
       const queryString = new URLSearchParams(exportFilters).toString();
 
-      const exportUrl = `${apiUrl}/vendor-categories/export/excel?${queryString}`;
-
-      const response = await fetch(exportUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetchApi(
+        `/vendor-categories/export/excel?${queryString}`,
+        {
+          method: "GET",
         },
-      });
+      );
 
       if (!response.ok) {
-        throw new Error("Export failed. Server responded with an error.");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(
+          errData.message || "Export failed. Server responded with an error.",
+        );
       }
 
       // 4. Proses File Binary (Blob)
@@ -168,22 +174,15 @@ const VendorCategoriesTable = () => {
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // Sesuaikan URL endpoint ini dengan backend Anda
-      const response = await fetch(`${apiUrl}/vendor-categories/${deleteId}`, {
+      const response = await fetchApi(`/vendor-categories/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {
-        const errData = await response.json();
+        // Parsing error secara aman jika server mengirimkan body
+        const errData = await response.json().catch(() => ({}));
         throw new Error(errData.message || "Gagal menghapus kategori");
       }
-
       toast.success("Kategori berhasil dihapus");
       setPage(1);
       fetchCategories();

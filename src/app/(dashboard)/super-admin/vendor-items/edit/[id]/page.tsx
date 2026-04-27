@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -9,11 +9,13 @@ import VendorItemForm, {
 } from "../../components/formItemVendor";
 
 const EditItemVendor = () => {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams();
   const router = useRouter();
 
   const [itemData, setItemData] = useState<VendorItemFormValues | undefined>(
-    undefined
+    undefined,
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,17 +23,20 @@ const EditItemVendor = () => {
   // === Fetch data item vendor by ID ===
   useEffect(() => {
     const fetchData = async () => {
-      try {
-        const tokenRes = await fetch("/api/auth/token");
-        if (!tokenRes.ok) throw new Error("Failed to get token");
-        const { token } = await tokenRes.json();
+      // 🛑 Guard: Jangan jalan jika ID tidak ada atau sesi belum siap
+      if (!id || status !== "authenticated") return;
 
-        const res = await fetch(`${apiUrl}/vendor-items/${id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!res.ok) throw new Error("Failed to fetch vendor item data");
+      try {
+        setIsLoading(true);
+        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        const res = await fetchApi(`/vendor-items/${id}`);
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(
+            errData.message || "Failed to fetch vendor item data",
+          );
+        }
 
         const data = await res.json();
         setItemData({
@@ -42,36 +47,33 @@ const EditItemVendor = () => {
         });
       } catch (err) {
         console.error("❌ Failed to load vendor item:", err);
-        toast.error("Failed to load vendor item data.");
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Failed to load vendor item data.",
+        );
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (id) fetchData();
-  }, [id]);
+    fetchData();
+  }, [id, status, fetchApi]);
 
   // === Update vendor item ===
   const handleUpdateVendor = async (data: VendorItemFormValues) => {
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+      if (status !== "authenticated") return;
 
-      if (!token) throw new Error("No token found");
-
-      const res = await fetch(`${apiUrl}/vendor-items/${id}`, {
+      const res = await fetchApi(`/vendor-items/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `Error: ${res.statusText}`);
       }
 
       toast.success("Vendor Item updated successfully!");
@@ -80,7 +82,7 @@ const EditItemVendor = () => {
     } catch (err) {
       console.error("❌ Failed to update vendor item:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to update vendor item"
+        err instanceof Error ? err.message : "Failed to update vendor item",
       );
     } finally {
       setIsSubmitting(false);

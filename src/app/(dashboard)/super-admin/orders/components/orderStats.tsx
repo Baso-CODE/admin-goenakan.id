@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { Clock, ShoppingBag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -13,6 +13,8 @@ interface OrderStatsData {
 }
 
 export default function OrderStats() {
+  const { fetchApi, status } = useApi();
+
   // 1. STATE INTERNAL
   const [stats, setStats] = useState<OrderStatsData>({
     totalOrders: 0,
@@ -23,16 +25,19 @@ export default function OrderStats() {
   // 2. FETCH DATA OTOMATIS
   useEffect(() => {
     const fetchStats = async () => {
+      if (status !== "authenticated") return;
+
       try {
         setIsLoading(true);
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
 
-        const res = await fetch(`${apiUrl}/orders/stats/general`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetchApi("/orders/stats/general");
 
-        if (!res.ok) throw new Error("Gagal mengambil data statistik order");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(
+            errData.message || "Gagal mengambil data statistik order",
+          );
+        }
 
         const result = await res.json();
 
@@ -46,7 +51,7 @@ export default function OrderStats() {
     };
 
     fetchStats();
-  }, []);
+  }, [status, fetchApi]);
 
   // 3. RENDER SKELETON (LOADING STATE - HANYA 2 KOTAK)
   if (isLoading) {

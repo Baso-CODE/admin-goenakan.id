@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { CreditCard, DollarSign, ShoppingBag, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -29,6 +29,8 @@ const getTrendColor = (val: number) => {
 };
 
 export default function SalesMetrics() {
+  const { fetchApi, status } = useApi();
+
   // === STATE ===
   const [metrics, setMetrics] = useState({
     totalRevenue: 0,
@@ -45,18 +47,13 @@ export default function SalesMetrics() {
 
   // === FETCH API ===
   useEffect(() => {
+    if (status === "loading" || status === "unauthenticated") return;
     const fetchMetrics = async () => {
       try {
         setLoading(true);
 
-        // 1. Ambil Token Auth
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-
         // 2. Panggil Endpoint Analytics
-        const res = await fetch(`${apiUrl}/orders/analytics/metrics`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetchApi(`/orders/analytics/metrics`);
 
         if (!res.ok) throw new Error("Gagal mengambil data metrics");
 
@@ -73,7 +70,7 @@ export default function SalesMetrics() {
     };
 
     fetchMetrics();
-  }, []);
+  }, [fetchApi, status]);
 
   // === RENDER LOADING (SKELETON) ===
   if (loading) {

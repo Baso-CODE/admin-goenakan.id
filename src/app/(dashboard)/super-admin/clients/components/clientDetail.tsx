@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import {
   Building,
   LaptopMinimalCheck,
@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 // === Tipe Data ===
@@ -375,6 +375,8 @@ const B2CDetails: React.FC<{ data: ClientB2C }> = ({ data }) => (
 
 // === Main Page ===
 export default function ClientDetail() {
+  const { fetchApi, status } = useApi();
+
   const params = useParams<{ clientId: string }>();
   const clientId = params.clientId;
   const router = useRouter();
@@ -383,49 +385,68 @@ export default function ClientDetail() {
 
   const [loading, setLoading] = useState(true);
 
+  // === FETCH DATA ===
+  // ✨ 2. Gunakan useCallback agar fungsi stabil
+  const fetchClient = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated" || !clientId)
+      return;
+
+    try {
+      setLoading(true);
+      const res = await fetchApi(`/clients/${clientId}`);
+
+      if (!res.ok) throw new Error("Gagal mengambil data client");
+
+      const data = await res.json();
+      setClient(data.data || data);
+    } catch (err) {
+      console.error("Error fetching client:", err);
+      toast.error("Gagal memuat detail klien");
+    } finally {
+      setLoading(false);
+    }
+  }, [clientId, status, fetchApi]);
+
   useEffect(() => {
-    const fetchClient = async () => {
-      try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-
-        const res = await fetch(`${apiUrl}/clients/${clientId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error("Gagal mengambil data client");
-
-        const data = await res.json();
-        setClient(data);
-      } catch (err) {
-        console.error("Error fetching client:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchClient();
-  }, [clientId]);
+  }, [fetchClient]);
 
+  // === DELETE HANDLER ===
   const handleDelete = async () => {
     if (!confirm("Yakin ingin menghapus client ini?")) return;
-    try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+    if (status !== "authenticated") return;
 
-      const res = await fetch(`${apiUrl}/clients/${clientId}`, {
+    try {
+      // ✨ Gunakan fetchApi dengan method DELETE
+      const res = await fetchApi(`/clients/${clientId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!res.ok) throw new Error("Gagal menghapus client");
+
       toast.success("Client berhasil dihapus");
       router.push("/super-admin/clients");
+      router.refresh();
     } catch (err) {
       toast.error("Terjadi kesalahan saat menghapus client");
       console.error(err);
     }
   };
+
+  // State loading session atau data
+  if (status === "loading" || loading)
+    return (
+      <div className="p-10 text-center animate-pulse text-muted-foreground">
+        Memuat data klien...
+      </div>
+    );
+
+  if (!client)
+    return (
+      <div className="p-10 text-center text-muted-foreground">
+        Data tidak ditemukan.
+      </div>
+    );
 
   if (loading)
     return <div className="p-10 text-center">Memuat data klien...</div>;

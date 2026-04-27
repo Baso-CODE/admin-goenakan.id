@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import * as LucideIcons from "lucide-react";
 import {
   Building,
@@ -62,6 +62,8 @@ interface VendorDetail {
 
 // === Page Component ===
 const DetailPageVendor: React.FC = () => {
+  const { fetchApi, status } = useApi();
+
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const vendorId = params.id;
@@ -71,27 +73,32 @@ const DetailPageVendor: React.FC = () => {
 
   useEffect(() => {
     const fetchVendor = async () => {
+      if (!vendorId || status !== "authenticated") return;
+
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        setLoading(true);
 
-        const res = await fetch(`${apiUrl}/vendors/detail/${vendorId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetchApi(`/vendors/detail/${vendorId}`);
 
-        if (!res.ok) throw new Error("Gagal mengambil data vendor");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Gagal mengambil data vendor");
+        }
+
         const data = await res.json();
         setVendor(data);
       } catch (err) {
         console.error("❌ Gagal mengambil data vendor:", err);
-        toast.error("Gagal mengambil data vendor");
+        toast.error(
+          err instanceof Error ? err.message : "Gagal mengambil data vendor",
+        );
       } finally {
         setLoading(false);
       }
     };
 
-    if (vendorId) fetchVendor();
-  }, [vendorId]);
+    fetchVendor();
+  }, [vendorId, status, fetchApi]);
 
   if (loading)
     return (

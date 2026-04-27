@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -8,19 +8,20 @@ import FormArticle, { ArticleFormValues } from "./formArticles";
 
 export default function AddArticle() {
   const router = useRouter();
+  const { fetchApi, status } = useApi();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCreateArticle = async (
     values: ArticleFormValues,
     coverFile: File | null,
   ) => {
+    if (status !== "authenticated") {
+      toast.error("Sesi anda berakhir, silakan login kembali.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("Tidak ada token otentikasi");
-
       const formData = new FormData();
       formData.append("title", values.title);
       formData.append("content", values.content);
@@ -35,11 +36,8 @@ export default function AddArticle() {
         formData.append("coverFile", coverFile);
       }
 
-      const res = await fetch(`${apiUrl}/articles`, {
+      const res = await fetchApi("/articles", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
@@ -58,7 +56,6 @@ export default function AddArticle() {
       setIsSubmitting(false);
     }
   };
-
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold tracking-tight">

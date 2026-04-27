@@ -15,11 +15,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import ProductionTab from "./productionTab";
 import ShipmentManager from "./shipmentManager";
 
 export default function LogisticsTrackingDetail() {
+  const { fetchApi, status } = useApi();
+
   const { orderId } = useParams();
   const router = useRouter();
 
@@ -41,24 +43,28 @@ export default function LogisticsTrackingDetail() {
 
   // FETCH DATA
   const loadData = async () => {
+    // 🛑 Jangan jalan jika sesi belum siap atau ID tidak ada
+    if (status !== "authenticated" || !orderId) return;
+
     try {
       setLoading(true);
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-      const headers = { Authorization: `Bearer ${token}` };
 
-      const orderRes = await fetch(`${apiUrl}/orders/${orderId}/tracking`, {
-        headers,
-      });
+      // ✨ Parallel Fetching menggunakan fetchApi (Otomatis handle Base URL & Token)
+      const [orderRes, vendorRes] = await Promise.all([
+        fetchApi(`/orders/${orderId}/tracking`),
+        fetchApi(`/vendors/by-order/${orderId}`),
+      ]);
+
+      if (!orderRes.ok || !vendorRes.ok)
+        throw new Error("Gagal mengambil data");
+
       const result = await orderRes.json();
-      setOrder(result.data);
-
-      const vendorRes = await fetch(`${apiUrl}/vendors/by-order/${orderId}`, {
-        headers,
-      });
       const vData = await vendorRes.json();
+
+      setOrder(result.data);
       setVendors(vData.data || []);
     } catch (error) {
+      console.error(error);
       toast.error("Gagal memuat data tracking");
     } finally {
       setLoading(false);
@@ -66,8 +72,8 @@ export default function LogisticsTrackingDetail() {
   };
 
   useEffect(() => {
-    if (orderId) loadData();
-  }, [orderId]);
+    loadData();
+  }, [orderId, status, fetchApi]); // Tambahkan dependensi agar sinkron
 
   if (loading) return <div>Loading Tracking Data...</div>;
   if (!order) return <div>Order not found</div>;

@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import FormUpdateAttributes from "../../components/update/AttributesSection";
 import FormProductCore, {
   ProductCoreFormValues,
@@ -19,6 +19,7 @@ const CLOUDINARY_CLOUD_NAME = "do9sfnf5k";
 const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 
 export default function EditProductPage() {
+  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status
   const { id } = useParams();
   const router = useRouter();
 
@@ -29,15 +30,10 @@ export default function EditProductPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!id) return;
+      if (!id || status === "loading") return;
 
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-
-        const res = await fetch(`${apiUrl}/products/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetchApi(`/products/${id}`);
 
         if (!res.ok) throw new Error("Failed to fetch product data");
 
@@ -51,24 +47,15 @@ export default function EditProductPage() {
     };
 
     fetchData();
-  }, [id]);
-
+  }, [id, status, fetchApi]); // Tambahkan dependensi useApi
   const handleUpdateProduct = async (
     coreValues: ProductCoreFormValues,
   ): Promise<void> => {
     setIsSubmitting(true);
 
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // 1. Update core product
-      const coreRes = await fetch(`${apiUrl}/products/${id}`, {
+      const coreRes = await fetchApi(`/products/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(coreValues),
       });
 
@@ -90,15 +77,9 @@ export default function EditProductPage() {
   const handleUpdateAttributes = async (payload: any) => {
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/products/${id}/attributes`, {
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
+      const res = await fetchApi(`/products/${id}/attributes`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
 
@@ -184,19 +165,15 @@ export default function EditProductPage() {
         formData.append("variantImages", file);
       });
 
-      // 5. Kirim Request PUT
-      const res = await fetch(`${apiUrl}/products/${id}/variants`, {
+      // 5. Kirim Request PUT menggunakan fetchApi
+      const res = await fetchApi(`/products/${id}/variants`, {
         method: "PUT",
-
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
       // 6. Penanganan Respons
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to update variants");
       }
 
@@ -223,20 +200,13 @@ export default function EditProductPage() {
   ) => {
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/products/image/${mediaId}/seo`, {
+      const res = await fetchApi(`/products/image/${mediaId}/seo`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(updates),
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to update image details");
       }
 
@@ -248,13 +218,13 @@ export default function EditProductPage() {
         let newImages = [...prev.images];
 
         if (updates.isFeatured === true) {
-          newImages = newImages.map((img) => ({
+          newImages = newImages.map((img: any) => ({
             ...img,
             isFeatured: false,
           }));
         }
 
-        newImages = newImages.map((img) =>
+        newImages = newImages.map((img: any) =>
           img.id === mediaId ? { ...img, ...updatedImage } : img,
         );
 
@@ -281,42 +251,31 @@ export default function EditProductPage() {
   ) => {
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/products/video/${mediaId}/seo`, {
+      const res = await fetchApi(`/products/video/${mediaId}/seo`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(updates),
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to update video details");
       }
 
-      // 1. Dapatkan data VIDEO yang sudah diupdate
       const updatedVideo = await res.json();
 
-      // 2. Update State Manual
       setProductData((prev: any) => {
         if (!prev) return prev;
 
         let newVideos = [...prev.videos];
 
-        // Reset isFeatured lain jika yang ini jadi featured
         if (updates.isFeatured === true) {
-          newVideos = newVideos.map((vid) => ({
+          newVideos = newVideos.map((vid: any) => ({
             ...vid,
             isFeatured: false,
           }));
         }
 
-        // Update video target
-        newVideos = newVideos.map((vid) =>
+        newVideos = newVideos.map((vid: any) =>
           vid.id === mediaId ? { ...vid, ...updatedVideo } : vid,
         );
 
@@ -339,23 +298,17 @@ export default function EditProductPage() {
 
   const handleAddImage = async (file: File): Promise<void> => {
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL, Token, dan deteksi FormData)
       const formData = new FormData();
-
       formData.append("image", file);
 
-      const res = await fetch(`${apiUrl}/products/${id}/image`, {
+      const res = await fetchApi(`/products/${id}/image`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to add image");
       }
 
@@ -423,17 +376,13 @@ export default function EditProductPage() {
         isFeatured: false,
       };
 
-      const res = await fetch(`${apiUrl}/products/${id}/video`, {
+      const res = await fetchApi(`/products/${id}/video`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to save video data");
       }
 
@@ -454,18 +403,13 @@ export default function EditProductPage() {
   const handleDeleteImage = async (mediaId: string): Promise<void> => {
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/products/image/${mediaId}`, {
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi(`/products/image/${mediaId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to delete image");
       }
 
@@ -485,18 +429,13 @@ export default function EditProductPage() {
   const handleDeleteVideo = async (mediaId: string): Promise<void> => {
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/products/video/${mediaId}`, {
+      // ✨ Gunakan fetchApi (Otomatis menangani Base URL dan Token)
+      const res = await fetchApi(`/products/video/${mediaId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to delete video");
       }
 
@@ -645,34 +584,26 @@ export default function EditProductPage() {
   const handleUpdatePriceTiers = async (tiers: any[]) => {
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(
-        `${apiUrl}/products/${id}/price-tiers`, // Endpoint update (sesuaikan jika beda)
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(tiers), // Kirim array tiers
-        },
-      );
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
+      const res = await fetchApi(`/products/${id}/price-tiers`, {
+        method: "PUT",
+        body: JSON.stringify(tiers), // Kirim array tiers
+      });
 
       if (!res.ok) {
-        const errData = await res.json();
+        const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || "Failed to update price tiers");
       }
 
       toast.success("Price tiers updated successfully");
 
-      // Refresh data agar UI terupdate
-      const updatedProductRes = await fetch(`${apiUrl}/products/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const updatedProduct = await updatedProductRes.json();
-      setProductData(updatedProduct);
+      // ✨ Refresh data menggunakan fetchApi
+      const updatedProductRes = await fetchApi(`/products/${id}`);
+
+      if (updatedProductRes.ok) {
+        const updatedProduct = await updatedProductRes.json();
+        setProductData(updatedProduct.data || updatedProduct);
+      }
     } catch (err) {
       console.error(err);
       toast.error(

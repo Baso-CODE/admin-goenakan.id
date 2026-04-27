@@ -1,95 +1,25 @@
-import { apiUrl } from "@/helper/apiurl";
-import { getSession } from "next-auth/react";
-
-export async function getToken() {
-  const res = await fetch("/api/auth/token");
-  if (!res.ok) throw new Error("Failed to fetch token");
-  const data = await res.json();
-  return data.token;
-}
-
-export async function fetchWithToken(url: string) {
-  const token = await getToken();
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error(`Failed to fetch ${url}`);
-  return res.json();
-}
-
-async function getAuthToken() {
-  const session = await getSession();
-
-  return session?.expires ? session.user : null;
-}
-
-export async function fetchWithTokenNew(
-  url: string,
-  options: RequestInit = {},
-) {
-  try {
-    const token = await getAuthToken();
-
-    if (!token) {
-      throw new Error("No authentication token found. Please login.");
-    }
-
-    // Gabungkan headers bawaan dengan Authorization header
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    };
-
-    const res = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    if (!res.ok) {
-      // Coba baca pesan error dari backend jika ada
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.message || `API Error: ${res.statusText}`);
-    }
-
-    return res.json();
-  } catch (error) {
-    console.error("Fetch Error:", error);
-    throw error; // Re-throw agar bisa ditangkap di komponen
-  }
-}
-
-export async function postOrder(data: any) {
-  const token = await getToken();
-  const res = await fetch(`${apiUrl}/orders`, {
+// 1. Fungsi Post Order
+export async function postOrder(fetchApi: any, data: any) {
+  const res = await fetchApi("/orders", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error("Failed to create order");
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || "Failed to create order");
+  }
   return res.json();
 }
 
-export async function generatePoNumber() {
+// 2. Fungsi Generate PO Number
+export async function generatePoNumber(fetchApi: any) {
   try {
-    const token = await getToken();
-
-    const res = await fetch(`${apiUrl}/orders/generate-po`, {
+    const res = await fetchApi("/orders/generate-po", {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-
       cache: "no-store",
     });
 
-    if (!res.ok) {
-      throw new Error(`API Error: ${res.status}`);
-    }
+    if (!res.ok) throw new Error(`API Error: ${res.status}`);
 
     const data = await res.json();
     return data.poNumber;
@@ -98,7 +28,7 @@ export async function generatePoNumber() {
       "Gagal generate PO dari server, menggunakan fallback:",
       error,
     );
-
+    // Fallback logic tetap sama
     const date = new Date();
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -109,20 +39,22 @@ export async function generatePoNumber() {
   }
 }
 
-export async function fetchOrderById(id: string) {
-  return fetchWithToken(`${apiUrl}/orders/${id}/edit-data`);
+// 3. Fungsi Fetch Order By ID
+export async function fetchOrderById(fetchApi: any, id: string) {
+  const res = await fetchApi(`/orders/${id}/edit-data`);
+  if (!res.ok) throw new Error("Failed to fetch order data");
+  return res.json();
 }
 
-export async function updateOrder(id: string, data: any) {
-  const token = await getToken();
-  const res = await fetch(`${apiUrl}/orders/${id}`, {
+// 4. Fungsi Update Order
+export async function updateOrder(fetchApi: any, id: string, data: any) {
+  const res = await fetchApi(`/orders/${id}`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error("Failed to update order");
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || "Failed to update order");
+  }
   return res.json();
 }

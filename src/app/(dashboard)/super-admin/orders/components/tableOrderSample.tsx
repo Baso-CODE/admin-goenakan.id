@@ -29,8 +29,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 
 // === TYPES ===
 type Order = {
@@ -68,6 +68,8 @@ const formatCurrency = (amount: number) => {
 };
 
 export default function TableOrderSample() {
+  const { fetchApi, status } = useApi();
+
   // === STATE ===
   const [orders, setOrders] = useState<Order[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -80,14 +82,13 @@ export default function TableOrderSample() {
   const [page, setPage] = useState(1);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-
   // === FETCH ORDERS (SAMPLE ONLY) ===
   const fetchOrders = async () => {
+    // 🛑 Guard: Jangan eksekusi jika sesi belum siap atau belum terautentikasi
+    if (status !== "authenticated") return;
+
     setLoading(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -98,11 +99,13 @@ export default function TableOrderSample() {
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
-      const res = await fetch(`${apiUrl}/orders/all?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi(`/orders/all?${params}`);
 
-      if (!res.ok) throw new Error("Failed to fetch orders");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to fetch orders");
+      }
 
       const result = await res.json();
       setOrders(result.data || []);
@@ -117,16 +120,13 @@ export default function TableOrderSample() {
 
   useEffect(() => {
     fetchOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, startDate, endDate]);
+  }, [page, debouncedSearch, startDate, endDate, status, fetchApi]); // Tambahkan status dan fetchApi ke dependensi
 
   // === HANDLER EXPORT (SAMPLE ONLY) ===
   const handleExport = async () => {
+    if (status !== "authenticated") return;
     setExporting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const exportFilters: OrderExportQuery = {
         salesCategory: "SAMPLE", // 🔥 HARDCODE SAMPLE DISINI
       };
@@ -139,14 +139,13 @@ export default function TableOrderSample() {
         exportFilters as Record<string, string>,
       ).toString();
 
-      const response = await fetch(
-        `${apiUrl}/orders/export/excel?${queryString}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const response = await fetchApi(`/orders/export/excel?${queryString}`, {
+        method: "GET",
+      });
 
-      if (!response.ok) throw new Error("Export failed");
+      if (!response.ok) {
+        throw new Error("Export failed. Server responded with an error.");
+      }
 
       const blob = await response.blob();
       const filename =

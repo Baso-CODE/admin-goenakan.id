@@ -13,7 +13,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 
 // === UTILS ===
@@ -107,6 +107,7 @@ type Vendor = {
 type Currency = { code: string; symbol: string };
 
 export default function EditCashflowClient() {
+  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status
   const params = useParams();
   const router = useRouter();
   const orderId = params.orderId as string;
@@ -182,64 +183,64 @@ export default function EditCashflowClient() {
   }, [revenues, costs]);
 
   // === LOAD DATA ===
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-        const headers = { Authorization: `Bearer ${token}` };
+  const loadData = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated" || !orderId)
+      return;
 
-        // 2. Fetch Cashflow Detail
-        const detailRes = await fetch(`${apiUrl}/cashflows/${orderId}`, {
-          headers,
-        });
-        if (!detailRes.ok) throw new Error("Failed to load cashflow data");
+    try {
+      setLoading(true);
 
-        const detailData = await detailRes.json();
-        setVendors(detailData.availableVendors || []);
+      const res = await fetchApi(`/cashflows/${orderId}`);
 
-        // 3. Populate Form
-        reset({
-          poNumber: detailData.summary.poNumber,
-          revenueItems: detailData.revenues.map((r: any) => ({
-            description: r.description,
-            productId: r.productId || "",
-            unitPrice: Number(r.unitPrice),
-            quantity: Number(r.quantity),
-            currency: r.currency || "IDR",
-            exchangeRate: Number(r.exchangeRate) || 1,
-            total: Number(r.total),
-          })),
-          costItems: detailData.costs.map((c: any) => ({
-            isManual: !c.vendorId,
-            description: c.description,
-            vendorId: c.vendorId || "",
-            costPerUnit: Number(c.costPerUnit),
-            quantity: Number(c.quantity),
-            currency: c.currency || "IDR",
-            exchangeRate: Number(c.exchangeRate) || 1,
-            total: Number(c.total),
-          })),
-        });
-      } catch (error) {
-        console.error(error);
-        toast.error("Gagal memuat data");
-      } finally {
-        setLoading(false);
-      }
+      if (!res.ok) throw new Error("Failed to load cashflow data");
+
+      const detailData = await res.json();
+      setVendors(detailData.availableVendors || []);
+
+      // Populate Form
+      reset({
+        poNumber: detailData.summary.poNumber,
+        revenueItems: detailData.revenues.map((r: any) => ({
+          description: r.description,
+          productId: r.productId || "",
+          unitPrice: Number(r.unitPrice),
+          quantity: Number(r.quantity),
+          currency: r.currency || "IDR",
+          exchangeRate: Number(r.exchangeRate) || 1,
+          total: Number(r.total),
+        })),
+        costItems: detailData.costs.map((c: any) => ({
+          isManual: !c.vendorId,
+          description: c.description,
+          vendorId: c.vendorId || "",
+          costPerUnit: Number(c.costPerUnit),
+          quantity: Number(c.quantity),
+          currency: c.currency || "IDR",
+          exchangeRate: Number(c.exchangeRate) || 1,
+          total: Number(c.total),
+        })),
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal memuat data");
+    } finally {
+      setLoading(false);
     }
+  }, [orderId, reset, status, fetchApi]);
+
+  useEffect(() => {
     loadData();
-  }, [orderId, reset]);
+  }, [loadData]);
 
   // === SUBMIT HANDLER ===
   const onSubmit = async (data: CashflowFormValues) => {
+    if (status !== "authenticated") {
+      toast.error("Sesi berakhir, silakan login kembali.");
+      return;
+    }
+
     try {
       setSubmitting(true);
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // Recalculate totals for payload safety
       const cleanData = {
         poNumber: data.poNumber,
         revenueItems: data.revenueItems.map((item) => ({
@@ -253,22 +254,22 @@ export default function EditCashflowClient() {
         })),
       };
 
-      const res = await fetch(`${apiUrl}/cashflows/${orderId}`, {
+      // ✨ Gunakan fetchApi dengan method POST
+      const res = await fetchApi(`/cashflows/${orderId}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(cleanData),
       });
 
-      if (!res.ok) throw new Error("Failed to save cashflow");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to save cashflow");
+      }
 
       toast.success("Cashflow berhasil disimpan!");
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Gagal menyimpan data");
+      toast.error(error.message || "Gagal menyimpan data");
     } finally {
       setSubmitting(false);
     }

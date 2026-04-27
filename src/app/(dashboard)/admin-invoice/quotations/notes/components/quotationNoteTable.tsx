@@ -8,7 +8,7 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -40,7 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { QuotationNoteForm } from "./quotationNoteForm";
 
 type CategoryData = {
@@ -53,6 +53,7 @@ type CategoryData = {
 };
 
 export default function QuotationNoteCategory() {
+  const { fetchApi, status } = useApi();
   // === STATE DATA ===
   const [data, setData] = useState<CategoryData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,34 +68,30 @@ export default function QuotationNoteCategory() {
   // === STATE ALERT DELETE ===
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-
   // === FETCH DATA ===
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated") return;
+
     setIsLoading(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // Endpoint Quotation Note Categories
-      const res = await fetch(`${apiUrl}/quotation-notes-categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchApi("/quotation-notes-categories");
 
       if (!res.ok) throw new Error("Failed to fetch data");
 
       const result = await res.json();
-      setData(result);
+      setData(result.data || result);
     } catch (error) {
       console.error(error);
       toast.error("Gagal memuat kategori.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [status, fetchApi]);
 
+  // Panggil di useEffect
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   // === HANDLERS ===
 
@@ -110,23 +107,18 @@ export default function QuotationNoteCategory() {
     setIsFormOpen(true);
   };
 
-  // 3. Handle Delete
+  // === HANDLE DELETE ===
   const handleDelete = async () => {
-    if (!deleteId) return;
-    try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+    if (!deleteId || status !== "authenticated") return;
 
-      const res = await fetch(
-        `${apiUrl}/quotation-notes-categories/${deleteId}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+    try {
+      // ✨ Cukup panggil fetchApi dengan method DELETE
+      const res = await fetchApi(`/quotation-notes-categories/${deleteId}`, {
+        method: "DELETE",
+      });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         throw new Error(err.message || "Gagal menghapus");
       }
 
@@ -134,10 +126,9 @@ export default function QuotationNoteCategory() {
       setIsAlertOpen(false);
       fetchData(); // Refresh data setelah delete
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || "Terjadi kesalahan saat menghapus data");
     }
   };
-
   // Filter Frontend Sederhana
   const filteredData = data.filter((item) =>
     item.name.toLowerCase().includes(search.toLowerCase()),

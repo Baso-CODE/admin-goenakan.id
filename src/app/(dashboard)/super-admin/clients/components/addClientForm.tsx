@@ -45,7 +45,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { countries } from "@/lib/countries";
 import { cn } from "@/lib/utils";
 
@@ -186,6 +186,7 @@ const initialFormData: ClientFormData = {
 };
 
 export default function ClientAddForm() {
+  const { fetchApi, status } = useApi();
   const [formData, setFormData] = useState(initialFormData);
   const [clientType, setClientType] = useState<ClientType>("");
   const [provinces, setProvinces] = useState<any[]>([]);
@@ -215,24 +216,20 @@ export default function ClientAddForm() {
 
   useEffect(() => {
     const fetchMasterData = async () => {
+      if (status === "loading" || status === "unauthenticated") return;
+
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        const [pcRes, depRes] = await Promise.all([
+          fetchApi("/purchase-channels/list"),
+          fetchApi("/departments/list"),
+        ]);
 
-        if (!token) throw new Error("No token found");
+        if (!pcRes.ok || !depRes.ok) throw new Error("Failed to fetch data");
 
-        // Fetch purchase channels
-        const pcRes = await fetch(`${apiUrl}/purchase-channels/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
         const pcData = await pcRes.json();
-        setPurchaseChannels(pcData);
-
-        // Fetch departments
-        const depRes = await fetch(`${apiUrl}/departments/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
         const depData = await depRes.json();
+
+        setPurchaseChannels(pcData);
         setDepartments(depData);
       } catch (err) {
         console.error("❌ Failed to fetch master data:", err);
@@ -241,8 +238,7 @@ export default function ClientAddForm() {
     };
 
     fetchMasterData();
-  }, []);
-
+  }, [status, fetchApi]);
   useEffect(() => {
     fetch("https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json")
       .then((res) => res.json())
@@ -398,12 +394,12 @@ export default function ClientAddForm() {
       if (!formData.b2c_purchaseChannelIdB2C)
         return toast.error("Saluran pembelian wajib dipilih");
     }
-
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+      if (status !== "authenticated") {
+        toast.error("Sesi berakhir, silakan login kembali.");
+        return;
+      }
 
-      // ✅ FIX: Payload B2C pakai nama field yang benar sesuai DTO backend
       const payload =
         clientType === "B2C"
           ? {
@@ -445,13 +441,8 @@ export default function ClientAddForm() {
               })),
             };
 
-      // ✅ FIX: Cek response, jangan langsung toast success
-      const res = await fetch(`${apiUrl}/clients`, {
+      const res = await fetchApi("/clients", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
 
@@ -465,6 +456,7 @@ export default function ClientAddForm() {
 
       toast.success("Client berhasil ditambahkan!");
       router.push("/super-admin/clients");
+      router.refresh();
     } catch (err) {
       toast.error("Terjadi kesalahan koneksi ke server.");
       console.error(err);

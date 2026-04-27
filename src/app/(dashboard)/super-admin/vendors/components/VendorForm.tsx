@@ -38,7 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import {
   Check,
@@ -97,6 +97,8 @@ export default function VendorForm({
   isSubmitting?: boolean;
   existingItems?: { id: string; name: string }[];
 }) {
+  const { fetchApi, status } = useApi();
+
   const [categoryTypes] = useState([
     { id: "SERVICE", name: "Service" },
     { id: "PRODUCT", name: "Product" },
@@ -191,35 +193,38 @@ export default function VendorForm({
       setHasCategoryChanged(true);
     }
   }, [currentCategoryId, initialData]);
-
-  // === 4. API CALLS (HAPUS dependency existingItems) ===
-  // Fetch hanya sekali saat mount. Tidak perlu fetch ulang saat existingItems berubah.
+  // === 4. API CALLS ===
   useEffect(() => {
     const fetchDependencies = async () => {
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-        const headers = { Authorization: `Bearer ${token}` };
-
         const [platformsRes, catsRes, itemsRes] = await Promise.all([
-          fetch(`${apiUrl}/contact-platforms/active`, { headers }),
-          fetch(`${apiUrl}/vendor-categories/active`, { headers }),
-          fetch(`${apiUrl}/vendor-items/active`, { headers }),
+          fetchApi("/contact-platforms/active"),
+          fetchApi("/vendor-categories/active"),
+          fetchApi("/vendor-items/active"),
         ]);
 
-        if (platformsRes.ok) setContactPlatforms(await platformsRes.json());
-        if (catsRes.ok) setVendorCategories(await catsRes.json());
+        // Parsing data jika response OK
+        if (platformsRes.ok) {
+          const platformsData = await platformsRes.json();
+          setContactPlatforms(platformsData);
+        }
+
+        if (catsRes.ok) {
+          const catsData = await catsRes.json();
+          setVendorCategories(catsData);
+        }
 
         if (itemsRes.ok) {
-          // HANYA SIMPAN DATA API MURNI DI SINI
-          setApiVendorItems(await itemsRes.json());
+          const itemsData = await itemsRes.json();
+          setApiVendorItems(itemsData);
         }
       } catch (error) {
-        console.error("Failed loading form dependencies");
+        console.error("Failed loading form dependencies:", error);
       }
     };
+
     fetchDependencies();
-  }, []); // Empty dependency array = run once
+  }, [status, fetchApi]);
 
   const handleSubmit = (values: VendorFormValues) => {
     // ... submit logic ...

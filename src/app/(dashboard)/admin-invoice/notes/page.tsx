@@ -3,7 +3,7 @@
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import { Edit, FileText, Plus, Search, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 // UI Components
@@ -21,8 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import Link from "next/link";
 
 // === TYPES ===
@@ -103,6 +103,8 @@ export default function InvoiceNotesPage() {
 // ============================================================================
 
 function CategoriesTable() {
+  const { fetchApi, status } = useApi();
+
   const [data, setData] = useState<NoteCategory[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
@@ -110,24 +112,23 @@ function CategoriesTable() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    // 🛑 Jangan fetch jika session NextAuth masih loading atau tidak ada
+    if (status === "loading" || status === "unauthenticated") return;
+
     setLoading(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
       });
       if (debouncedSearch) params.append("search", debouncedSearch);
 
-      // Ganti URL sesuai endpoint router backend
-      const res = await fetch(`${apiUrl}/invoice-notes/categories?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // ✨ 3. Panggil API tanpa fetch token manual
+      const res = await fetchApi(`/invoice-notes/categories?${params}`);
 
       if (!res.ok) throw new Error("Failed to fetch categories");
+
       const result = await res.json();
       setData(result.data || []);
       setMeta(result.meta);
@@ -137,11 +138,11 @@ function CategoriesTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debouncedSearch, status, fetchApi]);
 
   useEffect(() => {
     fetchData();
-  }, [page, debouncedSearch]);
+  }, [fetchData]);
 
   return (
     <Card className="shadow-sm">
@@ -290,6 +291,7 @@ function CategoriesTable() {
 // ============================================================================
 
 function TemplatesTable() {
+  const { fetchApi, status } = useApi();
   const [data, setData] = useState<NoteTemplate[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
@@ -297,24 +299,21 @@ function TemplatesTable() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated") return;
+
     setLoading(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
       });
       if (debouncedSearch) params.append("search", debouncedSearch);
 
-      // Ganti URL sesuai endpoint router backend
-      const res = await fetch(`${apiUrl}/invoice-notes/templates?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchApi(`/invoice-notes/templates?${params}`);
 
       if (!res.ok) throw new Error("Failed to fetch templates");
+
       const result = await res.json();
       setData(result.data || []);
       setMeta(result.meta);
@@ -324,11 +323,11 @@ function TemplatesTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debouncedSearch, status, fetchApi]);
 
   useEffect(() => {
     fetchData();
-  }, [page, debouncedSearch]);
+  }, [fetchData]);
 
   return (
     <Card className="shadow-sm">

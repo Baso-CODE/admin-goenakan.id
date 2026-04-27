@@ -1,16 +1,17 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { ArrowLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import NoteCategoryForm, {
   NoteCategoryFormValues,
 } from "../../../components/noteCategoryForm";
 
 const EditNoteCategoryPage = () => {
+  const { fetchApi, status } = useApi();
   const { slug } = useParams();
   const router = useRouter();
 
@@ -24,64 +25,49 @@ const EditNoteCategoryPage = () => {
   // ============================
   // FETCH DATA
   // ============================
+  const fetchData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+
+      const res = await fetchApi(`/invoice-notes/categories/${slug}`);
+
+      if (!res.ok) throw new Error("Failed to fetch category data");
+
+      const response = await res.json();
+      const data = response.data || response;
+
+      setInitialData({
+        name: data.name,
+        isActive: data.isActive ?? true,
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load category data.");
+      router.push("/admin-invoice/notes");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [slug, status, fetchApi, router]);
+
   useEffect(() => {
-    const fetchData = async () => {
-      if (!slug) return;
-
-      try {
-        setIsLoading(true);
-
-        const tokenRes = await fetch("/api/auth/token");
-        if (!tokenRes.ok) throw new Error("Failed to get token");
-        const { token } = await tokenRes.json();
-
-        // Fetch by SLUG
-        const res = await fetch(`${apiUrl}/invoice-notes/categories/${slug}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch category data");
-
-        const data = await res.json();
-
-        // Backend response format might be wrapped in { data: ... } or direct object
-        // Adjust accordingly based on your controller response
-        setInitialData({
-          name: data.name || data.data?.name,
-          isActive:
-            data.isActive !== undefined
-              ? data.isActive
-              : (data.data?.isActive ?? true),
-        });
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to load category data.");
-        router.push("/admin-invoice/notes"); // Redirect if not found
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchData();
-  }, [slug, router]);
+  }, [fetchData]);
 
   // ============================
   // UPDATE DATA
   // ============================
   const handleUpdateCategory = async (formValues: NoteCategoryFormValues) => {
+    if (status !== "authenticated") {
+      toast.error("Sesi berakhir, silakan login kembali.");
+      return;
+    }
+
     try {
-      setIsSubmitting(true);
+      setIsSubmitting(true); // ✨ Tetap kita gunakan sesuai kode asli Anda
 
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // Update by SLUG
-      const res = await fetch(`${apiUrl}/invoice-notes/categories/${slug}`, {
+      // ✨ Gunakan fetchApi dengan method PATCH
+      const res = await fetchApi(`/invoice-notes/categories/${slug}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(formValues),
       });
 
@@ -92,12 +78,13 @@ const EditNoteCategoryPage = () => {
 
       toast.success("Category updated successfully!");
       router.push("/admin-invoice/notes");
+      router.refresh();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to update category",
       );
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // ✨ Tetap kita kembalikan ke false di sini
     }
   };
 

@@ -13,12 +13,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import { Search } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 // === Type definitions ===
@@ -47,6 +47,8 @@ type Meta = {
 };
 
 export default function ArticlesSection() {
+  const { fetchApi, status } = useApi();
+
   // --- STATE UNTUK TABLE ---
   const [articles, setArticles] = useState<Article[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -61,12 +63,14 @@ export default function ArticlesSection() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   // --- FUNGSI FETCH DATA ---
-  const fetchArticles = async () => {
+  // ✨ 2. Gunakan useCallback agar aman dipanggil di useEffect dan handleDelete
+  const fetchArticles = useCallback(async () => {
+    // 🛑 Jangan jalan jika token belum siap
+    if (status === "loading" || status === "unauthenticated") return;
+
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -76,12 +80,9 @@ export default function ArticlesSection() {
         params.append("search", debouncedSearch.trim());
       }
 
-      // Pastikan endpoint backend ini sudah sesuai dengan ArticleRouter Anda
-      const res = await fetch(`${apiUrl}/articles?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // ✨ 3. Lihat betapa pendeknya sekarang! URL & Token diurus otomatis.
+      const res = await fetchApi(`/articles?${params}`);
+
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
 
       const result = await res.json();
@@ -93,7 +94,7 @@ export default function ArticlesSection() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debouncedSearch, status, fetchApi]); // Masukkan dependencies
 
   // --- FUNGSI HANDLE DELETE ---
   const handleDelete = async () => {
@@ -101,14 +102,9 @@ export default function ArticlesSection() {
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/articles/${deleteId}`, {
+      // ✨ 4. DELETE juga jadi super pendek!
+      const res = await fetchApi(`/articles/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!res.ok) {
@@ -118,7 +114,7 @@ export default function ArticlesSection() {
 
       toast.success("Article berhasil dihapus!");
       setDeleteId(null);
-      fetchArticles(); // Refresh data
+      fetchArticles(); // Refresh data otomatis menggunakan token yang sama
     } catch (error) {
       console.error("Delete Error:", error);
       toast.error("Gagal menghapus Article.");
@@ -127,10 +123,11 @@ export default function ArticlesSection() {
     }
   };
 
-  // Panggil fetch setiap kali halaman atau pencarian berubah
+  // --- USE EFFECT ---
   useEffect(() => {
+    // Cukup panggil fetchArticles, karena pengecekan status sudah ada di dalamnya
     fetchArticles();
-  }, [page, debouncedSearch]);
+  }, [fetchArticles]);
 
   return (
     <div className="space-y-4 w-auto mx-auto">

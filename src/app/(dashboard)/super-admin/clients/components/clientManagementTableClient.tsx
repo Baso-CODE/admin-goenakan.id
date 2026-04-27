@@ -42,8 +42,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 
 type ClientType = "B2B" | "B2C";
@@ -86,6 +86,8 @@ interface ClientExportQuery {
 }
 
 export default function ClientManagementTable() {
+  const { fetchApi, status } = useApi();
+
   const [clients, setClients] = useState<ClientData[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({
     page: 1,
@@ -116,7 +118,6 @@ export default function ClientManagementTable() {
     if (filterUpdate.type !== undefined) {
       setClientTypeFilter(filterUpdate.type);
     }
-    // Search sudah ditangani oleh debouncedSearch useEffect
   };
 
   const fetchClients = useCallback(async () => {
@@ -137,12 +138,7 @@ export default function ClientManagementTable() {
       if (debouncedSearch.trim()) {
         params.append("search", debouncedSearch.trim());
       }
-
-      const res = await fetch(`${apiUrl}/clients?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await fetchApi(`/clients?${params}`);
 
       const result = await res.json();
       if (res.ok) {
@@ -168,6 +164,7 @@ export default function ClientManagementTable() {
   useEffect(() => {
     fetchClients();
   }, [fetchClients]);
+
   // === FUNGSI HANDLE EXPORT ===
   const handleExport = async () => {
     setExporting(true);
@@ -191,13 +188,8 @@ export default function ClientManagementTable() {
       ).toString();
 
       // URL untuk export
-      const exportUrl = `${apiUrl}/clients/export/excel?${queryString}`;
-
-      const response = await fetch(exportUrl, {
+      const response = await fetchApi(`/clients/export/excel?${queryString}`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {
@@ -254,16 +246,13 @@ export default function ClientManagementTable() {
       const tokenRes = await fetch("/api/auth/token");
       const { token } = await tokenRes.json();
 
-      const response = await fetch(`${apiUrl}/clients/${deleteId}`, {
+      const response = await fetchApi(`/clients/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || "Gagal menghapus Client");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal menghapus client");
       }
 
       toast.success("Client berhasil dihapus");

@@ -28,8 +28,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import * as LucideIcons from "lucide-react";
 import { Search } from "lucide-react";
@@ -65,6 +65,8 @@ type Meta = {
 };
 
 const VendorsTable = () => {
+  const { fetchApi, status } = useApi();
+
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
@@ -83,29 +85,38 @@ const VendorsTable = () => {
   const [endDate, setEndDate] = useState<string>("");
   const [exportIsActiveFilter, setExportIsActiveFilter] =
     useState<string>("ALL");
+
+  // === FETCH VENDORS ===
   const fetchVendors = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+      // 1. Build Query Params
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
         isActive: statusFilter,
       });
+
       if (debouncedSearch.trim()) {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(`${apiUrl}/vendors?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchApi(`/vendors?${params}`);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to fetch vendors");
+      }
+
       const result = await res.json();
       setVendors(result.data || []);
       setMeta(result.meta);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Unknown error");
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      setError(msg);
       toast.error("Failed to load vendors");
     } finally {
       setLoading(false);
@@ -114,7 +125,7 @@ const VendorsTable = () => {
 
   useEffect(() => {
     fetchVendors();
-  }, [page, debouncedSearch, statusFilter]);
+  }, [page, debouncedSearch, statusFilter, status, fetchApi]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -130,21 +141,18 @@ const VendorsTable = () => {
       // Gunakan filter status aktif khusus untuk export
       if (exportIsActiveFilter !== "ALL")
         exportFilters.isActive = exportIsActiveFilter;
-
       const queryString = new URLSearchParams(exportFilters).toString();
-      const exportUrl = `${apiUrl}/vendors/export/excel?${queryString}`;
 
-      const response = await fetch(exportUrl, {
+      const response = await fetchApi(`/vendors/export/excel?${queryString}`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {
-        throw new Error("Export failed. Server responded with an error.");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(
+          errData.message || "Export failed. Server responded with an error.",
+        );
       }
-
       // Proses File Binary (Blob)
       const blob = await response.blob();
       const filename =
@@ -174,29 +182,25 @@ const VendorsTable = () => {
   };
 
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || status !== "authenticated") return;
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const response = await fetch(`${apiUrl}/vendors/${deleteId}`, {
+      const response = await fetchApi(`/vendors/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || "Gagal menghapus kategori");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal menghapus vendor");
       }
 
       toast.success("Vendor berhasil dihapus");
+
       setPage(1);
       fetchVendors();
     } catch (error: any) {
+      console.error("❌ Error delete vendor:", error);
       toast.error(error.message || "Terjadi kesalahan saat menghapus data");
     } finally {
       setIsDeleting(false);

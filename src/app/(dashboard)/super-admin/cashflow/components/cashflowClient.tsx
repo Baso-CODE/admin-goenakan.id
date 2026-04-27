@@ -18,8 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
@@ -32,7 +32,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import UtangPiutangCard from "./utangPiutangCard";
 
@@ -65,6 +65,7 @@ const formatCurrency = (amount: number) => {
 };
 
 export default function CashflowClient() {
+  const { fetchApi, status } = useApi();
   // === STATE ===
   const [cashflows, setCashflows] = useState<CashflowItem[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -78,24 +79,21 @@ export default function CashflowClient() {
   const [page, setPage] = useState(1);
 
   // === FETCH DATA TABLE ===
-  const fetchCashflows = async () => {
+  const fetchCashflows = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated") return;
+
     setLoading(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
       });
+
       if (debouncedSearch) params.append("search", debouncedSearch);
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
-      // Endpoint Service Cashflow
-      const res = await fetch(`${apiUrl}/cashflows?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchApi(`/cashflows?${params}`);
 
       if (!res.ok) throw new Error("Failed to fetch cashflows");
 
@@ -108,12 +106,11 @@ export default function CashflowClient() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debouncedSearch, startDate, endDate, status, fetchApi]);
 
   useEffect(() => {
     fetchCashflows();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, startDate, endDate]);
+  }, [fetchCashflows]);
 
   return (
     <div className="space-y-6 w-full mx-auto pb-10">

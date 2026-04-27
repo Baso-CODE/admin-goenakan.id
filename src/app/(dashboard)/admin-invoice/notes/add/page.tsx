@@ -1,10 +1,10 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import NoteTemplateForm, {
   NoteTemplateFormValues,
@@ -12,43 +12,43 @@ import NoteTemplateForm, {
 
 export default function AddNoteTemplatePage() {
   const router = useRouter();
+  const { fetchApi, status } = useApi();
   const [categories, setCategories] = useState([]);
   const [loadingInit, setLoadingInit] = useState(true);
 
-  // 1. Fetch Categories untuk Dropdown
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+  const fetchCategories = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated") return;
 
-        // Gunakan endpoint LIST yang ringan (tanpa pagination)
-        const res = await fetch(`${apiUrl}/invoice-notes/categories/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        setCategories(data);
-      } catch (error) {
-        toast.error("Gagal memuat list kategori");
-      } finally {
-        setLoadingInit(false);
-      }
-    };
+    try {
+      setLoadingInit(true);
+      const res = await fetchApi("/invoice-notes/categories/list");
+
+      if (!res.ok) throw new Error("Gagal memuat kategori");
+
+      const data = await res.json();
+      setCategories(data);
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal memuat list kategori");
+    } finally {
+      setLoadingInit(false);
+    }
+  }, [status, fetchApi]);
+
+  useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [fetchCategories]);
 
   // 2. Handle Submit
   const handleAddTemplate = async (data: NoteTemplateFormValues) => {
-    try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+    if (status !== "authenticated") {
+      toast.error("Sesi berakhir, silakan login kembali.");
+      return;
+    }
 
-      const res = await fetch(`${apiUrl}/invoice-notes/templates`, {
+    try {
+      const res = await fetchApi("/invoice-notes/templates", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
@@ -58,7 +58,8 @@ export default function AddNoteTemplatePage() {
       }
 
       toast.success("Template created successfully!");
-      router.push("/admin-invoice/notes"); // Balik ke halaman utama notes
+      router.push("/admin-invoice/notes");
+      router.refresh();
     } catch (err: any) {
       toast.error(err.message);
     }
@@ -82,7 +83,7 @@ export default function AddNoteTemplatePage() {
 
       <NoteTemplateForm
         onSubmit={handleAddTemplate}
-        categories={categories} // Pass kategori ke form
+        categories={categories}
         isLoading={loadingInit}
       />
     </div>

@@ -13,13 +13,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import { Search } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 // === Type definitions ===
@@ -48,6 +48,7 @@ type Meta = {
 };
 
 const ArticleBanners = () => {
+  const { fetchApi, status } = useApi();
   // --- STATE UNTUK TABLE ---
   const [banners, setBanners] = useState<ArticleBanner[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -63,13 +64,12 @@ const ArticleBanners = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // --- FUNGSI FETCH DATA ---
-  const fetchBanners = async () => {
+  const fetchBanners = useCallback(async () => {
+    if (status === "loading" || status === "unauthenticated") return;
+
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -79,12 +79,9 @@ const ArticleBanners = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      // Sesuaikan URL ini jika nama route backend Anda berbeda
-      const res = await fetch(`${apiUrl}/articles-banners?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // ✨ 3. Panggil API tanpa urusan token manual
+      const res = await fetchApi(`/articles-banners?${params}`);
+
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
 
       const result = await res.json();
@@ -96,7 +93,7 @@ const ArticleBanners = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debouncedSearch, status, fetchApi]);
 
   // --- FUNGSI HANDLE DELETE ---
   const handleDelete = async () => {
@@ -104,14 +101,9 @@ const ArticleBanners = () => {
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/article-banners/${deleteId}`, {
+      // ✨ 4. Gunakan fetchApi untuk DELETE
+      const res = await fetchApi(`/articles-banners/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!res.ok) {
@@ -130,10 +122,10 @@ const ArticleBanners = () => {
     }
   };
 
+  // ✨ 5. Trigger fetch saat depedensi berubah
   useEffect(() => {
     fetchBanners();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch]);
+  }, [fetchBanners]);
 
   return (
     <div className="space-y-4 w-auto mx-auto">

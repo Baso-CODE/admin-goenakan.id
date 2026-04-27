@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -10,22 +10,18 @@ import NoteCategoryForm, {
 } from "../../components/noteCategoryForm";
 
 const AddNoteCategoryPage = () => {
+  const { fetchApi, status } = useApi();
   const router = useRouter();
 
   const handleAddCategory = async (data: NoteCategoryFormValues) => {
+    if (status !== "authenticated") {
+      toast.error("Sesi berakhir, silakan login kembali.");
+      return;
+    }
+
     try {
-      // === GET TOKEN ===
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
-      const res = await fetch(`${apiUrl}/invoice-notes/categories`, {
+      const res = await fetchApi("/invoice-notes/categories", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
@@ -35,14 +31,14 @@ const AddNoteCategoryPage = () => {
       }
 
       toast.success("Category created successfully!");
-      router.push("/admin-invoice/notes"); // Redirect balik ke list
+      router.push("/admin-invoice/notes");
+      router.refresh();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to create category",
       );
     }
   };
-
   return (
     <div className="space-y-6 w-full mx-auto pb-20">
       <div className="flex items-center gap-4">

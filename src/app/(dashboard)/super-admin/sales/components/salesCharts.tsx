@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useEffect, useState } from "react";
 import {
   Bar,
@@ -37,20 +37,17 @@ export default function SalesCharts() {
   // === STATE ===
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
+  const { fetchApi, status } = useApi();
 
   // === FETCH DATA API ===
   useEffect(() => {
+    if (status === "loading" || status === "unauthenticated") return;
+
     const fetchChartData = async () => {
       try {
         setLoading(true);
 
-        // 1. Ambil Token
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-
-        const res = await fetch(`${apiUrl}/orders/analytics/charts`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetchApi("/orders/analytics/charts");
 
         if (!res.ok) throw new Error("Gagal mengambil data chart");
 
@@ -66,7 +63,7 @@ export default function SalesCharts() {
     };
 
     fetchChartData();
-  }, []);
+  }, [fetchApi, status]);
 
   // === RENDER LOADING (SKELETON) ===
   if (loading) {

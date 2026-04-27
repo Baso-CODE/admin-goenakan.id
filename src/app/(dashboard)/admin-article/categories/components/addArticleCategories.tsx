@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -9,22 +9,22 @@ import ArticleCategoryForm, {
 } from "./formArticleCategories";
 
 const AddArticleCategory = () => {
+  const { fetchApi, status } = useApi();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddCategory = async (data: ArticleCategoryFormValues) => {
+    // 🛑 Validasi status auth
+    if (status !== "authenticated") {
+      toast.error("Sesi berakhir, silakan login kembali.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
-      if (!token) throw new Error("No token found");
-      const res = await fetch(`${apiUrl}/article-categories`, {
+      const res = await fetchApi("/article-categories", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 

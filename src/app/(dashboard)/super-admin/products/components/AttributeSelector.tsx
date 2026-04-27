@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { GripVertical, ListChecks, Loader2, Plus, Trash2 } from "lucide-react"; // Menambahkan ikon baru
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -38,6 +38,8 @@ export function AttributeSelector({
   value?: SelectedAttributeRow[];
   onChange: (v: SelectedAttributeRow[], full: AttributeFromServer[]) => void;
 }) {
+  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status
+
   const [available, setAvailable] = useState<AttributeFromServer[]>([]);
   const [loading, setLoading] = useState(false);
   const [local, setLocal] = useState<SelectedAttributeRow[]>(value ?? []);
@@ -56,25 +58,29 @@ export function AttributeSelector({
 
   // Load attributes from server
   useEffect(() => {
-    setLoading(true);
     const fetchAttributes = async () => {
+      // 🛑 Jangan jalan jika sesi belum siap
+      if (status === "loading" || status === "unauthenticated") return;
+
+      setLoading(true);
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-        const res = await fetch(`${apiUrl}/product-attributes/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        const res = await fetchApi("/product-attributes/list");
+
         if (!res.ok) throw new Error();
+
         const data = await res.json();
         setAvailable(data);
-      } catch {
+      } catch (error) {
+        console.error(error);
         toast.error("Failed to load attributes.");
       } finally {
         setLoading(false);
       }
     };
+
     fetchAttributes();
-  }, []);
+  }, [status, fetchApi]); // Tambahkan dependensi lengkap
 
   // --- LOGIC HANDLERS ---
 
@@ -97,7 +103,7 @@ export function AttributeSelector({
 
         // Cek duplikasi
         const isDuplicate = prev.some(
-          (r, j) => j !== index && r.attributeId === id
+          (r, j) => j !== index && r.attributeId === id,
         );
         if (isDuplicate) {
           toast.error("This attribute has already been selected.");
@@ -106,7 +112,7 @@ export function AttributeSelector({
 
         // Reset valueIds saat attribute berubah
         return { ...row, attributeId: id, valueIds: [] };
-      })
+      }),
     );
 
   const toggleValue = (index: number, valueId: string) =>
@@ -119,8 +125,8 @@ export function AttributeSelector({
               valueIds: row.valueIds.includes(valueId)
                 ? row.valueIds.filter((v) => v !== valueId)
                 : [...row.valueIds, valueId],
-            }
-      )
+            },
+      ),
     );
 
   // Filter available attributes that are already selected in other rows
