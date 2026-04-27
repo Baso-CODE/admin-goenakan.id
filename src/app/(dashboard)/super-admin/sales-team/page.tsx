@@ -25,8 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils"; // Pastikan path utils Anda benar
 import { formatDate } from "@/utils/formatDate";
 import { format } from "date-fns";
@@ -73,6 +73,8 @@ interface SalesExportQuery {
 }
 
 const Sales = () => {
+  const { fetchApi, status } = useApi();
+
   // --- STATE DATA DAN PAGINATION ---
   const [sales, setSales] = useState<SalesPerson[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -95,19 +97,23 @@ const Sales = () => {
 
   // --- FUNGSI FETCH DATA (Untuk Tabel) ---
   const fetchSales = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+      // 1. Build Query Params
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
         isActive: statusFilter,
       });
+
       if (debouncedSearch.trim()) {
         params.append("search", debouncedSearch.trim());
       }
+
+      // Pastikan format tanggal aman sebelum dikirim
       if (exportStartDate) {
         params.append(
           "startDate",
@@ -118,28 +124,37 @@ const Sales = () => {
         params.append("endDate", format(new Date(exportEndDate), "yyyy-MM-dd"));
       }
 
-      const res = await fetch(`${apiUrl}/sales?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const result = await res.json();
+      // 2. ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi(`/sales?${params}`);
 
       if (!res.ok) {
-        throw new Error(result.message || "Failed to fetch sales data.");
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to fetch sales data.");
       }
 
+      const result = await res.json();
       setSales(result.data || []);
       setMeta(result.meta);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("❌ Load Sales Error:", error);
       setError(error instanceof Error ? error.message : "Unknown error");
-      toast.error("Failed to load sales data");
+      toast.error(error.message || "Failed to load sales data");
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchSales();
+  }, [
+    page,
+    debouncedSearch,
+    statusFilter,
+    exportStartDate,
+    exportEndDate,
+    status,
+    fetchApi,
+  ]);
   // --- FUNGSI HANDLE EXPORT (Implementasi Baru) ---
   const handleExportSales = async () => {
     setExporting(true);
@@ -165,22 +180,17 @@ const Sales = () => {
         exportFilters as Record<string, string>,
       ).toString();
 
-      // URL untuk export (Sesuaikan dengan endpoint backend Anda)
-      const exportUrl = `${apiUrl}/sales/export/excel?${queryString}`;
-
-      const response = await fetch(exportUrl, {
+      const response = await fetchApi(`/sales/export/excel?${queryString}`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Server Error:", errorText);
-        throw new Error("Export failed. Server responded with an error.");
+        const errData = await response.json().catch(() => ({}));
+        console.error("❌ Export Server Error:", errData);
+        throw new Error(
+          errData.message || "Export failed. Server responded with an error.",
+        );
       }
-
       // 3. Proses File Binary (Blob)
       const blob = await response.blob();
       const contentDisposition = response.headers.get("Content-Disposition");
@@ -208,9 +218,6 @@ const Sales = () => {
     }
   };
 
-  useEffect(() => {
-    fetchSales();
-  }, [page, debouncedSearch, statusFilter, exportStartDate, exportEndDate]);
   // === RENDER ===
   return (
     <div className="space-y-4 overflow-x-hidden w-full mx-auto">

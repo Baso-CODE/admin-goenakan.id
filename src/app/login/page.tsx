@@ -1,7 +1,6 @@
 "use client";
 
 import { LoginForm } from "@/components/login-form";
-import { GalleryVerticalEnd } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -12,7 +11,6 @@ import {
   CarouselItem,
 } from "@/components/ui/carousel";
 
-// Import plugin autoplay dari embla
 import Autoplay from "embla-carousel-autoplay";
 
 const IMAGES = [
@@ -62,8 +60,7 @@ export default function LoginPage() {
           className="w-full h-full"
           opts={{
             loop: true,
-          }}
-        >
+          }}>
           <CarouselContent>
             {IMAGES.map((img, index) => (
               <CarouselItem key={index} className="relative h-screen">

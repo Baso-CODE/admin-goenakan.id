@@ -4,10 +4,12 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import ProductTagForm, { ProductTagFormValues } from "./formTagProduct";
 
 export default function EditProductTag() {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams();
   const router = useRouter();
 
@@ -17,67 +19,58 @@ export default function EditProductTag() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // === Fetch data tag berdasarkan ID ===
   useEffect(() => {
     const fetchData = async () => {
+      if (!id || status !== "authenticated") return;
+
       setIsLoading(true);
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        if (!tokenRes.ok) throw new Error("Failed to get token");
-        const { token } = await tokenRes.json();
+        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        const res = await fetchApi(`/product-tags/${id}`);
 
-        // Fetch data tag berdasarkan ID
-        const res = await fetch(`${apiUrl}/product-tags/${id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch tag data");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to fetch tag data");
+        }
 
         const data = await res.json();
         setTagData({
           name: data.name,
         });
-      } catch (err) {
+      } catch (err: any) {
         console.error("❌ Failed to load data:", err);
         setTagData(undefined);
-        toast.error("Failed to load tag data. Using default values.");
+        toast.error(err.message || "Failed to load tag data.");
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (id) fetchData();
-  }, [id]);
+    fetchData();
+  }, [id, status, fetchApi]);
 
   const handleUpdateProductTag = async (data: ProductTagFormValues) => {
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
-      // PATCH request ke endpoint product-tags
-      const res = await fetch(`${apiUrl}/product-tags/${id}`, {
+      const res = await fetchApi(`/product-tags/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to update tag");
       }
 
       toast.success("Product Tag updated successfully!");
       router.push("/super-admin/product-tags");
       router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update tag");
+    } catch (err: any) {
+      console.error("❌ Update Tag Error:", err);
+      toast.error(err.message || "Failed to update tag");
     } finally {
       setIsSubmitting(false);
     }

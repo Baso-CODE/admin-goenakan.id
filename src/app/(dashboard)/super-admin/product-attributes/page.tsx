@@ -13,9 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import { FileDown, Loader2, Search } from "lucide-react";
 import Link from "next/link";
@@ -52,6 +52,8 @@ interface AttributeExportQuery {
 }
 
 export default function ProductAttributesPage() {
+  const { fetchApi, status } = useApi();
+
   // --- STATE UNTUK TABLE ---
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -67,18 +69,17 @@ export default function ProductAttributesPage() {
   // --- STATE BARU UNTUK EXPORT FILTER ---
   const [exportStartDate, setExportStartDate] = useState<string>("");
   const [exportEndDate, setExportEndDate] = useState<string>("");
-  const [exportSearch, setExportSearch] = useState<string>(""); // Tambahkan state search untuk export
-  const [exporting, setExporting] = useState<boolean>(false); // State untuk loading button export
+  const [exportSearch, setExportSearch] = useState<string>("");
+  const [exporting, setExporting] = useState<boolean>(false);
 
   // --- FUNGSI FETCH DATA (Untuk Tabel) ---
   const fetchAttributes = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
 
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -88,13 +89,12 @@ export default function ProductAttributesPage() {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(`${apiUrl}/product-attributes?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await fetchApi(`/product-attributes?${params}`);
 
-      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `HTTP Error ${res.status}`);
+      }
 
       const result = await res.json();
       setAttributes(result.data || []);
@@ -107,33 +107,32 @@ export default function ProductAttributesPage() {
     }
   };
 
+  useEffect(() => {
+    fetchAttributes();
+  }, [page, debouncedSearch, status, fetchApi]);
+
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || status !== "authenticated") return;
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/product-attributes/${deleteId}`, {
+      const res = await fetchApi(`/product-attributes/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to delete attribute");
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to delete attribute");
       }
 
       toast.success("Product Attribute berhasil dihapus!");
       setDeleteId(null);
-      fetchAttributes();
-    } catch (error) {
-      console.error("Delete Error:", error);
+      fetchAttributes(); // Refresh data
+    } catch (error: any) {
+      console.error("❌ Delete Error:", error);
       toast.error(
-        "Gagal menghapus attribute. Pastikan data ini tidak sedang digunakan.",
+        error.message ||
+          "Gagal menghapus attribute. Pastikan data tidak sedang digunakan.",
       );
     } finally {
       setIsDeleting(false);
@@ -152,7 +151,6 @@ export default function ProductAttributesPage() {
       const exportFilters: AttributeExportQuery = {
         ...(exportStartDate && { startDate: exportStartDate }),
         ...(exportEndDate && { endDate: exportEndDate }),
-        // Gunakan nilai search dari filter export
         ...(exportSearch.trim() && { search: exportSearch.trim() }),
       };
 
@@ -160,20 +158,19 @@ export default function ProductAttributesPage() {
         exportFilters as Record<string, string>,
       ).toString();
 
-      // Endpoint untuk export (Sesuaikan dengan endpoint backend Anda: /product-attributes/export/excel)
-      const exportUrl = `${apiUrl}/product-attributes/export/excel?${queryString}`;
-
-      const response = await fetch(exportUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetchApi(
+        `/product-attributes/export/excel?${queryString}`,
+        {
+          method: "GET",
         },
-      });
+      );
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Server Error:", errorText);
-        throw new Error("Export failed. Server responded with an error.");
+        const errData = await response.json().catch(() => ({}));
+        console.error("❌ Server Error:", errData);
+        throw new Error(
+          errData.message || "Export failed. Server responded with an error.",
+        );
       }
 
       // 3. Proses File Binary (Blob)

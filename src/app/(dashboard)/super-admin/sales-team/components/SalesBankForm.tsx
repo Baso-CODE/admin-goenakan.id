@@ -10,7 +10,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Banknote, Loader2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -57,6 +57,8 @@ export default function SalesBankForm({
   initialBankAccounts,
   onUpdateSuccess,
 }: SalesBankFormProps) {
+  const { fetchApi, status } = useApi();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<SalesBankFormValues>({
@@ -77,40 +79,35 @@ export default function SalesBankForm({
   });
 
   const handleUpdate = async (values: SalesBankFormValues) => {
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // Data yang dikirim hanya bankAccounts (tanpa ID SalesBank)
       const payload = values.bankAccounts.map(
         ({ bankName, accountNumber, accountHolderName }) => ({
           bankName,
           accountNumber,
           accountHolderName,
-        })
+        }),
       );
 
-      // Endpoint yang sesuai dengan backend Anda
-      const res = await fetch(`${apiUrl}/sales/${salesId}/banks`, {
+      const res = await fetchApi(`/sales/${salesId}/banks`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
 
-      const result = await res.json();
+      const result = await res.json().catch(() => ({}));
+
       if (!res.ok) {
         throw new Error(result.message || "Failed to update bank accounts");
       }
 
       toast.success("Bank Accounts updated successfully!");
       onUpdateSuccess();
-    } catch (err) {
+    } catch (err: any) {
+      console.error("❌ Update Sales Banks Error:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to update bank accounts"
+        err instanceof Error ? err.message : "Failed to update bank accounts",
       );
     } finally {
       setIsSubmitting(false);

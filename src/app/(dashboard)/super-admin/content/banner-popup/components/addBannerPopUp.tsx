@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import PopupBannerForm, {
 } from "../components/popUpBannerForm";
 
 export default function AddPopupBanner() {
+  const { fetchApi, status } = useApi();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -16,7 +17,6 @@ export default function AddPopupBanner() {
     data: PopupBannerFormValues,
     files: { desktop?: File; mobile?: File },
   ) => {
-    // 1. Validasi Manual: Wajib ada kedua gambar saat Create
     if (!files.desktop || !files.mobile) {
       toast.error("Both Desktop and Mobile images are required.");
       return;
@@ -29,7 +29,6 @@ export default function AddPopupBanner() {
       const { token } = await tokenRes.json();
       if (!token) throw new Error("No auth token found");
 
-      // 2. Gunakan FormData untuk Multiple Files + Body
       const formData = new FormData();
 
       // --- Text Fields ---
@@ -37,38 +36,23 @@ export default function AddPopupBanner() {
       if (data.altText) formData.append("altText", data.altText);
       if (data.linkUrl) formData.append("linkUrl", data.linkUrl);
 
-      // Boolean convert ke string
       formData.append("isActive", data.isActive.toString());
 
-      // Date Fields (Kirim string ISO/Format dari form)
       if (data.startDate) formData.append("startDate", data.startDate);
       if (data.endDate) formData.append("endDate", data.endDate);
 
-      // --- File Fields ---
-      // Nama field ("desktopImage", "mobileImage") harus SAMA PERSIS
-      // dengan konfigurasi Multer di Router Anda.
       formData.append("desktopImage", files.desktop);
       formData.append("mobileImage", files.mobile);
 
-      // 3. Hit API
-      const res = await fetch(`${apiUrl}/content/popup-banners`, {
+      const res = await fetchApi("/content/popup-banners", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        try {
-          const errJson = JSON.parse(errText);
-          throw new Error(errJson.message || "Failed to create banner");
-        } catch {
-          throw new Error(errText || "Unknown error occurred");
-        }
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to create banner");
       }
-
       toast.success("Popup banner created successfully!");
       router.push("/super-admin/content/banner-popup");
     } catch (err) {

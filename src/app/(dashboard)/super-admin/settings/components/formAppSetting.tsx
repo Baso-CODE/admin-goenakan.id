@@ -24,9 +24,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { Loader2, Save } from "lucide-react";
-
+import { useRouter } from "next/navigation";
 // === SCHEMA VALIDASI ===
 const appSettingSchema = z.object({
   googleAdsId: z.string().optional(),
@@ -37,6 +37,8 @@ const appSettingSchema = z.object({
 type AppSettingValues = z.infer<typeof appSettingSchema>;
 
 export default function AppSettings() {
+  const { fetchApi, status } = useApi();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -49,21 +51,18 @@ export default function AppSettings() {
       pixelId: "",
     },
   });
-
   // === 1. FETCH DATA ===
   useEffect(() => {
     const fetchSettings = async () => {
+      if (status !== "authenticated") return;
+
       try {
-        // Ambil token (sesuai pola auth Anda)
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        const res = await fetchApi("/app-settings");
 
-        // Ganti endpoint sesuai router yang sudah didaftarkan (misal: /app-settings)
-        const res = await fetch(`${apiUrl}/app-settings`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch settings");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to fetch settings");
+        }
 
         const data = await res.json();
 
@@ -75,43 +74,51 @@ export default function AppSettings() {
             pixelId: data.pixelId || "",
           });
         }
-      } catch (error) {
-        console.error("Error fetching settings:", error);
-        toast.error("Gagal memuat pengaturan.");
+      } catch (error: any) {
+        console.error("❌ Error fetching settings:", error);
+        toast.error(error.message || "Gagal memuat pengaturan.");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchSettings();
-  }, [form]);
+  }, [form, status, fetchApi]); // Tambahkan dependensi status dan fetchApi
 
   // === 2. HANDLE SUBMIT (SAVE) ===
   const onSubmit = async (values: AppSettingValues) => {
+    if (status !== "authenticated") return;
+
     setIsSaving(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/app-settings`, {
+      const res = await fetchApi("/app-settings", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(values),
       });
 
-      if (!res.ok) throw new Error("Failed to save settings");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to save settings");
+      }
 
       toast.success("Pengaturan tracking berhasil disimpan!");
-    } catch (error) {
-      console.error(error);
-      toast.error("Gagal menyimpan pengaturan.");
+      router.refresh();
+    } catch (error: any) {
+      console.error("❌ Save Settings Error:", error);
+      toast.error(error.message || "Gagal menyimpan pengaturan.");
     } finally {
       setIsSaving(false);
     }
   };
+
+  // UI Loading State (Tetap sama)
+  if (isLoading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

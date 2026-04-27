@@ -2,13 +2,12 @@
 
 import { apiUrl } from "@/helper/apiurl";
 import { useSession } from "next-auth/react";
-import { useCallback } from "react"; // ✨ IMPORT INI
+import { useCallback } from "react";
 
 export function useApi() {
-  const { data: session, status } = useSession(); // ✨ Ambil status juga
+  const { data: session, status } = useSession();
   const token = session?.user?.accessToken;
 
-  // ✨ Bungkus dengan useCallback agar stabil saat masuk ke dalam useEffect
   const fetchApi = useCallback(
     async (endpoint: string, options: RequestInit = {}) => {
       const headers = new Headers(options.headers || {});
@@ -28,8 +27,8 @@ export function useApi() {
 
       return res;
     },
-    [token], // ✨ Fungsi ini akan otomatis update kalau token berubah
+    [token],
   );
 
-  return { fetchApi, status }; // ✨ Export status agar komponen tahu kapan harus jalan
+  return { fetchApi, status };
 }

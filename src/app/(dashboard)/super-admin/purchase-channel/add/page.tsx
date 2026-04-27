@@ -3,42 +3,40 @@
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import PurchaseChannelForm, {
   PurchaseChannelFormValues,
 } from "../components/formPurchaseChannel";
 
 const AddPurchaseChannel = () => {
+  const { fetchApi, status } = useApi();
+
   const router = useRouter();
 
   const handleAddPurchaseChannel = async (data: PurchaseChannelFormValues) => {
+    if (status !== "authenticated") return;
+
     try {
-      // === GET TOKEN ===
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
-      // === POST TO BACKEND ===
-      const res = await fetch(`${apiUrl}/purchase-channels`, {
+      const res = await fetchApi("/purchase-channels", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText);
+        // Parsing error secara aman
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to create purchase channel");
       }
 
       toast.success("Purchase Channel created successfully!");
       router.push("/super-admin/purchase-channel");
-    } catch (err) {
+      router.refresh();
+    } catch (err: any) {
+      console.error("❌ Create Purchase Channel Error:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to create purchase channel"
+        err instanceof Error
+          ? err.message
+          : "Failed to create purchase channel",
       );
     }
   };

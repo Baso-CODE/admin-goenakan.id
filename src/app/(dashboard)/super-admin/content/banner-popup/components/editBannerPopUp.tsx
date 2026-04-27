@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import PopupBannerForm, { PopupBannerFormValues } from "./popUpBannerForm";
 
 export default function EditPopupBanner() {
+  const { fetchApi, status } = useApi();
   const { id } = useParams();
   const router = useRouter();
 
@@ -18,31 +19,32 @@ export default function EditPopupBanner() {
   // === 1. FETCH DATA BY ID ===
   useEffect(() => {
     const fetchBanner = async () => {
+      // 🛑 Guard: Jangan jalan jika ID tidak ada atau sesi belum siap
+      if (!id || status !== "authenticated") return;
+
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        setIsLoading(true);
+        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        const res = await fetchApi(`/content/popup-banners/${id}`);
 
-        const res = await fetch(`${apiUrl}/content/popup-banners/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch banner details");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to fetch banner details");
+        }
 
         const result = await res.json();
-        // Result.data biasanya berisi { id, title, desktopImageUrl, mobileImageUrl, ... }
-        // Struktur ini sudah cocok untuk prop 'initialData' di form
         setInitialData(result);
-      } catch (error) {
-        console.error(error);
-        toast.error("Gagal memuat data banner");
+      } catch (error: any) {
+        console.error("❌ Error fetching banner:", error);
+        toast.error(error.message || "Gagal memuat data banner");
         router.push("/super-admin/content/popup-banner");
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (id) fetchBanner();
-  }, [id, router]);
+    fetchBanner();
+  }, [id, status, fetchApi, router]); // Tambahkan dependensi lengkap
 
   // === 2. HANDLE UPDATE ===
   const handleUpdate = async (
@@ -77,22 +79,14 @@ export default function EditPopupBanner() {
       }
 
       // --- Fetch API (PATCH) ---
-      const res = await fetch(`${apiUrl}/content/popup-banners/${id}`, {
+      const res = await fetchApi(`/content/popup-banners/${id}`, {
         method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        try {
-          const errJson = JSON.parse(errText);
-          throw new Error(errJson.message || "Failed to update banner");
-        } catch {
-          throw new Error(errText || "Unknown error occurred");
-        }
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to update banner");
       }
 
       toast.success("Popup banner updated successfully!");

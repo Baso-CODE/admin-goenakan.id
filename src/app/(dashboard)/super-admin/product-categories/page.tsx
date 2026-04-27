@@ -12,8 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import { FileDown, Loader2, Search } from "lucide-react";
 import Link from "next/link";
@@ -46,6 +46,8 @@ interface CategoryExportQuery {
 }
 
 const ProductCategoriesPage = () => {
+  const { fetchApi, status } = useApi();
+
   // --- STATE UNTUK TABLE ---
   const [categories, setCategories] = useState<ProductCategories[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -66,11 +68,12 @@ const ProductCategoriesPage = () => {
 
   // --- FUNGSI FETCH DATA (Untuk Tabel) ---
   const fetchCategories = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+      // 1. Build Query Params
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -80,17 +83,19 @@ const ProductCategoriesPage = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(`${apiUrl}/product-categories?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      // 2. ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi(`/product-categories?${params}`);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `HTTP Error ${res.status}`);
+      }
 
       const result = await res.json();
       setCategories(result.data || []);
       setMeta(result.meta);
     } catch (error) {
+      console.error("❌ Load Categories Error:", error);
       setError(error instanceof Error ? error.message : "Unknown error");
       toast.error("Failed to load product categories");
     } finally {
@@ -98,34 +103,35 @@ const ProductCategoriesPage = () => {
     }
   };
 
+  useEffect(() => {
+    fetchCategories();
+  }, [page, debouncedSearch, status, fetchApi]);
+
   // --- FUNGSI HANDLE DELETE ---
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || status !== "authenticated") return;
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/product-categories/${deleteId}`, {
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi(`/product-categories/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to delete category");
+        // Parsing error secara aman
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to delete category");
       }
 
       toast.success("Product Category berhasil dihapus!");
       setDeleteId(null);
-      fetchCategories();
-    } catch (error) {
-      console.error("Delete Error:", error);
+      fetchCategories(); // Refresh data tabel
+    } catch (error: any) {
+      console.error("❌ Delete Error:", error);
       toast.error(
-        "Gagal menghapus Category. Pastikan kategori ini tidak sedang digunakan oleh data produk.",
+        error.message ||
+          "Gagal menghapus Category. Pastikan kategori ini tidak sedang digunakan oleh data produk.",
       );
     } finally {
       setIsDeleting(false);
@@ -150,19 +156,19 @@ const ProductCategoriesPage = () => {
         exportFilters as Record<string, string>,
       ).toString();
 
-      const exportUrl = `${apiUrl}/product-categories/export/excel?${queryString}`;
-
-      const response = await fetch(exportUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetchApi(
+        `/product-categories/export/excel?${queryString}`,
+        {
+          method: "GET",
         },
-      });
+      );
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Server Error:", errorText);
-        throw new Error("Export failed. Server responded with an error.");
+        const errData = await response.json().catch(() => ({}));
+        console.error("❌ Server Error:", errData);
+        throw new Error(
+          errData.message || "Export failed. Server responded with an error.",
+        );
       }
 
       // 3. Proses File Binary (Blob)

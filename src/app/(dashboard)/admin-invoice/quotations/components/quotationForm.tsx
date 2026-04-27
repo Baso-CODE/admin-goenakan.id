@@ -52,7 +52,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 
 export type PICData = {
@@ -626,6 +626,7 @@ export default function QuotationForm({
   onSubmit,
   isLoading,
 }: QuotationFormProps) {
+  const { fetchApi, status } = useApi();
   const [clients, setClients] = useState<ClientData[]>([]);
   const [products, setProducts] = useState<ProductData[]>([]);
   const [noteCategories, setNoteCategories] = useState<NoteCategory[]>([]);
@@ -653,26 +654,25 @@ export default function QuotationForm({
     return result;
   }, [initialData]);
 
+  // === FETCH DATA MASTER ===
   useEffect(() => {
     const fetchData = async () => {
+      if (status !== "authenticated") return;
+
       try {
         setLoadingData(true);
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+
         const [resClients, resProducts, resNotes] = await Promise.all([
-          fetch(`${apiUrl}/clients/order`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${apiUrl}/products/order`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${apiUrl}/quotation-notes-categories`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
+          fetchApi("/clients/order"),
+          fetchApi("/products/order"),
+          fetchApi("/quotation-notes-categories"),
         ]);
-        const clientData = await resClients.json();
-        const productData = await resProducts.json();
-        const notesData = await resNotes.json();
+
+        // Parsing data dari response
+        const clientData = resClients.ok ? await resClients.json() : [];
+        const productData = resProducts.ok ? await resProducts.json() : [];
+        const notesData = resNotes.ok ? await resNotes.json() : [];
+
         setClients(
           Array.isArray(clientData) ? clientData : clientData.data || [],
         );
@@ -680,14 +680,20 @@ export default function QuotationForm({
           Array.isArray(productData) ? productData : productData.data || [],
         );
         setNoteCategories(Array.isArray(notesData) ? notesData : []);
+
+        if (!resClients.ok || !resProducts.ok || !resNotes.ok) {
+          console.warn("Beberapa data Master gagal dimuat sepenuhnya.");
+        }
       } catch (error) {
+        console.error("❌ Error loading Master data:", error);
         toast.error("Gagal memuat data Master");
       } finally {
         setLoadingData(false);
       }
     };
+
     fetchData();
-  }, []);
+  }, [status, fetchApi]);
 
   const defaultValues = useMemo(() => {
     if (!initialData)

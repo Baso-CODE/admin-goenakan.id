@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import ProductTagForm, {
@@ -8,35 +8,31 @@ import ProductTagForm, {
 } from "../components/formTagProduct";
 
 const AddProductTag = () => {
+  const { fetchApi, status } = useApi();
+
   const router = useRouter();
 
   const handleAddProductTag = async (data: ProductTagFormValues) => {
+    if (status !== "authenticated") return;
+
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
-      // Sesuaikan URL endpoint ini dengan backend Anda
-      const res = await fetch(`${apiUrl}/product-tags`, {
+      const res = await fetchApi("/product-tags", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText);
+        // Parsing error secara aman
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to create tag");
       }
 
       toast.success("Product Tag created successfully!");
       router.push("/super-admin/product-tags");
       router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error || "Failed to create tag");
+    } catch (err: any) {
+      console.error("❌ Create Tag Error:", err);
+      toast.error(err.message || "Failed to create tag");
     }
   };
   return (

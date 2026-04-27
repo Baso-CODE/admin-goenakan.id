@@ -22,14 +22,8 @@ export function DashboardStats() {
   });
 
   useEffect(() => {
-    // Idealnya buat 1 endpoint khusus dashboard summary di backend: /dashboard/summary
-    // Tapi untuk contoh ini kita mock logic-nya atau fetch terpisah
     const fetchStats = async () => {
       try {
-        // Contoh fetch (Ganti URL ini dengan endpoint dashboard summary kamu nanti)
-        // const data = await fetchWithToken("http://localhost:8000/dashboard/summary");
-
-        // SEMENTARA: Kita hardcode atau simulasi data agar UI tampil dulu
         setStats({
           totalRevenue: 150000000, // Rp 150jt
           totalOrders: 25,

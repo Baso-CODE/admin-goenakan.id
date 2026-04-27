@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import PortfolioForm from "../../components/formPortfolio";
 
 export default function EditPortfolio() {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams();
   const router = useRouter();
 
@@ -18,41 +20,39 @@ export default function EditPortfolio() {
   // === 1. FETCH DATA EXISTING ===
   useEffect(() => {
     const fetchPortfolio = async () => {
+      if (!id || status !== "authenticated") return;
+
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        setIsLoading(true);
+        const res = await fetchApi(`/portfolios/${id}`);
 
-        const res = await fetch(`${apiUrl}/portfolios/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch data");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to fetch data");
+        }
 
         const result = await res.json();
         setInitialData(result);
-      } catch (error) {
-        toast.error("Gagal memuat data portofolio");
-        router.push("/super-admin/content/portfolio");
+      } catch (error: any) {
+        console.error("❌ Fetch Error:", error);
+        toast.error(error.message || "Gagal memuat data portofolio");
+        router.push("/super-admin/content/portfolios");
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (id) fetchPortfolio();
-  }, [id, router]);
+    fetchPortfolio();
+  }, [id, status, fetchApi, router]);
 
   // === 2. HANDLE UPDATE ===
   const handleUpdate = async (formData: FormData) => {
+    if (status !== "authenticated") return;
+
     setIsSaving(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/portfolios/${id}`, {
+      const res = await fetchApi(`/portfolios/${id}`, {
         method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
@@ -65,7 +65,7 @@ export default function EditPortfolio() {
       router.push("/super-admin/content/portfolios");
       router.refresh();
     } catch (err: any) {
-      console.error(err);
+      console.error("❌ Update Error:", err);
       toast.error(err.message || "Gagal memperbarui portfolio");
     } finally {
       setIsSaving(false);

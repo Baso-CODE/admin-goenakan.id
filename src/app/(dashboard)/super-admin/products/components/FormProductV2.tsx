@@ -34,7 +34,6 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { apiUrl } from "@/helper/apiurl";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -250,36 +249,37 @@ export default function ProductFormV2({
   const handleGenerateSku = async () => {
     const productName = form.getValues("name");
 
+    // 1. Validasi Input Awal
     if (!productName || productName.length < 3) {
       toast.error("Mohon isi Nama Produk minimal 3 karakter terlebih dahulu.");
       return;
     }
 
+    // 🛑 Guard: Jangan eksekusi jika sesi belum siap
+    if (status !== "authenticated") return;
+
     try {
       setIsGeneratingSku(true);
-      // Ambil token auth (sesuaikan dengan logic auth Anda)
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
-      // Panggil API Backend yang baru kita buat
-      const res = await fetch(`${apiUrl}/products/generate-sku`, {
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
+      const res = await fetchApi("/products/generate-sku", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ name: productName }),
       });
 
-      if (!res.ok) throw new Error("Gagal generate SKU");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal generate SKU");
+      }
 
       const data = await res.json();
 
-      // Set value ke form
+      // Set value ke form react-hook-form
       form.setValue("sku", data.sku);
       toast.success(`SKU Generated: ${data.sku}`);
-    } catch (error) {
-      toast.error("Terjadi kesalahan saat generate SKU");
+    } catch (error: any) {
+      console.error("❌ Generate SKU Error:", error);
+      toast.error(error.message || "Terjadi kesalahan saat generate SKU");
     } finally {
       setIsGeneratingSku(false);
     }

@@ -20,8 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import { FileDown, Loader2, Plus, Search, Star, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -65,9 +65,11 @@ interface FaqExportQuery {
 }
 
 export default function FaqTable() {
+  const { fetchApi, status } = useApi();
+
   // === STATE DATA ===
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
-  const [categories, setCategories] = useState<CategoryOption[]>([]); // Untuk Dropdown Filter
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
 
   // === STATE UI ===
@@ -92,30 +94,32 @@ export default function FaqTable() {
   // 1. FETCH CATEGORIES (Untuk Dropdown Filter)
   useEffect(() => {
     const fetchCategoryList = async () => {
+      if (status !== "authenticated") return;
+
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-        const res = await fetch(`${apiUrl}/content/faqs/categories/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetchApi("/content/faqs/categories/list");
+
+        if (!res.ok) throw new Error("Failed to load categories list");
+
         const result = await res.json();
         setCategories(result);
       } catch (err) {
-        console.error("Failed to load categories list");
+        console.error("❌ Failed to load categories list:", err);
       }
     };
+
     fetchCategoryList();
-  }, []);
+  }, [status, fetchApi]); // Tambahkan dependensi auth
 
   // 2. FETCH FAQS (Main Data)
   const fetchFaqs = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
 
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
+      // 1. Build Query Params
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -126,17 +130,19 @@ export default function FaqTable() {
       if (filterCategoryId !== "ALL")
         params.append("categoryId", filterCategoryId);
 
-      const res = await fetch(`${apiUrl}/content/faqs/items?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchApi(`/content/faqs/items?${params}`);
 
-      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `HTTP Error ${res.status}`);
+      }
 
       const result = await res.json();
       setFaqs(result.data || []);
       setMeta(result.meta);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Unknown error");
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      setError(msg);
       toast.error("Failed to load FAQs");
     } finally {
       setLoading(false);
@@ -145,30 +151,34 @@ export default function FaqTable() {
 
   useEffect(() => {
     fetchFaqs();
-  }, [page, debouncedSearch, filterCategoryId]); // Re-fetch saat filter berubah
+  }, [page, debouncedSearch, filterCategoryId, status, fetchApi]);
 
   // 3. HANDLE DELETE
   const handleDelete = async (id: string) => {
+    if (!id || status !== "authenticated") return;
+
     if (!confirm("Are you sure you want to delete this FAQ?")) return;
+
     setDeletingId(id);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-      const res = await fetch(`${apiUrl}/content/faqs/items/${id}`, {
+      const res = await fetchApi(`/content/faqs/items/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error("Failed to delete");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to delete");
+      }
+
       toast.success("FAQ deleted successfully");
       fetchFaqs();
-    } catch (err) {
-      toast.error("Failed to delete item");
+    } catch (err: any) {
+      console.error("❌ Delete Error:", err);
+      toast.error(err.message || "Failed to delete item");
     } finally {
       setDeletingId(null);
     }
   };
-
   // 4. HANDLE EXPORT
   const handleExport = async () => {
     setExporting(true);
@@ -189,14 +199,18 @@ export default function FaqTable() {
       const queryString = new URLSearchParams(
         exportFilters as Record<string, string>,
       ).toString();
-      const exportUrl = `${apiUrl}/content/faqs/items/export/excel?${queryString}`;
+      const response = await fetchApi(
+        `/content/faqs/items/export/excel?${queryString}`,
+        {
+          method: "GET",
+        },
+      );
 
-      const response = await fetch(exportUrl, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) throw new Error("Export failed");
+      if (!response.ok) {
+        // Ambil pesan error dari server jika tersedia
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Export failed");
+      }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);

@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -9,6 +9,8 @@ import AttributeForm, {
 } from "../../components/FormAttributes";
 
 export default function EditAttributePage() {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams();
   const router = useRouter();
 
@@ -21,16 +23,16 @@ export default function EditAttributePage() {
   // === Fetch attribute data ===
   useEffect(() => {
     const fetchData = async () => {
+      if (!id || status !== "authenticated") return;
+
       setIsLoading(true);
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        const res = await fetchApi(`/product-attributes/${id}`);
 
-        const res = await fetch(`${apiUrl}/product-attributes/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch attribute data");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to fetch attribute data");
+        }
 
         const data = await res.json();
 
@@ -38,42 +40,38 @@ export default function EditAttributePage() {
           name: data.name,
           values: data.values.map((v: any) => ({ id: v.id, value: v.value })),
         });
-      } catch (err) {
+      } catch (err: any) {
         console.error("❌ Failed to load attribute data:", err);
-        toast.error("Failed to load attribute data. Using default values.");
+        toast.error(err.message || "Failed to load attribute data.");
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (id) fetchData();
-  }, [id]);
+    fetchData();
+  }, [id, status, fetchApi]); // Tambahkan dependensi auth
 
   // === Submit update ===
   const handleUpdateAttribute = async (data: AttributeFormValues) => {
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/product-attributes/${id}`, {
+      const res = await fetchApi(`/product-attributes/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to update attribute");
       }
 
       toast.success("Attribute updated successfully!");
       router.push("/super-admin/product-attributes");
       router.refresh();
     } catch (err) {
+      console.error("❌ Update Attribute Error:", err);
       toast.error(
         err instanceof Error ? err.message : "Failed to update attribute",
       );
@@ -81,7 +79,6 @@ export default function EditAttributePage() {
       setIsSubmitting(false);
     }
   };
-
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-semibold tracking-tight uppercase">

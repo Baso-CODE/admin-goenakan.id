@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import FaqCategoryForm, {
@@ -8,40 +8,29 @@ import FaqCategoryForm, {
 } from "../component/formFaqCategories";
 
 export default function AddFaqCategory() {
+  const { fetchApi, status } = useApi();
+
   const router = useRouter();
 
   const handleAddCategory = async (data: FaqCategoryFormValues) => {
+    if (status !== "authenticated") return;
+
     try {
-      // === GET TOKEN ===
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
-      // === POST TO BACKEND ===
-      const res = await fetch(`${apiUrl}/content/faqs/categories`, {
+      const res = await fetchApi("/content/faqs/categories", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        // Coba parse JSON error jika ada message
-        try {
-          const errJson = JSON.parse(errText);
-          throw new Error(errJson.message || errText);
-        } catch {
-          throw new Error(errText);
-        }
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal membuat kategori FAQ");
       }
 
       toast.success("FAQ Category created successfully!");
       router.push("/super-admin/faqs/categories");
+      router.refresh();
     } catch (err) {
+      console.error("❌ Failed to create FAQ category:", err);
       toast.error(
         err instanceof Error ? err.message : "Failed to create category",
       );

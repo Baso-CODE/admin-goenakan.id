@@ -21,8 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import { Flag, Globe, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import Image from "next/image";
@@ -51,6 +51,7 @@ type Meta = {
 };
 
 export default function ClientLogoTable() {
+  const { fetchApi, status } = useApi();
   const [logos, setLogos] = useState<ClientLogo[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
@@ -66,12 +67,11 @@ export default function ClientLogoTable() {
   const [page, setPage] = useState(1);
 
   const fetchLogos = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -81,9 +81,7 @@ export default function ClientLogoTable() {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(`${apiUrl}/brand-clients?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchApi(`/brand-clients?${params}`);
 
       const result = await res.json();
 
@@ -102,7 +100,8 @@ export default function ClientLogoTable() {
       setLogos(data);
       setMeta(result.meta);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Unknown error");
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      setError(msg);
       toast.error("Failed to load brand clients");
     } finally {
       setLoading(false);
@@ -111,64 +110,37 @@ export default function ClientLogoTable() {
 
   useEffect(() => {
     fetchLogos();
-  }, [page, debouncedSearch, statusFilter]);
+  }, [page, debouncedSearch, statusFilter, status, fetchApi]);
 
   // --- FUNGSI HANDLE DELETE ---
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || status !== "authenticated") return;
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/product-categories/${deleteId}`, {
+      const res = await fetchApi(`/product-categories/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to delete category");
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to delete category");
       }
 
-      toast.success("Brand Client berhasil dihapus!");
+      toast.success("Kategori berhasil dihapus!");
       setDeleteId(null);
       fetchLogos();
-    } catch (error) {
-      console.error("Delete Error:", error);
+    } catch (error: any) {
+      console.error("❌ Delete Error:", error);
+
+      const errorMessage = error.message || "Gagal menghapus kategori.";
       toast.error(
-        "Gagal menghapus Category. Pastikan kategori ini tidak sedang digunakan oleh data produk.",
+        `${errorMessage}. Pastikan kategori ini tidak sedang digunakan oleh data produk.`,
       );
     } finally {
       setIsDeleting(false);
     }
   };
-  // const handleDelete = async (id: string) => {
-  //   if (!confirm("Are you sure you want to delete this brand client?")) return;
-
-  //   setDeletingId(id);
-  //   try {
-  //     const tokenRes = await fetch("/api/auth/token");
-  //     const { token } = await tokenRes.json();
-
-  //     const res = await fetch(`${apiUrl}/brand-clients/${id}`, {
-  //       method: "DELETE",
-  //       headers: { Authorization: `Bearer ${token}` },
-  //     });
-
-  //     if (!res.ok) throw new Error("Failed to delete client");
-
-  //     toast.success("Client deleted successfully");
-  //     fetchLogos();
-  //   } catch (error) {
-  //     toast.error("Failed to delete client");
-  //   } finally {
-  //     setDeletingId(null);
-  //   }
-  // };
 
   return (
     <div className="space-y-4 overflow-x-hidden w-full mx-auto">

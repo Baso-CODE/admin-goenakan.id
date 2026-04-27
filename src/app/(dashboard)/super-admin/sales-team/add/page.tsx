@@ -1,22 +1,25 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import SalesForm, { SalesFormValues } from "../components/FormSales";
 
 export default function AddSalesPage() {
+  const { fetchApi, status } = useApi();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
-
   const handleAddSales = async (data: SalesFormValues, file?: File) => {
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
 
     const formData = new FormData();
 
+    // 1. Lampirkan file jika ada
     if (file) {
-      // Nama field harus sama dengan yang dipakai di Multer (di router: 'signature')
       formData.append("signature", file, file.name);
     }
 
@@ -24,17 +27,13 @@ export default function AddSalesPage() {
     formData.append("data", JSON.stringify(salesData));
 
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-      const res = await fetch(`${apiUrl}/sales`, {
+      const res = await fetchApi("/sales", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
-      const result = await res.json();
+      const result = await res.json().catch(() => ({}));
+
       if (!res.ok) {
         throw new Error(result.message || "Failed to create sales person");
       }
@@ -43,9 +42,10 @@ export default function AddSalesPage() {
 
       router.push("/super-admin/sales");
       router.refresh();
-    } catch (err) {
+    } catch (err: any) {
+      console.error("❌ Add Sales Error:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to add sales person"
+        err instanceof Error ? err.message : "Failed to add sales person",
       );
     } finally {
       setIsSubmitting(false);

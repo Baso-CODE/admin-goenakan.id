@@ -1,6 +1,5 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
 import {
   EditorContent,
   EditorContext,
@@ -103,6 +102,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useApi } from "@/hooks/useApi";
 import { Table } from "@tiptap/extension-table";
 
 // ─── TYPES PROPS ───
@@ -398,6 +398,8 @@ const ImageControls = () => {
 };
 // ─── MAIN EDITOR COMPONENT ───
 export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
+  const { fetchApi, status } = useApi();
+
   const isMobile = useIsBreakpoint();
   const { height } = useWindowSize();
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
@@ -407,29 +409,35 @@ export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
 
   // ─── CUSTOM UPLOAD CLOUDINARY LOGIC ───
   const customCloudinaryUpload = async (file: File): Promise<string> => {
-    try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+    if (status !== "authenticated") {
+      toast.error("Sesi tidak valid. Silakan login kembali.");
+      throw new Error("Unauthenticated");
+    }
 
+    try {
       const formData = new FormData();
       formData.append("image", file);
 
-      const res = await fetch(`${apiUrl}/articles/upload-image`, {
+      const res = await fetchApi("/articles/upload-image", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
-      if (!res.ok) throw new Error("Gagal mengunggah gambar");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal mengunggah gambar");
+      }
+
       const data = await res.json();
 
       if (data.url) {
         toast.success("Gambar berhasil disisipkan!");
         return data.url;
       }
-      throw new Error("URL tidak ditemukan");
-    } catch (error) {
-      toast.error("Gagal mengunggah gambar.");
+      throw new Error("URL tidak ditemukan dalam respons server");
+    } catch (error: any) {
+      console.error("❌ Cloudinary Upload Error:", error);
+      toast.error(error.message || "Gagal mengunggah gambar.");
       throw error;
     }
   };

@@ -20,9 +20,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 
 import { FileDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
@@ -55,6 +55,8 @@ interface FaqCategoryExportQuery {
 }
 
 export default function FaqCategoryTable() {
+  const { fetchApi, status } = useApi();
+
   const [categories, setCategories] = useState<FaqCategory[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -73,13 +75,13 @@ export default function FaqCategoryTable() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchCategories = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
 
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
+      // 1. Build Query Params
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -89,21 +91,20 @@ export default function FaqCategoryTable() {
         params.append("search", debouncedSearch.trim());
       }
 
-      // Endpoint sesuai router yang kita buat
-      const res = await fetch(`${apiUrl}/content/faqs/categories?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await fetchApi(`/content/faqs/categories?${params}`);
 
-      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `HTTP Error ${res.status}`);
+      }
 
       const result = await res.json();
 
       setCategories(result.data || []);
       setMeta(result.meta);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Unknown error");
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      setError(msg);
       toast.error("Failed to load categories");
     } finally {
       setLoading(false);
@@ -112,7 +113,7 @@ export default function FaqCategoryTable() {
 
   useEffect(() => {
     fetchCategories();
-  }, [page, debouncedSearch]);
+  }, [page, debouncedSearch, status, fetchApi]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -134,14 +135,17 @@ export default function FaqCategoryTable() {
       ).toString();
 
       // Endpoint Export
-      const exportUrl = `${apiUrl}/content/faqs/categories/export/excel?${queryString}`;
+      const response = await fetchApi(
+        `/content/faqs/categories/export/excel?${queryString}`,
+        {
+          method: "GET",
+        },
+      );
 
-      const response = await fetch(exportUrl, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) throw new Error("Export failed");
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Export failed");
+      }
 
       const blob = await response.blob();
       const contentDisposition = response.headers.get("Content-Disposition");
@@ -168,28 +172,28 @@ export default function FaqCategoryTable() {
     }
   };
 
+  // === DELETE HANDLER ===
   const handleDelete = async (id: string) => {
+    if (!id || status !== "authenticated") return;
+
     if (!confirm("Are you sure you want to delete this category?")) return;
 
     setDeletingId(id);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/faqs/categories/${id}`, {
+      const res = await fetchApi(`/faqs/categories/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || "Failed to delete");
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to delete category");
       }
 
       toast.success("Category deleted successfully");
-      fetchCategories(); // Refresh table
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete");
+      fetchCategories();
+    } catch (error: any) {
+      console.error("❌ Error delete category:", error);
+      toast.error(error.message || "Failed to delete category");
     } finally {
       setDeletingId(null);
     }

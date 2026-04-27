@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import DepartmentForm, {
@@ -8,40 +8,36 @@ import DepartmentForm, {
 } from "../components/formDepartment";
 
 export default function AddDepartment() {
+  const { fetchApi, status } = useApi();
+
   const router = useRouter();
 
   const handleAddDepartment = async (data: DepartmentFormValues) => {
+    if (status !== "authenticated") return;
+
     try {
-      // === GET TOKEN ===
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
-      // === POST TO BACKEND ===
-      const res = await fetch(`${apiUrl}/departments`, {
+      const res = await fetchApi("/departments", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal membuat departemen");
       }
 
       toast.success("Department created successfully!");
+
+      // Navigasi ke halaman list
       router.push("/super-admin/departments");
+      router.refresh();
     } catch (err) {
+      console.error("❌ Failed to create department:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to create department"
+        err instanceof Error ? err.message : "Failed to create department",
       );
     }
   };
-
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-semibold tracking-tight uppercase">

@@ -31,7 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import Link from "next/link";
 import SalesBankForm from "../../components/SalesBankForm";
 
@@ -59,6 +59,8 @@ interface SalesData {
 }
 
 export default function SalesDetailPage() {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams();
   const [salesData, setSalesData] = useState<SalesData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,19 +68,14 @@ export default function SalesDetailPage() {
 
   // Fungsi untuk mengambil data sales
   const fetchSalesData = useCallback(async () => {
-    if (!id) return;
+    if (!id || status !== "authenticated") return;
 
     setIsLoading(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/sales/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchApi(`/sales/${id}`);
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to fetch sales data");
       }
 
@@ -87,17 +84,16 @@ export default function SalesDetailPage() {
     } catch (err) {
       console.error("❌ Error fetching sales data:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to load sales data"
+        err instanceof Error ? err.message : "Failed to load sales data",
       );
     } finally {
       setIsLoading(false);
     }
-  }, [id]);
+  }, [id, status, fetchApi]);
 
   useEffect(() => {
     fetchSalesData();
   }, [fetchSalesData]);
-
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-48">

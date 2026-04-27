@@ -21,9 +21,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 
 import { Edit, MoreHorizontalIcon, Search, Trash } from "lucide-react";
@@ -48,6 +48,8 @@ type Meta = {
 };
 
 const TablePurchaseChannels = () => {
+  const { fetchApi, status } = useApi();
+
   const [channels, setChannels] = useState<PurchaseChannel[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -60,13 +62,12 @@ const TablePurchaseChannels = () => {
   const [page, setPage] = useState(1);
 
   const fetchChannels = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
 
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -76,19 +77,19 @@ const TablePurchaseChannels = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(`${apiUrl}/purchase-channels?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await fetchApi(`/purchase-channels?${params}`);
 
-      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `HTTP Error ${res.status}`);
+      }
 
       const result = await res.json();
 
       setChannels(result.data || []);
       setMeta(result.meta);
     } catch (error) {
+      console.error("❌ Load Channels Error:", error);
       setError(error instanceof Error ? error.message : "Unknown error");
       toast.error("Failed to load purchase channels");
     } finally {
@@ -98,32 +99,27 @@ const TablePurchaseChannels = () => {
 
   useEffect(() => {
     fetchChannels();
-  }, [page, debouncedSearch]);
+  }, [page, debouncedSearch, status, fetchApi]);
 
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || status !== "authenticated") return;
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const response = await fetch(`${apiUrl}/purchase-channels/${deleteId}`, {
+      const response = await fetchApi(`/purchase-channels/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || "Gagal menghapus kategori");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal menghapus purchase channel");
       }
 
       toast.success("Purchase channel berhasil dihapus");
       setPage(1);
-      fetchChannels();
+      fetchChannels(); // Refresh daftar
     } catch (error: any) {
+      console.error("❌ Delete Error:", error);
       toast.error(error.message || "Terjadi kesalahan saat menghapus data");
     } finally {
       setIsDeleting(false);

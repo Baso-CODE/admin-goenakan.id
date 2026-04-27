@@ -1,24 +1,23 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import HeroForm, { HeroFormValues } from "../components/heroForm";
 
 export default function AddHero() {
+  const { fetchApi, status } = useApi();
+
   const router = useRouter();
 
   const handleAddHero = async (data: HeroFormValues, file?: File) => {
+    if (status !== "authenticated") return;
+
     try {
-      // Validasi Manual: File wajib ada saat Create
       if (!file) {
         toast.error("Please select an image for the slide.");
         return;
       }
-
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-      if (!token) throw new Error("No token found");
 
       // === GUNAKAN FORM DATA (Bukan JSON) ===
       const formData = new FormData();
@@ -28,34 +27,26 @@ export default function AddHero() {
       if (data.ctaLink) formData.append("ctaLink", data.ctaLink);
       formData.append("displayOrder", data.displayOrder.toString());
       formData.append("isActive", data.isActive.toString());
-
       formData.append("image", file);
 
-      const res = await fetch(`${apiUrl}/content/heros`, {
+      const res = await fetchApi("/content/heros", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        try {
-          const errJson = JSON.parse(errText);
-          throw new Error(errJson.message || errText);
-        } catch {
-          throw new Error(errText);
-        }
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to create slide");
       }
 
       toast.success("Hero slide created successfully!");
       router.push("/super-admin/content/heros");
+      router.refresh();
     } catch (err) {
+      console.error("❌ Create Hero Error:", err);
       toast.error(
         err instanceof Error ? err.message : "Failed to create slide",
       );
-      console.error(err);
     }
   };
 

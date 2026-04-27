@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -11,36 +11,33 @@ import FinanceCategoryForm, {
 } from "../../components/financeCategoryForm";
 
 export default function AddFinanceCategoryPage() {
+  const { fetchApi, status } = useApi();
+
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // === HANDLE SUBMIT ===
   const handleAddCategory = async (data: FinanceCategoryFormValues) => {
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
     try {
-      // 1. Dapatkan Token
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // 2. Tembak API POST Create Category
-      const res = await fetch(`${apiUrl}/finance/categories`, {
+      const res = await fetchApi("/finance/categories", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        const errJson = await res.json();
+        const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.message || "Gagal membuat kategori keuangan");
       }
 
       // 3. Sukses & Redirect
       toast.success("Kategori keuangan berhasil ditambahkan!");
       router.push("/super-admin/finance/categories");
+      router.refresh();
     } catch (err: any) {
+      console.error("❌ Error adding finance category:", err);
       toast.error(err.message || "Terjadi kesalahan sistem");
     } finally {
       setIsSubmitting(false);

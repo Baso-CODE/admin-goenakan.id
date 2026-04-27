@@ -50,7 +50,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import {
   QuotationNotesSection,
@@ -131,6 +131,8 @@ function ItemRow({
   onImageChange: (index: number, file: File | null) => void;
   imageFile: File | null;
 }) {
+  const { fetchApi, status } = useApi();
+
   const [expanded, setExpanded] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -569,6 +571,7 @@ export default function QuotationAddForm({
   onSubmit: (formData: FormData) => void;
   isLoading: boolean;
 }) {
+  const { fetchApi, status } = useApi();
   const [clients, setClients] = useState<ClientData[]>([]);
   const [products, setProducts] = useState<ProductData[]>([]);
 
@@ -622,33 +625,42 @@ export default function QuotationAddForm({
     resetNotesStore();
   }, []);
 
+  // === FETCH MASTER DATA ===
   useEffect(() => {
     const fetchMaster = async () => {
+      if (status !== "authenticated") return;
+
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-        const headers = { Authorization: `Bearer ${token}` };
+        setLoadingMaster(true);
 
         const [resC, resP, resN, resS] = await Promise.all([
-          fetch(`${apiUrl}/clients/order`, { headers }),
-          fetch(`${apiUrl}/products/order`, { headers }),
-          fetch(`${apiUrl}/quotation-notes-categories`, { headers }),
-          fetch(`${apiUrl}/sales?isActive=true`, { headers }),
+          fetchApi("/clients/order"),
+          fetchApi("/products/order"),
+          fetchApi("/quotation-notes-categories"),
+          fetchApi("/sales?isActive=true"),
         ]);
 
-        setClients(await resC.json());
-        setProducts(await resP.json());
-        setNoteCategories(await resN.json());
-        const salesResult = await resS.json();
-        setSalesList(salesResult.data || salesResult);
+        // Parsing data secara aman jika response OK
+        const clientData = resC.ok ? await resC.json() : [];
+        const productData = resP.ok ? await resP.json() : [];
+        const noteData = resN.ok ? await resN.json() : [];
+        const salesData = resS.ok ? await resS.json() : [];
+
+        // Set state dengan fallback data kosong
+        setClients(clientData.data || clientData || []);
+        setProducts(productData.data || productData || []);
+        setNoteCategories(noteData.data || noteData || []);
+        setSalesList(salesData.data || salesData || []);
       } catch (e) {
+        console.error("❌ Error loading master data:", e);
         toast.error("Gagal memuat master data");
       } finally {
         setLoadingMaster(false);
       }
     };
+
     fetchMaster();
-  }, []);
+  }, [status, fetchApi]); // Tambahkan dependensi auth agar fetch dipicu saat token siap
 
   const handleImageChange = (index: number, file: File | null) => {
     setItemImages((prev) => ({ ...prev, [index]: file }));

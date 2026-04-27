@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -9,6 +9,8 @@ import PurchaseChannelForm, {
 } from "../../components/formPurchaseChannel";
 
 const EditPurchaseChannel = () => {
+  const { fetchApi, status } = useApi();
+
   const { slug } = useParams();
   const router = useRouter();
 
@@ -24,21 +26,19 @@ const EditPurchaseChannel = () => {
   // ============================
   useEffect(() => {
     const fetchData = async () => {
+      if (!slug || status !== "authenticated") return;
+
       try {
         setIsLoading(true);
 
-        const tokenRes = await fetch("/api/auth/token");
-        if (!tokenRes.ok) throw new Error("Failed to get token");
+        const res = await fetchApi(`/purchase-channels/${slug}`);
 
-        const { token } = await tokenRes.json();
-
-        const res = await fetch(`${apiUrl}/purchase-channels/${slug}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch purchase channel data");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(
+            errData.message || "Failed to fetch purchase channel data",
+          );
+        }
 
         const data = await res.json();
 
@@ -46,52 +46,47 @@ const EditPurchaseChannel = () => {
           name: data.name,
           isActive: data.isActive,
         });
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to load purchase channel data.");
+      } catch (err: any) {
+        console.error("❌ Failed to load purchase channel:", err);
+        toast.error(err.message || "Failed to load purchase channel data.");
         setPurchaseChannelData(undefined);
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (slug) fetchData();
-  }, [slug]);
-
+    fetchData();
+  }, [slug, status, fetchApi]); // Tambahkan dependensi lengkap
   // ============================
   // UPDATE DATA
   // ============================
   const handleUpdatePurchaseChannel = async (
-    formValues: PurchaseChannelFormValues
+    formValues: PurchaseChannelFormValues,
   ) => {
+    if (status !== "authenticated") return;
+
     try {
       setIsSubmitting(true);
 
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
-      const res = await fetch(`${apiUrl}/purchase-channels/${slug}`, {
+      const res = await fetchApi(`/purchase-channels/${slug}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(formValues),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to update purchase channel");
       }
 
       toast.success("Purchase channel updated successfully!");
-
       router.push("/super-admin/purchase-channel");
+      router.refresh();
     } catch (err) {
+      console.error("❌ Update Error:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to update purchase channel"
+        err instanceof Error
+          ? err.message
+          : "Failed to update purchase channel",
       );
     } finally {
       setIsSubmitting(false);

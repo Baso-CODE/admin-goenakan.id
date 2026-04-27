@@ -1,29 +1,23 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import PortfolioForm from "./formPortfolio";
 export default function AddPortfolio() {
+  const { fetchApi, status } = useApi();
+
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCreate = async (formData: FormData) => {
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
-
     try {
-      // 1. Ambil Auth Token
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-      if (!token) throw new Error("No auth token found");
-
-      // 2. Hit API Portfolios
-      const res = await fetch(`${apiUrl}/portfolios`, {
+      const res = await fetchApi("/portfolios", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
@@ -34,11 +28,10 @@ export default function AddPortfolio() {
 
       toast.success("Portfolio added successfully!");
 
-      // 3. Redirect ke halaman list portfolio
       router.push("/super-admin/content/portfolios");
       router.refresh();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error("❌ Create Portfolio Error:", err);
       toast.error(
         err instanceof Error ? err.message : "Failed to add portfolio",
       );

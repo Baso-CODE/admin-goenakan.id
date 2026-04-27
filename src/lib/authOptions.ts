@@ -2,11 +2,10 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { sign } from "jsonwebtoken";
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { comparePassword } from "./argon"; // Pastikan path ini benar di project Admin
-import { prisma } from "./prisma"; // Pastikan path ini benar di project Admin
+import { comparePassword } from "./argon";
+import { prisma } from "./prisma";
 
 export const authOptions: NextAuthOptions = {
-  // ✨ 1. Tambahkan PrismaAdapter agar konsisten dengan Client
   adapter: PrismaAdapter(prisma),
 
   providers: [
@@ -54,7 +53,6 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.role = user.role;
 
-        // ✨ 2. Hasilkan accessToken dengan struktur payload yang persis sama
         token.accessToken = sign(
           {
             id: user.id,
@@ -62,7 +60,7 @@ export const authOptions: NextAuthOptions = {
             role: user.role,
           },
           process.env.NEXTAUTH_SECRET!,
-          { expiresIn: "1d" },
+          { expiresIn: "7d" },
         );
       }
       return token;

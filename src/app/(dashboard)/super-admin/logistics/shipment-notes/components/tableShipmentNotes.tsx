@@ -40,7 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { ShipmentNoteForm } from "./shipmentNoteForm";
 
 type CategoryData = {
@@ -52,6 +52,8 @@ type CategoryData = {
 };
 
 export default function ShipmentNoteCategory() {
+  const { fetchApi, status } = useApi();
+
   // === STATE DATA ===
   const [data, setData] = useState<CategoryData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,21 +71,23 @@ export default function ShipmentNoteCategory() {
 
   // === FETCH DATA ===
   const fetchData = async () => {
+    // 🛑 Guard: Jangan eksekusi jika sesi belum siap
+    if (status !== "authenticated") return;
+
     setIsLoading(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi("/shipment-notes-categories");
 
-      const res = await fetch(`${apiUrl}/shipment-notes-categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!res.ok) throw new Error("Failed to fetch data");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to fetch data");
+      }
 
       const result = await res.json();
       setData(result);
     } catch (error) {
-      console.error(error);
+      console.error("❌ Failed to load shipment notes categories:", error);
       toast.error("Gagal memuat kategori.");
     } finally {
       setIsLoading(false);
@@ -92,7 +96,7 @@ export default function ShipmentNoteCategory() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [status, fetchApi]);
 
   // === HANDLERS (Hanya untuk mengatur State UI) ===
 
@@ -110,29 +114,26 @@ export default function ShipmentNoteCategory() {
 
   // 3. Handle Delete
   const handleDelete = async () => {
-    if (!deleteId) return;
-    try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+    if (!deleteId || status !== "authenticated") return;
 
-      const res = await fetch(
-        `${apiUrl}/shipment-notes-categories/${deleteId}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+    try {
+      const res = await fetchApi(`/shipment-notes-categories/${deleteId}`, {
+        method: "DELETE",
+      });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Gagal menghapus");
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal menghapus kategori");
       }
 
       toast.success("Kategori berhasil dihapus");
       setIsAlertOpen(false);
       fetchData(); // Refresh data setelah delete
     } catch (error: any) {
-      toast.error(error.message);
+      console.error("❌ Error delete shipment notes category:", error);
+      toast.error(error.message || "Terjadi kesalahan saat menghapus data");
+    } finally {
+      setDeleteId(null);
     }
   };
 

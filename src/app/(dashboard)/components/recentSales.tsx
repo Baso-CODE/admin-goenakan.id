@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -22,24 +22,30 @@ const formatCurrency = (value: number) => {
 };
 
 export function RecentSales() {
+  const { fetchApi, status } = useApi();
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     const fetchRecent = async () => {
+      if (status !== "authenticated") return;
+
       try {
-        const res = await fetchWithToken(
-          `${apiUrl}/invoices?take=5&status=PAID`,
-        );
-        setSales(res.data || []);
+        setLoading(true);
+        const res = await fetchApi("/invoices?take=5&status=PAID");
+
+        if (!res.ok) throw new Error("Gagal mengambil data penjualan terbaru");
+
+        const result = await res.json();
+        setSales(result.data || []);
       } catch (error) {
-        console.error(error);
+        console.error("❌ Error fetching recent sales:", error);
       } finally {
         setLoading(false);
       }
     };
+
     fetchRecent();
-  }, []);
+  }, [status, fetchApi]);
 
   return (
     <Card className="col-span-3">

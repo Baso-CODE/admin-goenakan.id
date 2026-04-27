@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 
 // === SCHEMA ===
 const templateSchema = z.object({
@@ -62,6 +62,8 @@ export function ShipmentNoteForm({
   initialData,
   onSuccess,
 }: ShipmentNoteFormProps) {
+  const { fetchApi, status } = useApi();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // === INIT FORM ===
@@ -101,30 +103,24 @@ export function ShipmentNoteForm({
 
   // === SUBMIT HANDLER ===
   const onSubmit = async (values: FormValues) => {
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // Tentukan URL & Method berdasarkan mode
-      const url = initialData
-        ? `${apiUrl}/shipment-notes-categories/${initialData.id}`
-        : `${apiUrl}/shipment-notes-categories`;
+      const endpoint = initialData
+        ? `/shipment-notes-categories/${initialData.id}`
+        : "/shipment-notes-categories";
 
       const method = initialData ? "PATCH" : "POST";
 
-      const res = await fetch(url, {
+      const res = await fetchApi(endpoint, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(values),
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Gagal menyimpan data");
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || "Gagal menyimpan data");
       }
 
       toast.success(
@@ -133,11 +129,11 @@ export function ShipmentNoteForm({
           : "Kategori berhasil dibuat!",
       );
 
-      onSuccess(); // Refresh table di parent
-      onClose(); // Tutup modal
+      onSuccess();
+      onClose();
     } catch (error: any) {
-      console.error(error);
-      toast.error(error.message);
+      console.error("❌ Submit Error:", error);
+      toast.error(error.message || "Terjadi kesalahan saat menyimpan data");
     } finally {
       setIsSubmitting(false);
     }

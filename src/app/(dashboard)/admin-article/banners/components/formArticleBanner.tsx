@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import {
   Activity,
   FileText,
@@ -58,6 +58,7 @@ export default function FormArticleBanner({
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
+  const { fetchApi, status } = useApi();
   const [articles, setArticles] = useState<any[]>([]);
   const [loadingArticles, setLoadingArticles] = useState(true);
 
@@ -80,26 +81,28 @@ export default function FormArticleBanner({
 
   useEffect(() => {
     const fetchArticles = async () => {
+      if (status !== "authenticated") return;
+
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        setLoadingArticles(true);
+        const res = await fetchApi("/articles?take=50");
 
-        const res = await fetch(`${apiUrl}/articles?take=50`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Gagal mengambil data artikel");
+        }
 
-        if (!res.ok) throw new Error("Gagal mengambil data artikel");
         const responseData = await res.json();
         setArticles(responseData.data || []);
       } catch (error) {
-        console.error("Gagal memuat artikel:", error);
+        console.error("❌ Gagal memuat artikel:", error);
       } finally {
         setLoadingArticles(false);
       }
     };
 
     fetchArticles();
-  }, []);
+  }, [status, fetchApi]); // Tambahkan dependensi lengkap
 
   const handleSubmit = (values: ArticleBannerFormValues) => {
     onSubmit(values);

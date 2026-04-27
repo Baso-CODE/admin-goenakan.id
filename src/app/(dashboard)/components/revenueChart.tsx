@@ -13,12 +13,11 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { useApi } from "@/hooks/useApi";
 import { Loader2 } from "lucide-react";
 
-import { apiUrl } from "@/helper/apiurl";
 import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
-import { fetchWithToken } from "../super-admin/orders/order-service";
 
 // Helper Format Rupiah
 const formatCurrency = (value: number) => {
@@ -34,11 +33,12 @@ const formatCurrency = (value: number) => {
 const chartConfig = {
   revenue: {
     label: "Pendapatan",
-    color: "#2563eb", // Warna Biru (Primary)
+    color: "#2563eb",
   },
 } satisfies ChartConfig;
 
 export function RevenueChart() {
+  const { fetchApi, status } = useApi();
   const [chartData, setChartData] = useState<
     { date: string; revenue: number }[]
   >([]);
@@ -47,25 +47,31 @@ export function RevenueChart() {
   // === FETCH DATA DARI API ===
   useEffect(() => {
     const fetchData = async () => {
+      if (status !== "authenticated") return;
+
       try {
+        setLoading(true);
         const date = new Date();
         const month = date.getMonth() + 1;
         const year = date.getFullYear();
 
-        const data = await fetchWithToken(
-          `${apiUrl}/invoices/chart?month=${month}&year=${year}`,
+        const res = await fetchApi(
+          `/invoices/chart?month=${month}&year=${year}`,
         );
 
+        if (!res.ok) throw new Error("Gagal mengambil data chart");
+
+        const data = await res.json();
         setChartData(data);
       } catch (error) {
-        console.error("Gagal ambil data chart", error);
+        console.error("❌ Gagal ambil data chart:", error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [status, fetchApi]);
 
   return (
     <Card className="col-span-4">

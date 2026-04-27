@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { ArrowLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -11,6 +11,8 @@ import FinanceCategoryForm, {
 } from "../../../components/financeCategoryForm";
 
 export default function EditFinanceCategoryPage() {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
@@ -26,27 +28,22 @@ export default function EditFinanceCategoryPage() {
   // ============================
   useEffect(() => {
     const fetchData = async () => {
-      if (!id) return;
+      if (!id || status !== "authenticated") return;
 
       try {
         setIsLoading(true);
 
-        const tokenRes = await fetch("/api/auth/token");
-        if (!tokenRes.ok) throw new Error("Gagal mengambil token");
-        const { token } = await tokenRes.json();
+        const res = await fetchApi(`/finance/categories/${id}`);
 
-        // Ambil data kategori berdasarkan ID
-        const res = await fetch(`${apiUrl}/finance/categories/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error("Gagal mengambil data kategori");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Gagal mengambil data kategori");
+        }
 
         const responseJson = await res.json();
-        // Backend kita membungkus response di dalam properti "data"
+        // Backend membungkus response di dalam properti "data"
         const data = responseJson.data;
 
-        // Set state agar form terisi dengan data lama
         setInitialData({
           name: data.name,
           type: data.type,
@@ -54,16 +51,16 @@ export default function EditFinanceCategoryPage() {
           isActive: data.isActive,
         });
       } catch (err) {
-        console.error(err);
+        console.error("❌ Failed to fetch category:", err);
         toast.error("Gagal memuat data kategori keuangan.");
-        router.push("/super-admin/finance/categories"); // Lempar balik jika ID tidak valid
+        router.push("/super-admin/finance/categories");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchData();
-  }, [id, router]);
+  }, [id, status, fetchApi, router]); // Tambahkan dependensi auth
 
   // ============================
   // 2. UPDATE DATA (PATCH)
@@ -71,30 +68,25 @@ export default function EditFinanceCategoryPage() {
   const handleUpdateCategory = async (
     formValues: FinanceCategoryFormValues,
   ) => {
+    if (status !== "authenticated") return;
+
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
-
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // Update menggunakan method PATCH
-      const res = await fetch(`${apiUrl}/finance/categories/${id}`, {
+      const res = await fetchApi(`/finance/categories/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(formValues),
       });
 
       if (!res.ok) {
-        const errJson = await res.json();
+        const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.message || "Gagal mengupdate kategori");
       }
 
       toast.success("Kategori keuangan berhasil diupdate!");
       router.push("/super-admin/finance/categories");
+      router.refresh();
     } catch (err) {
+      console.error("❌ Failed to update category:", err);
       toast.error(
         err instanceof Error
           ? err.message

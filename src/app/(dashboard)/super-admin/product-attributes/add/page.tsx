@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import AttributeForm, {
@@ -8,37 +8,37 @@ import AttributeForm, {
 } from "../components/FormAttributes";
 
 export default function AddAttributePage() {
+  const { fetchApi, status } = useApi();
+
   const router = useRouter();
 
   const handleAddAttribute = async (data: AttributeFormValues) => {
+    if (status !== "authenticated") return;
+
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
       const payload = {
         name: data.name,
         values: data.values.map((v) => ({ value: v.value })),
       };
 
-      const res = await fetch(`${apiUrl}/product-attributes`, {
+      const res = await fetchApi("/product-attributes", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        // Parsing error secara aman
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to create attribute");
+      }
 
       toast.success("Attribute created successfully!");
       router.push("/super-admin/product-attributes");
       router.refresh();
     } catch (error) {
+      console.error("❌ Create Attribute Error:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to create attribute"
+        error instanceof Error ? error.message : "Failed to create attribute",
       );
     }
   };

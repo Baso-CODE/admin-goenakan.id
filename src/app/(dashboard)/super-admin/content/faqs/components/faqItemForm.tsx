@@ -26,8 +26,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiUrl } from "@/helper/apiurl";
 
+import { useApi } from "@/hooks/useApi";
 import {
   Check,
   ClipboardList,
@@ -70,36 +70,37 @@ export default function FaqItemForm({
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
-  // State untuk menyimpan list kategori untuk dropdown
+  const { fetchApi, status } = useApi();
   const [categories, setCategories] = useState<{ id: string; name: string }[]>(
     [],
   );
   const [loadingCats, setLoadingCats] = useState(false);
 
-  // 1. Fetch Categories for Dropdown
   useEffect(() => {
     const fetchCategories = async () => {
+      if (status !== "authenticated") return;
+
       setLoadingCats(true);
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        const res = await fetchApi("/content/faqs/categories/list");
 
-        const res = await fetch(`${apiUrl}/content/faqs/categories/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to load categories");
+        }
 
-        if (!res.ok) throw new Error("Failed to load categories");
         const data = await res.json();
         setCategories(data);
       } catch (error) {
-        console.error(error);
+        console.error("❌ Failed to load FAQ categories:", error);
         toast.error("Failed to load category options");
       } finally {
         setLoadingCats(false);
       }
     };
+
     fetchCategories();
-  }, []);
+  }, [status, fetchApi]);
 
   // 2. Form Initialization
   const form = useForm({

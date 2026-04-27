@@ -21,8 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import {
   Briefcase,
@@ -56,6 +56,8 @@ type Meta = {
 };
 
 export default function PortfolioTable() {
+  const { fetchApi, status } = useApi();
+
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
@@ -71,12 +73,12 @@ export default function PortfolioTable() {
   const [page, setPage] = useState(1);
 
   const fetchPortfolios = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
+      // 1. Build Query Params
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -86,10 +88,7 @@ export default function PortfolioTable() {
         params.append("search", debouncedSearch.trim());
       }
 
-      // Hit ke endpoint Portfolios
-      const res = await fetch(`${apiUrl}/portfolios?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchApi(`/portfolios?${params}`);
 
       const result = await res.json();
 
@@ -106,7 +105,8 @@ export default function PortfolioTable() {
       setPortfolios(data);
       setMeta(result.meta);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Unknown error");
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      setError(msg);
       toast.error("Failed to load portfolios");
     } finally {
       setLoading(false);
@@ -115,39 +115,34 @@ export default function PortfolioTable() {
 
   useEffect(() => {
     fetchPortfolios();
-  }, [page, debouncedSearch, statusFilter]);
+  }, [page, debouncedSearch, statusFilter, status, fetchApi]);
 
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || status !== "authenticated") return;
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/portfolios/${deleteId}`, {
+      const res = await fetchApi(`/portfolios/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to delete portfolio");
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to delete portfolio");
       }
 
       toast.success("Portfolio berhasil dihapus!");
       setDeleteId(null);
       fetchPortfolios();
-    } catch (error) {
-      console.error("Delete Error:", error);
-      toast.error("Gagal menghapus Portfolio. Terjadi kesalahan sistem.");
+    } catch (error: any) {
+      console.error("❌ Delete Error:", error);
+      toast.error(
+        error.message || "Gagal menghapus Portfolio. Terjadi kesalahan sistem.",
+      );
     } finally {
       setIsDeleting(false);
     }
   };
-
   return (
     <div className="space-y-4 overflow-x-hidden w-full mx-auto">
       <Card>

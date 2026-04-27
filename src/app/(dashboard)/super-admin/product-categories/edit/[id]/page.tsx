@@ -4,10 +4,12 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import ProductCategoryForm from "../../components/formCategoryProduct";
 
 export default function EditProductCategories() {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams();
   const router = useRouter();
 
@@ -18,53 +20,43 @@ export default function EditProductCategories() {
   // === 1. FETCH DATA EXISTING ===
   useEffect(() => {
     const fetchData = async () => {
+      if (!id || status !== "authenticated") return;
+
       setIsLoading(true);
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        if (!tokenRes.ok) throw new Error("Failed to get token");
-        const { token } = await tokenRes.json();
+        const res = await fetchApi(`/product-categories/${id}`);
 
-        const res = await fetch(`${apiUrl}/product-categories/${id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch category data");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to fetch category data");
+        }
 
         const data = await res.json();
         setCategoryData(data);
-      } catch (err) {
+      } catch (err: any) {
         console.error("❌ Failed to load data:", err);
-        toast.error("Failed to load category data.");
+        toast.error(err.message || "Failed to load category data.");
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (id) fetchData();
-  }, [id]);
+    fetchData();
+  }, [id, status, fetchApi]); // Tambahkan dependensi auth
 
   // === 2. HANDLE UPDATE (DENGAN FORMDATA) ===
   const handleUpdateCategoryProduct = async (formData: FormData) => {
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-      const res = await fetch(`${apiUrl}/product-categories/${id}`, {
+      const res = await fetchApi(`/product-categories/${id}`, {
         method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
       if (!res.ok) {
-        const errData = await res
-          .json()
-          .catch(() => ({ message: "Update failed" }));
+        const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || "Failed to update category");
       }
 
@@ -72,6 +64,7 @@ export default function EditProductCategories() {
       router.push("/super-admin/product-categories");
       router.refresh();
     } catch (err: any) {
+      console.error("❌ Update Error:", err);
       toast.error(err.message || "Failed to update category");
     } finally {
       setIsSubmitting(false);

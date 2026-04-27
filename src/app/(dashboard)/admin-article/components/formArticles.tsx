@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { FileImage, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
@@ -54,6 +54,7 @@ export default function FormArticle({
   initialData?: ArticleInitialData | null;
   isEditing?: boolean;
 }) {
+  const { fetchApi, status } = useApi();
   const [categories, setCategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
 
@@ -71,7 +72,7 @@ export default function FormArticle({
       source: "",
       published: false,
       productIds: [],
-      coverImageAlt: "", // ✨ Initial value
+      coverImageAlt: "",
     },
   });
 
@@ -84,48 +85,45 @@ export default function FormArticle({
         source: initialData.source || "",
         published: initialData.published || false,
         productIds: initialData.productIds || [],
-        coverImageAlt: initialData.coverImageAlt || "", // ✨ Set initial data
+        coverImageAlt: initialData.coverImageAlt || "",
       });
     }
   }, [initialData, form]);
 
+  // === FETCH CATEGORIES & PRODUCTS ===
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchData = async () => {
+      if (status !== "authenticated") return;
+
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-        const res = await fetch(`${apiUrl}/article-categories/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        setCategories(data || []);
+        const [catRes, prodRes] = await Promise.all([
+          fetchApi("/article-categories/list"),
+          fetchApi("/products/order"),
+        ]);
+
+        if (catRes.ok) {
+          const catData = await catRes.json();
+          setCategories(catData || []);
+        } else {
+          toast.error("Gagal memuat kategori artikel.");
+        }
+
+        if (prodRes.ok) {
+          const prodData = await prodRes.json();
+          setProducts(prodData.data || prodData || []);
+        } else {
+          toast.error("Gagal memuat daftar produk.");
+        }
       } catch (error) {
-        toast.error("Gagal memuat kategori artikel.");
+        console.error("❌ Failed to load dependencies:", error);
       } finally {
         setLoadingCategories(false);
-      }
-    };
-    fetchCategories();
-  }, []);
-
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-        const res = await fetch(`${apiUrl}/products/order`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        setProducts(data.data || data || []);
-      } catch (error) {
-        toast.error("Gagal memuat daftar produk.");
-      } finally {
         setLoadingProducts(false);
       }
     };
-    fetchProducts();
-  }, []);
+
+    fetchData();
+  }, [status, fetchApi]); // Tambahkan dependensi auth
 
   const handleSubmit = (values: ArticleFormValues) => {
     if (!isEditing && !coverFile) {

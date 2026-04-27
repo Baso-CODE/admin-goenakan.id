@@ -1,35 +1,29 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import ProductCategoryForm from "../components/formCategoryProduct";
 
 const AddCategoryProduct = () => {
+  const { fetchApi, status } = useApi();
+
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddCategoryProduct = async (formData: FormData) => {
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
-      const res = await fetch(`${apiUrl}/product-categories`, {
+      const res = await fetchApi("/product-categories", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
       if (!res.ok) {
-        const errData = await res
-          .json()
-          .catch(() => ({ message: "Failed to create" }));
+        const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || "Failed to create category");
       }
 
@@ -37,12 +31,12 @@ const AddCategoryProduct = () => {
       router.push("/super-admin/product-categories");
       router.refresh();
     } catch (err: any) {
+      console.error("❌ Create Category Error:", err);
       toast.error(err.message || "Failed to create category");
     } finally {
       setIsSubmitting(false);
     }
   };
-
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-semibold tracking-tight uppercase">

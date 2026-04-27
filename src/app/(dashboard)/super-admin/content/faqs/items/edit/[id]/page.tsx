@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -9,6 +9,8 @@ import FaqItemForm, {
 } from "../../../components/faqItemForm";
 
 export default function EditFaqItem() {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams();
   const router = useRouter();
 
@@ -24,26 +26,20 @@ export default function EditFaqItem() {
   // ============================
   useEffect(() => {
     const fetchData = async () => {
+      if (!id || status !== "authenticated") return;
+
       try {
         setIsLoading(true);
 
-        // Ambil Token
-        const tokenRes = await fetch("/api/auth/token");
-        if (!tokenRes.ok) throw new Error("Failed to get token");
-        const { token } = await tokenRes.json();
+        const res = await fetchApi(`/content/faqs/items/${id}`);
 
-        // Fetch Data FAQ by ID
-        const res = await fetch(`${apiUrl}/content/faqs/items/${id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch FAQ data");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to fetch FAQ data");
+        }
 
         const data = await res.json();
 
-        // Map data dari API ke format Form Values
         setFaqData({
           question: data.question,
           answer: data.answer,
@@ -52,50 +48,42 @@ export default function EditFaqItem() {
           isFeatured: data.isFeatured,
           isActive: data.isActive,
         });
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to load FAQ data.");
+      } catch (err: any) {
+        console.error("❌ Fetch Error:", err);
+        toast.error(err.message || "Failed to load FAQ data.");
         router.push("/super-admin/content/faqs/");
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (id) fetchData();
-  }, [id, router]);
+    fetchData();
+  }, [id, status, fetchApi, router]);
 
+  // ============================
+  // UPDATE DATA
+  // ============================
   const handleUpdateFaq = async (formValues: FaqItemFormValues) => {
+    if (status !== "authenticated") return;
+
     try {
       setIsSubmitting(true);
-
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
-      // Kirim Request PATCH
-      const res = await fetch(`${apiUrl}/content/faqs/items/${id}`, {
+      const res = await fetchApi(`/content/faqs/items/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(formValues),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        try {
-          const errJson = JSON.parse(errText);
-          throw new Error(errJson.message || errText);
-        } catch {
-          throw new Error(errText);
-        }
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to update FAQ item");
       }
 
       toast.success("FAQ Item updated successfully!");
+
       router.push("/super-admin/content/faqs/");
+      router.refresh();
     } catch (err) {
+      console.error("❌ Update Error:", err);
       toast.error(
         err instanceof Error ? err.message : "Failed to update FAQ item",
       );

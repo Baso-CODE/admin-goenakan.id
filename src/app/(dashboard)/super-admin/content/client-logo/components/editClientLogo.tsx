@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import ClientLogoForm from "../components/clientLogoForm";
 
 export default function EditClientLogo() {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams();
   const router = useRouter();
 
@@ -18,41 +20,39 @@ export default function EditClientLogo() {
   // === 1. FETCH DATA EXISTING ===
   useEffect(() => {
     const fetchLogo = async () => {
+      if (!id || status !== "authenticated") return;
+
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        setIsLoading(true);
+        const res = await fetchApi(`/brand-clients/${id}`);
 
-        const res = await fetch(`${apiUrl}/brand-clients/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch data");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to fetch data");
+        }
 
         const result = await res.json();
         setInitialData(result);
-      } catch (error) {
-        toast.error("Failed to load logo data");
+      } catch (error: any) {
+        console.error("❌ Fetch Error:", error);
+        toast.error(error.message || "Failed to load logo data");
         router.push("/super-admin/content/client-logo");
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (id) fetchLogo();
-  }, [id, router]);
+    fetchLogo();
+  }, [id, status, fetchApi, router]); // Tambahkan dependensi auth
 
   // === 2. HANDLE UPDATE ===
   const handleUpdate = async (formData: FormData) => {
+    if (status !== "authenticated") return;
+
     setIsSaving(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/brand-clients/${id}`, {
+      const res = await fetchApi(`/brand-clients/${id}`, {
         method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
@@ -65,7 +65,7 @@ export default function EditClientLogo() {
       router.push("/super-admin/content/client-logo");
       router.refresh();
     } catch (err: any) {
-      console.error(err);
+      console.error("❌ Update Error:", err);
       toast.error(err.message || "Failed to update logo");
     } finally {
       setIsSaving(false);

@@ -1,12 +1,14 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import SalesForm, { SalesFormValues } from "../../components/FormSales";
 
 export default function EditSalesPage() {
+  const { fetchApi, status } = useApi();
+
   const { id } = useParams();
   const router = useRouter();
 
@@ -17,16 +19,16 @@ export default function EditSalesPage() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!id || status !== "authenticated") return;
+
       setIsLoading(true);
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        const res = await fetchApi(`/sales/${id}`);
 
-        const res = await fetch(`${apiUrl}/sales/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch sales data");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to fetch sales data");
+        }
 
         const data = await res.json();
 
@@ -37,57 +39,53 @@ export default function EditSalesPage() {
           signatureUrl: data.signatureUrl || "",
           isActive: data.isActive,
         });
-      } catch (err) {
+      } catch (err: any) {
         console.error("❌ Error fetching sales data:", err);
-        toast.error("Failed to load sales data");
+        toast.error(err.message || "Failed to load sales data");
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (id) fetchData();
-  }, [id]);
+    fetchData();
+  }, [id, status, fetchApi]);
 
   const handleUpdateSales = async (data: SalesFormValues, file?: File) => {
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
 
     const formData = new FormData();
-
     if (file) {
       formData.append("signature", file, file.name);
     }
 
     const { signatureFile, signatureUrl, ...salesData } = data;
     formData.append("data", JSON.stringify(salesData));
-    try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
-      const res = await fetch(`${apiUrl}/sales/${id}`, {
+    try {
+      const res = await fetchApi(`/sales/${id}`, {
         method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to update sales person");
       }
 
       toast.success("Sales person updated successfully!");
       router.push("/super-admin/sales");
       router.refresh();
-    } catch (err) {
+    } catch (err: any) {
+      console.error("❌ Update Sales Error:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to update sales person"
+        err instanceof Error ? err.message : "Failed to update sales person",
       );
     } finally {
       setIsSubmitting(false);
     }
   };
-
   return (
     <div className="space-y-4 w-full max-w-full">
       <h2 className="text-xl font-semibold tracking-tight uppercase">

@@ -1,12 +1,14 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import DepartmentForm, { DepartmentFormValues } from "./formDepartment";
 
 export default function EditDepartment() {
+  const { fetchApi, status } = useApi();
+
   const { slug } = useParams();
   const router = useRouter();
 
@@ -22,21 +24,19 @@ export default function EditDepartment() {
   // ============================
   useEffect(() => {
     const fetchData = async () => {
+      // 🛑 Guard: Jangan jalan jika slug tidak ada atau sesi belum siap
+      if (!slug || status !== "authenticated") return;
+
       try {
         setIsLoading(true);
 
-        const tokenRes = await fetch("/api/auth/token");
-        if (!tokenRes.ok) throw new Error("Failed to get token");
+        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        const res = await fetchApi(`/departments/${slug}`);
 
-        const { token } = await tokenRes.json();
-
-        const res = await fetch(`${apiUrl}/departments/${slug}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch department data");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to fetch department data");
+        }
 
         const data = await res.json();
 
@@ -45,7 +45,7 @@ export default function EditDepartment() {
           isActive: data.isActive,
         });
       } catch (err) {
-        console.error(err);
+        console.error("❌ Failed to load department:", err);
         toast.error("Failed to load department data.");
         setDepartmentsData(undefined);
       } finally {
@@ -53,41 +53,37 @@ export default function EditDepartment() {
       }
     };
 
-    if (slug) fetchData();
-  }, [slug]);
+    fetchData();
+  }, [slug, status, fetchApi]); // Tambahkan dependensi auth
 
   // ============================
   // UPDATE DATA
   // ============================
   const handleUpdateDepartments = async (formValues: DepartmentFormValues) => {
+    // 🛑 Guard: Pastikan sesi siap sebelum menembak API
+    if (status !== "authenticated") return;
+
     try {
       setIsSubmitting(true);
 
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      if (!token) throw new Error("No token found");
-
-      const res = await fetch(`${apiUrl}/departments/${slug}`, {
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
+      const res = await fetchApi(`/departments/${slug}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(formValues),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to update department");
       }
 
       toast.success("Department updated successfully!");
-
       router.push("/super-admin/departments");
+      router.refresh(); // Opsional: pastikan server-side data terbaru
     } catch (err) {
+      console.error("❌ Failed to update department:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to update department"
+        err instanceof Error ? err.message : "Failed to update department",
       );
     } finally {
       setIsSubmitting(false);

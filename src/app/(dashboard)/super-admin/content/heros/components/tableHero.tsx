@@ -20,8 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import { FileDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import Image from "next/image";
@@ -58,6 +58,8 @@ interface HeroExportQuery {
 }
 
 export default function HeroTable() {
+  const { fetchApi, status } = useApi();
+
   // === STATE DATA ===
   const [slides, setSlides] = useState<HeroSlide[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -79,24 +81,22 @@ export default function HeroTable() {
 
   // === FETCH DATA ===
   const fetchSlides = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
-        isActive: statusFilter, // Filter status untuk tabel
+        isActive: statusFilter,
       });
+
       if (debouncedSearch.trim()) {
         params.append("search", debouncedSearch.trim());
       }
 
-      // Endpoint Admin untuk Hero
-      const res = await fetch(`${apiUrl}/content/heros/admin/list?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchApi(`/content/heros/admin/list?${params}`);
 
       const result = await res.json();
 
@@ -107,8 +107,10 @@ export default function HeroTable() {
       setSlides(result.data || []);
       setMeta(result.meta);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Unknown error");
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      setError(msg);
       toast.error("Failed to load slides data");
+      console.error("❌ Fetch Slides Error:", error);
     } finally {
       setLoading(false);
     }
@@ -116,28 +118,30 @@ export default function HeroTable() {
 
   useEffect(() => {
     fetchSlides();
-  }, [page, debouncedSearch, statusFilter]);
+  }, [page, debouncedSearch, statusFilter, status, fetchApi]);
 
   // === DELETE HANDLER ===
   const handleDelete = async (id: string) => {
+    if (!id || status !== "authenticated") return;
+
     if (!confirm("Are you sure you want to delete this slide?")) return;
 
     setDeletingId(id);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/content/heros/${id}`, {
+      const res = await fetchApi(`/content/heros/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error("Failed to delete slide");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to delete slide");
+      }
 
       toast.success("Slide deleted successfully");
-      fetchSlides(); // Refresh table
-    } catch (error) {
-      toast.error("Failed to delete slide");
+      fetchSlides();
+    } catch (error: any) {
+      console.error("❌ Delete Hero Error:", error);
+      toast.error(error.message || "Failed to delete slide");
     } finally {
       setDeletingId(null);
     }
@@ -163,14 +167,17 @@ export default function HeroTable() {
       const queryString = new URLSearchParams(
         exportFilters as Record<string, string>,
       ).toString();
-      const exportUrl = `${apiUrl}/content/heros/export/excel?${queryString}`; // Pastikan endpoint ini ada
+      const response = await fetchApi(
+        `/content/heros/export/excel?${queryString}`,
+        {
+          method: "GET",
+        },
+      );
 
-      const response = await fetch(exportUrl, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) throw new Error("Export failed");
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Export failed");
+      }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);

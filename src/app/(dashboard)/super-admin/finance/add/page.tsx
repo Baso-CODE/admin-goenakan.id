@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -11,6 +11,8 @@ import FinanceTransactionForm, {
 } from "../components/financeTransactionForm";
 
 export default function AddFinanceTransactionPage() {
+  const { fetchApi, status } = useApi();
+
   const router = useRouter();
 
   // State untuk form & data
@@ -23,21 +25,23 @@ export default function AddFinanceTransactionPage() {
   // ==========================================
   useEffect(() => {
     const fetchCategories = async () => {
+      // 🛑 Guard: Tunggu hingga status 'authenticated' agar fetchApi memiliki token
+      if (status !== "authenticated") return;
+
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
+        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        const res = await fetchApi("/finance/categories?isActive=true");
 
-        // Ambil hanya kategori yang berstatus AKTIF saja
-        const res = await fetch(`${apiUrl}/finance/categories?isActive=true`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error("Gagal mengambil data kategori");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || "Gagal mengambil data kategori");
+        }
 
         const result = await res.json();
-        // Pastikan format dari API sesuai (result.data adalah array kategori)
+        // Pastikan format dari API sesuai
         setCategories(result.data || []);
       } catch (error) {
+        console.error("❌ Failed to load categories:", error);
         toast.error("Gagal memuat list kategori untuk form");
       } finally {
         setLoadingInit(false);
@@ -45,36 +49,33 @@ export default function AddFinanceTransactionPage() {
     };
 
     fetchCategories();
-  }, []);
+  }, [status, fetchApi]); // Tambahkan dependensi lengkap
 
   // ==========================================
   // 2. HANDLE SUBMIT TRANSAKSI BARU
   // ==========================================
   const handleAddTransaction = async (data: FinanceTransactionFormValues) => {
+    // 🛑 Guard: Jangan eksekusi jika sesi belum siap
+    if (status !== "authenticated") return;
+
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // Tembak API POST
-      const res = await fetch(`${apiUrl}/finance/transactions`, {
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
+      const res = await fetchApi("/finance/transactions", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        const errJson = await res.json();
+        const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.message || "Gagal mencatat transaksi");
       }
 
       toast.success("Transaksi keuangan berhasil dicatat!");
-      router.push("/super-admin/finance"); // Kembali ke halaman utama Buku Kas
+      router.push("/super-admin/finance");
       router.refresh();
     } catch (err: any) {
+      console.error("❌ Transaction error:", err);
       toast.error(err.message || "Terjadi kesalahan sistem");
     } finally {
       setIsSubmitting(false);

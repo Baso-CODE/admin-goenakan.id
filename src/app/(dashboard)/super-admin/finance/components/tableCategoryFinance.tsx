@@ -26,8 +26,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 
 // === TYPES ===
@@ -44,6 +44,8 @@ type FinanceCategory = {
 };
 
 export default function TableFinanceCategory() {
+  const { fetchApi, status } = useApi();
+
   // === STATE ===
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [filteredCategories, setFilteredCategories] = useState<
@@ -59,22 +61,22 @@ export default function TableFinanceCategory() {
 
   // === FETCH CATEGORIES ===
   const fetchCategories = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
+      const res = await fetchApi("/finance/categories");
 
-      const res = await fetch(`${apiUrl}/finance/categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!res.ok) throw new Error("Failed to fetch categories");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to fetch categories");
+      }
 
       const result = await res.json();
       setCategories(result.data || []);
       setFilteredCategories(result.data || []);
     } catch (error) {
-      console.error(error);
+      console.error("❌ Failed to load finance categories:", error);
       toast.error("Gagal memuat data kategori keuangan");
     } finally {
       setLoading(false);
@@ -83,7 +85,7 @@ export default function TableFinanceCategory() {
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [status, fetchApi]);
 
   // === CLIENT-SIDE FILTERING ===
   useEffect(() => {

@@ -45,8 +45,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 
 // === TYPES ===
@@ -86,6 +86,8 @@ const formatCurrency = (amount: number) => {
 };
 
 export default function TableFinance() {
+  const { fetchApi, status } = useApi();
+
   // === STATE ===
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -102,11 +104,10 @@ export default function TableFinance() {
 
   // === FETCH TRANSACTIONS ===
   const fetchTransactions = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -117,17 +118,18 @@ export default function TableFinance() {
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
-      const res = await fetch(`${apiUrl}/finance/transactions?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchApi(`/finance/transactions?${params}`);
 
-      if (!res.ok) throw new Error("Failed to fetch transactions");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to fetch transactions");
+      }
 
       const result = await res.json();
       setTransactions(result.data || []);
       setMeta(result.meta);
     } catch (error) {
-      console.error(error);
+      console.error("❌ Failed to load transactions:", error);
       toast.error("Gagal memuat data transaksi");
     } finally {
       setLoading(false);
@@ -137,7 +139,15 @@ export default function TableFinance() {
   useEffect(() => {
     fetchTransactions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, transactionType, startDate, endDate]);
+  }, [
+    page,
+    debouncedSearch,
+    transactionType,
+    startDate,
+    endDate,
+    status,
+    fetchApi,
+  ]);
 
   // === HANDLER EXPORT ===
   const handleExport = async () => {
@@ -156,15 +166,19 @@ export default function TableFinance() {
         exportFilters as Record<string, string>,
       ).toString();
 
-      // Pastikan backend memiliki endpoint export ini
-      const response = await fetch(
-        `${apiUrl}/finance/transactions/export/excel?${queryString}`,
+      const response = await fetchApi(
+        `/finance/transactions/export/excel?${queryString}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          method: "GET",
         },
       );
 
-      if (!response.ok) throw new Error("Export failed");
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(
+          errData.message || "Export failed. Server responded with an error.",
+        );
+      }
 
       const blob = await response.blob();
       const filename =

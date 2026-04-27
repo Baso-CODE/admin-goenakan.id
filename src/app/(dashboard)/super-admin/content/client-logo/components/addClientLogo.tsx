@@ -1,12 +1,13 @@
 "use client";
 
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import ClientLogoForm from "../components/clientLogoForm";
 
 export default function AddClientLogo() {
+  const { fetchApi, status } = useApi();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -14,15 +15,9 @@ export default function AddClientLogo() {
     setIsSubmitting(true);
 
     try {
-      // 1. Ambil Auth Token
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-      if (!token) throw new Error("No auth token found");
-      const res = await fetch(`${apiUrl}/brand-clients`, {
+      if (status !== "authenticated") return;
+      const res = await fetchApi("/brand-clients", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       });
 
@@ -37,7 +32,7 @@ export default function AddClientLogo() {
       router.push("/super-admin/content/client-logo");
       router.refresh();
     } catch (err) {
-      console.error(err);
+      console.error("❌ Error adding client logo:", err);
       toast.error(
         err instanceof Error ? err.message : "Failed to add client logo",
       );

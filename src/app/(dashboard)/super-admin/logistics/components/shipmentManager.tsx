@@ -63,7 +63,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 
@@ -312,12 +311,10 @@ export default function ShipmentManager({
     if (!statusVal) return toast.error("Pilih Status Baru");
     if (!statusCity) return toast.error("Isi Lokasi Terkini (Kota/Gudang)");
 
+    if (status !== "authenticated") return;
+
     setIsUpdating(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      // Payload sesuai AddShipmentHistoryDTO
       const payload = {
         status: statusVal,
         city: statusCity,
@@ -327,19 +324,18 @@ export default function ShipmentManager({
         trackingNumber: statusTrackingNo || undefined,
       };
 
-      const res = await fetch(
-        `${apiUrl}/logistics/shipments/${updateStatusId}/status`,
+      const res = await fetchApi(
+        `/logistics/shipments/${updateStatusId}/status`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
           body: JSON.stringify(payload),
         },
       );
 
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal memperbarui status tracking");
+      }
 
       toast.success("Tracking berhasil diupdate!");
       onUpdate();
@@ -352,8 +348,9 @@ export default function ShipmentManager({
       setSelectedNotes({});
       setStatusDate(new Date());
       setStatusTrackingNo("");
-    } catch (e) {
-      toast.error("Gagal update status");
+    } catch (e: any) {
+      console.error("❌ Tracking Update Error:", e);
+      toast.error(e.message || "Gagal update status");
     } finally {
       setIsUpdating(false);
     }

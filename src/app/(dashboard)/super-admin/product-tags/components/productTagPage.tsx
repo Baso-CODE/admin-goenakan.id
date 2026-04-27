@@ -13,8 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import { FileDown, Loader2, Search } from "lucide-react";
 import Link from "next/link";
@@ -44,6 +44,8 @@ interface TagExportQuery {
 }
 
 export default function ProductTags() {
+  const { fetchApi, status } = useApi();
+
   // --- STATE UNTUK TABLE ---
   const [tags, setTags] = useState<ProductTag[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -63,11 +65,11 @@ export default function ProductTags() {
 
   // --- FUNGSI FETCH DATA ---
   const fetchTags = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -77,18 +79,18 @@ export default function ProductTags() {
         params.append("search", debouncedSearch.trim());
       }
 
-      // Pastikan endpoint ini sesuai dengan backend Anda
-      const res = await fetch(`${apiUrl}/product-tags?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      const res = await fetchApi(`/product-tags?${params}`);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `HTTP Error ${res.status}`);
+      }
 
       const result = await res.json();
       setTags(result.data || []);
       setMeta(result.meta);
     } catch (error) {
+      console.error("❌ Load Tags Error:", error);
       setError(error instanceof Error ? error.message : "Unknown error");
       toast.error("Failed to load product tags");
     } finally {
@@ -96,6 +98,9 @@ export default function ProductTags() {
     }
   };
 
+  useEffect(() => {
+    fetchTags();
+  }, [page, debouncedSearch, status, fetchApi]);
   // --- FUNGSI HANDLE EXPORT ---
   const handleExportTags = async () => {
     setExporting(true);
@@ -112,19 +117,19 @@ export default function ProductTags() {
         exportFilters as Record<string, string>,
       ).toString();
 
-      const exportUrl = `${apiUrl}/product-tags/export/excel?${queryString}`;
-
-      const response = await fetch(exportUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetchApi(
+        `/product-tags/export/excel?${queryString}`,
+        {
+          method: "GET",
         },
-      });
+      );
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Server Error:", errorText);
-        throw new Error("Export failed. Server responded with an error.");
+        const errData = await response.json().catch(() => ({}));
+        console.error("❌ Export Server Error:", errData);
+        throw new Error(
+          errData.message || "Export failed. Server responded with an error.",
+        );
       }
 
       const blob = await response.blob();
@@ -155,41 +160,33 @@ export default function ProductTags() {
 
   // --- FUNGSI HANDLE DELETE ---
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || status !== "authenticated") return;
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/product-tags/${deleteId}`, {
+      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi(`/product-tags/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to delete tag");
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to delete tag");
       }
 
       toast.success("Product Tag berhasil dihapus!");
       setDeleteId(null); // Tutup dialog
       fetchTags(); // Refresh data di tabel
-    } catch (error) {
-      console.error("Delete Error:", error);
+    } catch (error: any) {
+      console.error("❌ Delete Error:", error);
       toast.error(
-        "Gagal menghapus Tag. Pastikan tag ini tidak sedang digunakan oleh produk.",
+        error.message ||
+          "Gagal menghapus Tag. Pastikan tag ini tidak sedang digunakan oleh produk.",
       );
     } finally {
       setIsDeleting(false);
     }
   };
-
-  useEffect(() => {
-    fetchTags();
-  }, [page, debouncedSearch]);
 
   return (
     <div className="space-y-4 w-auto mx-auto">

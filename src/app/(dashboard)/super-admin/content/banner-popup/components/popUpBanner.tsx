@@ -20,8 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 import {
   CalendarClock,
@@ -60,6 +60,7 @@ type Meta = {
 };
 
 export default function PopupBannerTable() {
+  const { fetchApi, status } = useApi();
   // === STATE DATA ===
   const [banners, setBanners] = useState<PopupBanner[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -89,19 +90,14 @@ export default function PopupBannerTable() {
         params.append("search", debouncedSearch.trim());
       }
 
-      // Endpoint Admin untuk Popup Banner
-      const res = await fetch(
-        `${apiUrl}/content/popup-banners/admin/list?${params}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-
-      const result = await res.json();
+      const res = await fetchApi(`/content/popup-banners/admin/list?${params}`);
 
       if (!res.ok) {
-        throw new Error(result.message || "Failed to fetch banners data.");
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to fetch banners data.");
       }
+
+      const result = await res.json();
 
       setBanners(result.data || []);
       setMeta(result.meta);
@@ -119,29 +115,30 @@ export default function PopupBannerTable() {
 
   // === DELETE HANDLER ===
   const handleDelete = async (id: string) => {
+    if (!id || status !== "authenticated") return;
+
     if (!confirm("Are you sure you want to delete this banner?")) return;
 
     setDeletingId(id);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(`${apiUrl}/content/popup-banners/${id}`, {
+      const res = await fetchApi(`/content/popup-banners/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error("Failed to delete banner");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to delete banner");
+      }
 
       toast.success("Banner deleted successfully");
-      fetchBanners(); // Refresh table
-    } catch (error) {
-      toast.error("Failed to delete banner");
+      fetchBanners(); // Refresh table data
+    } catch (error: any) {
+      console.error("❌ Error delete banner:", error);
+      toast.error(error.message || "Failed to delete banner");
     } finally {
       setDeletingId(null);
     }
   };
-
   return (
     <div className="space-y-4 overflow-x-hidden w-full mx-auto">
       {/* === HEADER & SEARCH === */}

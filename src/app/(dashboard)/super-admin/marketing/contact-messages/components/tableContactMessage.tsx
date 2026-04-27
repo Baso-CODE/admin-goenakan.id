@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
+import { useApi } from "@/hooks/useApi";
 
 // === TYPES ===
 type ContactMessage = {
@@ -45,6 +45,8 @@ type ContactMessage = {
 };
 
 export default function AdminContactMessage() {
+  const { fetchApi, status } = useApi();
+
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [meta, setMeta] = useState({ page: 1, lastPage: 1, total: 0 });
   const [loading, setLoading] = useState(true);
@@ -71,27 +73,30 @@ export default function AdminContactMessage() {
 
   // Load Data
   const loadMessages = async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      let query = `?page=${page}&take=10`;
-      if (debouncedSearch)
-        query += `&search=${encodeURIComponent(debouncedSearch)}`;
-      if (isReadFilter !== "all") query += `&isRead=${isReadFilter}`;
-
-      const res = await fetch(`${apiUrl}/contact-messages/${query}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const params = new URLSearchParams({
+        page: page.toString(),
+        take: "10",
       });
 
-      if (!res.ok) throw new Error("Gagal memuat data kontak");
+      if (debouncedSearch) params.append("search", debouncedSearch.trim());
+      if (isReadFilter !== "all") params.append("isRead", isReadFilter);
+
+      const res = await fetchApi(`/contact-messages?${params}`);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal memuat data kontak");
+      }
 
       const data = await res.json();
-      setMessages(data.data);
+      setMessages(data.data || []);
       setMeta(data.meta);
     } catch (error) {
-      console.error(error);
+      console.error("❌ Load Messages Error:", error);
       toast.error("Gagal memuat daftar pesan");
     } finally {
       setLoading(false);
@@ -100,49 +105,47 @@ export default function AdminContactMessage() {
 
   useEffect(() => {
     loadMessages();
-  }, [page, debouncedSearch, isReadFilter]);
+  }, [page, debouncedSearch, isReadFilter, status, fetchApi]);
 
   const handleViewDetail = async (msg: ContactMessage) => {
     setSelectedMessage(msg);
     setIsDetailOpen(true);
 
-    // Jika pesan belum dibaca, panggil API detail untuk mengubah statusnya
-    if (!msg.isRead) {
+    if (!msg.isRead && status === "authenticated") {
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-        await fetch(`${apiUrl}/contact-messages/${msg.id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetchApi(`/contact-messages/${msg.id}`);
 
-        // Update state lokal agar UI langsung berubah tanpa perlu refresh
-        setMessages((prev) =>
-          prev.map((m) => (m.id === msg.id ? { ...m, isRead: true } : m)),
-        );
+        if (res.ok) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === msg.id ? { ...m, isRead: true } : m)),
+          );
+        }
       } catch (error) {
-        console.error("Gagal update status read:", error);
+        console.error("❌ Gagal update status read:", error);
       }
     }
   };
 
   // Handler Hapus Pesan
   const handleDelete = async (id: number) => {
+    if (status !== "authenticated") return;
+
     if (!confirm("Yakin ingin menghapus pesan ini?")) return;
 
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-      const res = await fetch(`${apiUrl}/contact-messages/${id}`, {
+      const res = await fetchApi(`/contact-messages/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error("Gagal menghapus pesan");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal menghapus pesan");
+      }
 
       toast.success("Pesan berhasil dihapus");
-      loadMessages(); // Refresh data
-    } catch (error) {
-      toast.error("Terjadi kesalahan saat menghapus pesan");
+      loadMessages();
+    } catch (error: any) {
+      toast.error(error.message || "Terjadi kesalahan saat menghapus pesan");
     }
   };
 

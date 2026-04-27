@@ -21,9 +21,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiUrl } from "@/helper/apiurl";
 
 import { useDebounce } from "@/helper/debounce";
+import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
 
 import { FileDown, Loader2, Search } from "lucide-react";
@@ -55,6 +55,8 @@ interface DepartmentExportQuery {
 }
 
 export default function DepartmentTable() {
+  const { fetchApi, status } = useApi();
+
   const [departments, setDepartments] = useState<Departments[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -71,14 +73,16 @@ export default function DepartmentTable() {
   const [exportIsActive, setExportIsActive] = useState<string>("ALL");
   const [exporting, setExporting] = useState<boolean>(false);
 
+  // === FETCH DEPARTMENTS ===
   const fetchDepartments = async () => {
+    // 🛑 Guard: Jangan eksekusi jika belum terautentikasi atau status belum siap
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
 
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
+      // 1. Build Query Params
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -88,21 +92,23 @@ export default function DepartmentTable() {
         params.append("search", debouncedSearch.trim());
       }
 
-      const res = await fetch(`${apiUrl}/departments?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // 2. Fetch menggunakan fetchApi (Otomatis handle Base URL dan Token)
+      const res = await fetchApi(`/departments?${params}`);
 
-      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `HTTP Error ${res.status}`);
+      }
 
       const result = await res.json();
 
       setDepartments(result.data || []);
       setMeta(result.meta);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Unknown error");
-      toast.error("Failed to load department");
+    } catch (error: any) {
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      setError(msg);
+      console.error("❌ Fetch Departments Error:", error);
+      toast.error("Failed to load departments");
     } finally {
       setLoading(false);
     }
@@ -110,7 +116,8 @@ export default function DepartmentTable() {
 
   useEffect(() => {
     fetchDepartments();
-  }, [page, debouncedSearch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, debouncedSearch, status, fetchApi]); // Tambahkan dependensi auth
 
   const handleExportDepartment = async () => {
     setExporting(true);
@@ -137,20 +144,19 @@ export default function DepartmentTable() {
         exportFilters as Record<string, string>,
       ).toString();
 
-      // URL untuk export (Endpoint: ${apiUrl}/departments/export/excel)
-      const exportUrl = `${apiUrl}/departments/export/excel?${queryString}`;
-
-      const response = await fetch(exportUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetchApi(
+        `/departments/export/excel?${queryString}`,
+        {
+          method: "GET",
         },
-      });
+      );
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Server Error:", errorText);
-        throw new Error("Export failed. Server responded with an error.");
+        const errData = await response.json().catch(() => ({}));
+        console.error("❌ Export Server Error:", errData);
+        throw new Error(
+          errData.message || "Export failed. Server responded with an error.",
+        );
       }
 
       // 3. Proses File Binary (Blob)
@@ -181,29 +187,25 @@ export default function DepartmentTable() {
   };
 
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || status !== "authenticated") return;
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
-      const response = await fetch(`${apiUrl}/departments/${deleteId}`, {
+      const response = await fetchApi(`/departments/${deleteId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || "Gagal menghapus kategori");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal menghapus department");
       }
 
       toast.success("Department berhasil dihapus");
+
       setPage(1);
       fetchDepartments();
     } catch (error: any) {
+      console.error("❌ Error delete department:", error);
       toast.error(error.message || "Terjadi kesalahan saat menghapus data");
     } finally {
       setIsDeleting(false);
