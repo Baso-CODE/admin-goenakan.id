@@ -79,8 +79,6 @@ export default function PopupBannerTable() {
     setLoading(true);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",

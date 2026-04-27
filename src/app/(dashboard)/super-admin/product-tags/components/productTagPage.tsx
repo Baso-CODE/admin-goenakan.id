@@ -105,9 +105,6 @@ export default function ProductTags() {
   const handleExportTags = async () => {
     setExporting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const exportFilters: TagExportQuery = {
         ...(exportStartDate && { startDate: exportStartDate }),
         ...(exportEndDate && { endDate: exportEndDate }),

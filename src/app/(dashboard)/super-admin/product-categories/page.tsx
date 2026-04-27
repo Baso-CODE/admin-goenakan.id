@@ -143,8 +143,6 @@ const ProductCategoriesPage = () => {
     setExporting(true);
     try {
       // 1. Ambil Token Autentikasi
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
       // 2. Kumpulkan Filter
       const exportFilters: CategoryExportQuery = {

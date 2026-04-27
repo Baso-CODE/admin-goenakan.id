@@ -152,9 +152,6 @@ export default function HeroTable() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const exportFilters: HeroExportQuery = {
         ...(exportStartDate && { startDate: exportStartDate }),
         ...(exportEndDate && { endDate: exportEndDate }),

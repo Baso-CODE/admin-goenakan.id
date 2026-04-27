@@ -170,9 +170,6 @@ const Products = () => {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const exportFilters: ProductExportQuery = {};
 
       if (exportStartDate) exportFilters.startDate = exportStartDate;

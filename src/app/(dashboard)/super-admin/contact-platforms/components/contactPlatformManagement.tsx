@@ -188,9 +188,6 @@ export default function ContactPlatformsManagement() {
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const response = await fetchApi(`/vendor-items/${deleteId}`, {
         method: "DELETE",
       });

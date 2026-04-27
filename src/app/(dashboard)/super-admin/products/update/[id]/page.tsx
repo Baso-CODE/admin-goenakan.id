@@ -99,8 +99,6 @@ export default function EditProductPage() {
 
     try {
       // 1. Dapatkan Token Otentikasi
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
       // 2. Persiapan Data untuk FormData
       const formData = new FormData();
@@ -364,9 +362,6 @@ export default function EditProductPage() {
 
         xhr.send(cloudinaryFormData);
       });
-
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
       const payload = {
         url: uploadData.secure_url,

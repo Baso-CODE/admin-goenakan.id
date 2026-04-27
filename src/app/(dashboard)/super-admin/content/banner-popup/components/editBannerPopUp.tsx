@@ -53,8 +53,6 @@ export default function EditPopupBanner() {
   ) => {
     setIsSaving(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
       if (!token) throw new Error("No token found");
 
       // Gunakan FormData untuk mengirim File + Text

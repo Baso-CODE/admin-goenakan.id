@@ -183,9 +183,6 @@ export default function FaqTable() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const exportFilters: FaqExportQuery = {
         ...(exportStartDate && { startDate: exportStartDate }),
         ...(exportEndDate && { endDate: exportEndDate }),

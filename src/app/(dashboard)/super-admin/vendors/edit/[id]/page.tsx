@@ -92,9 +92,6 @@ export default function EditVendorPage() {
   const handleUpdateVendor = async (data: VendorFormValues) => {
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const payload = {
         ...data,
         contacts: [{ platformId: data.platformId, contactId: data.contactId }],

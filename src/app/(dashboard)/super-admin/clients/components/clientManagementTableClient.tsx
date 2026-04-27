@@ -111,7 +111,6 @@ export default function ClientManagementTable() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Fungsi untuk mereset halaman ke 1 saat filter utama berubah
   const handleFilterChange = (filterUpdate: Partial<ClientExportQuery>) => {
     setMeta((prev) => ({ ...prev, page: 1 }));
     // Update filter type
@@ -125,9 +124,6 @@ export default function ClientManagementTable() {
     setError(null);
 
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const params = new URLSearchParams({
         page: meta.page.toString(),
         take: meta.perPage.toString(),
@@ -170,8 +166,6 @@ export default function ClientManagementTable() {
     setExporting(true);
     try {
       // 1. Ambil Token Autentikasi
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
 
       // 2. Kumpulkan Filter (menggunakan semua filter yang ada)
       const exportFilters: ClientExportQuery & { search?: string } = {
@@ -243,9 +237,6 @@ export default function ClientManagementTable() {
 
     setIsDeleting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const response = await fetchApi(`/clients/${deleteId}`, {
         method: "DELETE",
       });

@@ -25,8 +25,6 @@ export default function AddPopupBanner() {
     setIsSubmitting(true);
 
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
       if (!token) throw new Error("No auth token found");
 
       const formData = new FormData();

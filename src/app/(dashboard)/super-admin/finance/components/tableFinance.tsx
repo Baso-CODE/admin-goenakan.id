@@ -90,6 +90,8 @@ export default function TableFinance() {
 
   // === STATE ===
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
+  console.log("ini adlaah transaction", transactions);
+
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -138,7 +140,6 @@ export default function TableFinance() {
 
   useEffect(() => {
     fetchTransactions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     page,
     debouncedSearch,
@@ -153,9 +154,6 @@ export default function TableFinance() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const exportFilters: FinanceExportQuery = {};
       if (startDate) exportFilters.startDate = startDate;
       if (endDate) exportFilters.endDate = endDate;
@@ -472,7 +470,7 @@ export default function TableFinance() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-gray-500">
-                        {tx.user.name}
+                        {tx.user?.name ?? "Tanpa Nama"}
                       </TableCell>
                       <TableCell
                         className={cn(

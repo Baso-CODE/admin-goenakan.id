@@ -104,9 +104,6 @@ export function ProductSeoForm({ productId }: ProductSeoFormProps) {
   const onSubmit = async (values: SeoFormValues) => {
     setIsSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       const res = await fetch(`${apiBaseUrl}/products/${productId}/seo`, {
         method: "PUT", // Kita pakai PUT sesuai endpoint backend
         headers: {

@@ -414,9 +414,6 @@ export default function ClientEditForm() {
     e.preventDefault();
 
     try {
-      const tokenRes = await fetch("/api/auth/token");
-      const { token } = await tokenRes.json();
-
       let payload: any = {
         custCode: formData.custCode,
         type: clientType,
