@@ -14,7 +14,6 @@ const AddArticleCategory = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddCategory = async (data: ArticleCategoryFormValues) => {
-    // 🛑 Validasi status auth
     if (status !== "authenticated") {
       toast.error("Sesi berakhir, silakan login kembali.");
       return;

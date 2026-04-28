@@ -2,11 +2,22 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
-import { Resolver, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Form,
   FormControl,
@@ -17,6 +28,11 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -25,8 +41,19 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/useApi";
-import { FileImage, Loader2, Save } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Check,
+  FileImage,
+  Loader2,
+  Save,
+  Search,
+  TagIcon,
+  X,
+  ZoomIn,
+} from "lucide-react";
 import { toast } from "sonner";
+import { ImagePreviewModal } from "./imagePreviewModal";
 
 const articleSchema = z.object({
   title: z.string().min(5, "Judul minimal 5 karakter"),
@@ -35,7 +62,8 @@ const articleSchema = z.object({
   source: z.string().optional(),
   published: z.boolean().default(false),
   productIds: z.array(z.string()).optional().default([]),
-  coverImageAlt: z.string().optional(), // Opsional
+  tagIds: z.array(z.string()).optional().default([]),
+  coverImageAlt: z.string().optional(),
 });
 
 export type ArticleFormValues = z.infer<typeof articleSchema>;
@@ -49,22 +77,25 @@ export default function FormArticle({
   initialData,
   isEditing = false,
 }: {
-  onSubmit: (values: ArticleFormValues, coverFile: File | null) => void;
+  onSubmit: (values: any, coverFile: File | null) => void;
   isSubmitting: boolean;
-  initialData?: ArticleInitialData | null;
+  initialData?: any | null;
   isEditing?: boolean;
 }) {
   const { fetchApi, status } = useApi();
+
+  // Data States
   const [categories, setCategories] = useState<any[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
-
   const [products, setProducts] = useState<any[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(true);
-
+  const [availableTags, setAvailableTags] = useState<any[]>([]);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Loading States
+  const [loadingData, setLoadingData] = useState(true);
   const [coverFile, setCoverFile] = useState<File | null>(null);
 
-  const form = useForm<ArticleFormValues>({
-    resolver: zodResolver(articleSchema) as Resolver<ArticleFormValues>,
+  const form = useForm<any>({
+    resolver: zodResolver(articleSchema),
     defaultValues: {
       title: "",
       categoryId: "",
@@ -72,6 +103,7 @@ export default function FormArticle({
       source: "",
       published: false,
       productIds: [],
+      tagIds: [],
       coverImageAlt: "",
     },
   });
@@ -79,53 +111,39 @@ export default function FormArticle({
   useEffect(() => {
     if (initialData) {
       form.reset({
-        title: initialData.title || "",
-        categoryId: initialData.categoryId || "",
-        content: initialData.content || "",
-        source: initialData.source || "",
-        published: initialData.published || false,
+        ...initialData,
         productIds: initialData.productIds || [],
-        coverImageAlt: initialData.coverImageAlt || "",
+        tagIds: initialData.tagIds || [],
       });
     }
   }, [initialData, form]);
 
-  // === FETCH CATEGORIES & PRODUCTS ===
   useEffect(() => {
     const fetchData = async () => {
       if (status !== "authenticated") return;
-
       try {
-        const [catRes, prodRes] = await Promise.all([
+        const [catRes, prodRes, tagRes] = await Promise.all([
           fetchApi("/article-categories/list"),
           fetchApi("/products/order"),
+          fetchApi("/article-tags/list"),
         ]);
 
-        if (catRes.ok) {
-          const catData = await catRes.json();
-          setCategories(catData || []);
-        } else {
-          toast.error("Gagal memuat kategori artikel.");
-        }
-
+        if (catRes.ok) setCategories(await catRes.json());
         if (prodRes.ok) {
-          const prodData = await prodRes.json();
-          setProducts(prodData.data || prodData || []);
-        } else {
-          toast.error("Gagal memuat daftar produk.");
+          const p = await prodRes.json();
+          setProducts(p.data || p || []);
         }
+        if (tagRes.ok) setAvailableTags(await tagRes.json());
       } catch (error) {
-        console.error("❌ Failed to load dependencies:", error);
+        toast.error("Gagal memuat data pendukung.");
       } finally {
-        setLoadingCategories(false);
-        setLoadingProducts(false);
+        setLoadingData(false);
       }
     };
-
     fetchData();
   }, [status, fetchApi]);
 
-  const handleSubmit = (values: ArticleFormValues) => {
+  const handleSubmit = (values: any) => {
     if (!isEditing && !coverFile) {
       toast.error("Cover image wajib diunggah!");
       return;
@@ -133,71 +151,227 @@ export default function FormArticle({
     onSubmit(values, coverFile);
   };
 
+  const handlePreview = (url: string) => {
+    setPreviewUrl(url);
+    setIsPreviewOpen(true);
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start w-full">
-          <div className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+        <Card className="p-6 border-stone-200 shadow-sm bg-stone-50/30">
+          <FormLabel className="text-base font-bold flex items-center gap-2 mb-4">
+            <FileImage className="w-5 h-5 text-primary" /> Sampul Artikel
+          </FormLabel>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  className="bg-white cursor-pointer"
+                  onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Format: JPG, PNG, atau WEBP. Maksimal 2MB.
+                </p>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="coverImageAlt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">
+                      Alt Text Gambar (SEO)
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Deskripsi gambar untuk Google..."
+                        className="bg-white"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="flex justify-center border-2 border-dashed rounded-xl p-2 bg-white min-h-40 items-center">
+              {coverFile ? (
+                <div className="relative group w-full h-40 cursor-zoom-in">
+                  {/* Gambar Preview */}
+                  <img
+                    src={URL.createObjectURL(coverFile)}
+                    className="w-full h-full object-cover rounded-lg"
+                    onClick={() =>
+                      handlePreview(URL.createObjectURL(coverFile))
+                    }
+                  />
+
+                  {/* Overlay Icon Zoom (Hanya muncul saat hover) */}
+                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg pointer-events-none">
+                    <ZoomIn className="text-white w-8 h-8" />
+                  </div>
+
+                  {/* Tombol Hapus (X) */}
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCoverFile(null);
+                    }}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : isEditing && initialData?.coverImage ? (
+                <div
+                  className="relative group w-full h-40 cursor-zoom-in"
+                  onClick={() => handlePreview(initialData.coverImage)}>
+                  <img
+                    src={initialData.coverImage}
+                    className="w-full h-full object-cover rounded-lg"
+                  />
+                  {/* Overlay Icon Zoom */}
+                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                    <ZoomIn className="text-white w-8 h-8" />
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center text-stone-400">
+                  <FileImage className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                  <p className="text-xs italic">Belum ada gambar terpilih</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* SECTION 2: BASIC INFO & TAGS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 space-y-6">
             <FormField
               control={form.control}
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Judul Artikel</FormLabel>
+                  <FormLabel className="font-bold">Judul Artikel</FormLabel>
                   <FormControl>
-                    <Input placeholder="Masukkan judul artikel..." {...field} />
+                    <Input
+                      placeholder="Masukkan judul yang menarik..."
+                      className="text-lg py-6 shadow-sm"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {/* TAGS SELECTOR (Combobox Multi-select) */}
+            <FormField
+              control={form.control}
+              name="tagIds"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel className="font-bold flex items-center gap-2">
+                    <TagIcon className="w-4 h-4" /> Tags Artikel
+                  </FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className={cn(
+                            "w-full justify-between bg-white min-h-11 h-auto py-2",
+                            !field.value?.length && "text-muted-foreground",
+                          )}>
+                          <div className="flex flex-wrap gap-1">
+                            {field.value?.length > 0
+                              ? field.value.map((id: string) => (
+                                  <Badge
+                                    key={id}
+                                    variant="secondary"
+                                    className="bg-stone-100 text-stone-700 hover:bg-stone-200">
+                                    {
+                                      availableTags.find((t) => t.id === id)
+                                        ?.name
+                                    }
+                                  </Badge>
+                                ))
+                              : "Cari & pilih tag artikel..."}
+                          </div>
+                          <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Ketik nama tag..." />
+                        <CommandList>
+                          <CommandEmpty>Tag tidak ditemukan.</CommandEmpty>
+                          <CommandGroup>
+                            {availableTags.map((tag) => (
+                              <CommandItem
+                                key={tag.id}
+                                onSelect={() => {
+                                  const current = field.value || [];
+                                  const next = current.includes(tag.id)
+                                    ? current.filter(
+                                        (id: string) => id !== tag.id,
+                                      )
+                                    : [...current, tag.id];
+                                  field.onChange(next);
+                                }}>
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    field.value?.includes(tag.id)
+                                      ? "opacity-100"
+                                      : "opacity-0",
+                                  )}
+                                />
+                                {tag.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* SIDEBAR SETTINGS */}
+          <div className="space-y-6 bg-stone-50/50 p-4 rounded-xl border border-stone-100">
             <FormField
               control={form.control}
               name="categoryId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Kategori</FormLabel>
-                  {loadingCategories ? (
-                    <div className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-stone-50 px-3 py-2 text-sm text-muted-foreground animate-pulse">
-                      Memuat kategori...
-                    </div>
-                  ) : (
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value ? String(field.value) : undefined}>
-                      <FormControl>
-                        <SelectTrigger className="w-full bg-white">
-                          <SelectValue placeholder="Pilih Kategori" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={String(cat.id)}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="source"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Sumber Referensi (Opsional)</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="URL sumber artikel..."
-                      className="bg-white"
-                      {...field}
-                    />
-                  </FormControl>
+                  <FormLabel className="font-bold">Kategori</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Pilih Kategori" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -207,15 +381,10 @@ export default function FormArticle({
               control={form.control}
               name="published"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 bg-stone-50">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">
-                      Publish Langsung?
-                    </FormLabel>
-                    <p className="text-[11px] text-muted-foreground">
-                      Aktifkan untuk mempublikasikan artikel saat disimpan.
-                    </p>
-                  </div>
+                <FormItem className="flex items-center justify-between rounded-lg border bg-white p-3 shadow-sm">
+                  <FormLabel className="text-sm font-medium">
+                    Status Publish
+                  </FormLabel>
                   <FormControl>
                     <Switch
                       checked={field.value}
@@ -225,150 +394,105 @@ export default function FormArticle({
                 </FormItem>
               )}
             />
-          </div>
 
-          {/* KOLOM KANAN */}
-          <div className="space-y-6">
-            <FormItem>
-              <FormLabel>Cover Image</FormLabel>
-              <div className="flex flex-col gap-3 p-4 border rounded-md bg-stone-50">
-                {isEditing && initialData?.coverImage && !coverFile && (
-                  <div className="relative w-full h-32 rounded-md overflow-hidden border bg-white">
-                    <img
-                      src={initialData.coverImage}
-                      alt="Current Cover"
-                      className="object-cover w-full h-full"
-                    />
-                  </div>
-                )}
-                <Input
-                  type="file"
-                  accept="image/*"
-                  className="bg-white"
-                  onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
-                />
-                {coverFile && (
-                  <p className="text-xs text-green-600 flex items-center gap-1 truncate">
-                    <FileImage className="w-3 h-3 shrink-0" />
-                    <span className="truncate">{coverFile.name}</span>
-                  </p>
-                )}
-                {isEditing && !coverFile && (
-                  <p className="text-xs text-muted-foreground">
-                    Biarkan kosong jika tidak ingin mengubah cover.
-                  </p>
-                )}
-              </div>
-            </FormItem>
-
-            {/* ✨ NEW: Field Alt Image (Teks Alternatif) */}
             <FormField
               control={form.control}
-              name="coverImageAlt"
+              name="source"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Alt Text Gambar (Opsional)</FormLabel>
+                  <FormLabel className="text-xs">Referensi/Sumber</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Contoh: Ilustrasi tumpukan kardus untuk pengiriman barang"
-                      className="bg-white"
+                      placeholder="URL Sumber..."
+                      className="bg-white text-xs"
                       {...field}
                     />
                   </FormControl>
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Membantu SEO (Pencarian Google) dan aksesibilitas untuk
-                    pembaca layar.
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="productIds"
-              render={() => (
-                <FormItem>
-                  <div className="mb-2">
-                    <FormLabel className="text-base">
-                      Produk Terkait (Opsional)
-                    </FormLabel>
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      Pilih produk yang akan direkomendasikan di sidebar artikel
-                      ini.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-3 border rounded-md bg-stone-50">
-                    {loadingProducts ? (
-                      <p className="text-xs text-stone-500 animate-pulse">
-                        Memuat produk...
-                      </p>
-                    ) : products.length === 0 ? (
-                      <p className="text-xs text-stone-500">
-                        Tidak ada produk.
-                      </p>
-                    ) : (
-                      products.map((product) => (
-                        <FormField
-                          key={product.id}
-                          control={form.control}
-                          name="productIds"
-                          render={({ field }) => {
-                            return (
-                              <FormItem
-                                key={product.id}
-                                className="flex flex-row items-center space-x-3 space-y-0">
-                                <FormControl>
-                                  <input
-                                    type="checkbox"
-                                    className="w-4 h-4 rounded border-gray-300 text-stone-900 focus:ring-stone-900 cursor-pointer"
-                                    checked={field.value?.includes(product.id)}
-                                    onChange={(e) => {
-                                      return e.target.checked
-                                        ? field.onChange([
-                                            ...(field.value || []),
-                                            product.id,
-                                          ])
-                                        : field.onChange(
-                                            field.value?.filter(
-                                              (value) => value !== product.id,
-                                            ),
-                                          );
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="font-normal text-sm cursor-pointer line-clamp-1 leading-snug">
-                                  {product.name}
-                                </FormLabel>
-                              </FormItem>
-                            );
-                          }}
-                        />
-                      ))
-                    )}
-                  </div>
-                  <FormMessage />
                 </FormItem>
               )}
             />
           </div>
         </div>
 
-        <div className="pt-6 border-t">
+        {/* SECTION 3: PRODUCT RECOMMENDATIONS */}
+        <FormField
+          control={form.control}
+          name="productIds"
+          render={() => (
+            <FormItem className="space-y-3">
+              <div className="flex flex-col">
+                <FormLabel className="text-base font-bold">
+                  Produk Terkait
+                </FormLabel>
+                <p className="text-[11px] text-muted-foreground">
+                  Pilih produk yang akan direkomendasikan di artikel ini.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-4 border rounded-xl bg-stone-50/30 max-h-64 overflow-y-auto">
+                {products.map((product) => (
+                  <FormField
+                    key={product.id}
+                    control={form.control}
+                    name="productIds"
+                    render={({ field }) => {
+                      const isChecked = field.value?.includes(product.id);
+                      return (
+                        <FormItem
+                          key={product.id}
+                          className={cn(
+                            "flex flex-row items-center space-x-3 space-y-0 p-2 rounded-lg border bg-white transition-all hover:bg-stone-50",
+                            isChecked &&
+                              "border-stone-600 bg-stone-50 ring-1 ring-stone-600",
+                          )}>
+                          <FormControl>
+                            <Checkbox
+                              checked={isChecked}
+                              onCheckedChange={(checked) => {
+                                return checked
+                                  ? field.onChange([
+                                      ...(field.value || []),
+                                      product.id,
+                                    ])
+                                  : field.onChange(
+                                      field.value?.filter(
+                                        (value: string) => value !== product.id,
+                                      ),
+                                    );
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="text-[11px] font-medium leading-none cursor-pointer flex-1 line-clamp-2">
+                            {product.name}
+                          </FormLabel>
+                        </FormItem>
+                      );
+                    }}
+                  />
+                ))}
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* SECTION 4: EDITOR */}
+        <div className="pt-6">
           <FormField
             control={form.control}
             name="content"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-lg font-semibold">
-                  Konten Artikel
-                </FormLabel>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Tuliskan isi dari artikel kamu di sini. Gunakan *toolbar*
-                  untuk memformat teks.
-                </p>
+                <div className="flex justify-between items-end mb-4">
+                  <FormLabel className="text-xl font-bold">
+                    Isi Artikel
+                  </FormLabel>
+                  <span className="text-xs text-muted-foreground italic">
+                    Auto-save aktif
+                  </span>
+                </div>
                 <FormControl>
-                  <div className="w-full max-w-full overflow-hidden border rounded-xl bg-white shadow-sm min-h-100">
+                  <div className="w-full border rounded-xl bg-white shadow-sm min-h-125">
                     <SimpleEditor
                       value={field.value}
                       onChange={field.onChange}
@@ -381,26 +505,33 @@ export default function FormArticle({
           />
         </div>
 
-        {/* 🔄 UPDATE: Tombol Simpan (Full Width di Paling Bawah) */}
-        <div className="pt-4">
+        {/* SUBMIT */}
+        <div className="sticky bottom-4 z-20">
           <Button
             type="submit"
             size="lg"
-            className="w-full font-bold text-md"
+            className="w-full font-bold shadow-xl bg-primary hover:bg-accent text-primary-foreground py-7 text-lg rounded-2xl transition-all active:scale-[0.98]"
             disabled={isSubmitting}>
             {isSubmitting ? (
               <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Menyimpan...
+                <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                Menyimpan...
               </>
             ) : (
               <>
-                <Save className="mr-2 h-5 w-5" />{" "}
-                {isEditing ? "Update Artikel" : "Simpan Artikel"}
+                <Save className="mr-2 h-6 w-6" />
+                {isEditing ? "Perbarui Artikel" : "Terbitkan Artikel"}
               </>
             )}
           </Button>
         </div>
       </form>
+      <ImagePreviewModal
+        src={previewUrl}
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        alt="Preview Sampul Artikel"
+      />
     </Form>
   );
 }

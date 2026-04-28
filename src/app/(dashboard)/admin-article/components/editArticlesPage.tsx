@@ -38,6 +38,10 @@ export default function EditArticle() {
         ? article.relatedProducts.map((rp: any) => rp.productId)
         : [];
 
+      const existingTagIds = article.articleTags
+        ? article.articleTags.map((at: any) => at.tagId)
+        : [];
+
       setInitialData({
         title: article.title,
         categoryId: article.categoryId,
@@ -45,8 +49,9 @@ export default function EditArticle() {
         source: article.source || "",
         published: article.published,
         coverImage: article.coverImage,
-        coverImageAlt: article.coverImageAlt,
+        coverImageAlt: article.coverImageAlt || "",
         productIds: existingProductIds,
+        tagIds: existingTagIds,
       });
     } catch (error) {
       console.error(error);
@@ -61,7 +66,7 @@ export default function EditArticle() {
     if (id) fetchArticle();
   }, [id, fetchArticle]);
 
-  // ✨ 2. Fungsi ketika tombol Update ditekan
+  // Fungsi ketika tombol Update ditekan
   const handleUpdateArticle = async (
     values: ArticleFormValues,
     coverFile: File | null,
@@ -83,18 +88,14 @@ export default function EditArticle() {
       if (values.source) {
         formData.append("source", values.source);
       }
+      formData.append("productIds", values.productIds?.join(",") || "");
 
-      if (values.productIds && values.productIds.length > 0) {
-        formData.append("productIds", values.productIds.join(","));
-      } else {
-        formData.append("productIds", "");
-      }
+      formData.append("tagIds", values.tagIds?.join(",") || "");
 
       if (coverFile) {
         formData.append("coverFile", coverFile);
       }
 
-      // ✨ Gunakan fetchApi dengan method PATCH
       const res = await fetchApi(`/articles/${id}`, {
         method: "PATCH",
         body: formData,
@@ -129,6 +130,7 @@ export default function EditArticle() {
       <div className="p-8 text-center text-red-500">Gagal memuat artikel.</div>
     );
   }
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold tracking-tight">Edit Artikel 📝</h2>
