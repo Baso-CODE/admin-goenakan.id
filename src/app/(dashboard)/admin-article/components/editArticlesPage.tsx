@@ -51,7 +51,7 @@ export default function EditArticle() {
     } catch (error) {
       console.error(error);
       toast.error("Artikel tidak ditemukan atau terjadi kesalahan.");
-      router.push("/admin-article/");
+      router.push("/admin-article/article");
     } finally {
       setIsLoading(false);
     }
@@ -106,7 +106,7 @@ export default function EditArticle() {
       }
 
       toast.success("Artikel berhasil diperbarui!");
-      router.push("/admin-article/");
+      router.push("/admin-article/article");
       router.refresh();
     } catch (err: any) {
       console.error(err);
@@ -116,7 +116,6 @@ export default function EditArticle() {
     }
   };
 
-  // Render loading state jika session masih loading atau data artikel sedang diambil
   if (status === "loading" || isLoading) {
     return (
       <div className="p-8 text-center text-muted-foreground animate-pulse">

@@ -91,7 +91,7 @@ export default function ArticlesSection() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, status, fetchApi]); // Masukkan dependencies
+  }, [page, debouncedSearch, status, fetchApi]);
 
   // --- FUNGSI HANDLE DELETE ---
   const handleDelete = async () => {
@@ -99,7 +99,6 @@ export default function ArticlesSection() {
 
     setIsDeleting(true);
     try {
-      // ✨ 4. DELETE juga jadi super pendek!
       const res = await fetchApi(`/articles/${deleteId}`, {
         method: "DELETE",
       });
@@ -111,7 +110,7 @@ export default function ArticlesSection() {
 
       toast.success("Article berhasil dihapus!");
       setDeleteId(null);
-      fetchArticles(); // Refresh data otomatis menggunakan token yang sama
+      fetchArticles();
     } catch (error) {
       console.error("Delete Error:", error);
       toast.error("Gagal menghapus Article.");
@@ -122,7 +121,6 @@ export default function ArticlesSection() {
 
   // --- USE EFFECT ---
   useEffect(() => {
-    // Cukup panggil fetchArticles, karena pengecekan status sudah ada di dalamnya
     fetchArticles();
   }, [fetchArticles]);
 
@@ -149,7 +147,7 @@ export default function ArticlesSection() {
             </div>
 
             {/* BUTTON ADD ARTICLE */}
-            <Link href="/admin-article/add" className="md:ml-auto">
+            <Link href="/admin-article/article/add" className="md:ml-auto">
               <Button size="sm" className="w-full gap-2 cursor-pointer h-10">
                 + Write Article
               </Button>
@@ -252,7 +250,7 @@ export default function ArticlesSection() {
 
                     {/* Actions */}
                     <TableCell className="text-center space-x-2">
-                      <Link href={`/admin-article/edit/${data.id}`}>
+                      <Link href={`/admin-article/article/edit/${data.id}`}>
                         <Button
                           variant="outline"
                           size="sm"

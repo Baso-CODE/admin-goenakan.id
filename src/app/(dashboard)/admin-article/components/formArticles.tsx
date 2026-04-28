@@ -123,7 +123,7 @@ export default function FormArticle({
     };
 
     fetchData();
-  }, [status, fetchApi]); // Tambahkan dependensi auth
+  }, [status, fetchApi]);
 
   const handleSubmit = (values: ArticleFormValues) => {
     if (!isEditing && !coverFile) {
@@ -136,9 +136,7 @@ export default function FormArticle({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        {/* 🔄 UPDATE: Layout Atas (Informasi & Pengaturan) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start w-full">
-          {/* KOLOM KIRI */}
           <div className="space-y-6">
             <FormField
               control={form.control}

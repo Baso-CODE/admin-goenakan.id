@@ -1,9 +1,6 @@
 "use client";
-
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 import {
   ArrowLeft,
   CheckCircle,
@@ -14,6 +11,7 @@ import {
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useReactToPrint } from "react-to-print";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -148,18 +146,21 @@ export default function InvoiceDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
-
   const [loading, setLoading] = useState(true);
-  const [isDownloading, setIsDownloading] = useState(false);
-
+  // const [isDownloading, setIsDownloading] = useState(false);
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("BANK_TRANSFER");
   const [paymentDate, setPaymentDate] = useState<string>(
     new Date().toISOString().split("T")[0],
   );
-
   const invoiceRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = useReactToPrint({
+    contentRef: invoiceRef,
+    documentTitle: `Invoice-${invoice?.invoiceNumber || invoice?.id}`,
+    onAfterPrint: () => toast.success("PDF siap disimpan"),
+  });
 
   const loadData = useCallback(async () => {
     if (status === "loading" || status === "unauthenticated") return;
@@ -184,51 +185,51 @@ export default function InvoiceDetailPage() {
     loadData();
   }, [loadData]);
 
-  const handleDownloadPDF = async () => {
-    const element = invoiceRef.current;
-    if (!element) return;
+  // const handleDownloadPDF = async () => {
+  //   const element = invoiceRef.current;
+  //   if (!element) return;
 
-    setIsDownloading(true);
-    try {
-      const images = element.querySelectorAll("img");
-      const promises = Array.from(images).map((img) => {
-        if (img.complete) return Promise.resolve();
-        return new Promise((resolve) => {
-          img.onload = resolve;
-          img.onerror = resolve;
-        });
-      });
-      await Promise.all(promises);
+  //   setIsDownloading(true);
+  //   try {
+  //     const images = element.querySelectorAll("img");
+  //     const promises = Array.from(images).map((img) => {
+  //       if (img.complete) return Promise.resolve();
+  //       return new Promise((resolve) => {
+  //         img.onload = resolve;
+  //         img.onerror = resolve;
+  //       });
+  //     });
+  //     await Promise.all(promises);
 
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: true,
-        backgroundColor: "#ffffff",
-        onclone: (clonedDoc) => {
-          const clonedElement = clonedDoc.getElementById("invoice-content");
-          if (clonedElement) {
-            clonedElement.style.boxShadow = "none";
-          }
-        },
-      });
+  //     const canvas = await html2canvas(element, {
+  //       scale: 2,
+  //       useCORS: true,
+  //       logging: true,
+  //       backgroundColor: "#ffffff",
+  //       onclone: (clonedDoc) => {
+  //         const clonedElement = clonedDoc.getElementById("invoice-content");
+  //         if (clonedElement) {
+  //           clonedElement.style.boxShadow = "none";
+  //         }
+  //       },
+  //     });
 
-      const imgData = canvas.toDataURL("image/jpeg", 1.0);
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
+  //     const imgData = canvas.toDataURL("image/jpeg", 1.0);
+  //     const pdf = new jsPDF("p", "mm", "a4");
+  //     const pdfWidth = pdf.internal.pageSize.getWidth();
+  //     const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-      const fileName = `Invoice-${invoice?.invoiceNumber || invoice?.id}.pdf`;
-      pdf.save(fileName);
-      toast.success("Berhasil download PDF");
-    } catch (error) {
-      console.error("Failed to download PDF", error);
-      toast.error("Gagal mendownload PDF");
-    } finally {
-      setIsDownloading(false);
-    }
-  };
+  //     pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+  //     const fileName = `Invoice-${invoice?.invoiceNumber || invoice?.id}.pdf`;
+  //     pdf.save(fileName);
+  //     toast.success("Berhasil download PDF");
+  //   } catch (error) {
+  //     console.error("Failed to download PDF", error);
+  //     toast.error("Gagal mendownload PDF");
+  //   } finally {
+  //     setIsDownloading(false);
+  //   }
+  // };
 
   const handleMarkAsPaid = async () => {
     if (!invoice || status !== "authenticated") return;
@@ -346,16 +347,9 @@ export default function InvoiceDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              onClick={handleDownloadPDF}
-              disabled={isDownloading}>
-              {isDownloading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="mr-2 h-4 w-4" />
-              )}
-              Download PDF
+            <Button variant="outline" onClick={handlePrint}>
+              <Download className="mr-2 h-4 w-4" />
+              Print / Save PDF
             </Button>
 
             {invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
@@ -375,14 +369,9 @@ export default function InvoiceDetailPage() {
         <div
           id="invoice-content"
           ref={invoiceRef}
-          className="w-[210mm] h-[297mm] bg-[#ffffff] text-[#1e293b] p-10 flex flex-col font-sans text-[13px] leading-relaxed relative box-border transform scale-90 md:scale-100 origin-top"
+          className="w-[210mm] min-h-[297mm] h-auto bg-[#ffffff] text-[#1e293b] p-10 flex flex-col font-sans text-[13px] leading-relaxed relative box-border transform scale-90 md:scale-100 origin-top shadow-lg print:shadow-none print:scale-100 print:p-0"
           style={{
-            width: "210mm",
-            minHeight: "297mm",
-            height: "auto",
             padding: "40px",
-            display: "flex",
-            flexDirection: "column",
           }}>
           <div className="flex-1">
             {/* 1. HEADER */}
@@ -552,9 +541,9 @@ export default function InvoiceDetailPage() {
             </div>
 
             {/* 4. PRODUCT TABLE */}
-            <div className="mb-6">
+            <div className="mb-6 page-break-inside-auto">
               <table className="w-full border-collapse border border-[#94a3b8]">
-                <thead>
+                <thead className="print:table-header-group">
                   <tr className="bg-[#f3f4f6] text-center font-bold">
                     <th className="border border-[#94a3b8] py-2 w-8">No</th>
                     <th className="border border-[#94a3b8] py-2">
@@ -571,7 +560,9 @@ export default function InvoiceDetailPage() {
                 </thead>
                 <tbody>
                   {invoice.items.map((item, index) => (
-                    <tr key={item.id} className="text-center align-top h-15">
+                    <tr
+                      key={item.id}
+                      className="text-center align-top h-15 break-inside-avoid page-break-inside-avoid">
                       <td className="border border-[#94a3b8] py-2">
                         {index + 1}
                       </td>
@@ -625,7 +616,7 @@ export default function InvoiceDetailPage() {
             </div>
 
             {/* 5. PAYMENT SUMMARY */}
-            <div className="mb-6 p-4 border border-[#94a3b8] bg-[#f8fafc] rounded-sm text-[12px]">
+            <div className="mb-6 p-4 border border-[#94a3b8] bg-[#f8fafc] rounded-sm text-[12px] break-inside-avoid page-break-inside-avoid">
               <div className="font-bold mb-3 uppercase border-b pb-1.5 border-[#cbd5e1] text-[#1e293b]">
                 Payment Summary
               </div>
@@ -797,7 +788,6 @@ export default function InvoiceDetailPage() {
                               {formatCurrency(invoice.totalAmount)}
                             </span>
                             <span className="italic text-gray-600">
-                              {" "}
                               (Due: Immediately)
                             </span>
                           </div>
@@ -832,7 +822,7 @@ export default function InvoiceDetailPage() {
 
             {/* 6. NOTES SECTION */}
             {invoice.notes && invoice.notes.length > 0 && (
-              <div className="mb-8 mt-6">
+              <div className="mb-8 mt-6 break-inside-avoid">
                 <div className="font-bold mb-2 text-sm uppercase tracking-wide border-b pb-1 border-[#e2e8f0]">
                   Notes & Instructions
                 </div>
@@ -853,7 +843,7 @@ export default function InvoiceDetailPage() {
           </div>
 
           {/* BAGIAN BAWAH (Bank & TTD) */}
-          <div className="mt-auto break-inside-avoid">
+          <div className="mt-10 break-inside-avoid">
             <div className="flex justify-end items-end">
               <div className="text-center mr-6">
                 <div className="mb-4 font-bold text-sm">Best Regards,</div>
@@ -883,7 +873,7 @@ export default function InvoiceDetailPage() {
 
           {/* STAMP LUNAS */}
           {invoice.status === "PAID" && (
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 border-4 border-green-600 text-green-600 text-6xl font-black p-4 rotate-[-15deg] opacity-30 select-none pointer-events-none rounded-lg">
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 border-4 border-green-600 text-green-600 text-6xl font-black p-4 rotate-[-15deg] opacity-20 select-none pointer-events-none rounded-lg z-0">
               LUNAS
             </div>
           )}

@@ -47,7 +47,7 @@ export default function AddArticle() {
       }
 
       toast.success("Artikel berhasil dibuat dan diunggah!");
-      router.push("/admin-article/");
+      router.push("/admin-article/article");
       router.refresh();
     } catch (err: any) {
       console.error(err);

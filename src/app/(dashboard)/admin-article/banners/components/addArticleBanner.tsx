@@ -14,7 +14,6 @@ const AddArticleBanner = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddBanner = async (data: ArticleBannerFormValues) => {
-    // 🛑 Jangan kirim jika sesi belum siap
     if (status !== "authenticated") {
       toast.error("Sesi berakhir, silakan login kembali.");
       return;

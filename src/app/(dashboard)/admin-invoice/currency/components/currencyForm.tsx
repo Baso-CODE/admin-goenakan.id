@@ -119,7 +119,6 @@ export default function CurrencyForm() {
       const params = new URLSearchParams();
       if (debouncedSearch) params.append("search", debouncedSearch);
 
-      // ✨ Gunakan fetchApi
       const res = await fetchApi(`/currencies?${params}`);
 
       if (!res.ok) throw new Error("Failed to fetch");
