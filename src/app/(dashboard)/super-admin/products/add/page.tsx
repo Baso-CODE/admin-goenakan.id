@@ -13,7 +13,7 @@ type FileUploads = {
 };
 
 export default function AddProductPage() {
-  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status
+  const { fetchApi, status } = useApi();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
@@ -31,12 +31,10 @@ export default function AddProductPage() {
     try {
       const formData = new FormData();
 
-      // 1️⃣ Append images
       if (files.images) {
         files.images.forEach((file) => formData.append("images", file));
       }
 
-      // 2️⃣ Append videos
       if (files.videos) {
         files.videos.forEach((file) => formData.append("videos", file));
       }

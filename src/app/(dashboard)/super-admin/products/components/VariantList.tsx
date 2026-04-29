@@ -28,6 +28,7 @@ interface VariantListProps {
   variantMetas: {
     variantIndex: number;
     price: number;
+    stock?: number;
     description?: string;
     isFeatured?: boolean;
     altText?: string;
@@ -270,34 +271,61 @@ export function VariantList({
               </h4>
             </div>
 
-            {/* 🟢 UPDATE DISINI: Mengubah dari grid Kiri-Kanan menjadi Atas-Bawah (flex-col) */}
             <div className="flex flex-col gap-6 items-start">
-              {/* BAGIAN ATAS: Informasi (Price, Dimensi, & Deskripsi) - Full Width */}
               <div className="w-full bg-white p-4 rounded-lg border shadow-sm space-y-5">
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-gray-500 uppercase">
-                    Variant Price (Rp)
-                  </Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={meta?.price ?? 0}
-                    onChange={(e) =>
-                      onUpdateVariantMeta(idx, "price", e.target.valueAsNumber)
-                    }
-                    className="font-mono font-medium text-lg md:w-1/3" // Diberi batas lebar sedikit agar tidak terlalu panjang
-                    placeholder="0"
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    Overrides Base Price.
-                  </p>
+                {/* BARIS HARGA & STOK */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-gray-500 uppercase">
+                      Variant Price (Rp)
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={meta?.price ?? 0}
+                      onChange={(e) =>
+                        onUpdateVariantMeta(
+                          idx,
+                          "price",
+                          e.target.valueAsNumber,
+                        )
+                      }
+                      className="font-mono font-medium text-lg"
+                      placeholder="0"
+                    />
+                    <p className="text-[10px] text-muted-foreground italic">
+                      Harga spesifik untuk varian ini.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-amber-600 uppercase">
+                      Variant Stock
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={meta?.stock ?? 0}
+                      onChange={(e) =>
+                        onUpdateVariantMeta(
+                          idx,
+                          "stock",
+                          e.target.valueAsNumber,
+                        )
+                      }
+                      className="font-mono font-medium text-lg border-amber-200 focus-visible:ring-amber-500"
+                      placeholder="0"
+                    />
+                    <p className="text-[10px] text-amber-600 italic">
+                      Jumlah stok untuk kombinasi atribut ini.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="pt-4 border-t border-gray-100 space-y-3">
                   <Label className="text-xs font-bold text-gray-500 uppercase">
                     Dimensi & Berat
                   </Label>
-                  {/* Grid ini akan 2 kolom di HP, dan 4 kolom berjajar di layar besar */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="space-y-1">
                       <Label className="text-[10px] text-muted-foreground font-semibold">

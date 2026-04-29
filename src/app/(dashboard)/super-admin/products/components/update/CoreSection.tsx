@@ -53,6 +53,15 @@ const FormCoreSchema = z.object({
     z.number().nonnegative("Harga harus angka valid"),
   ),
   isCustom: z.boolean().optional(),
+  materialTypeId: z.string().min(1, "Material wajib dipilih").optional(),
+  stock: z.preprocess(
+    (v) => Number(v),
+    z
+      .number()
+      .int()
+      .nonnegative("Stok harus berupa angka bulat dan tidak boleh negatif")
+      .default(0),
+  ),
   materialType: z.string().optional(),
   categoryId: z.string().min(1, "Kategori wajib dipilih"),
   tagIds: z.array(z.string()).optional().default([]),
@@ -74,13 +83,14 @@ export default function FormProductCore({
   onSubmit: (values: ProductCoreFormValues) => void;
   isSubmitting: boolean;
 }) {
-  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status
+  const { fetchApi, status } = useApi();
 
   const [categories, setCategories] = useState<any[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
   const [tags, setTags] = useState<any[]>([]);
   const [tagSearchOpen, setTagSearchOpen] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState("");
+  const [materialTypes, setMaterialTypes] = useState<any[]>([]);
 
   const form = useForm<ProductCoreFormValues>({
     resolver: zodResolver(FormCoreSchema) as any,
@@ -89,7 +99,9 @@ export default function FormProductCore({
       description: "",
       sku: "",
       basePrice: 0,
+      stock: 0,
       isCustom: false,
+      materialTypeId: "",
       materialType: "",
       categoryId: "",
       weight: 0,
@@ -99,6 +111,7 @@ export default function FormProductCore({
     },
   });
 
+  const isCustomProduct = form.watch("isCustom");
   useEffect(() => {
     if (initialData) {
       form.reset({
@@ -106,8 +119,9 @@ export default function FormProductCore({
         description: initialData.description ?? "",
         sku: initialData.sku ?? "",
         basePrice: initialData.basePrice ?? 0,
+        stock: initialData.stock ?? 0,
         isCustom: initialData.isCustom ?? false,
-        materialType: initialData.materialType ?? "",
+        materialTypeId: initialData.materialTypeId ?? "",
         categoryId: initialData.categoryId ?? "",
         tagIds: initialData.tags ? initialData.tags.map((t: any) => t.id) : [],
         weight: initialData.weight ?? 0,
@@ -118,53 +132,48 @@ export default function FormProductCore({
     }
   }, [initialData, categories, form]);
 
-  // Fetch kategori & tags
+  // Fetch kategori, tags, & material types
   useEffect(() => {
-    const fetchCategories = async () => {
-      // 🛑 Jangan jalan jika sesi belum siap
+    const fetchFormData = async () => {
       if (status === "loading" || status === "unauthenticated") return;
 
-      setLoadingCategories(true);
+      setLoadingData(true);
       try {
-        // ✨ Parallel Fetching menggunakan fetchApi (Otomatis handle Base URL & Token)
-        const [catRes, tagRes] = await Promise.all([
+        const [catRes, tagRes, matRes] = await Promise.all([
           fetchApi("/product-categories/list"),
           fetchApi("/product-tags/list"),
+          fetchApi("/material-types/list"),
         ]);
 
-        if (!catRes.ok) throw new Error("Failed to fetch categories");
-
-        const data = await catRes.json();
-        const tagData = await tagRes.json();
-
-        setCategories(data);
-        setTags(tagData || []);
+        if (catRes.ok) setCategories(await catRes.json());
+        if (tagRes.ok) setTags((await tagRes.json()) || []);
+        if (matRes.ok) setMaterialTypes((await matRes.json()) || []);
       } catch (error) {
         console.error(error);
-        toast.error("Failed to load categories.");
+        toast.error("Failed to load form data.");
       } finally {
-        setLoadingCategories(false);
+        setLoadingData(false);
       }
     };
 
-    fetchCategories();
-  }, [status, fetchApi]); // Tambahkan dependensi agar sinkron dengan hook useApi
-
+    fetchFormData();
+  }, [status, fetchApi]);
   return (
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="space-y-6 border p-4 rounded-md">
-        <h3 className="text-lg font-semibold tracking-tight">
+        className="space-y-6 border p-6 rounded-md bg-white shadow-sm">
+        <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
           Core Product Data
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-          {/* Name */}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+          {/* Name - Span 2 */}
           <FormField
             control={form.control}
             name="name"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="md:col-span-2">
                 <FormLabel>Nama Produk</FormLabel>
                 <FormControl>
                   <Input placeholder="Nama Produk" {...field} />
@@ -196,30 +205,60 @@ export default function FormProductCore({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Kategori</FormLabel>
-                <FormControl>
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    disabled={loadingCategories}>
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  disabled={loadingData}>
+                  <FormControl>
                     <SelectTrigger>
                       <SelectValue
                         placeholder={
-                          loadingCategories
-                            ? "Loading kategori..."
-                            : "Pilih kategori"
+                          loadingData ? "Loading..." : "Pilih kategori"
                         }
                       />
                     </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={String(cat.id)}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={String(cat.id)}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormControl>
+          {/* ✨ Material Type Select */}
+          <FormField
+            control={form.control}
+            name="materialTypeId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Material</FormLabel>
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  disabled={loadingData}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          loadingData ? "Loading..." : "Pilih material"
+                        }
+                      />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {materialTypes.map((mat) => (
+                      <SelectItem key={mat.id} value={String(mat.id)}>
+                        {mat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -231,78 +270,97 @@ export default function FormProductCore({
             name="basePrice"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Harga Dasar</FormLabel>
-                <FormControl>
-                  <Input type="number" placeholder="0" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          {/* Material Type */}
-          <FormField
-            control={form.control}
-            name="materialType"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Material</FormLabel>
+                <FormLabel>Harga Dasar (Rp)</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="Material (ex: Kayu, Kain, Bambu)"
+                    type="number"
+                    placeholder="0"
                     {...field}
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
+                    }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-          {/* Custom Product */}
+
+          <FormField
+            control={form.control}
+            name="stock"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Stok{" "}
+                  {isCustomProduct && (
+                    <span className="text-[10px] text-amber-600 font-normal italic">
+                      (Diatur per Varian)
+                    </span>
+                  )}
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    {...field}
+                    disabled={isCustomProduct}
+                    placeholder={isCustomProduct ? "0" : "Masukkan jumlah stok"}
+                    onChange={(e) =>
+                      field.onChange(parseInt(e.target.value) || 0)
+                    }
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Custom Product Toggle - Span 2 */}
           <FormField
             control={form.control}
             name="isCustom"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="md:col-span-2">
                 <FormLabel>Tipe Produk</FormLabel>
                 <FormControl>
-                  <div className="flex items-center gap-3 h-10 border rounded-md px-3">
+                  <div className="flex items-center gap-3 h-10 border rounded-md px-4 bg-white">
                     <span
                       className={`text-sm cursor-pointer transition-colors ${
-                        !field.value ? "font-bold text-black" : "text-gray-400"
+                        !field.value
+                          ? "font-bold text-primary"
+                          : "text-gray-400"
                       }`}
                       onClick={() => field.onChange(false)}>
                       Standard
                     </span>
-
                     <Switch
                       checked={field.value}
-                      onCheckedChange={field.onChange}
+                      onCheckedChange={(checked) => {
+                        field.onChange(checked);
+                        if (checked) form.setValue("stock", 0); // Reset stock if custom
+                      }}
                     />
-
                     <span
                       className={`text-sm cursor-pointer transition-colors ${
-                        field.value ? "font-bold text-black" : "text-gray-400"
+                        field.value ? "font-bold text-primary" : "text-gray-400"
                       }`}
                       onClick={() => field.onChange(true)}>
                       Custom
                     </span>
                   </div>
                 </FormControl>
-                <p className="text-[0.8rem] text-muted-foreground">
-                  {field.value
-                    ? "Produk memiliki varian & attribut (Warna, Ukuran, dll)."
-                    : "Produk standar tanpa variasi."}
-                </p>
               </FormItem>
             )}
           />
 
+          {/* Tags - Full Width */}
           <FormField
             control={form.control}
             name="tagIds"
             render={({ field }) => {
               const selectedTags = field.value || [];
               return (
-                <FormItem className="flex flex-col col-span-1 md:col-span-3">
+                <FormItem className="flex flex-col md:col-span-3">
                   <FormLabel>Product Tags</FormLabel>
                   <Popover open={tagSearchOpen} onOpenChange={setTagSearchOpen}>
                     <PopoverTrigger asChild>
@@ -310,13 +368,12 @@ export default function FormProductCore({
                         <Button
                           variant="outline"
                           role="combobox"
-                          aria-expanded={tagSearchOpen}
                           className={cn(
-                            "w-full justify-between h-auto min-h-10 text-left",
+                            "w-full justify-between h-auto min-h-11 text-left bg-white",
                             selectedTags.length === 0 &&
                               "text-muted-foreground",
                           )}>
-                          <div className="flex flex-wrap gap-1 items-center">
+                          <div className="flex flex-wrap gap-1.5 items-center">
                             {selectedTags.length > 0
                               ? selectedTags.map((tagId) => {
                                   const tagInfo = tags.find(
@@ -327,19 +384,19 @@ export default function FormProductCore({
                                     <Badge
                                       key={tagId}
                                       variant="secondary"
-                                      className="flex items-center gap-1 px-2 py-0.5">
+                                      className="flex items-center gap-1 px-2 py-1">
                                       {tagInfo.name}
-                                      <div
-                                        className="rounded-full hover:bg-red-200 p-0.5 transition-colors cursor-pointer"
+                                      <X
+                                        className="h-3 w-3 cursor-pointer hover:text-red-500"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          const newTags = selectedTags.filter(
-                                            (id) => id !== tagId,
+                                          field.onChange(
+                                            selectedTags.filter(
+                                              (id) => id !== tagId,
+                                            ),
                                           );
-                                          field.onChange(newTags);
-                                        }}>
-                                        <X className="h-3 w-3" />
-                                      </div>
+                                        }}
+                                      />
                                     </Badge>
                                   );
                                 })
@@ -349,11 +406,12 @@ export default function FormProductCore({
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
-                    <PopoverContent className="w-100 p-0" align="start">
+                    <PopoverContent
+                      className="w-[--radix-popover-trigger-width] p-0"
+                      align="start">
                       <Command>
                         <CommandInput
                           placeholder="Cari tag..."
-                          value={tagSearchQuery}
                           onValueChange={setTagSearchQuery}
                         />
                         <CommandList>
@@ -364,17 +422,14 @@ export default function FormProductCore({
                               return (
                                 <CommandItem
                                   key={tag.id}
-                                  value={tag.name}
                                   onSelect={() => {
-                                    if (isSelected) {
-                                      field.onChange(
-                                        selectedTags.filter(
-                                          (id) => id !== tag.id,
-                                        ),
-                                      );
-                                    } else {
-                                      field.onChange([...selectedTags, tag.id]);
-                                    }
+                                    field.onChange(
+                                      isSelected
+                                        ? selectedTags.filter(
+                                            (id) => id !== tag.id,
+                                          )
+                                        : [...selectedTags, tag.id],
+                                    );
                                     setTagSearchQuery("");
                                   }}>
                                   <CheckCheck
@@ -399,95 +454,34 @@ export default function FormProductCore({
           />
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4">
-          <FormField
-            control={form.control}
-            name="weight"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Berat (gram)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="any"
-                    min={0}
-                    {...field}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      field.onChange(isNaN(val) ? 0 : val);
-                    }}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="length"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Panjang (cm)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="any"
-                    min={0}
-                    {...field}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      field.onChange(isNaN(val) ? 0 : val);
-                    }}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="width"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Lebar (cm)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="any"
-                    min={0}
-                    {...field}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      field.onChange(isNaN(val) ? 0 : val);
-                    }}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="height"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tinggi (cm)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="any"
-                    min={0}
-                    {...field}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      field.onChange(isNaN(val) ? 0 : val);
-                    }}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        {/* Dimension Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-6">
+          {["weight", "length", "width", "height"].map((dim) => (
+            <FormField
+              key={dim}
+              control={form.control}
+              name={dim as any}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="capitalize">
+                    {dim === "weight" ? "Berat (gr)" : dim + " (cm)"}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="any"
+                      min={0}
+                      {...field}
+                      onChange={(e) =>
+                        field.onChange(parseFloat(e.target.value) || 0)
+                      }
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          ))}
         </div>
 
         {/* Description */}
@@ -496,11 +490,11 @@ export default function FormProductCore({
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Deskripsi</FormLabel>
+              <FormLabel>Deskripsi Produk</FormLabel>
               <FormControl>
                 <Textarea
-                  rows={3}
-                  placeholder="Deskripsi produk..."
+                  rows={4}
+                  placeholder="Jelaskan detail produk..."
                   {...field}
                 />
               </FormControl>
@@ -509,9 +503,14 @@ export default function FormProductCore({
           )}
         />
 
-        <Button type="submit" disabled={isSubmitting} className="">
-          {isSubmitting ? "Updating..." : "Update Core Data"}
-        </Button>
+        <div className="flex justify-end">
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full md:w-auto px-8">
+            {isSubmitting ? "Updating..." : "Update Core Data"}
+          </Button>
+        </div>
       </form>
     </Form>
   );

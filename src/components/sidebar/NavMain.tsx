@@ -20,7 +20,7 @@ import Link from "next/link";
 
 export function NavMain({
   items,
-  label = "Platform", // Default label jika tidak diisi
+  label = "Platform",
 }: {
   items: {
     title: string;
@@ -32,11 +32,10 @@ export function NavMain({
       url: string;
     }[];
   }[];
-  label?: string; // Tambahkan prop label
+  label?: string;
 }) {
   return (
     <SidebarGroup>
-      {/* Gunakan prop label disini */}
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (

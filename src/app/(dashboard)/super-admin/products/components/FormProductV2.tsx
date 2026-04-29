@@ -69,11 +69,11 @@ const attributeSelectionSchema = z.object({
   valueIds: z.array(z.string()).min(1, "Choose at least one value"),
 });
 
-// Cari bagian ini di atas
 const variantMetaSchema = z.object({
   variantIndex: z.number(),
   isFeatured: z.boolean().optional(),
   price: z.number().min(0, "Price must be >= 0"),
+  stock: z.number().min(0, "Stock minimal 0").default(0),
   altText: z.string().optional(),
   description: z.string().optional(),
   weight: z.number().optional(),
@@ -99,6 +99,8 @@ const productSchema = z.object({
   description: z.string().optional(),
   basePrice: z.number().min(0, "Base price must be >= 0"),
   isCustom: z.boolean().optional(),
+  materialTypeId: z.string().optional(),
+  stock: z.number().min(0, "Stock minimal 0").optional().default(0),
   materialType: z.string().optional(),
   weight: z.number().min(0, "Weight must be >= 0").optional(),
   width: z.number().min(0, "Width must be >= 0").optional(),
@@ -154,25 +156,32 @@ export default function ProductFormV2({
   const [isGeneratingSku, setIsGeneratingSku] = useState(false);
   const [tagSearchOpen, setTagSearchOpen] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState("");
+  const [materialTypes, setMaterialTypes] = useState<
+    { id: string; name: string }[]
+  >([]);
 
   useEffect(() => {
     const fetchCategories = async () => {
-      // 🛑 Jangan jalan jika sesi belum siap
       if (status === "loading" || status === "unauthenticated") return;
 
       try {
-        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        // Fetch Categories
         const catRes = await fetchApi("/product-categories/list");
-
         if (!catRes.ok) throw new Error("Failed to fetch categories");
         const data = await catRes.json();
         setCategories(data);
 
+        // Fetch Tags
         const tagRes = await fetchApi("/product-tags/list");
-
         if (tagRes.ok) {
           const tagData = await tagRes.json();
           setTags(tagData);
+        }
+
+        const matRes = await fetchApi("/material-types/list");
+        if (matRes.ok) {
+          const matData = await matRes.json();
+          setMaterialTypes(matData);
         }
       } catch (error) {
         console.error(error);
@@ -181,7 +190,8 @@ export default function ProductFormV2({
     };
 
     fetchCategories();
-  }, [status, fetchApi]); // Tambahkan dependensi fetchApi dan status
+  }, [status, fetchApi]);
+
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema) as any,
     defaultValues: {
@@ -196,7 +206,8 @@ export default function ProductFormV2({
       height: 0,
       length: 0,
       isCustom: false,
-      materialType: "",
+      materialTypeId: "",
+      stock: 0,
       attributes: [],
       priceTiers: [],
       imagesMetadata: [],
@@ -221,6 +232,7 @@ export default function ProductFormV2({
     {
       variantIndex: number;
       price: number;
+      stock: number;
       isFeatured?: boolean;
       altText?: string;
     }[]
@@ -230,10 +242,17 @@ export default function ProductFormV2({
   const [productImagesFiles, setProductImagesFiles] = useState<File[]>([]);
 
   useEffect(() => {
-    form.register("attributes");
-    form.register("variantImagesMetadata");
-    form.register("videosMetadata");
-  }, [form]);
+    if (!isCustomProduct) {
+      setAttributeSelections([]);
+      setCombinations([]);
+      setVariantMetas([]);
+      setVariantFilesMap([]);
+      form.setValue("attributes", []);
+      form.setValue("variantImagesMetadata", []);
+    } else {
+      form.setValue("stock", 0);
+    }
+  }, [isCustomProduct, form]);
 
   useEffect(() => {
     if (!isCustomProduct) {
@@ -248,20 +267,14 @@ export default function ProductFormV2({
 
   const handleGenerateSku = async () => {
     const productName = form.getValues("name");
-
-    // 1. Validasi Input Awal
     if (!productName || productName.length < 3) {
       toast.error("Mohon isi Nama Produk minimal 3 karakter terlebih dahulu.");
       return;
     }
-
-    // 🛑 Guard: Jangan eksekusi jika sesi belum siap
     if (status !== "authenticated") return;
 
     try {
       setIsGeneratingSku(true);
-
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
       const res = await fetchApi("/products/generate-sku", {
         method: "POST",
         body: JSON.stringify({ name: productName }),
@@ -273,8 +286,6 @@ export default function ProductFormV2({
       }
 
       const data = await res.json();
-
-      // Set value ke form react-hook-form
       form.setValue("sku", data.sku);
       toast.success(`SKU Generated: ${data.sku}`);
     } catch (error: any) {
@@ -325,6 +336,7 @@ export default function ProductFormV2({
     const newVariantMetas = comboObjects.map((_, idx) => ({
       variantIndex: idx,
       price: currentBasePrice,
+      stock: 0,
       isFeatured: false,
       altText: "",
       description: "",
@@ -367,18 +379,16 @@ export default function ProductFormV2({
       const payload: ProductFormValues = {
         ...values,
         basePrice: Number(values.basePrice),
+        stock: isCustomProduct ? 0 : Number(values.stock || 0),
         weight: values.weight ? Number(values.weight) : 0,
         width: values.width ? Number(values.width) : 0,
         height: values.height ? Number(values.height) : 0,
         length: values.length ? Number(values.length) : 0,
-
         attributes: finalAttributes?.length ? finalAttributes : undefined,
-
         priceTiers: values.priceTiers?.length ? values.priceTiers : undefined,
         imagesMetadata: values.imagesMetadata?.length
           ? values.imagesMetadata
           : undefined,
-
         videosMetadata: values.videosMetadata,
         variantImagesMetadata: finalVariantMetas,
       };
@@ -407,7 +417,7 @@ export default function ProductFormV2({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(submit)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-              {/* Nama, SKU, Kategori, Base Price, Material - TIDAK BERUBAH */}
+              {/* NAMA PRODUK */}
               <FormField
                 control={form.control}
                 name="name"
@@ -421,6 +431,8 @@ export default function ProductFormV2({
                   </FormItem>
                 )}
               />
+
+              {/* SKU */}
               <FormField
                 control={form.control}
                 name="sku"
@@ -440,9 +452,7 @@ export default function ProductFormV2({
                         title="Auto Generate SKU dari Nama Produk"
                         className="shrink-0">
                         <RefreshCw
-                          className={`h-4 w-4 ${
-                            isGeneratingSku ? "animate-spin" : ""
-                          }`}
+                          className={`h-4 w-4 ${isGeneratingSku ? "animate-spin" : ""}`}
                         />
                       </Button>
                     </div>
@@ -450,20 +460,22 @@ export default function ProductFormV2({
                   </FormItem>
                 )}
               />
+
+              {/* KATEGORI */}
               <FormField
                 control={form.control}
                 name="categoryId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Kategori</FormLabel>
-
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih kategori..." />
-                      </SelectTrigger>
-
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih kategori..." />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent>
                         {categories.map((cat) => (
                           <SelectItem key={cat.id} value={cat.id}>
@@ -472,11 +484,12 @@ export default function ProductFormV2({
                         ))}
                       </SelectContent>
                     </Select>
-
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              {/* BASE PRICE */}
               <FormField
                 control={form.control}
                 name="basePrice"
@@ -496,15 +509,63 @@ export default function ProductFormV2({
                   </FormItem>
                 )}
               />
+
+              {/* MATERIAL TYPE (Updated to Select & materialTypeId) */}
               <FormField
                 control={form.control}
-                name="materialType"
+                name="materialTypeId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Material</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih jenis material..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {materialTypes.map((mat) => (
+                          <SelectItem key={mat.id} value={mat.id}>
+                            {mat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* STOCK (Only for Standard Product) */}
+              <FormField
+                control={form.control}
+                name="stock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Stok{" "}
+                      {form.watch("isCustom") && (
+                        <span className="text-[10px] text-amber-600 font-normal italic">
+                          (Diatur per Varian)
+                        </span>
+                      )}
+                    </FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input
+                        type="number"
+                        {...field}
+                        value={field.value}
+                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                        disabled={form.watch("isCustom")}
+                        placeholder={
+                          form.watch("isCustom") ? "0" : "Masukkan jumlah stok"
+                        }
+                        min={0}
+                      />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -517,11 +578,11 @@ export default function ProductFormV2({
                   <FormItem>
                     <FormLabel>Tipe Produk</FormLabel>
                     <FormControl>
-                      <div className="flex items-center gap-3 h-10 border rounded-md px-3">
+                      <div className="flex items-center gap-3 h-10 border rounded-md px-3 bg-white">
                         <span
                           className={`text-sm cursor-pointer transition-colors ${
                             !field.value
-                              ? "font-bold text-black"
+                              ? "font-bold text-primary"
                               : "text-gray-400"
                           }`}
                           onClick={() => field.onChange(false)}>
@@ -536,7 +597,7 @@ export default function ProductFormV2({
                         <span
                           className={`text-sm cursor-pointer transition-colors ${
                             field.value
-                              ? "font-bold text-black"
+                              ? "font-bold text-primary"
                               : "text-gray-400"
                           }`}
                           onClick={() => field.onChange(true)}>
@@ -546,24 +607,22 @@ export default function ProductFormV2({
                     </FormControl>
                     <p className="text-[0.8rem] text-muted-foreground">
                       {field.value
-                        ? "Produk memiliki varian & attribut (Warna, Ukuran, dll)."
-                        : "Produk standar tanpa variasi."}
+                        ? "Varian memiliki stok masing-masing."
+                        : "Stok dikelola secara global di sini."}
                     </p>
                   </FormItem>
                 )}
               />
             </div>
 
+            {/* TAGS (Sama seperti sebelumnya) */}
             <FormField
               control={form.control}
               name="tagIds"
               render={({ field }) => {
                 const selectedTags = field.value || [];
-
                 return (
-                  <FormItem className="flex flex-col col-span-1 md:col-span-3">
-                    {" "}
-                    {/* Atau sesuaikan ukuran gridnya */}
+                  <FormItem className="flex flex-col col-span-1 md:col-span-3 mt-4">
                     <FormLabel>Product Tags</FormLabel>
                     <Popover
                       open={tagSearchOpen}
@@ -575,7 +634,7 @@ export default function ProductFormV2({
                             role="combobox"
                             aria-expanded={tagSearchOpen}
                             className={cn(
-                              "w-full justify-between h-auto min-h-10",
+                              "w-full justify-between h-auto min-h-10 text-left bg-white",
                               selectedTags.length === 0 &&
                                 "text-muted-foreground",
                             )}>
@@ -592,26 +651,26 @@ export default function ProductFormV2({
                                         variant="secondary"
                                         className="mr-1 mb-1 flex items-center gap-1 px-2 py-0.5"
                                         onClick={(e) => {
-                                          e.stopPropagation(); // Mencegah popover terbuka saat klik silang
+                                          e.stopPropagation();
                                           const newTags = selectedTags.filter(
                                             (id) => id !== tagId,
                                           );
                                           field.onChange(newTags);
                                         }}>
                                         {tagInfo.name}
-                                        <div className="rounded-full bg-slate-200 hover:bg-red-200 p-0.5 transition-colors cursor-pointer">
-                                          <X className="h-3 w-3 text-slate-500 hover:text-red-500" />
-                                        </div>
+                                        <X className="h-3 w-3 text-slate-500 hover:text-red-500 cursor-pointer" />
                                       </Badge>
                                     );
                                   })
-                                : "Pilih tag produk (bisa lebih dari satu)..."}
+                                : "Pilih tag produk..."}
                             </div>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-full p-0" align="start">
+                      <PopoverContent
+                        className="w-[--radix-popover-trigger-width] p-0"
+                        align="start">
                         <Command>
                           <CommandInput
                             placeholder="Cari tag..."
@@ -630,18 +689,13 @@ export default function ProductFormV2({
                                     key={tag.id}
                                     value={tag.name}
                                     onSelect={() => {
-                                      if (isSelected) {
-                                        field.onChange(
-                                          selectedTags.filter(
-                                            (id) => id !== tag.id,
-                                          ),
-                                        );
-                                      } else {
-                                        field.onChange([
-                                          ...selectedTags,
-                                          tag.id,
-                                        ]);
-                                      }
+                                      field.onChange(
+                                        isSelected
+                                          ? selectedTags.filter(
+                                              (id) => id !== tag.id,
+                                            )
+                                          : [...selectedTags, tag.id],
+                                      );
                                       setTagSearchQuery("");
                                     }}>
                                     <Check
@@ -666,10 +720,6 @@ export default function ProductFormV2({
                 );
               }}
             />
-
-            <div className="mt-6">
-              <PriceTiers />
-            </div>
 
             {/* DIMENSI & DESKRIPSI & MEDIA - TIDAK BERUBAH */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4 mt-4">
@@ -771,7 +821,11 @@ export default function ProductFormV2({
                 </FormItem>
               )}
             />
+            <div className="mt-6">
+              <PriceTiers />
+            </div>
 
+            {/* Media Produk */}
             <div className="space-y-6 rounded-xl border border-gray-200 p-6 shadow-sm">
               <h3 className="text-xl font-bold tracking-tight text-gray-800 border-b pb-3 mb-3">
                 📸 Media Produk

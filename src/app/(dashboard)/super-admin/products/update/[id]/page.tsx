@@ -19,7 +19,7 @@ const CLOUDINARY_CLOUD_NAME = "do9sfnf5k";
 const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 
 export default function EditProductPage() {
-  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status
+  const { fetchApi, status } = useApi();
   const { id } = useParams();
   const router = useRouter();
 
@@ -47,7 +47,7 @@ export default function EditProductPage() {
     };
 
     fetchData();
-  }, [id, status, fetchApi]); // Tambahkan dependensi useApi
+  }, [id, status, fetchApi]);
   const handleUpdateProduct = async (
     coreValues: ProductCoreFormValues,
   ): Promise<void> => {
@@ -77,7 +77,6 @@ export default function EditProductPage() {
   const handleUpdateAttributes = async (payload: any) => {
     setIsSubmitting(true);
     try {
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
       const res = await fetchApi(`/products/${id}/attributes`, {
         method: "PUT",
         body: JSON.stringify(payload),
@@ -98,9 +97,6 @@ export default function EditProductPage() {
     setIsSubmitting(true);
 
     try {
-      // 1. Dapatkan Token Otentikasi
-
-      // 2. Persiapan Data untuk FormData
       const formData = new FormData();
       const filesToUpload: File[] = [];
       const dtoVariants: any[] = [];
@@ -123,7 +119,7 @@ export default function EditProductPage() {
             filesToUpload.push(img.file);
 
             variantImages.push({
-              id: img.id, // null/undefined jika baru
+              id: img.id,
               altText: img.altText,
               isFeatured: img.isFeatured,
 
@@ -163,7 +159,6 @@ export default function EditProductPage() {
         formData.append("variantImages", file);
       });
 
-      // 5. Kirim Request PUT menggunakan fetchApi
       const res = await fetchApi(`/products/${id}/variants`, {
         method: "PUT",
         body: formData,
@@ -296,7 +291,6 @@ export default function EditProductPage() {
 
   const handleAddImage = async (file: File): Promise<void> => {
     try {
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL, Token, dan deteksi FormData)
       const formData = new FormData();
       formData.append("image", file);
 
@@ -579,10 +573,9 @@ export default function EditProductPage() {
   const handleUpdatePriceTiers = async (tiers: any[]) => {
     setIsSubmitting(true);
     try {
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
       const res = await fetchApi(`/products/${id}/price-tiers`, {
         method: "PUT",
-        body: JSON.stringify(tiers), // Kirim array tiers
+        body: JSON.stringify(tiers),
       });
 
       if (!res.ok) {

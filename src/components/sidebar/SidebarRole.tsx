@@ -69,7 +69,7 @@ export default function SidebarRole({ ...props }) {
         url: "#",
         icon: ListOrdered,
         items: [
-          { title: "Sales Dashboard", url: "/super-admin" },
+          // { title: "Sales Dashboard", url: "/super-admin" },
           // { title: "Dashboard Overview", url: "/" },
           { title: "Order Form", url: "/super-admin/orders/add" },
           { title: "All Orders List", url: "/super-admin/orders" },
@@ -145,6 +145,11 @@ export default function SidebarRole({ ...props }) {
           {
             title: "Product Categories",
             url: "/super-admin/product-categories",
+            icon: Tags,
+          },
+          {
+            title: "Product Materials",
+            url: "/super-admin/product-materials",
             icon: Tags,
           },
           {
@@ -239,7 +244,7 @@ export default function SidebarRole({ ...props }) {
     // OTHER (PERBAIKAN DISINI)
     Etc: [
       {
-        name: "Settings", // DULU 'title', SEKARANG 'name' AGAR SESUAI TIPE
+        name: "Settings",
         url: "/super-admin/settings",
         icon: Settings,
       },
@@ -262,6 +267,22 @@ export default function SidebarRole({ ...props }) {
       </SidebarHeader>
 
       <SidebarContent>
+        {/* -- DASHBOARD MANDIRI (PALING ATAS) -- */}
+        {isSuperAdmin && (
+          <SidebarMenu className="p-2">
+            <SidebarMenuItem>
+              <a
+                href="/super-admin"
+                className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+                <LucideChartNetwork className="h-4 w-4" />
+                <span className="group-data-[collapsible=icon]:hidden">
+                  Sales Dashboard
+                </span>
+              </a>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        )}
+
         {/* -- SECTION 1: ORDER MANAGEMENT -- */}
         {(isSuperAdmin || role === "ADMIN_INVOICE") && (
           <NavMain label="Order Management" items={data.navOrder} />

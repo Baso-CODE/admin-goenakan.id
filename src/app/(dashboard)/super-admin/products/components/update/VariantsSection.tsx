@@ -28,7 +28,6 @@ const ImageSchema = z.object({
   isFeatured: z.boolean().nullable().optional(),
   file: z.any().optional(),
   _isDeleted: z.boolean().optional(),
-  // Tambahkan field transient untuk tracking file index di frontend
   fileIndex: z.number().nullable().optional(),
 });
 
@@ -40,6 +39,11 @@ const VariantSchema = z.object({
       description: z.string().optional().nullable(),
       sku: z.string().optional(),
       price: z.coerce.number().min(0, "Price must be non-negative"),
+      stock: z.coerce
+        .number()
+        .int()
+        .min(0, "Stock must be at least 0")
+        .default(0),
       weight: z.coerce.number().min(0).optional().nullable(),
       width: z.coerce.number().min(0).optional().nullable(),
       height: z.coerce.number().min(0).optional().nullable(),
@@ -90,6 +94,7 @@ export default function FormUpdateVariants({
           description: v.description ?? "",
           sku: v.sku ?? "",
           price: Number(v.price) ?? 0,
+          stock: v.stock ? Number(v.stock) : 0,
           _isDeleted: false,
           weight: v.weight ? Number(v.weight) : undefined,
           width: v.width ? Number(v.width) : undefined,
@@ -131,6 +136,7 @@ export default function FormUpdateVariants({
       description: "",
       sku: "",
       price: 0,
+      stock: 0,
       weight: undefined,
       width: undefined,
       height: undefined,
@@ -313,26 +319,36 @@ export default function FormUpdateVariants({
                         </FormItem>
                       )}
                     />
-                  </div>
 
-                  <FormField
-                    control={form.control}
-                    name={`variants.${index}.description`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Variant Description (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Deskripsi spesifik untuk varian ini..."
-                            className="resize-y min-h-20"
-                            {...field}
-                            value={field.value || ""}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                    <FormField
+                      control={form.control}
+                      name={`variants.${index}.stock`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className=" font-semibold">
+                            Stock
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              className=" focus:border-border"
+                              placeholder="0"
+                              value={(field.value as number) ?? ""}
+                              onChange={(e) =>
+                                field.onChange(
+                                  e.target.value === ""
+                                    ? 0
+                                    : parseInt(e.target.value),
+                                )
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <div className="pt-4 border-t border-gray-200">
                     <FormLabel className="mb-3 block text-gray-700">
                       Dimensi & Berat (Opsional)
@@ -448,6 +464,25 @@ export default function FormUpdateVariants({
                       />
                     </div>
                   </div>
+                  <FormField
+                    control={form.control}
+                    name={`variants.${index}.description`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Variant Description (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Deskripsi spesifik untuk varian ini..."
+                            className="resize-y min-h-20"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   {/* IMAGE SECTION */}
                   <div className="space-y-4 pt-4 border-t border-gray-200">
                     <div className="text-sm font-semibold flex items-center gap-2">
