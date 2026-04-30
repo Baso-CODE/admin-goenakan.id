@@ -46,7 +46,7 @@ export default function OpsLogisticsLateDeliveries() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[250px] w-full mt-4">
+          <div className="h-62.5 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={dataMonth}
@@ -95,7 +95,7 @@ export default function OpsLogisticsLateDeliveries() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[250px] w-full mt-4">
+          <div className="h-62.5 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={dataVendor}
@@ -136,7 +136,7 @@ export default function OpsLogisticsLateDeliveries() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[250px] w-full mt-4">
+          <div className="h-62.5 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={dataProduct}

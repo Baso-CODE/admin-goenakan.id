@@ -21,10 +21,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
-import { FileDown, Loader2, Search } from "lucide-react";
+import { format } from "date-fns";
+import { FileDown, Loader2, Package, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -71,6 +73,7 @@ const VendorItemsTable = () => {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -79,21 +82,15 @@ const VendorItemsTable = () => {
   const [categoryOptions, setCategoryOptions] = useState<
     VendorCategoryOption[]
   >([]);
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
-  const [exportCategoryId, setExportCategoryId] = useState<string>("ALL");
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
 
   // === FETCH CATEGORY OPTIONS ===
   const fetchCategoryOptions = async () => {
-    // 🛑 Guard: Jangan eksekusi jika belum terautentikasi
     if (status !== "authenticated") return;
-
     try {
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
       const res = await fetchApi("/vendor-categories?take=1000&isActive=true");
-
       if (!res.ok) throw new Error("Gagal mengambil kategori");
-
       const result = await res.json();
       setCategoryOptions(
         result.data.map((cat: any) => ({ id: cat.id, name: cat.name })) || [],
@@ -105,7 +102,6 @@ const VendorItemsTable = () => {
 
   // === FETCH ITEMS ===
   const fetchItems = async () => {
-    // 🛑 Guard: Jangan eksekusi jika belum terautentikasi
     if (status !== "authenticated") return;
 
     setLoading(true);
@@ -115,26 +111,27 @@ const VendorItemsTable = () => {
         page: page.toString(),
         take: "10",
         isActive: statusFilter,
+        categoryId: categoryFilter, // Ditambahkan ke fetch tabel
       });
 
-      if (debouncedSearch.trim()) {
+      if (debouncedSearch.trim())
         params.append("search", debouncedSearch.trim());
-      }
 
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      // Tambahkan filter tanggal ke API tabel
+      if (startDate)
+        params.append("startDate", format(startDate, "yyyy-MM-dd"));
+      if (endDate) params.append("endDate", format(endDate, "yyyy-MM-dd"));
+
       const res = await fetchApi(`/vendor-items?${params}`);
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to load vendor items");
-      }
-
       const result = await res.json();
+
+      if (!res.ok)
+        throw new Error(result.message || "Failed to load vendor items");
+
       setItems(result.data || []);
       setMeta(result.meta);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Unknown error";
-      setError(msg);
+      setError(error instanceof Error ? error.message : "Unknown error");
       toast.error("Failed to load vendor items");
     } finally {
       setLoading(false);
@@ -142,34 +139,35 @@ const VendorItemsTable = () => {
   };
 
   useEffect(() => {
-    fetchItems();
     fetchCategoryOptions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, statusFilter, status, fetchApi]); // Tambahkan dependensi auth
+  }, [status]);
 
+  useEffect(() => {
+    fetchItems();
+  }, [
+    page,
+    debouncedSearch,
+    statusFilter,
+    categoryFilter,
+    startDate,
+    endDate,
+    status,
+  ]);
+
+  // === HANDLE EXPORT ===
   const handleExport = async () => {
     setExporting(true);
     try {
-      // 1. Ambil Token Autentikasi
+      const exportFilters: Record<string, string> = {};
 
-      // 2. Kumpulkan Filter
-      const exportFilters: ItemExportQuery = {};
+      if (startDate) exportFilters.startDate = format(startDate, "yyyy-MM-dd");
+      if (endDate) exportFilters.endDate = format(endDate, "yyyy-MM-dd");
+      if (statusFilter !== "ALL") exportFilters.isActive = statusFilter;
+      if (categoryFilter !== "ALL") exportFilters.categoryId = categoryFilter;
+      if (debouncedSearch.trim()) exportFilters.search = debouncedSearch.trim();
 
-      if (startDate) exportFilters.startDate = startDate;
-      if (endDate) exportFilters.endDate = endDate;
-      // Gunakan statusFilter yang sudah ada, atau buat filter baru khusus export jika perlu
-      if (statusFilter !== "ALL")
-        exportFilters.isActive = statusFilter as "true" | "false";
+      const queryString = new URLSearchParams(exportFilters).toString();
 
-      // Tambahkan filter categoryId untuk export
-      if (exportCategoryId && exportCategoryId !== "ALL")
-        exportFilters.categoryId = exportCategoryId;
-
-      const queryString = new URLSearchParams(
-        exportFilters as Record<string, string>,
-      ).toString();
-
-      // PASTIKAN URL INI SESUAI DENGAN ROUTE BACKEND ANDA!
       const response = await fetchApi(
         `/vendor-items/export/excel?${queryString}`,
         {
@@ -177,35 +175,21 @@ const VendorItemsTable = () => {
         },
       );
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(
-          errData.message || "Export failed. Server responded with an error.",
-        );
-      }
-      // 3. Proses File Binary (Blob)
-      const blob = await response.blob();
-      const filename =
-        response.headers
-          .get("Content-Disposition")
-          ?.match(/filename="(.+)"/)?.[1] || "vendor_items_export.xlsx";
+      if (!response.ok) throw new Error("Export failed");
 
-      // Membuat URL objek untuk file yang akan diunduh
+      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename; // Nama file download
+      a.download = `vendor_items_export_${format(new Date(), "yyyyMMdd")}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url); // Bersihkan URL
+      window.URL.revokeObjectURL(url);
 
-      toast.success("Data Vendor Items berhasil di-export ke Excel!");
+      toast.success("Data Vendor Items berhasil di-export!");
     } catch (error) {
-      console.error("Export Error:", error);
-      toast.error(
-        "Gagal meng-export data. Pastikan filter sudah benar dan Anda memiliki akses.",
-      );
+      toast.error("Gagal meng-export data.");
     } finally {
       setExporting(false);
     }
@@ -238,113 +222,153 @@ const VendorItemsTable = () => {
   return (
     <div className="space-y-4 overflow-x-hidden w-full  mx-auto">
       <Card>
-        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 overflow-x-auto">
-          <CardTitle className="text-xl font-semibold whitespace-nowrap">
+        <CardHeader className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          <CardTitle className="text-2xl font-bold whitespace-nowrap flex items-center gap-2">
+            <Package className="h-7 w-7" />
             Vendor Items Management
           </CardTitle>
 
-          <div className="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64 min-w-50">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search vendor item..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8"
-              />
-            </div>
-
-            <Select
-              value={statusFilter}
-              onValueChange={(val) => setStatusFilter(val)}>
-              <SelectTrigger className="w-37.5 min-w-37.5">
-                <SelectValue placeholder="Filter status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All</SelectItem>
-                <SelectItem value="true">Active</SelectItem>
-                <SelectItem value="false">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex gap-2 ml-auto">
+            <Link href="/super-admin/vendor-items/add">
+              <Button size="sm" className="gap-2 cursor-pointer">
+                + Add Vendor Item
+              </Button>
+            </Link>
+            <Button
+              size="sm"
+              className="gap-2 bg-green-600 hover:bg-green-700"
+              onClick={handleExport}
+              disabled={exporting}>
+              {exporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileDown className="h-4 w-4" />
+              )}
+              {exporting ? "Exporting..." : "Export Excel"}
+            </Button>
           </div>
         </CardHeader>
-      </Card>
 
-      {/* --- GARIS PEMISAH --- */}
-      <hr />
+        <CardContent>
+          {/* Baris Filter Terpadu - Rata Bawah (items-end) */}
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Search */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase px-1">
+                Search Item
+              </label>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Name or SKU..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  className="pl-8 w-60 h-10"
+                />
+              </div>
+            </div>
 
-      {/* === FILTER DAN EXPORT BARU === */}
-      <Card className="p-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <h3 className="w-full text-sm font-semibold text-muted-foreground">
-            Export Filters:
-          </h3>
+            {/* Category */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase px-1">
+                Category
+              </label>
+              <Select
+                value={categoryFilter}
+                onValueChange={(val) => {
+                  setCategoryFilter(val);
+                  setPage(1);
+                }}>
+                <SelectTrigger className="w-48 h-10">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Categories</SelectItem>
+                  {categoryOptions.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Filter Category ID untuk Export */}
-          <Select value={exportCategoryId} onValueChange={setExportCategoryId}>
-            <SelectTrigger className="w-50">
-              <SelectValue placeholder="Filter Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Categories</SelectItem>
-              {categoryOptions.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {/* Status */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase px-1">
+                Status
+              </label>
+              <Select
+                value={statusFilter}
+                onValueChange={(val) => {
+                  setStatusFilter(val);
+                  setPage(1);
+                }}>
+                <SelectTrigger className="w-32 h-10">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All</SelectItem>
+                  <SelectItem value="true">Active</SelectItem>
+                  <SelectItem value="false">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Filter Tanggal Mulai */}
-          <div className="flex flex-col">
-            <label className="text-xs font-medium text-muted-foreground mb-1">
-              Start Date
-            </label>
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-37.5"
-            />
-          </div>
+            {/* Date Range */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase px-1">
+                Date Range
+              </label>
+              <div className="flex items-center gap-2">
+                <DatePickerHelper
+                  date={startDate}
+                  setDate={(date) => {
+                    setStartDate(date);
+                    setPage(1);
+                  }}
+                  placeholder="Start Date"
+                />
+                <span className="text-muted-foreground">-</span>
+                <DatePickerHelper
+                  date={endDate}
+                  setDate={(date) => {
+                    setEndDate(date);
+                    setPage(1);
+                  }}
+                  placeholder="End Date"
+                />
+              </div>
+            </div>
 
-          {/* Filter Tanggal Akhir */}
-          <div className="flex flex-col">
-            <label className="text-xs font-medium text-muted-foreground mb-1">
-              End Date
-            </label>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-37.5"
-            />
-          </div>
-
-          {/* Tombol Export */}
-          <Button
-            size="sm"
-            className="gap-2 bg-green-600 hover:bg-green-700 ml-auto"
-            onClick={handleExport}
-            disabled={exporting}>
-            {exporting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileDown className="h-4 w-4" />
+            {/* Clear Filter */}
+            {(startDate ||
+              endDate ||
+              statusFilter !== "ALL" ||
+              categoryFilter !== "ALL" ||
+              search) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStartDate(undefined);
+                  setEndDate(undefined);
+                  setStatusFilter("ALL");
+                  setCategoryFilter("ALL");
+                  setSearch("");
+                  setPage(1);
+                }}
+                className="h-10 text-muted-foreground hover:text-red-600">
+                Clear
+              </Button>
             )}
-            {exporting ? "Exporting..." : "Export to Excel"}
-          </Button>
-        </div>
+          </div>
+        </CardContent>
       </Card>
-      {/* --- END: FILTER DAN EXPORT BARU --- */}
-      <div className="p-1 flex justify-start">
-        <Link href="/super-admin/vendor-items/add">
-          <Button size="sm" className="gap-2 cursor-pointer">
-            + Add Vendor Item
-          </Button>
-        </Link>
-      </div>
 
       <Card className="w-full">
         <CardContent className="p-0">

@@ -185,52 +185,6 @@ export default function InvoiceDetailPage() {
     loadData();
   }, [loadData]);
 
-  // const handleDownloadPDF = async () => {
-  //   const element = invoiceRef.current;
-  //   if (!element) return;
-
-  //   setIsDownloading(true);
-  //   try {
-  //     const images = element.querySelectorAll("img");
-  //     const promises = Array.from(images).map((img) => {
-  //       if (img.complete) return Promise.resolve();
-  //       return new Promise((resolve) => {
-  //         img.onload = resolve;
-  //         img.onerror = resolve;
-  //       });
-  //     });
-  //     await Promise.all(promises);
-
-  //     const canvas = await html2canvas(element, {
-  //       scale: 2,
-  //       useCORS: true,
-  //       logging: true,
-  //       backgroundColor: "#ffffff",
-  //       onclone: (clonedDoc) => {
-  //         const clonedElement = clonedDoc.getElementById("invoice-content");
-  //         if (clonedElement) {
-  //           clonedElement.style.boxShadow = "none";
-  //         }
-  //       },
-  //     });
-
-  //     const imgData = canvas.toDataURL("image/jpeg", 1.0);
-  //     const pdf = new jsPDF("p", "mm", "a4");
-  //     const pdfWidth = pdf.internal.pageSize.getWidth();
-  //     const pdfHeight = pdf.internal.pageSize.getHeight();
-
-  //     pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-  //     const fileName = `Invoice-${invoice?.invoiceNumber || invoice?.id}.pdf`;
-  //     pdf.save(fileName);
-  //     toast.success("Berhasil download PDF");
-  //   } catch (error) {
-  //     console.error("Failed to download PDF", error);
-  //     toast.error("Gagal mendownload PDF");
-  //   } finally {
-  //     setIsDownloading(false);
-  //   }
-  // };
-
   const handleMarkAsPaid = async () => {
     if (!invoice || status !== "authenticated") return;
     setIsPaying(true);
@@ -384,62 +338,90 @@ export default function InvoiceDetailPage() {
               />
             </div>
 
-            {/* 2. CONTACT INFO & INVOICE META */}
             <div className="mb-8 w-full">
-              <table className=" w-full">
+              <table className="w-full">
                 <tbody>
                   <tr>
-                    <td className="w-25 font-medium pr-2 text-left">Phone</td>
-                    <td className="text-left">
-                      : {salesData.phone} ({salesData.name.split(" ")[0]})
+                    <td className="w-25 font-medium pr-2 align-top text-left py-0.5">
+                      Phone
+                    </td>
+                    <td className="align-top text-left py-0.5">
+                      <div className="flex">
+                        <span className="w-3 mr-1">:</span>
+                        <div className="flex-1">
+                          {salesData.phone} ({salesData.name.split(" ")[0]})
+                        </div>
+                      </div>
                     </td>
                   </tr>
                   <tr>
-                    <td className="font-medium pr-2 text-left">E-mail</td>
-                    <td className="text-left">: goenakan.id@gmail.com</td>
+                    <td className="font-medium pr-2 align-top text-left py-0.5">
+                      E-mail
+                    </td>
+                    <td className="align-top text-left py-0.5">
+                      <div className="flex">
+                        <span className="w-3 mr-1">:</span>
+                        <div className="flex-1">goenakan.id@gmail.com</div>
+                      </div>
+                    </td>
                   </tr>
                   <tr>
                     <td className="h-2"></td>
                   </tr>
 
                   <tr>
-                    <td className="font-medium pr-2 text-left">Invoice Date</td>
-                    <td className="text-left">
-                      :{" "}
-                      {format(createdDate, "dd MMMM yyyy", {
-                        locale: idLocale,
-                      })}
+                    <td className="font-medium pr-2 align-top text-left py-0.5">
+                      Invoice Date
+                    </td>
+                    <td className="align-top text-left py-0.5">
+                      <div className="flex">
+                        <span className="w-3 mr-1">:</span>
+                        <div className="flex-1">
+                          {format(createdDate, "dd MMMM yyyy", {
+                            locale: idLocale,
+                          })}
+                        </div>
+                      </div>
                     </td>
                   </tr>
 
                   {invoice.dueDate && (
                     <tr>
-                      <td className="font-medium pr-2 text-left text-red-600">
+                      <td className="font-medium pr-2 align-top text-left text-red-600 py-0.5">
                         Due Date
                       </td>
-                      <td className="text-left text-red-600 font-medium">
-                        :{" "}
-                        {format(new Date(invoice.dueDate), "dd MMMM yyyy", {
-                          locale: idLocale,
-                        })}
+                      <td className="align-top text-left text-red-600 font-medium py-0.5">
+                        <div className="flex">
+                          <span className="w-3 mr-1">:</span>
+                          <div className="flex-1">
+                            {format(new Date(invoice.dueDate), "dd MMMM yyyy", {
+                              locale: idLocale,
+                            })}
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   )}
                   <tr>
-                    <td className="font-medium pr-2 text-left">Invoice No.</td>
-                    <td className="text-left uppercase font-bold">
-                      : {displayInvoiceNo}
+                    <td className="font-medium pr-2 align-top text-left py-0.5">
+                      Invoice No.
+                    </td>
+                    <td className="align-top text-left uppercase font-bold py-0.5">
+                      <div className="flex">
+                        <span className="w-3 mr-1">:</span>
+                        <div className="flex-1">{displayInvoiceNo}</div>
+                      </div>
                     </td>
                   </tr>
 
                   {previousInvoices.length > 0 && (
                     <tr>
-                      <td className="font-medium pr-2 text-left text-slate-700 align-top">
+                      <td className="font-medium pr-2 align-top text-left text-slate-700 py-0.5">
                         Prev. Invoice
                       </td>
-                      <td className="text-left uppercase text-slate-700 font-medium">
+                      <td className="align-top text-left uppercase text-slate-700 font-medium py-0.5">
                         <div className="flex">
-                          <span className="whitespace-pre mr-1">: </span>
+                          <span className="w-3 mr-1">:</span>
                           <div className="flex-1 leading-relaxed">
                             {previousInvoices.map((prevInv, index) => (
                               <span key={prevInv.id} className="inline-block">
@@ -461,29 +443,45 @@ export default function InvoiceDetailPage() {
                   )}
 
                   <tr>
-                    <td className="font-medium pr-2 text-left">Currency</td>
-                    <td className="text-left">: IDR</td>
+                    <td className="font-medium pr-2 align-top text-left py-0.5">
+                      Currency
+                    </td>
+                    <td className="align-top text-left py-0.5">
+                      <div className="flex">
+                        <span className="w-3 mr-1">:</span>
+                        <div className="flex-1">IDR</div>
+                      </div>
+                    </td>
                   </tr>
                   {invoice.status === "PAID" && invoice.method && (
                     <tr>
-                      <td className="font-medium pr-2 text-left text-green-600">
+                      <td className="font-medium pr-2 align-top text-left text-green-600 py-0.5">
                         Paid Via
                       </td>
-                      <td className="text-left text-green-600 font-bold uppercase">
-                        : {invoice.method.replace("_", " ")}
+                      <td className="align-top text-left text-green-600 font-bold uppercase py-0.5">
+                        <div className="flex">
+                          <span className="w-3 mr-1">:</span>
+                          <div className="flex-1">
+                            {invoice.method.replace("_", " ")}
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   )}
                   {invoice.status === "PAID" && invoice.paidAt && (
                     <tr>
-                      <td className="font-medium pr-2 text-left text-green-600">
+                      <td className="font-medium pr-2 align-top text-left text-green-600 py-0.5">
                         Date Paid
                       </td>
-                      <td className="text-left text-green-600 font-bold uppercase">
-                        :{" "}
-                        {format(new Date(invoice.paidAt), "dd MMMM yyyy", {
-                          locale: idLocale,
-                        })}
+                      <td className="align-top text-left text-green-600 font-bold uppercase py-0.5">
+                        <div className="flex">
+                          <span className="w-3 mr-1">:</span>
+                          <div className="flex-1">
+                            {format(new Date(invoice.paidAt), "dd MMMM yyyy", {
+                              locale: idLocale,
+                            })}
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   )}
@@ -501,7 +499,10 @@ export default function InvoiceDetailPage() {
                   <tr>
                     <td className="w-25 font-medium align-top py-0.5">Name</td>
                     <td className="align-top font-bold uppercase py-0.5">
-                      : {clientName}
+                      <div className="flex">
+                        <span className="w-3 mr-1">:</span>
+                        <div className="flex-1">{clientName}</div>
+                      </div>
                     </td>
                   </tr>
                   {isB2B && (
@@ -511,17 +512,25 @@ export default function InvoiceDetailPage() {
                           Department
                         </td>
                         <td className="align-top py-0.5">
-                          : {departmentName || "-"}{" "}
-                          {picName
-                            ? `(UP: ${picPrefix ? picPrefix + " " : ""}${picName})`
-                            : ""}
+                          <div className="flex">
+                            <span className="w-3 mr-1">:</span>
+                            <div className="flex-1">
+                              {departmentName || "-"}{" "}
+                              {picName
+                                ? `(UP: ${picPrefix ? picPrefix + " " : ""}${picName})`
+                                : ""}
+                            </div>
+                          </div>
                         </td>
                       </tr>
 
                       <tr>
                         <td className="font-medium align-top py-0.5">Phone</td>
                         <td className="align-top py-0.5">
-                          : {picPhone || "-"}
+                          <div className="flex">
+                            <span className="w-3 mr-1">:</span>
+                            <div className="flex-1">{picPhone || "-"}</div>
+                          </div>
                         </td>
                       </tr>
                     </>
@@ -529,12 +538,24 @@ export default function InvoiceDetailPage() {
                   <tr>
                     <td className="font-medium align-top py-0.5">PO No.</td>
                     <td className="align-top py-0.5">
-                      : {invoice?.order?.poNumber || "-"}
+                      <div className="flex">
+                        <span className="w-3 mr-1">:</span>
+                        <div className="flex-1">
+                          {invoice?.order?.poNumber || "-"}
+                        </div>
+                      </div>
                     </td>
                   </tr>
                   <tr>
                     <td className="font-medium align-top py-0.5">Address</td>
-                    <td className="align-top py-0.5">: {clientAddress}</td>
+                    <td className="align-top py-0.5">
+                      <div className="flex">
+                        <span className="w-3 mr-1">:</span>
+                        <div className="flex-1 text-justify pr-4">
+                          {clientAddress}
+                        </div>
+                      </div>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -598,19 +619,16 @@ export default function InvoiceDetailPage() {
                     </tr>
                   ))}
 
-                  {/* Jika lebih dari 1 produk, tambahkan Amount Due (Total Order) di bawah tabel item */}
-                  {invoice.items.length > 1 && (
-                    <tr className="text-center bg-[#f9fafb]">
-                      <td
-                        colSpan={4}
-                        className="border border-[#94a3b8] py-2 text-right px-3 font-bold text-gray-700">
-                        Total Amount Due
-                      </td>
-                      <td className="border border-[#94a3b8] py-2 text-right px-2 font-bold text-gray-900">
-                        {formatCurrency(calculatedOrderTotal)}
-                      </td>
-                    </tr>
-                  )}
+                  <tr className="text-center bg-[#f9fafb]">
+                    <td
+                      colSpan={4}
+                      className="border border-[#94a3b8] py-2 text-right px-3 font-bold text-gray-700">
+                      Total Amount Due
+                    </td>
+                    <td className="border border-[#94a3b8] py-2 text-right px-2 font-bold text-gray-900">
+                      {formatCurrency(calculatedOrderTotal)}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
