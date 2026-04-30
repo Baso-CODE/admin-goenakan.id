@@ -1,18 +1,26 @@
-// app/super-admin/components/tabs/OpsDashboardTab.tsx
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+"use client";
+
+import OpsLogisticsLateDeliveries from "../customer-analytic/opsLogisticsLateDeliveries";
+import OpsLogisticsAverages from "../ops/opsLogisticsAverages";
+import OpsLogisticsMetrics from "../ops/opsLogisticsMetrics";
+import OpsQuotationSection from "../ops/opsQuotationSection";
+import OpsSampleSection from "../ops/opsSampleSection";
 
 export default function OpsDashboardTab() {
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <Card>
-        <CardHeader>
-          <CardTitle>Operational Dashboard</CardTitle>
-        </CardHeader>
-        <CardContent className="h-64 flex items-center justify-center text-muted-foreground bg-slate-50 rounded-md">
-          {/* Nanti masukkan data antrean order, stok kritis, performa staf dll */}
-          Area ini sedang dalam pengembangan...
-        </CardContent>
-      </Card>
+    <div className="space-y-8 animate-in fade-in duration-500 mt-6 pb-10">
+      {/* SECTION A: LOGISTICS */}
+      <div className="space-y-4">
+        <OpsLogisticsMetrics />
+        <OpsLogisticsAverages />
+        <OpsLogisticsLateDeliveries />
+      </div>
+
+      {/* SECTION B: SAMPLE */}
+      <OpsSampleSection />
+
+      {/* SECTION C: QUOTATION */}
+      <OpsQuotationSection />
     </div>
   );
 }

@@ -35,6 +35,7 @@ import {
   UserCircle,
   Users,
 } from "lucide-react";
+import Link from "next/link";
 import { NavMain } from "./NavMain";
 import { NavProjects } from "./nav-project";
 import { NavUser } from "./nav-user";
@@ -271,14 +272,14 @@ export default function SidebarRole({ ...props }) {
         {isSuperAdmin && (
           <SidebarMenu className="p-2">
             <SidebarMenuItem>
-              <a
+              <Link
                 href="/super-admin"
                 className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
                 <LucideChartNetwork className="h-4 w-4" />
                 <span className="group-data-[collapsible=icon]:hidden">
                   Sales Dashboard
                 </span>
-              </a>
+              </Link>
             </SidebarMenuItem>
           </SidebarMenu>
         )}

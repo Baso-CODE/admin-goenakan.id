@@ -1,0 +1,120 @@
+"use client";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  CheckCircle2,
+  Clock,
+  FileEdit,
+  SendHorizontal,
+  XCircle,
+} from "lucide-react";
+
+export default function OpsQuotationSection() {
+  // === DUMMY DATA ===
+  const quotationData = {
+    draft: "88,978.00",
+    sent: "88,978.00",
+    accept: "88,978.00",
+    reject: "88,978.00",
+    avgLeadTime: "2.5", // Angka rata-rata hari
+  };
+
+  return (
+    <div className="space-y-4 mt-8">
+      {/* PEMBATAS SECTION C */}
+      <div className="flex items-center gap-4">
+        <h2 className="text-lg font-bold text-foreground whitespace-nowrap">
+          C. Quotation
+        </h2>
+        {/* bg-border menyesuaikan garis dengan light/dark mode */}
+        <div className="h-px w-full bg-border"></div>
+      </div>
+
+      {/* ROW 1: 3 METRICS (Draft, Sent, Accept) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 1. Draft */}
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Draft
+            </CardTitle>
+            <FileEdit className="h-4 w-4 text-slate-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">
+              {quotationData.draft}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 2. Sent */}
+        <Card className="shadow-sm border-blue-100 dark:border-blue-900/50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Sent
+            </CardTitle>
+            <SendHorizontal className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">
+              {quotationData.sent}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 3. Accept */}
+        <Card className="shadow-sm border-emerald-100 dark:border-emerald-900/50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Accept
+            </CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">
+              {quotationData.accept}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ROW 2: 2 METRICS (Reject, Average Lead Time) - Full Width */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* 4. Reject */}
+        <Card className="shadow-sm border-rose-100 dark:border-rose-900/50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Reject
+            </CardTitle>
+            <XCircle className="h-4 w-4 text-rose-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">
+              {quotationData.reject}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 5. Average sending quotation lead time */}
+        <Card className="shadow-sm border-amber-100 dark:border-amber-900/50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground leading-tight">
+              Average sending quotation lead time
+            </CardTitle>
+            <Clock className="h-4 w-4 text-amber-500 shrink-0 ml-2" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-2 mt-1">
+              <div className="text-2xl font-bold text-foreground">
+                {quotationData.avgLeadTime}
+              </div>
+              <span className="text-sm text-muted-foreground font-medium">
+                hari
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
