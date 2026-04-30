@@ -28,9 +28,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
+import { format } from "date-fns";
 import * as LucideIcons from "lucide-react";
 import { Search } from "lucide-react";
 import Link from "next/link";
@@ -81,10 +83,8 @@ const VendorsTable = () => {
 
   // export
   const [exporting, setExporting] = useState(false);
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
-  const [exportIsActiveFilter, setExportIsActiveFilter] =
-    useState<string>("ALL");
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
 
   // === FETCH VENDORS ===
   const fetchVendors = async () => {
@@ -93,30 +93,28 @@ const VendorsTable = () => {
     setLoading(true);
     setError(null);
     try {
-      // 1. Build Query Params
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
         isActive: statusFilter,
       });
 
-      if (debouncedSearch.trim()) {
+      if (debouncedSearch.trim())
         params.append("search", debouncedSearch.trim());
-      }
+
+      // Tambahkan filter tanggal ke API tabel jika ada
+      if (startDate)
+        params.append("startDate", format(startDate, "yyyy-MM-dd"));
+      if (endDate) params.append("endDate", format(endDate, "yyyy-MM-dd"));
 
       const res = await fetchApi(`/vendors?${params}`);
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to fetch vendors");
-      }
+      if (!res.ok) throw new Error("Failed to fetch vendors");
 
       const result = await res.json();
       setVendors(result.data || []);
       setMeta(result.meta);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Unknown error";
-      setError(msg);
+      setError(error instanceof Error ? error.message : "Unknown error");
       toast.error("Failed to load vendors");
     } finally {
       setLoading(false);
@@ -125,54 +123,46 @@ const VendorsTable = () => {
 
   useEffect(() => {
     fetchVendors();
-  }, [page, debouncedSearch, statusFilter, status, fetchApi]);
+  }, [
+    page,
+    debouncedSearch,
+    statusFilter,
+    startDate,
+    endDate,
+    status,
+    fetchApi,
+  ]);
 
   const handleExport = async () => {
     setExporting(true);
     try {
-      // Kumpulkan Filter untuk Export
       const exportFilters: Record<string, string> = {};
 
-      if (startDate) exportFilters.startDate = startDate;
-      if (endDate) exportFilters.endDate = endDate;
-      // Gunakan filter status aktif khusus untuk export
-      if (exportIsActiveFilter !== "ALL")
-        exportFilters.isActive = exportIsActiveFilter;
-      const queryString = new URLSearchParams(exportFilters).toString();
+      if (startDate) exportFilters.startDate = format(startDate, "yyyy-MM-dd");
+      if (endDate) exportFilters.endDate = format(endDate, "yyyy-MM-dd");
+      if (statusFilter !== "ALL") exportFilters.isActive = statusFilter;
+      if (debouncedSearch.trim()) exportFilters.search = debouncedSearch.trim();
 
+      const queryString = new URLSearchParams(exportFilters).toString();
       const response = await fetchApi(`/vendors/export/excel?${queryString}`, {
         method: "GET",
       });
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(
-          errData.message || "Export failed. Server responded with an error.",
-        );
-      }
-      // Proses File Binary (Blob)
-      const blob = await response.blob();
-      const filename =
-        response.headers
-          .get("Content-Disposition")
-          ?.match(/filename="(.+)"/)?.[1] || "vendor_master_export.xlsx";
+      if (!response.ok) throw new Error("Export failed");
 
-      // Membuat URL objek untuk file yang akan diunduh
+      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename;
+      a.download = `vendor_export_${format(new Date(), "yyyyMMdd")}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
 
-      toast.success("Data Vendor berhasil di-export ke Excel!");
+      toast.success("Data Vendor berhasil di-export!");
     } catch (error) {
-      console.error("Export Error:", error);
-      toast.error(
-        "Gagal meng-export data. Pastikan filter sudah benar dan Anda memiliki akses.",
-      );
+      toast.error("Gagal meng-export data.");
     } finally {
       setExporting(false);
     }
@@ -207,111 +197,125 @@ const VendorsTable = () => {
   return (
     <div className="space-y-4 overflow-x-hidden w-full mx-auto">
       <Card>
-        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <CardTitle className="text-xl font-semibold">
+        <CardHeader className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          <CardTitle className="text-2xl font-bold whitespace-nowrap flex items-center gap-2">
+            <LucideIcons.Package className="h-7 w-7" />
             Vendor Management
           </CardTitle>
 
-          <div className="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64 min-w-50">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search vendor..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8"
+          <div className="flex gap-2 ml-auto">
+            <Link href="/super-admin/vendors/add">
+              <Button size="sm" className="gap-2">
+                + Add Vendor
+              </Button>
+            </Link>
+            <Button
+              size="sm"
+              className="gap-2 bg-green-600 hover:bg-green-700"
+              onClick={handleExport}
+              disabled={exporting}>
+              {exporting ? (
+                <LucideIcons.Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <LucideIcons.FileDown className="h-4 w-4" />
+              )}
+              {exporting ? "Exporting..." : "Export Excel"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Baris Filter Terpadu */}
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Search */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase px-1">
+                Search
+              </label>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search vendor..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  className="pl-8 w-60 h-10"
+                />
+              </div>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase px-1">
+                Status
+              </label>
+              <Select
+                value={statusFilter}
+                onValueChange={(val) => {
+                  setStatusFilter(val);
+                  setPage(1);
+                }}>
+                <SelectTrigger className="w-36 h-10">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Status</SelectItem>
+                  <SelectItem value="true">Active</SelectItem>
+                  <SelectItem value="false">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date Range Picker */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase px-1">
+                Start Date
+              </label>
+              <DatePickerHelper
+                date={startDate}
+                setDate={(date) => {
+                  setStartDate(date);
+                  setPage(1);
+                }}
+                placeholder="Start Date"
               />
             </div>
 
-            <Select
-              value={statusFilter}
-              onValueChange={(val) => setStatusFilter(val)}>
-              <SelectTrigger className="w-37.5">
-                <SelectValue placeholder="Filter status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All</SelectItem>
-                <SelectItem value="true">Active</SelectItem>
-                <SelectItem value="false">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-      </Card>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase px-1">
+                End Date
+              </label>
+              <DatePickerHelper
+                date={endDate}
+                setDate={(date) => {
+                  setEndDate(date);
+                  setPage(1);
+                }}
+                placeholder="End Date"
+              />
+            </div>
 
-      <hr />
-
-      {/* === FILTER DAN EXPORT BARU === */}
-      <Card className="p-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <h3 className="w-full text-sm font-semibold text-muted-foreground">
-            Export Filters:
-          </h3>
-
-          {/* Filter Status Aktif Export */}
-          <Select
-            value={exportIsActiveFilter}
-            onValueChange={setExportIsActiveFilter}>
-            <SelectTrigger className="w-30">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Status</SelectItem>
-              <SelectItem value="true">Active</SelectItem>
-              <SelectItem value="false">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Filter Tanggal Mulai */}
-          <div className="flex flex-col">
-            <label className="text-xs font-medium text-muted-foreground mb-1">
-              Start Date
-            </label>
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-37.5"
-            />
-          </div>
-
-          {/* Filter Tanggal Akhir */}
-          <div className="flex flex-col">
-            <label className="text-xs font-medium text-muted-foreground mb-1">
-              End Date
-            </label>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-37.5"
-            />
-          </div>
-
-          {/* Tombol Export */}
-          <Button
-            size="sm"
-            className="gap-2 bg-green-600 hover:bg-green-700 ml-auto"
-            onClick={handleExport}
-            disabled={exporting}>
-            {exporting ? (
-              <LucideIcons.Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <LucideIcons.FileDown className="h-4 w-4" />
+            {/* Clear Filter Button */}
+            {(startDate || endDate || statusFilter !== "ALL" || search) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStartDate(undefined);
+                  setEndDate(undefined);
+                  setStatusFilter("ALL");
+                  setSearch("");
+                  setPage(1);
+                }}
+                className="h-10 text-muted-foreground hover:text-red-600 transition-colors">
+                Clear Filters
+              </Button>
             )}
-            {exporting ? "Exporting..." : "Export to Excel"}
-          </Button>
-        </div>
+          </div>
+        </CardContent>
       </Card>
-      {/* --- END: FILTER DAN EXPORT BARU --- */}
-      <div className="p-1 flex justify-start">
-        <Link href="/super-admin/vendors/add">
-          <Button size="sm" className="gap-2">
-            + Add Vendor
-          </Button>
-        </Link>
-      </div>
 
       <Card className="w-full">
         <CardContent className="p-0">

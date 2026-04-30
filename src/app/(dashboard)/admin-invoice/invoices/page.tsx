@@ -73,11 +73,11 @@ const formatCurrency = (amount: number) => {
 const getStatusBadgeVariant = (status: string) => {
   switch (status) {
     case "PAID":
-      return "default"; // Hitam/Primary
+      return "default";
     case "UNPAID":
-      return "secondary"; // Abu-abu
+      return "secondary";
     case "OVERDUE":
-      return "destructive"; // Merah
+      return "destructive";
     default:
       return "outline";
   }

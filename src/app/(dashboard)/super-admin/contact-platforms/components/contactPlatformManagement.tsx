@@ -21,9 +21,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
+import { format } from "date-fns";
 import * as LucideIcons from "lucide-react";
 import { Search } from "lucide-react";
 import Link from "next/link";
@@ -63,47 +65,40 @@ export default function ContactPlatformsManagement() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // const [typeFilter, setTypeFilter] = useState<string>("ALL");
-
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
 
   const [isActiveFilter, setIsActiveFilter] = useState<string>("ALL");
 
+  // === FETCH DATA ===
   const fetchContactPlatforms = async () => {
     setLoading(true);
     setError(null);
     try {
-      // 🛑 Jangan jalan jika sesi belum siap
       if (status === "loading") return;
 
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
+        isActive: isActiveFilter,
       });
 
-      if (debouncedSearch.trim()) {
+      if (debouncedSearch.trim())
         params.append("search", debouncedSearch.trim());
-      }
 
-      // PENTING: Tambahkan filter Status Aktif untuk tampilan tabel
-      if (isActiveFilter !== "ALL") {
-        params.append("isActive", isActiveFilter);
-      }
+      // Tambahkan filter tanggal ke kueri tabel
+      if (startDate)
+        params.append("startDate", format(startDate, "yyyy-MM-dd"));
+      if (endDate) params.append("endDate", format(endDate, "yyyy-MM-dd"));
 
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
       const res = await fetchApi(`/contact-platforms?${params}`);
-
       const result = await res.json();
 
-      if (!res.ok) {
-        throw new Error(result.message || "Failed to fetch data");
-      }
+      if (!res.ok) throw new Error(result.message || "Failed to fetch data");
 
       setPlatforms(result.data || []);
       setMeta(result.meta);
     } catch (error) {
-      console.error(error);
       setError(error instanceof Error ? error.message : "Unknown error");
       toast.error("Failed to load contact platforms");
     } finally {
@@ -113,71 +108,41 @@ export default function ContactPlatformsManagement() {
 
   useEffect(() => {
     fetchContactPlatforms();
-  }, [page, debouncedSearch, isActiveFilter]);
+  }, [page, debouncedSearch, isActiveFilter, startDate, endDate, status]);
 
+  // === HANDLE EXPORT ===
   const handleExport = async () => {
     setExporting(true);
     try {
-      // 2. Kumpulkan Filter untuk Export
       const exportFilters: Record<string, string> = {};
 
-      if (startDate) exportFilters.startDate = startDate;
-      if (endDate) exportFilters.endDate = endDate;
-
-      // Logika isActiveFilter: Hanya tambahkan jika BUKAN 'ALL'
-      if (isActiveFilter !== "ALL") {
-        // Backend mengharapkan 'true' atau 'false'
-        exportFilters.isActive = isActiveFilter;
-      }
-
-      // NOTE: Filter search (debouncedSearch) tidak disertakan di sini.
-      // Jika Anda ingin search juga di-export, uncomment baris ini:
-      // if (debouncedSearch.trim()) exportFilters.search = debouncedSearch.trim();
+      if (startDate) exportFilters.startDate = format(startDate, "yyyy-MM-dd");
+      if (endDate) exportFilters.endDate = format(endDate, "yyyy-MM-dd");
+      if (isActiveFilter !== "ALL") exportFilters.isActive = isActiveFilter;
+      if (debouncedSearch.trim()) exportFilters.search = debouncedSearch.trim();
 
       const queryString = new URLSearchParams(exportFilters).toString();
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
-      const response = await fetchApi(`/contact-platforms?${queryString}`);
 
-      const result = await response.json();
+      // Pastikan endpoint backend untuk export sudah benar
+      const response = await fetchApi(
+        `/contact-platforms/export/excel?${queryString}`,
+      );
 
-      if (!response.ok) {
-        throw new Error(result.message || "Failed to fetch data");
-      }
+      if (!response.ok) throw new Error("Export failed");
 
-      if (!response.ok) {
-        const errorBody = await response
-          .json()
-          .catch(() => ({ message: "Unknown error" }));
-        throw new Error(
-          errorBody.message || "Export failed. Server responded with an error.",
-        );
-      }
-
-      // 4. Proses File Binary (Blob)
       const blob = await response.blob();
-      const filename =
-        response.headers
-          .get("Content-Disposition")
-          ?.match(/filename="(.+)"/)?.[1] || "contact_platforms.xlsx";
-
-      // Membuat URL objek untuk file yang akan diunduh
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename; // Nama file download
+      a.download = `contact_platforms_${format(new Date(), "yyyyMMdd")}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url); // Bersihkan URL
+      window.URL.revokeObjectURL(url);
 
-      toast.success("Data berhasil di-export ke Excel!");
+      toast.success("Data berhasil di-export!");
     } catch (error) {
-      console.error("Export Error:", error);
-      toast.error(
-        `Gagal meng-export data: ${
-          error instanceof Error ? error.message : "Error tidak diketahui"
-        }`,
-      );
+      toast.error("Gagal meng-export data.");
     } finally {
       setExporting(false);
     }
@@ -210,96 +175,125 @@ export default function ContactPlatformsManagement() {
 
   return (
     <div className="space-y-4 w-full  mx-auto">
-      {/* === HEADER === */}
+      {/* === HEADER & FILTER TERPADU === */}
       <Card>
-        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <CardTitle className="text-xl font-semibold">
-            Contact Platforms Management
+        <CardHeader className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          <CardTitle className="text-2xl font-bold whitespace-nowrap flex items-center gap-2">
+            <LucideIcons.Package className="h-7 w-7" />
+            Contact Platforms
           </CardTitle>
 
-          {/* SEARCH */}
-          <div className="relative flex-1 md:w-32">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search platform..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8"
-            />
+          <div className="flex gap-2 ml-auto">
+            <Link href="/super-admin/contact-platforms/add">
+              <Button size="sm" className="gap-2 cursor-pointer">
+                + Add Platform
+              </Button>
+            </Link>
+            <Button
+              size="sm"
+              className="gap-2 bg-green-600 hover:bg-green-700"
+              onClick={handleExport}
+              disabled={exporting}>
+              {exporting ? (
+                <LucideIcons.Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <LucideIcons.FileDown className="h-4 w-4" />
+              )}
+              {exporting ? "Exporting..." : "Export Excel"}
+            </Button>
           </div>
         </CardHeader>
-      </Card>
 
-      {/* === FILTER DAN EXPORT BARU === */}
-      <Card className="p-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <h3 className="w-full text-sm font-semibold text-muted-foreground">
-            Export Filters:
-          </h3>
+        <CardContent>
+          {/* Baris Filter - Simetris Rata Bawah */}
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Search */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase px-1">
+                Search
+              </label>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Platform name..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  className="pl-8 w-60 h-10"
+                />
+              </div>
+            </div>
 
-          <Select value={isActiveFilter} onValueChange={setIsActiveFilter}>
-            <SelectTrigger className="w-30">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Status</SelectItem>
-              <SelectItem value="true">Active</SelectItem>
-              <SelectItem value="false">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
+            {/* Status */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase px-1">
+                Status
+              </label>
+              <Select
+                value={isActiveFilter}
+                onValueChange={(val) => {
+                  setIsActiveFilter(val);
+                  setPage(1);
+                }}>
+                <SelectTrigger className="w-32 h-10">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Status</SelectItem>
+                  <SelectItem value="true">Active</SelectItem>
+                  <SelectItem value="false">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Filter Tanggal Mulai */}
-          <div className="flex flex-col">
-            <label className="text-xs font-medium text-muted-foreground mb-1">
-              Start Date (Creation)
-            </label>
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-37.5"
-            />
-          </div>
+            {/* Date Range Creation */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase px-1">
+                Date Created
+              </label>
+              <div className="flex items-center gap-2">
+                <DatePickerHelper
+                  date={startDate}
+                  setDate={(date) => {
+                    setStartDate(date);
+                    setPage(1);
+                  }}
+                  placeholder="Start Date"
+                />
+                <span className="text-muted-foreground">-</span>
+                <DatePickerHelper
+                  date={endDate}
+                  setDate={(date) => {
+                    setEndDate(date);
+                    setPage(1);
+                  }}
+                  placeholder="End Date"
+                />
+              </div>
+            </div>
 
-          {/* Filter Tanggal Akhir */}
-          <div className="flex flex-col">
-            <label className="text-xs font-medium text-muted-foreground mb-1">
-              End Date (Creation)
-            </label>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-37.5"
-            />
-          </div>
-
-          {/* Tombol Export */}
-          <Button
-            size="sm"
-            className="gap-2 bg-green-600 hover:bg-green-700 ml-auto"
-            onClick={handleExport}
-            disabled={exporting}>
-            {exporting ? (
-              <LucideIcons.Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <LucideIcons.FileDown className="h-4 w-4" />
+            {/* Clear Filter */}
+            {(startDate || endDate || isActiveFilter !== "ALL" || search) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStartDate(undefined);
+                  setEndDate(undefined);
+                  setIsActiveFilter("ALL");
+                  setSearch("");
+                  setPage(1);
+                }}
+                className="h-10 text-muted-foreground hover:text-red-600">
+                Clear
+              </Button>
             )}
-            {exporting ? "Exporting..." : "Export to Excel"}
-          </Button>
-        </div>
+          </div>
+        </CardContent>
       </Card>
-      {/* --- END: FILTER DAN EXPORT BARU --- */}
-
-      {/* === ADD BUTTON === */}
-      <div className="p-1 flex justify-start">
-        <Link href="/super-admin/contact-platforms/add">
-          <Button size="sm" className="gap-2 cursor-pointer">
-            + Add Platform
-          </Button>
-        </Link>
-      </div>
 
       {/* === TABLE (Konten Lain Sudah Benar) === */}
       <Card className="w-full">

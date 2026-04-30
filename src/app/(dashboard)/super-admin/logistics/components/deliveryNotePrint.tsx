@@ -1,37 +1,32 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { useApi } from "@/hooks/useApi";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
-import html2canvas from "html2canvas-pro";
+import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { FileDown, Loader2 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { useApi } from "@/hooks/useApi";
-
 export default function DeliveryNotePrint() {
   const { fetchApi, status } = useApi();
-
   const { shipmentId } = useParams();
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<any>(null);
-
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
 
   // FETCH DATA SHIPMENT
   useEffect(() => {
     const fetchData = async () => {
-      // 🛑 Guard: Jangan jalan jika ID tidak ada atau sesi belum siap
       if (!shipmentId || status !== "authenticated") return;
 
       try {
         setLoading(true);
 
-        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
         const res = await fetchApi(`/logistics/shipments/${shipmentId}`);
 
         if (!res.ok) throw new Error("Gagal mengambil data surat jalan");
@@ -47,7 +42,7 @@ export default function DeliveryNotePrint() {
     };
 
     fetchData();
-  }, [shipmentId, status, fetchApi]); // Tambahkan dependensi lengkap
+  }, [shipmentId, status, fetchApi]);
 
   // === FUNCTION DOWNLOAD PDF ===
   const handleDownloadPDF = async () => {
@@ -101,17 +96,14 @@ export default function DeliveryNotePrint() {
   const {
     deliveryNoteNumber,
     departureDate,
-    arrivalDate,
     order,
     items,
-    remarks,
     destination,
     invoiceNumbers,
     previousDO,
-    isFirstShipment,
     shipmentSequence,
-    totalShipments,
     type,
+    notes,
   } = data;
 
   // Setup Variabel Penerima & PIC
@@ -121,11 +113,11 @@ export default function DeliveryNotePrint() {
   let picDept = "-";
   let picPhone = "-";
 
-  // Setup Variabel Sales (Untuk kontak info di DN)
+  // Setup Variabel Sales
   const salesName = order?.sales?.name || "Goenakan Admin";
   const salesPhone = order?.sales?.phone || "+62 823-8790-2238";
 
-  // Ekstrak data dari struktur relasi backend
+  // Ekstrak data client
   if (order?.client?.b2b) {
     receiverCompany = order.client.b2b.companyName;
     if (order.client.b2b.fullAddress) {
@@ -148,8 +140,63 @@ export default function DeliveryNotePrint() {
     picPhone = order.client.b2c.phone || "-";
   }
 
-  // Cek jika ada invoice di order, kalau tidak ada kita kasih "-"
-  const invoiceNumber = order?.invoices?.[0]?.invoiceNumber || "-";
+  // ==========================================
+  // LOGIKA SHIPMENT SUMMARY (SESUAI GAMBAR)
+  // ==========================================
+  const isMultipleSkus = items?.length > 1;
+  const totalOutstanding =
+    items?.reduce((sum: number, i: any) => sum + (i.inProcessPcs || 0), 0) || 0;
+
+  // Tentukan State Pengiriman
+  const isDirectFull = shipmentSequence === 1 && totalOutstanding === 0;
+  const isPartialFirst = shipmentSequence === 1 && totalOutstanding > 0;
+  const isPartialMid = shipmentSequence > 1 && totalOutstanding > 0;
+  const isPartialFinal = shipmentSequence > 1 && totalOutstanding === 0;
+  const isPartialFlow = !isDirectFull;
+
+  // Helper Formatter
+  const formatValue = (key: string) => {
+    if (!isMultipleSkus)
+      return `${(items?.[0]?.[key] || 0).toLocaleString()} pcs`;
+    return items
+      ?.map(
+        (i: any) =>
+          `${i.orderProduct?.product?.name || "Produk"} (${(i[key] || 0).toLocaleString()} pcs)`,
+      )
+      .join("; ");
+  };
+
+  // String Builder
+  const totalPoString = formatValue("orderedPcs");
+  const currentShipmentString = formatValue("sendPcs");
+  const outstandingString = formatValue("inProcessPcs");
+
+  let prevShippedString = formatValue("deliveredPcs");
+  if (!isMultipleSkus && isPartialFinal) {
+    prevShippedString += " (Total of previous shipments)";
+  }
+
+  // Teks Label "Current Shipment"
+  let currentShipmentLabel = "Current Shipment";
+  if (isPartialFirst) currentShipmentLabel = "Current Shipment (Shipment #1)";
+  else if (isPartialMid)
+    currentShipmentLabel = `Current Shipment (Shipment #${shipmentSequence})`;
+  else if (isPartialFinal)
+    currentShipmentLabel = "Current Shipment (Fulfillment)";
+
+  // Teks "Status"
+  let statusString = "Full Delivery (Order Completed)";
+  if (isPartialFirst)
+    statusString = "Partial Delivery (Next shipment to be advised)";
+  else if (isPartialMid)
+    statusString = "Partial Delivery (Pending Fulfillment)";
+  else if (isPartialFinal)
+    statusString = "Fulfillment Completed (Order Fully Delivered)";
+
+  // Teks "Note" Logika
+  const hasManualNotes = notes && notes.length > 0;
+  const showAutoNotes = isMultipleSkus && isPartialFlow;
+  const showNotesSection = showAutoNotes || hasManualNotes;
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center py-10">
@@ -192,84 +239,124 @@ export default function DeliveryNotePrint() {
               </div>
             </div>
 
-            {type === "OUTBOUND" && totalShipments > 1 && (
-              <div className="mb-4 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 bg-orange-50 border border-orange-300 text-orange-700 text-[11px] font-semibold px-3 py-1 rounded-full">
-                  ⚠ Pengiriman Partial — Surat Jalan ke-{shipmentSequence} dari{" "}
-                  {totalShipments}
-                </span>
-                {isFirstShipment && (
-                  <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-600 text-[10px] px-2 py-1 rounded-full">
-                    Pengiriman Pertama
-                  </span>
-                )}
-                {!isFirstShipment && shipmentSequence === totalShipments && (
-                  <span className="inline-flex items-center gap-1 bg-green-50 border border-green-200 text-green-600 text-[10px] px-2 py-1 rounded-full">
-                    Pengiriman Terakhir
-                  </span>
-                )}
-              </div>
-            )}
-
             <div className="mb-6 flex flex-col items-start">
               <div className="flex flex-col items-start w-full mb-4">
-                <table className="text-[12px] text-left w-full">
+                <table className="text-[12px] text-left w-full border-collapse">
                   <tbody>
+                    {/* Baris Phone */}
                     <tr>
                       <td className="py-0.5 pr-4 align-top w-28 whitespace-nowrap">
                         Phone
                       </td>
                       <td className="py-0.5 align-top font-medium">
-                        : {salesPhone} ({salesName})
+                        <div className="flex">
+                          <span className="w-3 shrink-0">:</span>
+                          <div className="flex-1">
+                            {salesPhone} ({salesName})
+                          </div>
+                        </div>
                       </td>
                     </tr>
+
+                    {/* Baris E-mail */}
                     <tr>
                       <td className="py-0.5 pr-4 align-top whitespace-nowrap">
                         E-mail
                       </td>
                       <td className="py-0.5 align-top font-medium">
-                        : goenakan.id@gmail.com
+                        <div className="flex">
+                          <span className="w-3 shrink-0">:</span>
+                          <div className="flex-1">goenakan.id@gmail.com</div>
+                        </div>
                       </td>
                     </tr>
+
+                    {/* Baris DN Date */}
                     <tr>
                       <td className="py-0.5 pr-4 align-top whitespace-nowrap">
                         DN Date
                       </td>
                       <td className="py-0.5 align-top font-medium">
-                        :{" "}
-                        {departureDate
-                          ? format(new Date(departureDate), "dd MMMM yyyy", {
-                              locale: idLocale,
-                            })
-                          : "-"}
+                        <div className="flex">
+                          <span className="w-3 shrink-0">:</span>
+                          <div className="flex-1">
+                            {departureDate
+                              ? format(
+                                  new Date(departureDate),
+                                  "dd MMMM yyyy",
+                                  {
+                                    locale: idLocale,
+                                  },
+                                )
+                              : "-"}
+                          </div>
+                        </div>
                       </td>
                     </tr>
+
+                    {/* Baris DN No. */}
                     <tr>
                       <td className="py-0.5 pr-4 align-top whitespace-nowrap">
                         DN No.
                       </td>
-                      <td className="py-0.5 align-top font-bold">
-                        : {deliveryNoteNumber || "-"}
+                      <td className="py-0.5 align-top font-bold text-gray-900">
+                        <div className="flex">
+                          <span className="w-3 shrink-0">:</span>
+                          <div className="flex-1 uppercase">
+                            {deliveryNoteNumber || "-"}
+                          </div>
+                        </div>
                       </td>
                     </tr>
+
+                    {/* Baris ETA */}
+                    <tr>
+                      <td className="py-0.5 pr-4 align-top whitespace-nowrap text-[10px]">
+                        ETA
+                      </td>
+                      <td className="py-0.5 align-top font-bold text-[10px]">
+                        <div className="flex">
+                          <span className="w-3 shrink-0">:</span>
+                          <div className="flex-1">
+                            {departureDate
+                              ? format(new Date(departureDate), "MMM dd, yyyy")
+                              : "-"}{" "}
+                            (Estimated)
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Baris Invoice No. */}
                     <tr>
                       <td className="py-0.5 pr-4 align-top whitespace-nowrap">
                         Invoice No.
                       </td>
                       <td className="py-0.5 align-top font-medium wrap-break-word">
-                        :{" "}
-                        {invoiceNumbers && invoiceNumbers.length > 0
-                          ? invoiceNumbers.join(" | ")
-                          : "-"}
+                        <div className="flex">
+                          <span className="w-3 shrink-0">:</span>
+                          <div className="flex-1">
+                            {invoiceNumbers && invoiceNumbers.length > 0
+                              ? invoiceNumbers.join(" | ")
+                              : "-"}
+                          </div>
+                        </div>
                       </td>
                     </tr>
+
+                    {/* Baris Previous DN No. (Opsional) */}
                     {previousDO && type === "OUTBOUND" && (
                       <tr>
-                        <td className="py-0.5 pr-4 align-top whitespace-nowrap">
+                        <td className="py-0.5 pr-4 align-top whitespace-nowrap text-slate-600">
                           Previous DN No.
                         </td>
-                        <td className="py-0.5 align-top font-medium">
-                          : {previousDO.deliveryNoteNumber || "-"}
+                        <td className="py-0.5 align-top font-medium text-slate-600">
+                          <div className="flex">
+                            <span className="w-3 shrink-0">:</span>
+                            <div className="flex-1 uppercase">
+                              {previousDO.deliveryNoteNumber || "-"}
+                            </div>
+                          </div>
                         </td>
                       </tr>
                     )}
@@ -300,7 +387,6 @@ export default function DeliveryNotePrint() {
                         {picName !== "Personal" ? `(UP: ${picName})` : ""}
                       </td>
                     </tr>
-
                     <tr>
                       <td className="py-0.5 align-top whitespace-nowrap">
                         Phone
@@ -331,51 +417,37 @@ export default function DeliveryNotePrint() {
             </div>
 
             {/* ========================================================= */}
-            {/* 3. PRODUCT TABLE */}
+            {/* 3. PRODUCT TABLE (KOLOM SUDAH DI-UPDATE) */}
             {/* ========================================================= */}
             <div className="mb-6 overflow-x-hidden">
-              <table className="w-full border-collapse border border-[#94a3b8] text-[10px]">
+              <table className="w-full border-collapse border border-[#e2e8f0] text-[10px]">
                 <thead>
-                  <tr className="bg-[#f3f4f6] text-center font-bold uppercase text-gray-700 leading-tight">
-                    <th className="border border-[#94a3b8] py-2 w-8">No</th>
-                    <th className="border border-[#94a3b8] py-2 w-24">
-                      Product
+                  <tr className="bg-[#e5e5e5] text-center font-bold text-gray-800 leading-tight">
+                    <th className="border border-[#d4d4d8] py-2 w-8">No.</th>
+                    <th className="border border-[#d4d4d8] py-2">
+                      Product /
                       <br />
-                      Details
+                      Description
                     </th>
-                    <th className="border border-[#94a3b8] py-2">
-                      Nama Barang /<br />
-                      Deskripsi
-                    </th>
-                    <th className="border border-[#94a3b8] py-2 w-16">
-                      Ordered
+                    <th className="border border-[#d4d4d8] py-2 w-16">
+                      Order Qty
                       <br />
-                      (Pcs)
+                      (pcs)
                     </th>
-                    <th className="border border-[#94a3b8] py-2 w-16 bg-blue-50">
-                      Send
+                    <th className="border border-[#d4d4d8] py-2 w-16">
+                      Shipped Qty
                       <br />
-                      (Pcs)
+                      (pcs)
                     </th>
-                    <th className="border border-[#94a3b8] py-2 w-16">
-                      Delivered
+                    <th className="border border-[#d4d4d8] py-2 w-20">
+                      Outstanding
                       <br />
-                      (Pcs)
+                      Qty (pcs)
                     </th>
-                    <th className="border border-[#94a3b8] py-2 w-16">
-                      In Process
+                    <th className="border border-[#d4d4d8] py-2 w-16">
+                      Packaging
                       <br />
-                      (Pcs)
-                    </th>
-                    <th className="border border-[#94a3b8] py-2 w-16">
-                      Total
-                      <br />
-                      Carton
-                    </th>
-                    <th className="border border-[#94a3b8] py-2 w-20">
-                      Date
-                      <br />
-                      Received
+                      (Ctn)
                     </th>
                   </tr>
                 </thead>
@@ -383,74 +455,48 @@ export default function DeliveryNotePrint() {
                   {items?.map((item: any, index: number) => {
                     const product = item.orderProduct.product;
 
+                    // Mengambil nilai mapping backend baru
                     const orderedPcs = item.orderedPcs || 0;
                     const sendPcs = item.sendPcs || 0;
-                    const deliveredPcs = item.deliveredPcs || "-";
-                    const inProcessPcs = item.inProcessPcs || "-";
+                    const outstandingPcs = item.inProcessPcs || 0;
                     const totalCarton = item.totalCarton || "-";
-                    const dateReceived = arrivalDate
-                      ? format(new Date(arrivalDate), "dd/MM/yyyy")
-                      : "    /    /    ";
 
                     return (
                       <tr key={item.id} className="align-middle">
-                        <td className="border border-[#94a3b8] py-2 text-center">
+                        <td className="border border-[#d4d4d8] py-2 text-center text-gray-700 bg-gray-50/50">
                           {index + 1}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 px-2 font-mono text-center wrap-break-word">
-                          {product.sku || "-"}
-                        </td>
-                        <td className="border border-[#94a3b8] py-2 px-2">
-                          {/* 1. Nama Barang */}
-                          <div className="font-bold text-gray-800">
+                        <td className="border border-[#d4d4d8] py-2 px-3 bg-gray-50/50">
+                          <div className="font-bold text-gray-900">
                             {product.name}
                           </div>
-
-                          {/* 2. Nama Varian (Jika Ada) */}
                           {item.orderProduct.variant?.variantName && (
-                            <div className="text-[10px] text-gray-700 font-semibold mt-0.5 leading-tight">
+                            <div className="text-[10px] text-gray-700 font-semibold mt-0.5">
                               Variant: {item.orderProduct.variant.variantName}
                             </div>
                           )}
-
-                          {/* 3. Deskripsi Produk Induk (Jika Ada) */}
-                          {product.description && (
-                            <div className="text-[9px] text-gray-600 mt-0.5 leading-tight">
+                          {/* {product.description && (
+                            <div className="text-[9px] text-gray-600 mt-0.5">
                               {product.description}
                             </div>
-                          )}
-
-                          {/* 4. Catatan Customization / Spesifikasi Tambahan (Jika Ada) */}
+                          )} */}
                           {item.orderProduct.customization && (
-                            <div className="text-[9px] text-gray-500 mt-0.5 italic leading-tight">
+                            <div className="text-[9px] text-gray-500 mt-0.5 italic">
                               Spec: {item.orderProduct.customization}
                             </div>
                           )}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 text-center text-gray-600">
+                        <td className="border border-[#d4d4d8] py-2 text-center text-gray-800 bg-gray-50/50">
                           {orderedPcs}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 text-center font-bold text-blue-700 bg-blue-50/30">
+                        <td className="border border-[#d4d4d8] py-2 text-center text-gray-800 bg-gray-50/50">
                           {sendPcs}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 text-center text-gray-500">
-                          {deliveredPcs}
+                        <td className="border border-[#d4d4d8] py-2 text-center text-gray-800 bg-gray-50/50">
+                          {outstandingPcs}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 text-center text-gray-500">
-                          {inProcessPcs}
-                        </td>
-                        <td className="border border-[#94a3b8] py-2 text-center text-gray-500 font-semibold">
+                        <td className="border border-[#d4d4d8] py-2 text-center text-gray-800 bg-gray-50/50">
                           {totalCarton}
-                        </td>
-                        <td className="border border-[#94a3b8] py-2 text-center text-gray-700">
-                          <div className="flex flex-col items-center justify-center gap-0.5">
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground/80">
-                              ETA
-                            </span>
-                            <span className="font-medium">
-                              {dateReceived} 🔄
-                            </span>
-                          </div>
                         </td>
                       </tr>
                     );
@@ -459,30 +505,67 @@ export default function DeliveryNotePrint() {
               </table>
             </div>
 
-            {/* 4. REMARKS */}
+            {/* ========================================================= */}
+            {/* 4. SHIPMENT SUMMARY (LOGIKA MENGIKUTI GAMBAR) */}
+            {/* ========================================================= */}
             <div className="mb-10">
-              <div className="font-bold text-[12px] uppercase mb-1 text-gray-700">
-                Catatan (Remarks):
+              <div className="font-bold text-[12px] mb-1 text-gray-900">
+                Shipment Summary:
               </div>
-              <div className="border border-gray-300 p-3 min-h-15 rounded-sm text-[11px] text-gray-600 bg-gray-50/30 whitespace-pre-wrap">
-                {/* LOGIKA MENAMPILKAN NOTES */}
-                {data?.notes && data.notes.length > 0 ? (
-                  <ul className="list-disc pl-4 space-y-1">
-                    {data.notes.map((note: any) => (
-                      <li key={note.id}>
-                        <span className="font-bold">
-                          [{note.category?.name}]
-                        </span>{" "}
-                        {note.content}
-                      </li>
-                    ))}
-                  </ul>
-                ) : remarks ? (
-                  <p>{remarks}</p>
-                ) : (
-                  <p>Barang diterima dalam kondisi baik dan sesuai pesanan.</p>
+              <ul className="list-disc pl-5 text-[11px] text-gray-800 space-y-0.5">
+                <li>Total Purchase Order Quantity: {totalPoString}</li>
+
+                {/* Tampilkan Previously Shipped jika ini parsial urutan ke-2 ke atas */}
+                {shipmentSequence > 1 && (
+                  <li>Previously Shipped: {prevShippedString}</li>
                 )}
-              </div>
+
+                <li>
+                  {currentShipmentLabel}: {currentShipmentString}
+                </li>
+
+                <li>Outstanding Quantity: {outstandingString}</li>
+
+                <li>Status: {statusString}</li>
+
+                {/* AREA NOTES DINAMIS */}
+                {showNotesSection && (
+                  <li>
+                    Note:
+                    <ul className="list-none pl-2 mt-0.5 space-y-0.5 text-gray-600">
+                      {/* Tampilkan rincian sisa produk jika SKU lebih dari 1 dan parsial */}
+                      {showAutoNotes &&
+                        items?.map((item: any) => {
+                          const isFullyDelivered = item.inProcessPcs === 0;
+                          return (
+                            <li key={item.id}>
+                              - {item.orderProduct?.product?.name}:{" "}
+                              {isFullyDelivered
+                                ? "Fully Delivered."
+                                : `${item.inProcessPcs} pcs remaining (to be shipped in next batch).`}
+                            </li>
+                          );
+                        })}
+
+                      {/* Info komplit PO jika ini adalah pengiriman parsial terakhir */}
+                      {showAutoNotes && isPartialFinal && (
+                        <li>
+                          - All items in PO [{order?.poNumber || "-"}] have been
+                          delivered.
+                        </li>
+                      )}
+
+                      {/* Notes manual dari backend */}
+                      {hasManualNotes &&
+                        notes?.map((note: any) => (
+                          <li key={note.id}>
+                            - [{note.category?.name}] {note.content}
+                          </li>
+                        ))}
+                    </ul>
+                  </li>
+                )}
+              </ul>
             </div>
           </div>
 
@@ -517,9 +600,7 @@ export default function DeliveryNotePrint() {
 
               <div className="flex flex-col items-center">
                 <div className="mb-4 text-[12px] font-bold">Hormat Kami,</div>
-                <div className="relative h-20 w-32 flex items-center justify-center -mb-2">
-                  {/* Kosongkan untuk tanda tangan basah / digital */}
-                </div>
+                <div className="relative h-20 w-32 flex items-center justify-center -mb-2"></div>
                 <div className="font-bold underline text-[12px] mt-1">
                   Goenakan Indonesia
                 </div>

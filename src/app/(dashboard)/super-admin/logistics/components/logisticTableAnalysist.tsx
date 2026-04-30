@@ -1,5 +1,6 @@
 "use client";
 
+import { format } from "date-fns";
 import {
   ArrowRight,
   Container,
@@ -15,7 +16,6 @@ import {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-
 // UI Components
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 
@@ -59,7 +60,6 @@ export default function LogisticTableAnalysist() {
 
   // === STATE ===
   const [data, setData] = useState<LogisticsData[]>([]);
-
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,8 +67,9 @@ export default function LogisticTableAnalysist() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
 
   // === FETCH DATA ===
   const fetchData = async () => {
@@ -82,8 +83,10 @@ export default function LogisticTableAnalysist() {
       });
 
       if (debouncedSearch) params.append("search", debouncedSearch);
-      if (startDate) params.append("startDate", startDate);
-      if (endDate) params.append("endDate", endDate);
+
+      if (startDate)
+        params.append("startDate", format(startDate, "yyyy-MM-dd"));
+      if (endDate) params.append("endDate", format(endDate, "yyyy-MM-dd"));
 
       const res = await fetchApi(`/logistics/analytics/summary?${params}`);
 
@@ -162,52 +165,56 @@ export default function LogisticTableAnalysist() {
 
       {/* Filter Bar */}
       <Card className="p-4 shadow-sm bg-gray-50/50 border-gray-100">
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex items-center gap-2 mr-2 h-9 bg-white px-3 border rounded-md shadow-sm text-muted-foreground">
+        <div className="flex flex-wrap items-end gap-4">
+          {/* 1. Label Filter Icon */}
+          <div className="flex items-center gap-2 h-10 bg-white px-4 border rounded-md shadow-sm text-muted-foreground">
             <Filter className="h-4 w-4" />
-            <span className="text-xs font-medium">Filter Tanggal</span>
+            <span className="text-sm font-medium">Filter Tanggal</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground font-medium uppercase px-1">
+          {/* 2. Grup Input Tanggal */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Input: Dari */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider pl-1">
                 Dari
-              </span>
-              <Input
-                type="date"
-                className="h-9 w-40 bg-white"
-                value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value);
+              </label>
+              <DatePickerHelper
+                date={startDate}
+                setDate={(date) => {
+                  setStartDate(date);
                   setPage(1);
                 }}
+                placeholder="Pilih Tanggal Mulai"
               />
             </div>
-            <div className="h-px w-2 bg-gray-400 mt-4"></div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground font-medium uppercase px-1">
+
+            {/* Input: Sampai */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider pl-1">
                 Sampai
-              </span>
-              <Input
-                type="date"
-                className="h-9 w-40 bg-white"
-                value={endDate}
-                onChange={(e) => {
-                  setEndDate(e.target.value);
+              </label>
+              <DatePickerHelper
+                date={endDate}
+                setDate={(date) => {
+                  setEndDate(date);
                   setPage(1);
                 }}
+                placeholder="Pilih Tanggal Akhir"
               />
             </div>
           </div>
 
+          {/* 3. Tombol Reset */}
           {(startDate || endDate) && (
             <Button
               variant="ghost"
               size="sm"
-              className="mt-4 text-red-500 hover:text-red-700 h-9"
+              className="h-10 px-4 text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
               onClick={() => {
-                setStartDate("");
-                setEndDate("");
+                setStartDate(undefined);
+                setEndDate(undefined);
+                setPage(1);
               }}>
               Reset
             </Button>
