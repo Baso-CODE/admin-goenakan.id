@@ -1,7 +1,7 @@
 "use client";
 
-import * as React from "react";
 import { ChevronsUpDown, Plus } from "lucide-react";
+import * as React from "react";
 
 import {
   DropdownMenu,
@@ -19,21 +19,16 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-// ⚠️ ASUMSI: Ganti path ini dengan path komponen Image Anda
 import Image from "next/image";
 
-// --- Komponen Logo Kustom Anda yang Sederhana ---
-// Logo sekarang hanya berupa Image yang di-wrap dalam div relatif
 const GoenakanLogo = ({ sizeClass }: { sizeClass: string }) => (
-  // Div ini berfungsi sebagai wadah untuk Image, dan ukurannya dikontrol
-  // oleh sizeClass (misalnya size-8 atau size-6)
   <div className={`relative shrink-0 ${sizeClass}`}>
     <Image
       src="/goenakan_logo.webp"
       alt="Goenakan Logo"
       fill
       sizes={sizeClass}
-      style={{ objectFit: "contain" }} // Penting agar tidak terdistorsi
+      style={{ objectFit: "contain" }}
     />
   </div>
 );
@@ -62,9 +57,7 @@ export function TeamSwitcher({
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            >
-              {/* 🔄 PERUBAHAN DI TRIGGER: Hapus BG, atur ukuran via sizeClass="size-8 aspect-square" */}
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
               <GoenakanLogo sizeClass="size-10 aspect-square" />
 
               <div className="grid flex-1 text-left text-sm leading-tight">
@@ -78,8 +71,7 @@ export function TeamSwitcher({
             className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
             align="start"
             side={isMobile ? "bottom" : "right"}
-            sideOffset={4}
-          >
+            sideOffset={4}>
             <DropdownMenuLabel className="text-muted-foreground text-xs">
               Teams
             </DropdownMenuLabel>
@@ -87,9 +79,7 @@ export function TeamSwitcher({
               <DropdownMenuItem
                 key={team.name}
                 onClick={() => setActiveTeam(team)}
-                className="gap-2 p-2"
-              >
-                {/* 🔄 PERUBAHAN DI DAFTAR ITEM: Hapus BG, atur ukuran via sizeClass="size-6 aspect-square" */}
+                className="gap-2 p-2">
                 <GoenakanLogo sizeClass="size-6 aspect-square" />
 
                 {team.name}

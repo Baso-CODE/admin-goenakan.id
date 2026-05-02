@@ -209,6 +209,10 @@ export default function SidebarRole({ ...props }) {
         items: [
           { title: "Hero Images", url: "/super-admin/content/heros" },
           { title: "Banner Pop-Up", url: "/super-admin/content/banner-popup" },
+          {
+            title: "Banner Products",
+            url: "/super-admin/content/banner-products",
+          },
           { title: "Brand Client", url: "/super-admin/content/client-logo" },
           {
             title: "Testimonials & Photos",

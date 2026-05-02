@@ -13,7 +13,6 @@ export default function AddContactPlatform() {
 
   const handleAddContactPlatform = async (data: ContactPlatformFormValues) => {
     try {
-      // ✨ Gunakan fetchApi (Otomatis menangani Base URL, Token, dan JSON Content-Type)
       const res = await fetchApi("/contact-platforms", {
         method: "POST",
         body: JSON.stringify(data),

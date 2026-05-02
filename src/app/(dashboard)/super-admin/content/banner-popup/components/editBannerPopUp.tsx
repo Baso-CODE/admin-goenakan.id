@@ -19,12 +19,10 @@ export default function EditPopupBanner() {
   // === 1. FETCH DATA BY ID ===
   useEffect(() => {
     const fetchBanner = async () => {
-      // 🛑 Guard: Jangan jalan jika ID tidak ada atau sesi belum siap
       if (!id || status !== "authenticated") return;
 
       try {
         setIsLoading(true);
-        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
         const res = await fetchApi(`/content/popup-banners/${id}`);
 
         if (!res.ok) {
@@ -44,7 +42,7 @@ export default function EditPopupBanner() {
     };
 
     fetchBanner();
-  }, [id, status, fetchApi, router]); // Tambahkan dependensi lengkap
+  }, [id, status, fetchApi, router]);
 
   // === 2. HANDLE UPDATE ===
   const handleUpdate = async (
@@ -53,17 +51,13 @@ export default function EditPopupBanner() {
   ) => {
     setIsSaving(true);
     try {
-      // Gunakan FormData untuk mengirim File + Text
       const formData = new FormData();
 
-      // --- Append Text Fields ---
       formData.append("title", data.title);
       if (data.altText) formData.append("altText", data.altText);
       if (data.linkUrl) formData.append("linkUrl", data.linkUrl);
 
       formData.append("isActive", data.isActive.toString());
-
-      // Kirim tanggal hanya jika ada isinya
       if (data.startDate) formData.append("startDate", data.startDate);
       if (data.endDate) formData.append("endDate", data.endDate);
 
