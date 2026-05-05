@@ -392,7 +392,6 @@ export default function EditProductPage() {
   const handleDeleteImage = async (mediaId: string): Promise<void> => {
     setIsSubmitting(true);
     try {
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
       const res = await fetchApi(`/products/image/${mediaId}`, {
         method: "DELETE",
       });
@@ -418,7 +417,6 @@ export default function EditProductPage() {
   const handleDeleteVideo = async (mediaId: string): Promise<void> => {
     setIsSubmitting(true);
     try {
-      // ✨ Gunakan fetchApi (Otomatis menangani Base URL dan Token)
       const res = await fetchApi(`/products/video/${mediaId}`, {
         method: "DELETE",
       });
@@ -439,11 +437,8 @@ export default function EditProductPage() {
     }
   };
 
-  // Fungsi utilitas untuk menghasilkan Cross Product dari Attribute Selections
   const generateCrossProduct = (selections: any[], fullList: any[]) => {
     if (selections.length === 0) return [];
-
-    // 1. Filter fullList menjadi hanya atribut yang dipilih (selections)
     const activeAttributes = fullList
       .filter((attr) => selections.some((sel) => sel.attributeId === attr.id))
       .map((attr) => ({

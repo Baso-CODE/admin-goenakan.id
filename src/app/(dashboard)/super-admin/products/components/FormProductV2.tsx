@@ -52,6 +52,7 @@ import { VariantList } from "./VariantList";
 type Category = {
   id: string;
   name: string;
+  code?: string;
 };
 
 export const priceTierSchema = z.object({
@@ -95,11 +96,13 @@ const productSchema = z.object({
   name: z.string().min(2),
   sku: z.string().min(1),
   categoryId: z.string().min(1),
+  itemCategoryId: z.string().min(1, "Item Category wajib dipilih"),
+  itemNameId: z.string().min(1, "Item Name wajib dipilih"),
   tagIds: z.array(z.string()).optional(),
   description: z.string().optional(),
   basePrice: z.number().min(0, "Base price must be >= 0"),
   isCustom: z.boolean().optional(),
-  materialTypeId: z.string().optional(),
+  materialTypeId: z.string().min(1, "Material wajib dipilih"),
   stock: z.number().min(0, "Stock minimal 0").optional().default(0),
   materialType: z.string().optional(),
   weight: z.number().min(0, "Weight must be >= 0").optional(),
@@ -152,12 +155,14 @@ export default function ProductFormV2({
   const { fetchApi, status } = useApi();
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [itemCategories, setItemCategories] = useState<any[]>([]);
+  const [itemNames, setItemNames] = useState<any[]>([]);
   const [tags, setTags] = useState<{ id: string; name: string }[]>([]);
   const [isGeneratingSku, setIsGeneratingSku] = useState(false);
   const [tagSearchOpen, setTagSearchOpen] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState("");
   const [materialTypes, setMaterialTypes] = useState<
-    { id: string; name: string }[]
+    { id: string; name: string; code?: string }[]
   >([]);
 
   useEffect(() => {
@@ -198,6 +203,8 @@ export default function ProductFormV2({
       name: "",
       sku: "",
       categoryId: "",
+      itemCategoryId: "",
+      itemNameId: "",
       tagIds: [],
       description: "",
       basePrice: 0,
@@ -215,6 +222,49 @@ export default function ProductFormV2({
       variantImagesMetadata: [],
     } as ProductFormValues,
   });
+
+  const selectedCategoryId = form.watch("categoryId");
+  const selectedItemCategoryId = form.watch("itemCategoryId");
+
+  useEffect(() => {
+    const fetchItemCategories = async () => {
+      if (!selectedCategoryId) {
+        setItemCategories([]);
+        return;
+      }
+      try {
+        const res = await fetchApi(
+          `/item-categories?productCategoryId=${selectedCategoryId}&take=100`,
+        );
+        const result = await res.json();
+        setItemCategories(result.data || []);
+      } catch (error) {
+        console.error("Gagal mengambil Item Categories:", error);
+      }
+    };
+
+    fetchItemCategories();
+  }, [selectedCategoryId, fetchApi]);
+
+  useEffect(() => {
+    const fetchItemNames = async () => {
+      if (!selectedItemCategoryId) {
+        setItemNames([]);
+        return;
+      }
+      try {
+        const res = await fetchApi(
+          `/item-names?itemCategoryId=${selectedItemCategoryId}&take=100`,
+        );
+        const result = await res.json();
+        setItemNames(result.data || []);
+      } catch (error) {
+        console.error("Gagal mengambil Item Names:", error);
+      }
+    };
+
+    fetchItemNames();
+  }, [selectedItemCategoryId, fetchApi]);
 
   const isCustomProduct = form.watch("isCustom");
 
@@ -265,19 +315,41 @@ export default function ProductFormV2({
     }
   }, [isCustomProduct, form]);
 
+  // --- UPDATE GENERATE SKU ---
   const handleGenerateSku = async () => {
-    const productName = form.getValues("name");
-    if (!productName || productName.length < 3) {
-      toast.error("Mohon isi Nama Produk minimal 3 karakter terlebih dahulu.");
+    const values = form.getValues();
+
+    // Validasi Nama
+    if (!values.name || values.name.length < 3) {
+      toast.error("Mohon isi Nama Produk minimal 3 karakter.");
       return;
     }
+
+    if (
+      !values.categoryId ||
+      !values.itemCategoryId ||
+      !values.itemNameId ||
+      !values.materialTypeId
+    ) {
+      toast.error(
+        "Pastikan Kategori, Item Category, Item Name, dan Material sudah dipilih!",
+      );
+      return;
+    }
+
     if (status !== "authenticated") return;
 
     try {
       setIsGeneratingSku(true);
       const res = await fetchApi("/products/generate-sku", {
         method: "POST",
-        body: JSON.stringify({ name: productName }),
+        body: JSON.stringify({
+          productName: values.name,
+          categoryId: values.categoryId,
+          itemCategoryId: values.itemCategoryId,
+          itemNameId: values.itemNameId,
+          materialTypeId: values.materialTypeId,
+        }),
       });
 
       if (!res.ok) {
@@ -432,44 +504,20 @@ export default function ProductFormV2({
                 )}
               />
 
-              {/* SKU */}
-              <FormField
-                control={form.control}
-                name="sku"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>SKU</FormLabel>
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <Input {...field} placeholder="Contoh: SG0001" />
-                      </FormControl>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={handleGenerateSku}
-                        disabled={isGeneratingSku}
-                        title="Auto Generate SKU dari Nama Produk"
-                        className="shrink-0">
-                        <RefreshCw
-                          className={`h-4 w-4 ${isGeneratingSku ? "animate-spin" : ""}`}
-                        />
-                      </Button>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               {/* KATEGORI */}
               <FormField
                 control={form.control}
                 name="categoryId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Kategori</FormLabel>
+                    <FormLabel>Kategori Produk</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        // Reset child ketika parent berubah
+                        form.setValue("itemCategoryId", "");
+                        form.setValue("itemNameId", "");
+                      }}
                       defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -479,11 +527,137 @@ export default function ProductFormV2({
                       <SelectContent>
                         {categories.map((cat) => (
                           <SelectItem key={cat.id} value={cat.id}>
-                            {cat.name}
+                            {cat.name} {cat.code && `(${cat.code})`}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* ITEM CATEGORY  */}
+              <FormField
+                control={form.control}
+                name="itemCategoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Item Category</FormLabel>
+                    <Select
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        // Reset anak ketika berubah
+                        form.setValue("itemNameId", "");
+                      }}
+                      defaultValue={field.value}
+                      disabled={
+                        !selectedCategoryId || itemCategories.length === 0
+                      }>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih item category..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {itemCategories.map((ic) => (
+                          <SelectItem key={ic.id} value={ic.id}>
+                            {ic.name} {ic.code && `(${ic.code})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* ITEM NAME  */}
+              <FormField
+                control={form.control}
+                name="itemNameId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Item Name</FormLabel>
+                    <Select
+                      value={field.value || ""}
+                      onValueChange={field.onChange}
+                      disabled={
+                        !selectedItemCategoryId || itemNames.length === 0
+                      }>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih item name..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {itemNames.map((inm) => (
+                          <SelectItem key={inm.id} value={inm.id}>
+                            {inm.name} {inm.code && `(${inm.code})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* MATERIAL TYPE */}
+              <FormField
+                control={form.control}
+                name="materialTypeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Material</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih jenis material..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {materialTypes.map((mat) => (
+                          <SelectItem key={mat.id} value={mat.id}>
+                            {mat.name} {mat.code && `(${mat.code})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* SKU (Digeser setelah input yang dibutuhkan siap) */}
+              <FormField
+                control={form.control}
+                name="sku"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SKU</FormLabel>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Contoh: ELE-LAP-MAC-ALU-MA0001"
+                        />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={handleGenerateSku}
+                        disabled={isGeneratingSku}
+                        title="Auto Generate SKU dari Hirarki Produk"
+                        className="shrink-0">
+                        <RefreshCw
+                          className={`h-4 w-4 ${isGeneratingSku ? "animate-spin" : ""}`}
+                        />
+                      </Button>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -505,34 +679,6 @@ export default function ProductFormV2({
                         min={0}
                       />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* MATERIAL TYPE (Updated to Select & materialTypeId) */}
-              <FormField
-                control={form.control}
-                name="materialTypeId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Material</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih jenis material..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {materialTypes.map((mat) => (
-                          <SelectItem key={mat.id} value={mat.id}>
-                            {mat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

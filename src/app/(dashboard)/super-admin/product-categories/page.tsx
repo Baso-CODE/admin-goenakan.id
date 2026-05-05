@@ -24,6 +24,7 @@ import { ConfirmDeleteDialog } from "../../components/confirmDeleteDialog";
 type ProductCategories = {
   id: string;
   name?: string;
+  code: string;
   name_id?: string;
   name_en?: string;
   slug: string;
@@ -283,11 +284,12 @@ const ProductCategoriesPage = () => {
       <Card className="w-full">
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-[oklch(0.95_0.02_85)]">
               <TableRow>
-                {/* 🔄 2. UPDATE: Pisah menjadi kolom ID dan EN */}
-                <TableHead className="w-[20%]">Category Name (ID)</TableHead>
-                <TableHead className="w-[20%]">Category Name (EN)</TableHead>
+                <TableHead className="w-[15%]">Category Name (ID)</TableHead>
+                <TableHead className="w-[15%]">Category Name (EN)</TableHead>
+                {/* ✨ BARU: Kolom Code */}
+                <TableHead className="w-[10%]">Code</TableHead>
                 <TableHead className="w-[20%]">Slug</TableHead>
                 <TableHead className="w-[20%]">Created</TableHead>
                 <TableHead className="w-[20%]">Actions</TableHead>
@@ -299,19 +301,23 @@ const ProductCategoriesPage = () => {
                 /* Skeleton Loader */
                 Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={index}>
-                    <TableCell className="h-12">
+                    <TableCell>
                       <Skeleton className="h-4 w-3/4" />
                     </TableCell>
-                    <TableCell className="h-12">
+                    <TableCell>
                       <Skeleton className="h-4 w-3/4" />
                     </TableCell>
-                    <TableCell className="h-12">
+                    {/* ✨ Skeleton untuk kolom Code */}
+                    <TableCell>
+                      <Skeleton className="h-4 w-1/2" />
+                    </TableCell>
+                    <TableCell>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
-                    <TableCell className="h-12">
+                    <TableCell>
                       <Skeleton className="h-4 w-2/3" />
                     </TableCell>
-                    <TableCell className="h-12">
+                    <TableCell>
                       <div className="flex space-x-2">
                         <Skeleton className="h-8 w-12" />
                         <Skeleton className="h-8 w-16" />
@@ -322,9 +328,8 @@ const ProductCategoriesPage = () => {
               ) : error ? (
                 /* Error State */
                 <TableRow>
-                  {/* 🔄 3. Update colSpan dari 4 menjadi 5 karena ada tambahan kolom */}
                   <TableCell
-                    colSpan={5}
+                    colSpan={6} // ✨ UPDATE: Ubah ke 6
                     className="text-center text-red-500 py-6">
                     Error: {"Failed to load categories."}
                   </TableCell>
@@ -332,19 +337,28 @@ const ProductCategoriesPage = () => {
               ) : categories.length > 0 ? (
                 /* Data Rendering */
                 categories.map((data) => (
-                  <TableRow key={data.id}>
-                    {/* 🔄 4. Tampilkan Bahasa Indonesia (name_id atau fallback name) */}
+                  <TableRow
+                    key={data.id}
+                    className="hover:bg-[oklch(0.98_0.02_90)] transition-colors">
                     <TableCell className="font-medium text-gray-900">
                       {data.name_id || data.name || "-"}
                     </TableCell>
 
-                    {/* 🔄 5. Tampilkan Bahasa Inggris (name_en) */}
                     <TableCell className="text-gray-500 italic">
                       {data.name_en || "-"}
                     </TableCell>
 
-                    <TableCell>{data.slug}</TableCell>
+                    {/* ✨ BARU: Menampilkan Code dengan badge style */}
                     <TableCell>
+                      <span className="px-2 py-1 rounded bg-primary/10 text-primary font-bold text-xs">
+                        {data.code || "-"}
+                      </span>
+                    </TableCell>
+
+                    <TableCell className="text-xs font-mono text-muted-foreground">
+                      {data.slug}
+                    </TableCell>
+                    <TableCell className="text-sm">
                       {formatDate(data.createdAt, { style: "relative" })}
                     </TableCell>
                     <TableCell className="space-x-2">
@@ -368,11 +382,9 @@ const ProductCategoriesPage = () => {
                   </TableRow>
                 ))
               ) : (
-                /* Empty State */
                 <TableRow>
-                  {/* 🔄 3. Update colSpan dari 4 menjadi 5 */}
                   <TableCell
-                    colSpan={5}
+                    colSpan={6} // ✨ UPDATE: Ubah ke 6
                     className="text-center py-6 text-muted-foreground">
                     No categories found.
                   </TableCell>

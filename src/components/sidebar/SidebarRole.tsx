@@ -149,6 +149,16 @@ export default function SidebarRole({ ...props }) {
             icon: Tags,
           },
           {
+            title: "Category Items",
+            url: "/super-admin/item-categories-product",
+            icon: Tags,
+          },
+          {
+            title: "Item Names",
+            url: "/super-admin/item-names-product",
+            icon: Tags,
+          },
+          {
             title: "Product Materials",
             url: "/super-admin/product-materials",
             icon: Tags,

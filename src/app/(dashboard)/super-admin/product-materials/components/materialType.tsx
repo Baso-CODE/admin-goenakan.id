@@ -40,6 +40,7 @@ import { toast } from "sonner";
 type MaterialType = {
   id: string;
   name: string;
+  code: string;
   slug: string;
   description?: string;
   createdAt: string;
@@ -297,6 +298,8 @@ export default function MaterialTypes() {
                 <TableHead className=" text-foreground">
                   Material Name
                 </TableHead>
+                <TableHead className=" text-foreground">Code</TableHead>{" "}
+                {/* ✨ TAMBAH KOLOM HEADER */}
                 <TableHead className=" text-foreground">Slug</TableHead>
                 <TableHead className=" text-foreground">Description</TableHead>
                 <TableHead className=" text-foreground">Created</TableHead>
@@ -310,7 +313,8 @@ export default function MaterialTypes() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 5 }).map((_, j) => (
+                    {/* ✨ UPDATE: Panjang array jadi 6 karena kolom bertambah */}
+                    {Array.from({ length: 6 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-5 w-full" />
                       </TableCell>
@@ -324,6 +328,12 @@ export default function MaterialTypes() {
                     className="hover:bg-[oklch(0.98_0.02_90)] transition-colors">
                     <TableCell className="font-bold text-primary">
                       {item.name}
+                    </TableCell>
+                    {/* ✨ BARU: Tampilan Kolom Code */}
+                    <TableCell>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
+                        {item.code}
+                      </span>
                     </TableCell>
                     <TableCell className="text-xs font-mono text-muted-foreground">
                       {item.slug}
@@ -360,8 +370,9 @@ export default function MaterialTypes() {
                 ))
               ) : (
                 <TableRow>
+                  {/* ✨ UPDATE: colSpan jadi 6 agar pesan berada di tengah tabel */}
                   <TableCell
-                    colSpan={5}
+                    colSpan={6}
                     className="text-center py-10 text-muted-foreground italic">
                     Belum ada data material ditemukan.
                   </TableCell>

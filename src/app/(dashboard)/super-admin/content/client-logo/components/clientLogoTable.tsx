@@ -35,7 +35,7 @@ type ClientLogo = {
   id: string;
   name: string;
   country: string; // Tambahan baru
-  logo: string; // Berubah dari imageUrl ke logo sesuai DB
+  logo: string;
   websiteUrl?: string;
   displayOrder: number;
   isActive: boolean;
