@@ -44,14 +44,17 @@ export default function EditArticle() {
 
       setInitialData({
         title: article.title,
+        authorName: article.authorName || "",
         categoryId: article.categoryId,
         content: article.content,
         source: article.source || "",
         published: article.published,
         coverImage: article.coverImage,
+        coverImageMobile: article.coverImageMobile || undefined,
         coverImageAlt: article.coverImageAlt || "",
         productIds: existingProductIds,
         tagIds: existingTagIds,
+        focusKeywords: article.focusKeywords || "",
       });
     } catch (error) {
       console.error(error);
@@ -70,6 +73,7 @@ export default function EditArticle() {
   const handleUpdateArticle = async (
     values: ArticleFormValues,
     coverFile: File | null,
+    coverMobileFile: File | null,
   ) => {
     if (status !== "authenticated") {
       toast.error("Sesi berakhir, silakan login kembali.");
@@ -80,20 +84,28 @@ export default function EditArticle() {
     try {
       const formData = new FormData();
       formData.append("title", values.title);
+      formData.append("authorName", values.authorName);
       formData.append("content", values.content);
       formData.append("categoryId", values.categoryId);
       formData.append("published", String(values.published));
       formData.append("coverImageAlt", values.coverImageAlt || "");
+      formData.append("focusKeywords", values.focusKeywords || "");
 
       if (values.source) {
         formData.append("source", values.source);
       }
-      formData.append("productIds", values.productIds?.join(",") || "");
 
+      formData.append("productIds", values.productIds?.join(",") || "");
       formData.append("tagIds", values.tagIds?.join(",") || "");
 
+      // Kirim file desktop jika ada perubahan
       if (coverFile) {
         formData.append("coverFile", coverFile);
+      }
+
+      // ✨ TAMBAHAN: Kirim file mobile jika ada perubahan
+      if (coverMobileFile) {
+        formData.append("coverMobileFile", coverMobileFile);
       }
 
       const res = await fetchApi(`/articles/${id}`, {

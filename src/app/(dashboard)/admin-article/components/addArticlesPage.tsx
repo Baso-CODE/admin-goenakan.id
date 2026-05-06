@@ -14,6 +14,7 @@ export default function AddArticle() {
   const handleCreateArticle = async (
     values: ArticleFormValues,
     coverFile: File | null,
+    coverMobileFile: File | null,
   ) => {
     if (status !== "authenticated") {
       toast.error("Sesi anda berakhir, silakan login kembali.");
@@ -24,16 +25,27 @@ export default function AddArticle() {
     try {
       const formData = new FormData();
       formData.append("title", values.title);
+      formData.append("authorName", values.authorName);
       formData.append("content", values.content);
       formData.append("categoryId", values.categoryId);
       formData.append("published", String(values.published));
+      formData.append("coverImageAlt", values.coverImageAlt || "");
+      formData.append("focusKeywords", values.focusKeywords || "");
 
       if (values.source) {
         formData.append("source", values.source);
       }
+      formData.append("productIds", values.productIds?.join(",") || "");
+      formData.append("tagIds", values.tagIds?.join(",") || "");
 
+      // Mengirimkan file gambar desktop
       if (coverFile) {
         formData.append("coverFile", coverFile);
+      }
+
+      // ✨ TAMBAHAN: Mengirimkan file gambar mobile (opsional)
+      if (coverMobileFile) {
+        formData.append("coverMobileFile", coverMobileFile);
       }
 
       const res = await fetchApi("/articles", {
@@ -56,6 +68,7 @@ export default function AddArticle() {
       setIsSubmitting(false);
     }
   };
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold tracking-tight">

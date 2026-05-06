@@ -48,15 +48,19 @@ import {
   Loader2,
   Save,
   Search,
+  Smartphone,
   TagIcon,
   X,
   ZoomIn,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImagePreviewModal } from "./imagePreviewModal";
+import { SEOAnalyzer } from "./seoAnalyzer";
 
+// ✨ 1. PERBARUI SCHEMA ZOD
 const articleSchema = z.object({
   title: z.string().min(5, "Judul minimal 5 karakter"),
+  authorName: z.string().min(2, "Nama penulis wajib diisi"), // Tambahan
   categoryId: z.string().min(1, "Kategori wajib dipilih"),
   content: z.string().min(20, "Konten artikel terlalu pendek"),
   source: z.string().optional(),
@@ -64,11 +68,13 @@ const articleSchema = z.object({
   productIds: z.array(z.string()).optional().default([]),
   tagIds: z.array(z.string()).optional().default([]),
   coverImageAlt: z.string().optional(),
+  focusKeywords: z.string().optional().default(""), // Diubah menjadi jamak (Multi-keyword)
 });
 
 export type ArticleFormValues = z.infer<typeof articleSchema>;
 export interface ArticleInitialData extends ArticleFormValues {
   coverImage?: string;
+  coverImageMobile?: string; // Tambahan untuk inisial data
 }
 
 export default function FormArticle({
@@ -77,7 +83,11 @@ export default function FormArticle({
   initialData,
   isEditing = false,
 }: {
-  onSubmit: (values: any, coverFile: File | null) => void;
+  onSubmit: (
+    values: any,
+    coverFile: File | null,
+    coverMobileFile: File | null,
+  ) => void; // Update signature onSubmit
   isSubmitting: boolean;
   initialData?: any | null;
   isEditing?: boolean;
@@ -90,14 +100,17 @@ export default function FormArticle({
   const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  // Loading States
+
+  // ✨ 2. STATE UNTUK DUA GAMBAR
   const [loadingData, setLoadingData] = useState(true);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverMobileFile, setCoverMobileFile] = useState<File | null>(null);
 
   const form = useForm<any>({
     resolver: zodResolver(articleSchema),
     defaultValues: {
       title: "",
+      authorName: "", // Tambahan
       categoryId: "",
       content: "",
       source: "",
@@ -105,8 +118,14 @@ export default function FormArticle({
       productIds: [],
       tagIds: [],
       coverImageAlt: "",
+      focusKeywords: "", // Tambahan
     },
   });
+
+  // Watcher untuk SEO Analyzer
+  const watchedTitle = form.watch("title");
+  const watchedContent = form.watch("content");
+  const watchedKeywords = form.watch("focusKeywords");
 
   useEffect(() => {
     if (initialData) {
@@ -145,10 +164,11 @@ export default function FormArticle({
 
   const handleSubmit = (values: any) => {
     if (!isEditing && !coverFile) {
-      toast.error("Cover image wajib diunggah!");
+      toast.error("Cover image Desktop wajib diunggah!");
       return;
     }
-    onSubmit(values, coverFile);
+    // Kirim kedua file ke fungsi parent (page.tsx)
+    onSubmit(values, coverFile, coverMobileFile);
   };
 
   const handlePreview = (url: string) => {
@@ -159,36 +179,189 @@ export default function FormArticle({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+        {/* ✨ SECTION 1: COVER IMAGES (Layout Dirapikan) */}
         <Card className="p-6 border-stone-200 shadow-sm bg-stone-50/30">
-          <FormLabel className="text-base font-bold flex items-center gap-2 mb-4">
-            <FileImage className="w-5 h-5 text-primary" /> Sampul Artikel
+          <FormLabel className="text-base font-bold flex items-center gap-2 mb-6">
+            <FileImage className="w-5 h-5 text-primary" /> Manajemen Sampul
+            Artikel
           </FormLabel>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* --- UPLOAD DESKTOP --- */}
             <div className="space-y-4">
-              <div className="flex flex-col gap-3">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  className="bg-white cursor-pointer"
-                  onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  Format: JPG, PNG, atau WEBP. Maksimal 2MB.
-                </p>
+              <div className="flex items-center gap-2 text-sm font-semibold text-stone-700">
+                <FileImage className="w-4 h-4" /> Cover Desktop (Wajib)
               </div>
+              <div className="flex justify-center border-2 border-dashed rounded-xl p-2 bg-white min-h-48 items-center relative">
+                {coverFile ? (
+                  <div className="relative group w-full h-44 cursor-zoom-in">
+                    <img
+                      src={URL.createObjectURL(coverFile)}
+                      className="w-full h-full object-cover rounded-lg"
+                      onClick={() =>
+                        handlePreview(URL.createObjectURL(coverFile))
+                      }
+                    />
+                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg pointer-events-none">
+                      <ZoomIn className="text-white w-8 h-8" />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCoverFile(null);
+                      }}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : isEditing && initialData?.coverImage ? (
+                  <div
+                    className="relative group w-full h-44 cursor-zoom-in"
+                    onClick={() => handlePreview(initialData.coverImage)}>
+                    <img
+                      src={initialData.coverImage}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                      <ZoomIn className="text-white w-8 h-8" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center text-stone-400 p-4">
+                    <FileImage className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                    <p className="text-xs italic">Belum ada gambar terpilih</p>
+                  </div>
+                )}
+              </div>
+              <Input
+                type="file"
+                accept="image/*"
+                className="bg-white cursor-pointer"
+                onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+              />
+            </div>
+
+            {/* --- UPLOAD MOBILE --- */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-stone-700">
+                <Smartphone className="w-4 h-4" /> Cover Mobile (Opsional)
+              </div>
+              <div className="flex justify-center border-2 border-dashed rounded-xl p-2 bg-white min-h-48 items-center relative">
+                {coverMobileFile ? (
+                  <div className="relative group w-32 h-44 cursor-zoom-in">
+                    <img
+                      src={URL.createObjectURL(coverMobileFile)}
+                      className="w-full h-full object-cover rounded-lg"
+                      onClick={() =>
+                        handlePreview(URL.createObjectURL(coverMobileFile))
+                      }
+                    />
+                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg pointer-events-none">
+                      <ZoomIn className="text-white w-8 h-8" />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCoverMobileFile(null);
+                      }}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : isEditing && initialData?.coverImageMobile ? (
+                  <div
+                    className="relative group w-32 h-44 cursor-zoom-in"
+                    onClick={() => handlePreview(initialData.coverImageMobile)}>
+                    <img
+                      src={initialData.coverImageMobile}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                      <ZoomIn className="text-white w-8 h-8" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center text-stone-400 p-4">
+                    <Smartphone className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                    <p className="text-xs italic">
+                      Disarankan aspek rasio 9:16
+                    </p>
+                  </div>
+                )}
+              </div>
+              <Input
+                type="file"
+                accept="image/*"
+                className="bg-white cursor-pointer"
+                onChange={(e) =>
+                  setCoverMobileFile(e.target.files?.[0] || null)
+                }
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-stone-200">
+            <FormField
+              control={form.control}
+              name="coverImageAlt"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs font-bold">
+                    Teks Alternatif Gambar (Alt Text - SEO)
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Deskripsi singkat gambar untuk dibaca oleh mesin pencari Google..."
+                      className="bg-white"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </Card>
+
+        {/* ✨ SECTION 2: GRID LAYOUT (Kiri: Utama, Kanan: Pengaturan/SEO) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* KOLOM KIRI (AREA UTAMA) */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel className="font-bold">Judul Artikel</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Masukkan judul yang menarik..."
+                        className="text-lg py-6 shadow-sm"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
-                name="coverImageAlt"
+                name="authorName"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">
-                      Alt Text Gambar (SEO)
-                    </FormLabel>
+                  <FormItem className="md:col-span-2">
+                    <FormLabel className="font-bold">Nama Penulis</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Deskripsi gambar untuk Google..."
-                        className="bg-white"
+                        placeholder="Contoh: Baso Afriza"
+                        className="bg-white shadow-sm"
                         {...field}
                       />
                     </FormControl>
@@ -198,81 +371,6 @@ export default function FormArticle({
               />
             </div>
 
-            <div className="flex justify-center border-2 border-dashed rounded-xl p-2 bg-white min-h-40 items-center">
-              {coverFile ? (
-                <div className="relative group w-full h-40 cursor-zoom-in">
-                  {/* Gambar Preview */}
-                  <img
-                    src={URL.createObjectURL(coverFile)}
-                    className="w-full h-full object-cover rounded-lg"
-                    onClick={() =>
-                      handlePreview(URL.createObjectURL(coverFile))
-                    }
-                  />
-
-                  {/* Overlay Icon Zoom (Hanya muncul saat hover) */}
-                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg pointer-events-none">
-                    <ZoomIn className="text-white w-8 h-8" />
-                  </div>
-
-                  {/* Tombol Hapus (X) */}
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-20"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCoverFile(null);
-                    }}>
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ) : isEditing && initialData?.coverImage ? (
-                <div
-                  className="relative group w-full h-40 cursor-zoom-in"
-                  onClick={() => handlePreview(initialData.coverImage)}>
-                  <img
-                    src={initialData.coverImage}
-                    className="w-full h-full object-cover rounded-lg"
-                  />
-                  {/* Overlay Icon Zoom */}
-                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
-                    <ZoomIn className="text-white w-8 h-8" />
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center text-stone-400">
-                  <FileImage className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                  <p className="text-xs italic">Belum ada gambar terpilih</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* SECTION 2: BASIC INFO & TAGS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-bold">Judul Artikel</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Masukkan judul yang menarik..."
-                      className="text-lg py-6 shadow-sm"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* TAGS SELECTOR (Combobox Multi-select) */}
             <FormField
               control={form.control}
               name="tagIds"
@@ -348,136 +446,174 @@ export default function FormArticle({
                 </FormItem>
               )}
             />
-          </div>
 
-          {/* SIDEBAR SETTINGS */}
-          <div className="space-y-6 bg-stone-50/50 p-4 rounded-xl border border-stone-100">
             <FormField
               control={form.control}
-              name="categoryId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-bold">Kategori</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Pilih Kategori" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              name="productIds"
+              render={() => (
+                <FormItem className="space-y-3 pt-4">
+                  <div className="flex flex-col">
+                    <FormLabel className="text-base font-bold">
+                      Produk Terkait
+                    </FormLabel>
+                    <p className="text-[11px] text-muted-foreground">
+                      Pilih produk yang akan direkomendasikan di artikel ini.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 border rounded-xl bg-stone-50/30 max-h-64 overflow-y-auto">
+                    {products.map((product) => (
+                      <FormField
+                        key={product.id}
+                        control={form.control}
+                        name="productIds"
+                        render={({ field }) => {
+                          const isChecked = field.value?.includes(product.id);
+                          return (
+                            <FormItem
+                              key={product.id}
+                              className={cn(
+                                "flex flex-row items-center space-x-3 space-y-0 p-2 rounded-lg border bg-white transition-all hover:bg-stone-50",
+                                isChecked &&
+                                  "border-stone-600 bg-stone-50 ring-1 ring-stone-600",
+                              )}>
+                              <FormControl>
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) =>
+                                    checked
+                                      ? field.onChange([
+                                          ...(field.value || []),
+                                          product.id,
+                                        ])
+                                      : field.onChange(
+                                          field.value?.filter(
+                                            (v: string) => v !== product.id,
+                                          ),
+                                        )
+                                  }
+                                />
+                              </FormControl>
+                              <FormLabel className="text-[11px] font-medium leading-none cursor-pointer flex-1 line-clamp-2">
+                                {product.name}
+                              </FormLabel>
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    ))}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
             />
+          </div>
 
-            <FormField
-              control={form.control}
-              name="published"
-              render={({ field }) => (
-                <FormItem className="flex items-center justify-between rounded-lg border bg-white p-3 shadow-sm">
-                  <FormLabel className="text-sm font-medium">
-                    Status Publish
-                  </FormLabel>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+          {/* KOLOM KANAN (SIDEBAR PENGATURAN & SEO) */}
+          <div className="space-y-6">
+            <Card className="p-4 bg-stone-50/50 shadow-sm border-stone-200">
+              <div className="space-y-5">
+                <FormField
+                  control={form.control}
+                  name="categoryId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-bold">Kategori</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="bg-white">
+                            <SelectValue placeholder="Pilih Kategori" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="source"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs">Referensi/Sumber</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="URL Sumber..."
-                      className="bg-white text-xs"
-                      {...field}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="published"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between rounded-lg border bg-white p-3 shadow-sm">
+                      <FormLabel className="text-sm font-medium">
+                        Status Publish
+                      </FormLabel>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="source"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">
+                        Referensi/Sumber
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="URL Sumber..."
+                          className="bg-white text-xs"
+                          {...field}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </Card>
+
+            {/* Kotak Khusus Analisis SEO */}
+            <div className="space-y-4">
+              <FormField
+                control={form.control}
+                name="focusKeywords"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-bold text-blue-600">
+                      Target Kata Kunci (SEO)
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="sepatu lari, diskon sepatu, ..."
+                        className="bg-white border-blue-200"
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      Gunakan koma (,) untuk memasukkan lebih dari satu kata
+                      kunci yang diincar.
+                    </p>
+                  </FormItem>
+                )}
+              />
+
+              <SEOAnalyzer
+                title={watchedTitle || ""}
+                content={watchedContent || ""}
+                focusKeywords={watchedKeywords || ""}
+              />
+            </div>
           </div>
         </div>
 
-        {/* SECTION 3: PRODUCT RECOMMENDATIONS */}
-        <FormField
-          control={form.control}
-          name="productIds"
-          render={() => (
-            <FormItem className="space-y-3">
-              <div className="flex flex-col">
-                <FormLabel className="text-base font-bold">
-                  Produk Terkait
-                </FormLabel>
-                <p className="text-[11px] text-muted-foreground">
-                  Pilih produk yang akan direkomendasikan di artikel ini.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-4 border rounded-xl bg-stone-50/30 max-h-64 overflow-y-auto">
-                {products.map((product) => (
-                  <FormField
-                    key={product.id}
-                    control={form.control}
-                    name="productIds"
-                    render={({ field }) => {
-                      const isChecked = field.value?.includes(product.id);
-                      return (
-                        <FormItem
-                          key={product.id}
-                          className={cn(
-                            "flex flex-row items-center space-x-3 space-y-0 p-2 rounded-lg border bg-white transition-all hover:bg-stone-50",
-                            isChecked &&
-                              "border-stone-600 bg-stone-50 ring-1 ring-stone-600",
-                          )}>
-                          <FormControl>
-                            <Checkbox
-                              checked={isChecked}
-                              onCheckedChange={(checked) => {
-                                return checked
-                                  ? field.onChange([
-                                      ...(field.value || []),
-                                      product.id,
-                                    ])
-                                  : field.onChange(
-                                      field.value?.filter(
-                                        (value: string) => value !== product.id,
-                                      ),
-                                    );
-                              }}
-                            />
-                          </FormControl>
-                          <FormLabel className="text-[11px] font-medium leading-none cursor-pointer flex-1 line-clamp-2">
-                            {product.name}
-                          </FormLabel>
-                        </FormItem>
-                      );
-                    }}
-                  />
-                ))}
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* SECTION 4: EDITOR */}
-        <div className="pt-6">
+        {/* ✨ SECTION 3: EDITOR */}
+        <div className="pt-6 border-t border-stone-200">
           <FormField
             control={form.control}
             name="content"
@@ -505,7 +641,7 @@ export default function FormArticle({
           />
         </div>
 
-        {/* SUBMIT */}
+        {/* ✨ SUBMIT BUTTON */}
         <div className="sticky bottom-4 z-20">
           <Button
             type="submit"
@@ -526,6 +662,8 @@ export default function FormArticle({
           </Button>
         </div>
       </form>
+
+      {/* Modal Preview Gambar */}
       <ImagePreviewModal
         src={previewUrl}
         isOpen={isPreviewOpen}
