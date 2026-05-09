@@ -30,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 
 // === TYPES ===
@@ -44,69 +45,87 @@ type ContactMessage = {
   createdAt: string;
 };
 
+// Menambahkan type Meta yang sama dengan Product Categories
+type Meta = {
+  hasNext: boolean;
+  hasPrevious: boolean;
+  page: number;
+  perPage: number;
+  total: number;
+};
+
 export default function AdminContactMessage() {
   const { fetchApi, status } = useApi();
 
+  // --- STATE UNTUK TABLE ---
   const [messages, setMessages] = useState<ContactMessage[]>([]);
-  const [meta, setMeta] = useState({ page: 1, lastPage: 1, total: 0 });
+  const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Filters
+  // --- STATE UNTUK FILTER & PAGINATION ---
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // ✨ Menggunakan useDebounce yang jauh lebih bersih
+  const debouncedSearch = useDebounce(search, 500);
   const [isReadFilter, setIsReadFilter] = useState("all");
   const [page, setPage] = useState(1);
 
-  // Modal Detail
+  // --- STATE UNTUK MODAL DETAIL ---
   const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(
     null,
   );
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  // Load Data
-  const loadMessages = async () => {
+  // --- FUNGSI FETCH DATA ---
+  const fetchMessages = async () => {
     if (status !== "authenticated") return;
 
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
       });
 
-      if (debouncedSearch) params.append("search", debouncedSearch.trim());
-      if (isReadFilter !== "all") params.append("isRead", isReadFilter);
+      if (debouncedSearch.trim()) {
+        params.append("search", debouncedSearch.trim());
+      }
+      if (isReadFilter !== "all") {
+        params.append("isRead", isReadFilter);
+      }
 
+      // Gunakan fetchApi (Otomatis handle Base URL dan Token)
       const res = await fetchApi(`/contact-messages?${params}`);
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Gagal memuat data kontak");
+        throw new Error(errData.message || `HTTP Error ${res.status}`);
       }
 
-      const data = await res.json();
-      setMessages(data.data || []);
-      setMeta(data.meta);
+      const result = await res.json();
+      setMessages(result.data || []);
+      setMeta(result.meta);
     } catch (error) {
       console.error("❌ Load Messages Error:", error);
+      setError(error instanceof Error ? error.message : "Unknown error");
       toast.error("Gagal memuat daftar pesan");
     } finally {
       setLoading(false);
     }
   };
 
+  // Pantau perubahan pada filter untuk trigger fetch ulang
   useEffect(() => {
-    loadMessages();
+    fetchMessages();
   }, [page, debouncedSearch, isReadFilter, status, fetchApi]);
 
+  // Reset page ke 1 jika filter pencarian atau status baca berubah
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, isReadFilter]);
+
+  // --- FUNGSI UPDATE STATUS BACA ---
   const handleViewDetail = async (msg: ContactMessage) => {
     setSelectedMessage(msg);
     setIsDetailOpen(true);
@@ -126,11 +145,11 @@ export default function AdminContactMessage() {
     }
   };
 
-  // Handler Hapus Pesan
+  // --- FUNGSI HANDLE DELETE ---
   const handleDelete = async (id: number) => {
     if (status !== "authenticated") return;
 
-    if (!confirm("Yakin ingin menghapus pesan ini?")) return;
+    if (!window.confirm("Yakin ingin menghapus pesan ini?")) return;
 
     try {
       const res = await fetchApi(`/contact-messages/${id}`, {
@@ -142,13 +161,13 @@ export default function AdminContactMessage() {
         throw new Error(errData.message || "Gagal menghapus pesan");
       }
 
-      toast.success("Pesan berhasil dihapus");
-      loadMessages();
+      toast.success("Pesan berhasil dihapus!");
+      fetchMessages(); // Refresh data tabel
     } catch (error: any) {
+      console.error("❌ Delete Error:", error);
       toast.error(error.message || "Terjadi kesalahan saat menghapus pesan");
     }
   };
-
   // Buka WhatsApp Klien
   const handleReplyWhatsapp = (phone: string, name: string) => {
     let formattedPhone = phone.replace(/\D/g, "");
@@ -274,29 +293,32 @@ export default function AdminContactMessage() {
         </Table>
       </div>
 
-      {/* PAGINATION */}
-      <div className="flex justify-between items-center mt-4">
-        <span className="text-sm text-gray-500">Total {meta.total} pesan</span>
-        <div className="space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}>
-            Sebelumnya
-          </Button>
-          <span className="text-sm font-medium">
-            Hal {meta.page} / {meta.lastPage}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage((p) => Math.min(meta.lastPage, p + 1))}
-            disabled={page === meta.lastPage}>
-            Selanjutnya
-          </Button>
+      {/* === PAGINATION === */}
+      {meta && (
+        <div className="flex justify-between items-center mt-4 p-4 border-t text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
+            Halaman {meta.page} dari {Math.ceil(meta.total / meta.perPage)}{" "}
+            (Total {meta.total} pesan)
+          </p>
+
+          <div className="space-x-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!meta.hasPrevious}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              Sebelumnya
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!meta.hasNext}
+              onClick={() => setPage((p) => p + 1)}>
+              Selanjutnya
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* DETAIL MODAL */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
