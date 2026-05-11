@@ -37,6 +37,9 @@ export default function AddArticle() {
       }
       formData.append("productIds", values.productIds?.join(",") || "");
       formData.append("tagIds", values.tagIds?.join(",") || "");
+      if (values.seo) {
+        formData.append("seo", JSON.stringify(values.seo));
+      }
 
       // Mengirimkan file gambar desktop
       if (coverFile) {
