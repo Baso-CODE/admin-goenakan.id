@@ -90,17 +90,6 @@ export type ArticleFormValues = z.infer<typeof articleSchema>;
 export interface ArticleInitialData extends ArticleFormValues {
   coverImage?: string;
   coverImageMobile?: string;
-  seo?: {
-    metaTitle?: string;
-    metaDescription?: string;
-    keywords?: string;
-    canonicalUrl?: string;
-    ogTitle?: string;
-    ogDescription?: string;
-    ogImage?: string;
-    robots?: string;
-    structuredData?: string;
-  };
 }
 
 export default function FormArticle({

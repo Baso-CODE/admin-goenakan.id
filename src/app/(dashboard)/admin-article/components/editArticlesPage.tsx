@@ -55,6 +55,19 @@ export default function EditArticle() {
         productIds: existingProductIds,
         tagIds: existingTagIds,
         focusKeywords: article.focusKeywords || "",
+
+        // ✨ Data SEO diambil dari relasi backend
+        seo: {
+          metaTitle: article.seo?.metaTitle || "",
+          metaDescription: article.seo?.metaDescription || "",
+          keywords: article.seo?.keywords || "",
+          canonicalUrl: article.seo?.canonicalUrl || "",
+          ogTitle: article.seo?.ogTitle || "",
+          ogDescription: article.seo?.ogDescription || "",
+          ogImage: article.seo?.ogImage || "",
+          robots: article.seo?.robots || "index, follow",
+          structuredData: article.seo?.structuredData || "",
+        },
       });
     } catch (error) {
       console.error(error);
@@ -82,6 +95,9 @@ export default function EditArticle() {
 
     setIsSubmitting(true);
     try {
+      // ==========================================
+      // PROSES 1: UPDATE ARTIKEL UTAMA (FormData)
+      // ==========================================
       const formData = new FormData();
       formData.append("title", values.title);
       formData.append("authorName", values.authorName);
@@ -98,27 +114,52 @@ export default function EditArticle() {
       formData.append("productIds", values.productIds?.join(",") || "");
       formData.append("tagIds", values.tagIds?.join(",") || "");
 
-      // Kirim file desktop jika ada perubahan
       if (coverFile) {
         formData.append("coverFile", coverFile);
       }
 
-      // ✨ TAMBAHAN: Kirim file mobile jika ada perubahan
       if (coverMobileFile) {
         formData.append("coverMobileFile", coverMobileFile);
       }
 
-      const res = await fetchApi(`/articles/${id}`, {
+      // Tembak API Artikel Utama
+      const resArticle = await fetchApi(`/articles/${id}`, {
         method: "PATCH",
         body: formData,
       });
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Gagal mengupdate artikel");
+      if (!resArticle.ok) {
+        const errorData = await resArticle.json().catch(() => ({}));
+        throw new Error(errorData.message || "Gagal mengupdate artikel utama");
       }
 
-      toast.success("Artikel berhasil diperbarui!");
+      // ==========================================
+      // PROSES 2: UPSERT DATA SEO (JSON)
+      // ==========================================
+      if (values.seo) {
+        // Tembak API SEO
+        const resSeo = await fetchApi(`/article-seo/${id}`, {
+          method: "POST", // Menggunakan POST karena controller kita Upsert
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(values.seo),
+        });
+
+        if (!resSeo.ok) {
+          const errorData = await resSeo.json().catch(() => ({}));
+          // Jika artikel berhasil tapi SEO gagal, kita throw error agar ditangkap catch
+          throw new Error(
+            errorData.message ||
+              "Artikel berhasil diupdate, tetapi gagal menyimpan pengaturan SEO",
+          );
+        }
+      }
+
+      // ==========================================
+      // PROSES SELESAI
+      // ==========================================
+      toast.success("Artikel dan Pengaturan SEO berhasil diperbarui!");
       router.push("/admin-article/article");
       router.refresh();
     } catch (err: any) {
