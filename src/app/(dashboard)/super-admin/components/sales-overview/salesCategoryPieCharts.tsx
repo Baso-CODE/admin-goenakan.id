@@ -24,53 +24,59 @@ import {
   Tooltip,
 } from "recharts";
 
-// === DUMMY DATA ===
-const dataCategory = [
-  { name: "Drinkware", value: 45000 },
-  { name: "Stationary", value: 30000 },
-  { name: "Apparel", value: 15000 },
-  { name: "Accessories", value: 10000 },
+const COLORS = [
+  "#0ea5e9",
+  "#10b981",
+  "#f59e0b",
+  "#6366f1",
+  "#ec4899",
+  "#8b5cf6",
+  "#f43f5e",
 ];
 
-const dataItemStationary = [
-  { name: "Pensil", value: 12000 },
-  { name: "Penggaris", value: 8000 },
-  { name: "Spidol", value: 6000 },
-  { name: "Buku Tulis", value: 4000 },
-];
-
-const dataItemDrinkware = [
-  { name: "Tumbler Stainless", value: 25000 },
-  { name: "Mug Keramik", value: 15000 },
-  { name: "Botol Plastik", value: 5000 },
-];
-
-// Palet warna yang elegan untuk Pie Chart
-const COLORS = ["#0ea5e9", "#10b981", "#f59e0b", "#6366f1", "#ec4899"];
+interface PieData {
+  name: string;
+  value: number;
+}
 
 interface SalesCategoryPieChartsProps {
-  hasComparison?: boolean; // Prop untuk mengecek apakah user sedang membandingkan tanggal
+  hasComparison?: boolean;
+  data?: {
+    productCategories: PieData[];
+    itemCategories: Record<string, PieData[]>; // ✨ Diperbarui: Menerima tipe Object Record
+  };
 }
 
 export default function SalesCategoryPieCharts({
   hasComparison = false,
+  data,
 }: SalesCategoryPieChartsProps) {
-  const [selectedCategory, setSelectedCategory] = useState("stationary");
+  // ✨ STATE BARU: Mengatur kategori apa yang dipilih di grafik kanan (Default: "all")
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
-  // Logika sederhana untuk mengganti data grafik kanan berdasarkan dropdown
-  const currentItemData =
-    selectedCategory === "stationary" ? dataItemStationary : dataItemDrinkware;
+  const productCategories = data?.productCategories || [];
+
+  // ✨ LOGIKA BARU: Mengambil seluruh objek itemCategories, dan daftar nama kategorinya
+  const itemCategoriesObject = data?.itemCategories || { all: [] };
+
+  // Daftar pilihan untuk Dropdown (contoh: ["all", "Drinkware", "Stationary", "Uncategorized"])
+  const dropdownOptions = Object.keys(itemCategoriesObject);
+
+  // Data item yang akan dirender berdasarkan Dropdown yang dipilih
+  const currentItemData = itemCategoriesObject[selectedCategory] || [];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
-      {/* 1. GRAFIK KIRI: REVENUE BY PRODUCT CATEGORY */}
+      {/* ============================================================== */}
+      {/* 1. GRAFIK KIRI: REVENUE BY PRODUCT CATEGORY                      */}
+      {/* ============================================================== */}
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold text-slate-800">
             Revenue by Product Category
           </CardTitle>
           <CardDescription className="text-xs">
-            (Default is total revenue from beginning until now)
+            (Berdasarkan rentang waktu filter)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -82,20 +88,20 @@ export default function SalesCategoryPieCharts({
                   Previous)
                 </p>
               </div>
-            ) : (
+            ) : productCategories.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={dataCategory}
+                    data={productCategories}
                     cx="50%"
                     cy="45%"
-                    innerRadius={60} // Hapus baris ini jika ingin Pie penuh tanpa lubang di tengah
+                    innerRadius={60}
                     outerRadius={90}
                     paddingAngle={2}
                     dataKey="value"
                     labelLine={false}
                     label={({ percent }) => `${(percent * 100).toFixed(0)}%`}>
-                    {dataCategory.map((entry, index) => (
+                    {productCategories.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={COLORS[index % COLORS.length]}
@@ -104,7 +110,11 @@ export default function SalesCategoryPieCharts({
                   </Pie>
                   <Tooltip
                     formatter={(value: number) => [
-                      `$${value.toLocaleString()}`,
+                      new Intl.NumberFormat("id-ID", {
+                        style: "currency",
+                        currency: "IDR",
+                        minimumFractionDigits: 0,
+                      }).format(value),
                       "Revenue",
                     ]}
                     contentStyle={{
@@ -120,12 +130,18 @@ export default function SalesCategoryPieCharts({
                   />
                 </PieChart>
               </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                Tidak ada data
+              </div>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* 2. GRAFIK KANAN: REVENUE BY ITEM CATEGORY */}
+      {/* ============================================================== */}
+      {/* 2. GRAFIK KANAN: REVENUE BY ITEM CATEGORY                        */}
+      {/* ============================================================== */}
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -134,10 +150,10 @@ export default function SalesCategoryPieCharts({
                 Revenue by Item Category
               </CardTitle>
               <CardDescription className="text-xs mt-1 max-w-62.5">
-                Filter per kategori produk. <br /> (Default: All)
+                Menampilkan sub-kategori berdasarkan produk
               </CardDescription>
             </div>
-            {/* DROPDOWN FILTER KHUSUS GRAFIK KANAN */}
+            {/* ✨ DROPDOWN DINAMIS BERDASARKAN API */}
             <div className="w-35 shrink-0">
               <Select
                 value={selectedCategory}
@@ -146,11 +162,11 @@ export default function SalesCategoryPieCharts({
                   <SelectValue placeholder="Pilih Kategori" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="stationary">Stationary</SelectItem>
-                  <SelectItem value="drinkware">Drinkware</SelectItem>
-                  <SelectItem value="all" disabled>
-                    All (Coming Soon)
-                  </SelectItem>
+                  {dropdownOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option === "all" ? "All Categories" : option}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -158,39 +174,53 @@ export default function SalesCategoryPieCharts({
         </CardHeader>
         <CardContent>
           <div className="h-75 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={currentItemData}
-                  cx="50%"
-                  cy="45%"
-                  innerRadius={60}
-                  outerRadius={90}
-                  paddingAngle={2}
-                  dataKey="value"
-                  labelLine={false}
-                  label={({ percent }) => `${(percent * 100).toFixed(0)}%`}>
-                  {currentItemData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[(index + 2) % COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value: number) => [
-                    `$${value.toLocaleString()}`,
-                    "Revenue",
-                  ]}
-                  contentStyle={{
-                    borderRadius: "8px",
-                    border: "none",
-                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                  }}
-                />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" />
-              </PieChart>
-            </ResponsiveContainer>
+            {currentItemData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={currentItemData}
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={60}
+                    outerRadius={90}
+                    paddingAngle={2}
+                    dataKey="value"
+                    labelLine={false}
+                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}>
+                    {currentItemData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[(index + 2) % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number) => [
+                      new Intl.NumberFormat("id-ID", {
+                        style: "currency",
+                        currency: "IDR",
+                        minimumFractionDigits: 0,
+                      }).format(value),
+                      "Revenue",
+                    ]}
+                    contentStyle={{
+                      borderRadius: "8px",
+                      border: "none",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    height={36}
+                    iconType="circle"
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                Tidak ada data item untuk kategori ini
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

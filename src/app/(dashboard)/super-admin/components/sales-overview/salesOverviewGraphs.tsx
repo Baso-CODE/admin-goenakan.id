@@ -19,18 +19,17 @@ import {
   YAxis,
 } from "recharts";
 
-// === DUMMY DATA ===
-// Data ini merepresentasikan trend "per month" sesuai gambar
-const monthlyData = [
-  { month: "Jan", revenue: 45000, order: 320, profit: 12000 },
-  { month: "Feb", revenue: 52000, order: 380, profit: 15500 },
-  { month: "Mar", revenue: 48000, order: 350, profit: 13200 },
-  { month: "Apr", revenue: 61000, order: 430, profit: 18000 },
-  { month: "May", revenue: 59000, order: 410, profit: 17500 },
-  { month: "Jun", revenue: 75000, order: 520, profit: 24000 },
-];
+// ✨ UPDATE: Tambahkan interface untuk props data dari API
+interface SalesOverviewGraphsProps {
+  data?: any[]; // Menerima array grafik dari parent
+}
 
-export default function SalesOverviewGraphs() {
+export default function SalesOverviewGraphs({
+  data = [],
+}: SalesOverviewGraphsProps) {
+  // Pastikan data adalah array, jika tidak berikan array kosong agar Recharts tidak error
+  const chartData = Array.isArray(data) ? data : [];
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
       {/* 1. REVENUE TREND (BAR CHART) */}
@@ -40,22 +39,23 @@ export default function SalesOverviewGraphs() {
             Revenue Trend
           </CardTitle>
           <CardDescription className="text-xs">
-            (Default per month)
+            (Berdasarkan tanggal)
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-62.5 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
+              {/* ✨ Ganti monthlyData menjadi chartData */}
               <BarChart
-                data={monthlyData}
-                margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                data={chartData}
+                margin={{ top: 0, right: 0, left: 10, bottom: 0 }}>
                 <CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
                   stroke="#e2e8f0"
                 />
                 <XAxis
-                  dataKey="month"
+                  dataKey="month" // Ini sama dengan "month" yang kita set di backend
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fill: "#64748b" }}
@@ -65,7 +65,10 @@ export default function SalesOverviewGraphs() {
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fill: "#64748b" }}
-                  tickFormatter={(value) => `$${value / 1000}k`}
+                  // Format persingkat angka Y-Axis (contoh: 1000 jadi 1k)
+                  tickFormatter={(value) =>
+                    `${value >= 1000 ? value / 1000 + "k" : value}`
+                  }
                 />
                 <Tooltip
                   cursor={{ fill: "#f1f5f9" }}
@@ -75,7 +78,7 @@ export default function SalesOverviewGraphs() {
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
                   formatter={(value: number) => [
-                    `$${value.toLocaleString()}`,
+                    `Rp ${value.toLocaleString("id-ID")}`,
                     "Revenue",
                   ]}
                 />
@@ -98,15 +101,16 @@ export default function SalesOverviewGraphs() {
             Order Trend
           </CardTitle>
           <CardDescription className="text-xs">
-            (Default per month)
+            (Berdasarkan tanggal)
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-62.5 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
+              {/* ✨ Ganti monthlyData menjadi chartData */}
               <BarChart
-                data={monthlyData}
-                margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                data={chartData}
+                margin={{ top: 0, right: 0, left: -10, bottom: 0 }}>
                 <CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
@@ -132,7 +136,7 @@ export default function SalesOverviewGraphs() {
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
                   formatter={(value: number) => [
-                    value.toLocaleString(),
+                    value.toLocaleString("id-ID"),
                     "Orders",
                   ]}
                 />
@@ -157,10 +161,7 @@ export default function SalesOverviewGraphs() {
                 Profit Trend
               </CardTitle>
               <CardDescription className="text-xs text-indigo-600/70 mt-1">
-                (Default per month)
-              </CardDescription>
-              <CardDescription className="text-[10px] italic text-indigo-400 mt-0.5">
-                =revenue-cost (Owner only)
+                (Berdasarkan tanggal)
               </CardDescription>
             </div>
           </div>
@@ -168,9 +169,10 @@ export default function SalesOverviewGraphs() {
         <CardContent>
           <div className="h-62.5 w-full mt-1">
             <ResponsiveContainer width="100%" height="100%">
+              {/* ✨ Ganti monthlyData menjadi chartData */}
               <LineChart
-                data={monthlyData}
-                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                data={chartData}
+                margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                 <CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
@@ -187,7 +189,9 @@ export default function SalesOverviewGraphs() {
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fill: "#6366f1" }}
-                  tickFormatter={(value) => `$${value / 1000}k`}
+                  tickFormatter={(value) =>
+                    `${value >= 1000 ? value / 1000 + "k" : value}`
+                  }
                 />
                 <Tooltip
                   contentStyle={{
@@ -196,7 +200,7 @@ export default function SalesOverviewGraphs() {
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
                   formatter={(value: number) => [
-                    `$${value.toLocaleString()}`,
+                    `Rp ${value.toLocaleString("id-ID")}`,
                     "Profit",
                   ]}
                 />

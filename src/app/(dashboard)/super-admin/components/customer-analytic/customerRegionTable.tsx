@@ -19,61 +19,50 @@ import {
 import { ArrowUpDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
-// === DUMMY DATA ===
-const initialRegionData = [
-  {
-    id: 1,
-    region: "East Java",
-    totalCustomer: 28,
-    totalSales: 27823,
-    lastOrder: "2026-04-26",
-  },
-  {
-    id: 2,
-    region: "DKI Jakarta",
-    totalCustomer: 85,
-    totalSales: 120500,
-    lastOrder: "2026-04-29",
-  },
-  {
-    id: 3,
-    region: "West Java",
-    totalCustomer: 45,
-    totalSales: 45000,
-    lastOrder: "2026-04-28",
-  },
-  {
-    id: 4,
-    region: "Bali",
-    totalCustomer: 15,
-    totalSales: 15200,
-    lastOrder: "2026-04-20",
-  },
-  {
-    id: 5,
-    region: "Central Java",
-    totalCustomer: 22,
-    totalSales: 19800,
-    lastOrder: "2026-04-25",
-  },
-];
+// ✨ UPDATE: Interface untuk tabel region
+interface RegionData {
+  id: string | number;
+  region: string;
+  totalCustomer: number;
+  totalSales: number;
+  lastOrder: string;
+}
 
-// Helper untuk format tanggal (Contoh: "26 Apr 2026")
+interface CustomerRegionTableProps {
+  data?: RegionData[];
+}
+
+// Helper untuk format tanggal
 const formatDate = (dateString: string) => {
+  if (!dateString) return "-";
   const date = new Date(dateString);
-  return date.toLocaleDateString("en-GB", {
+  return date.toLocaleDateString("id-ID", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 };
 
-export default function CustomerRegionTable() {
+// Helper format uang
+const formatIDR = (val: number) => {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+  }).format(val || 0);
+};
+
+export default function CustomerRegionTable({
+  data = [],
+}: CustomerRegionTableProps) {
   const [sortBy, setSortBy] = useState("sales-desc");
 
-  // Logika Sorting Data
+  // Logika Sorting Data yang sudah dinamis
   const sortedData = useMemo(() => {
-    const dataCopy = [...initialRegionData];
+    // Pastikan data valid
+    if (!Array.isArray(data)) return [];
+
+    const dataCopy = [...data];
 
     switch (sortBy) {
       case "region-asc":
@@ -101,7 +90,7 @@ export default function CustomerRegionTable() {
       default:
         return dataCopy;
     }
-  }, [sortBy]);
+  }, [data, sortBy]); // akan render ulang jika `data` dari API atau `sortBy` berubah
 
   return (
     <Card className="shadow-sm mt-6">
@@ -157,20 +146,32 @@ export default function CustomerRegionTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedData.map((item) => (
-                <TableRow key={item.id} className="hover:bg-slate-50/50">
-                  <TableCell className="font-medium">{item.region}</TableCell>
-                  <TableCell className="text-right">
-                    {item.totalCustomer.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold text-emerald-600">
-                    ${item.totalSales.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-right text-slate-500 text-sm">
-                    {formatDate(item.lastOrder)}
+              {sortedData.length > 0 ? (
+                sortedData.map((item, index) => (
+                  <TableRow
+                    key={item.id || index}
+                    className="hover:bg-slate-50/50">
+                    <TableCell className="font-medium">{item.region}</TableCell>
+                    <TableCell className="text-right">
+                      {item.totalCustomer.toLocaleString("id-ID")}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-emerald-600">
+                      {formatIDR(item.totalSales)}
+                    </TableCell>
+                    <TableCell className="text-right text-slate-500 text-sm">
+                      {formatDate(item.lastOrder)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={4}
+                    className="text-center text-slate-400 py-4 h-24">
+                    Tidak ada data pelanggan
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </div>

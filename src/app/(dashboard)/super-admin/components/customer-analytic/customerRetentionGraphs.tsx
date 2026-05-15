@@ -11,17 +11,16 @@ import {
   YAxis,
 } from "recharts";
 
-// === DUMMY DATA ===
-const monthlyData = [
-  { month: "Jan", repeatRate: 25, churnRate: 5 },
-  { month: "Feb", repeatRate: 28, churnRate: 4.5 },
-  { month: "Mar", repeatRate: 32, churnRate: 6 },
-  { month: "Apr", repeatRate: 35, churnRate: 4 },
-  { month: "May", repeatRate: 40, churnRate: 3.5 },
-  { month: "Jun", repeatRate: 45, churnRate: 3 },
-];
+// ✨ UPDATE: Interface untuk props data grafik
+interface CustomerRetentionGraphsProps {
+  data?: any[];
+}
 
-export default function CustomerRetentionGraphs() {
+export default function CustomerRetentionGraphs({
+  data = [],
+}: CustomerRetentionGraphsProps) {
+  const chartData = Array.isArray(data) ? data : [];
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
       {/* 1. REPEAT PURCHASE RATE */}
@@ -35,7 +34,7 @@ export default function CustomerRetentionGraphs() {
           <div className="h-70 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={monthlyData}
+                data={chartData}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid
                   strokeDasharray="3 3"
@@ -43,7 +42,7 @@ export default function CustomerRetentionGraphs() {
                   stroke="#e2e8f0"
                 />
                 <XAxis
-                  dataKey="month"
+                  dataKey="month" // Diambil dari backend
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fill: "#64748b" }}
@@ -90,7 +89,7 @@ export default function CustomerRetentionGraphs() {
           <div className="h-70 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={monthlyData}
+                data={chartData}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid
                   strokeDasharray="3 3"
@@ -119,7 +118,6 @@ export default function CustomerRetentionGraphs() {
                   }}
                   formatter={(value: number) => [`${value}%`, "Churn Rate"]}
                 />
-                {/* Warna merah (rose) untuk churn karena berkonotasi negatif */}
                 <Bar
                   dataKey="churnRate"
                   fill="#f43f5e"

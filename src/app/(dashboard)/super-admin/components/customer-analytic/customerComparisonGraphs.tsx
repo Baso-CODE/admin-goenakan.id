@@ -12,53 +12,15 @@ import {
   YAxis,
 } from "recharts";
 
-// === DUMMY DATA ===
-const comparisonData = [
-  {
-    month: "Jan",
-    newOrderPct: 70,
-    repeatOrderPct: 30,
-    avgSalesNew: 120,
-    avgSalesRepeat: 250,
-  },
-  {
-    month: "Feb",
-    newOrderPct: 65,
-    repeatOrderPct: 35,
-    avgSalesNew: 130,
-    avgSalesRepeat: 270,
-  },
-  {
-    month: "Mar",
-    newOrderPct: 60,
-    repeatOrderPct: 40,
-    avgSalesNew: 125,
-    avgSalesRepeat: 280,
-  },
-  {
-    month: "Apr",
-    newOrderPct: 55,
-    repeatOrderPct: 45,
-    avgSalesNew: 140,
-    avgSalesRepeat: 310,
-  },
-  {
-    month: "May",
-    newOrderPct: 50,
-    repeatOrderPct: 50,
-    avgSalesNew: 150,
-    avgSalesRepeat: 340,
-  },
-  {
-    month: "Jun",
-    newOrderPct: 40,
-    repeatOrderPct: 60,
-    avgSalesNew: 160,
-    avgSalesRepeat: 380,
-  },
-];
+interface CustomerComparisonGraphsProps {
+  data?: any[];
+}
 
-export default function CustomerComparisonGraphs() {
+export default function CustomerComparisonGraphs({
+  data = [],
+}: CustomerComparisonGraphsProps) {
+  const chartData = Array.isArray(data) ? data : [];
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
       {/* 3. PERCENTAGE NEW VS REPEAT ORDER (STACKED BAR) */}
@@ -71,9 +33,8 @@ export default function CustomerComparisonGraphs() {
         <CardContent>
           <div className="h-70 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
-              {/* Stacked bar chart (total 100%) */}
               <BarChart
-                data={comparisonData}
+                data={chartData}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid
                   strokeDasharray="3 3"
@@ -140,10 +101,9 @@ export default function CustomerComparisonGraphs() {
         <CardContent>
           <div className="h-70 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
-              {/* Grouped bar chart (batang bersebelahan) */}
               <BarChart
-                data={comparisonData}
-                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                data={chartData}
+                margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                 <CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
@@ -160,7 +120,9 @@ export default function CustomerComparisonGraphs() {
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fill: "#64748b" }}
-                  tickFormatter={(val) => `$${val}`}
+                  tickFormatter={(value) =>
+                    `${value >= 1000 ? value / 1000 + "k" : value}`
+                  }
                 />
                 <Tooltip
                   cursor={{ fill: "#f8fafc" }}
@@ -169,7 +131,14 @@ export default function CustomerComparisonGraphs() {
                     border: "none",
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
-                  formatter={(value: number) => [`$${value.toLocaleString()}`]}
+                  formatter={(value: number) => [
+                    new Intl.NumberFormat("id-ID", {
+                      style: "currency",
+                      currency: "IDR",
+                      minimumFractionDigits: 0,
+                    }).format(value),
+                    "Sales",
+                  ]}
                 />
                 <Legend
                   verticalAlign="bottom"
