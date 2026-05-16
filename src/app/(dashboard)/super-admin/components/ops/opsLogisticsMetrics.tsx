@@ -3,14 +3,32 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, Hammer, PackageOpen, Send, Truck } from "lucide-react";
 
-export default function OpsLogisticsMetrics() {
-  // === DUMMY DATA ===
-  const logisticsData = {
-    production: "88,978.00",
-    shipping: "88,978.00",
-    packaging: "88,978.00",
-    sendToCustomer: "88,978.00",
-    complete: "88,978.00",
+export interface LogisticsMetricsData {
+  production: number;
+  packaging: number;
+  shipping: number;
+  sendToCustomer: number;
+  complete: number;
+}
+
+interface OpsLogisticsMetricsProps {
+  data?: LogisticsMetricsData;
+}
+
+// Helper untuk format angka
+const formatNumber = (val: number) =>
+  new Intl.NumberFormat("id-ID").format(val || 0);
+
+export default function OpsLogisticsMetrics({
+  data,
+}: OpsLogisticsMetricsProps) {
+  // Fallback jika data belum ada
+  const safeData = data || {
+    production: 0,
+    packaging: 0,
+    shipping: 0,
+    sendToCustomer: 0,
+    complete: 0,
   };
 
   return (
@@ -36,22 +54,11 @@ export default function OpsLogisticsMetrics() {
                 Production
               </h3>
               <p className="text-xl font-bold text-slate-800">
-                {logisticsData.production}
+                {formatNumber(safeData.production)}
               </p>
             </div>
 
-            {/* 2. Shipping */}
-            <div className="p-6 flex flex-col items-center justify-center text-center space-y-2 hover:bg-slate-50 transition-colors">
-              <div className="p-3 bg-blue-50 rounded-full">
-                <Truck className="w-5 h-5 text-blue-600" />
-              </div>
-              <h3 className="text-sm font-semibold text-slate-500">Shipping</h3>
-              <p className="text-xl font-bold text-slate-800">
-                {logisticsData.shipping}
-              </p>
-            </div>
-
-            {/* 3. Packaging */}
+            {/* 2. Packaging (Diubah urutannya sesuai logika bisnis: Produksi -> Kemas -> Kirim) */}
             <div className="p-6 flex flex-col items-center justify-center text-center space-y-2 hover:bg-slate-50 transition-colors">
               <div className="p-3 bg-amber-50 rounded-full">
                 <PackageOpen className="w-5 h-5 text-amber-600" />
@@ -60,7 +67,18 @@ export default function OpsLogisticsMetrics() {
                 Packaging
               </h3>
               <p className="text-xl font-bold text-slate-800">
-                {logisticsData.packaging}
+                {formatNumber(safeData.packaging)}
+              </p>
+            </div>
+
+            {/* 3. Shipping */}
+            <div className="p-6 flex flex-col items-center justify-center text-center space-y-2 hover:bg-slate-50 transition-colors">
+              <div className="p-3 bg-blue-50 rounded-full">
+                <Truck className="w-5 h-5 text-blue-600" />
+              </div>
+              <h3 className="text-sm font-semibold text-slate-500">Shipping</h3>
+              <p className="text-xl font-bold text-slate-800">
+                {formatNumber(safeData.shipping)}
               </p>
             </div>
 
@@ -73,7 +91,7 @@ export default function OpsLogisticsMetrics() {
                 Send to customer
               </h3>
               <p className="text-xl font-bold text-slate-800">
-                {logisticsData.sendToCustomer}
+                {formatNumber(safeData.sendToCustomer)}
               </p>
             </div>
 
@@ -84,7 +102,7 @@ export default function OpsLogisticsMetrics() {
               </div>
               <h3 className="text-sm font-semibold text-slate-500">Complete</h3>
               <p className="text-xl font-bold text-emerald-600">
-                {logisticsData.complete}
+                {formatNumber(safeData.complete)}
               </p>
             </div>
           </div>

@@ -1,3 +1,4 @@
+// app/super-admin/components/ops/opsSampleSection.tsx
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,15 +12,39 @@ import {
   UserCheck,
 } from "lucide-react";
 
-export default function OpsSampleSection() {
-  // === DUMMY DATA ===
-  const sampleData = {
-    totalSample: "213,123.00",
-    totalCost: "$213,123.00",
-    convertedCustomer: "213,123.00",
-    conversionRate: "45.2%",
-    returnOfSample: "$2,323,432.00",
-    avgConversionRate: "42.8%",
+// ✨ UPDATE: Interface untuk Props dari API
+export interface SampleMetricsData {
+  totalSample: number;
+  totalCost: number;
+  convertedCustomer: number;
+  conversionRate: number;
+  returnOfSample: number;
+  avgConversionRate: number;
+}
+
+interface OpsSampleSectionProps {
+  data?: SampleMetricsData;
+}
+
+// ✨ Helper untuk format angka dan uang
+const formatNumber = (val: number) =>
+  new Intl.NumberFormat("id-ID").format(val || 0);
+const formatCurrency = (val: number) =>
+  new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+  }).format(val || 0);
+
+export default function OpsSampleSection({ data }: OpsSampleSectionProps) {
+  // Fallback data jika API belum mengirimkan props
+  const safeData = data || {
+    totalSample: 0,
+    totalCost: 0,
+    convertedCustomer: 0,
+    conversionRate: 0,
+    returnOfSample: 0,
+    avgConversionRate: 0,
   };
 
   return (
@@ -44,8 +69,9 @@ export default function OpsSampleSection() {
             <PackageSearch className="h-4 w-4 text-indigo-500" />
           </CardHeader>
           <CardContent>
+            {/* ✨ Menggunakan format angka biasa */}
             <div className="text-2xl font-bold text-foreground">
-              {sampleData.totalSample}
+              {formatNumber(safeData.totalSample)}
             </div>
           </CardContent>
         </Card>
@@ -59,8 +85,9 @@ export default function OpsSampleSection() {
             <CircleDollarSign className="h-4 w-4 text-rose-500" />
           </CardHeader>
           <CardContent>
+            {/* ✨ Menggunakan format mata uang IDR */}
             <div className="text-2xl font-bold text-foreground">
-              {sampleData.totalCost}
+              {formatCurrency(safeData.totalCost)}
             </div>
           </CardContent>
         </Card>
@@ -75,7 +102,7 @@ export default function OpsSampleSection() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              {sampleData.convertedCustomer}
+              {formatNumber(safeData.convertedCustomer)}
             </div>
           </CardContent>
         </Card>
@@ -92,8 +119,9 @@ export default function OpsSampleSection() {
             <Percent className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
+            {/* ✨ Menggunakan toFixed(1) untuk menjamin 1 angka di belakang koma */}
             <div className="text-2xl font-bold text-foreground">
-              {sampleData.conversionRate}
+              {safeData.conversionRate.toFixed(1)}%
             </div>
           </CardContent>
         </Card>
@@ -108,7 +136,7 @@ export default function OpsSampleSection() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              {sampleData.returnOfSample}
+              {formatCurrency(safeData.returnOfSample)}
             </div>
           </CardContent>
         </Card>
@@ -123,7 +151,7 @@ export default function OpsSampleSection() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              {sampleData.avgConversionRate}
+              {safeData.avgConversionRate.toFixed(1)}%
             </div>
           </CardContent>
         </Card>

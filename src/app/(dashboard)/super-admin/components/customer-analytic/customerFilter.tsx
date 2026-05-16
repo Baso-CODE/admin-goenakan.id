@@ -77,7 +77,7 @@ export default function CustomerFilter({
       {/* ========================================== */}
       <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
         {/* 1. DROPDOWN RENTANG WAKTU UTAMA */}
-        <div className="w-full sm:w-[200px] shrink-0">
+        <div className="w-full sm:w-50 shrink-0">
           <Select value={dateRange} onValueChange={setDateRange}>
             <SelectTrigger className="bg-white">
               <CalendarIcon className="w-4 h-4 mr-2 text-muted-foreground" />
@@ -102,7 +102,7 @@ export default function CustomerFilter({
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-full sm:w-[150px] justify-between text-left font-normal bg-white",
+                    "w-full sm:w-37.5 justify-between text-left font-normal bg-white",
                     !customStartDate && "text-muted-foreground",
                   )}>
                   {customStartDate ? (
@@ -133,7 +133,7 @@ export default function CustomerFilter({
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-full sm:w-[150px] justify-between text-left font-normal bg-white",
+                    "w-full sm:w-37.5 justify-between text-left font-normal bg-white",
                     !customEndDate && "text-muted-foreground",
                   )}>
                   {customEndDate ? (
@@ -157,7 +157,7 @@ export default function CustomerFilter({
         )}
 
         {/* 3. DROPDOWN PERBANDINGAN */}
-        <div className="w-full sm:w-[180px] shrink-0">
+        <div className="w-full sm:w-45 shrink-0">
           <Select value={comparison} onValueChange={setComparison}>
             <SelectTrigger className="bg-white">
               <SelectValue placeholder="Comparison" />

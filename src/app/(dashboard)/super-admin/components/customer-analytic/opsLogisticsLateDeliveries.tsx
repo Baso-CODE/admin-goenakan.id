@@ -11,31 +11,27 @@ import {
   YAxis,
 } from "recharts";
 
-// === DUMMY DATA ===
-const dataMonth = [
-  { label: "Jan", value: 45 },
-  { label: "Feb", value: 52 },
-  { label: "Mar", value: 38 },
-  { label: "Apr", value: 65 },
-  { label: "May", value: 48 },
-  { label: "Jun", value: 55 },
-];
+interface ChartItem {
+  label: string;
+  value: number;
+}
 
-const dataVendor = [
-  { label: "Vendor A", value: 120 },
-  { label: "Vendor B", value: 85 },
-  { label: "Vendor C", value: 40 },
-  { label: "Vendor D", value: 25 },
-];
+interface OpsLogisticsLateDeliveriesProps {
+  data?: {
+    byMonth: ChartItem[];
+    byVendor: ChartItem[];
+    byProduct: ChartItem[];
+  };
+}
 
-const dataProduct = [
-  { label: "Tumbler", value: 95 },
-  { label: "Apparel", value: 70 },
-  { label: "Agenda", value: 30 },
-  { label: "Bag", value: 20 },
-];
+export default function OpsLogisticsLateDeliveries({
+  data,
+}: OpsLogisticsLateDeliveriesProps) {
+  // Ekstrak data atau gunakan array kosong
+  const dataMonth = data?.byMonth || [];
+  const dataVendor = data?.byVendor || [];
+  const dataProduct = data?.byProduct || [];
 
-export default function OpsLogisticsLateDeliveries() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
       {/* 1. LATE DELIVERIES BY MONTH */}

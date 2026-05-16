@@ -3,12 +3,23 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckSquare, Clock, Timer } from "lucide-react";
 
-export default function OpsLogisticsAverages() {
-  // === DUMMY DATA ===
-  const data = {
-    avgProduction: "94.5%",
-    avgShipping: "98.2%",
-    avgFulfillment: "92.0%",
+export interface LogisticsAveragesData {
+  avgProduction: number;
+  avgShipping: number;
+  avgFulfillment: number;
+}
+
+interface OpsLogisticsAveragesProps {
+  data?: LogisticsAveragesData;
+}
+
+export default function OpsLogisticsAverages({
+  data,
+}: OpsLogisticsAveragesProps) {
+  const safeData = data || {
+    avgProduction: 0,
+    avgShipping: 0,
+    avgFulfillment: 0,
   };
 
   return (
@@ -22,8 +33,9 @@ export default function OpsLogisticsAverages() {
           <Timer className="h-4 w-4 text-slate-400" />
         </CardHeader>
         <CardContent>
+          {/* ✨ Format jadi persentase 1 desimal */}
           <div className="text-2xl font-bold text-slate-800">
-            {data.avgProduction}
+            {safeData.avgProduction.toFixed(1)}%
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             Tingkat ketepatan waktu produksi
@@ -41,7 +53,7 @@ export default function OpsLogisticsAverages() {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-slate-800">
-            {data.avgShipping}
+            {safeData.avgShipping.toFixed(1)}%
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             Tingkat pengiriman sesuai SLA
@@ -59,7 +71,7 @@ export default function OpsLogisticsAverages() {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-slate-800">
-            {data.avgFulfillment}
+            {safeData.avgFulfillment.toFixed(1)}%
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             Rata-rata pesanan terselesaikan
