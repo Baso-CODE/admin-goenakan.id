@@ -9,7 +9,6 @@ import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Command,
   CommandEmpty,
@@ -47,6 +46,7 @@ import {
   Check,
   FileImage,
   Loader2,
+  PackageSearch,
   Save,
   Search,
   Smartphone,
@@ -59,10 +59,9 @@ import { FormSeo } from "./formArticleSEO";
 import { ImagePreviewModal } from "./imagePreviewModal";
 import { SEOAnalyzer } from "./seoAnalyzer";
 
-// ✨ 1. PERBARUI SCHEMA ZOD
 const articleSchema = z.object({
   title: z.string().min(5, "Judul minimal 5 karakter"),
-  authorName: z.string().min(2, "Nama penulis wajib diisi"), // Tambahan
+  authorName: z.string().min(2, "Nama penulis wajib diisi"),
   categoryId: z.string().min(1, "Kategori wajib dipilih"),
   content: z.string().min(20, "Konten artikel terlalu pendek"),
   source: z.string().optional(),
@@ -102,21 +101,19 @@ export default function FormArticle({
     values: any,
     coverFile: File | null,
     coverMobileFile: File | null,
-  ) => void; // Update signature onSubmit
+  ) => void;
   isSubmitting: boolean;
   initialData?: any | null;
   isEditing?: boolean;
 }) {
   const { fetchApi, status } = useApi();
 
-  // Data States
   const [categories, setCategories] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // ✨ 2. STATE UNTUK DUA GAMBAR
   const [loadingData, setLoadingData] = useState(true);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverMobileFile, setCoverMobileFile] = useState<File | null>(null);
@@ -142,13 +139,12 @@ export default function FormArticle({
         ogTitle: "",
         ogDescription: "",
         ogImage: "",
-        robots: "index, follow", // Default Prisma
+        robots: "index, follow",
         structuredData: "",
       },
     },
   });
 
-  // Watcher untuk SEO Analyzer
   const watchedTitle = form.watch("title");
   const watchedContent = form.watch("content");
   const watchedKeywords = form.watch("focusKeywords");
@@ -193,7 +189,6 @@ export default function FormArticle({
       toast.error("Cover image Desktop wajib diunggah!");
       return;
     }
-    // Kirim kedua file ke fungsi parent (page.tsx)
     onSubmit(values, coverFile, coverMobileFile);
   };
 
@@ -205,7 +200,6 @@ export default function FormArticle({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-        {/* ✨ BUNGKUS DENGAN TABS */}
         <Tabs defaultValue="content" className="w-full">
           <TabsList className="mb-6 bg-stone-100 p-1">
             <TabsTrigger value="content" className="font-bold px-8">
@@ -216,11 +210,10 @@ export default function FormArticle({
             </TabsTrigger>
           </TabsList>
 
-          {/* === TAB 1: KONTEN UTAMA === */}
           <TabsContent
             value="content"
             className="space-y-8 mt-0 focus-visible:outline-none">
-            {/* ✨ SECTION 1: COVER IMAGES (Layout Dirapikan) */}
+            {/* AREA UPLOAD COVER */}
             <Card className="p-6 border-stone-200 shadow-sm bg-stone-50/30">
               <FormLabel className="text-base font-bold flex items-center gap-2 mb-6">
                 <FileImage className="w-5 h-5 text-primary" /> Manajemen Sampul
@@ -374,7 +367,6 @@ export default function FormArticle({
               </div>
             </Card>
 
-            {/* ✨ SECTION 2: GRID LAYOUT (Kiri: Utama, Kanan: Pengaturan/SEO) */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* KOLOM KIRI (AREA UTAMA) */}
               <div className="lg:col-span-2 space-y-6">
@@ -496,67 +488,120 @@ export default function FormArticle({
                   )}
                 />
 
+                {/* ✨ IMPLEMENTASI BARU: PRODUK TERKAIT (COMBOBOX SEARCH + SELECTED LIST) */}
                 <FormField
                   control={form.control}
                   name="productIds"
-                  render={() => (
-                    <FormItem className="space-y-3 pt-4">
-                      <div className="flex flex-col">
-                        <FormLabel className="text-base font-bold">
-                          Produk Terkait
-                        </FormLabel>
-                        <p className="text-[11px] text-muted-foreground">
-                          Pilih produk yang akan direkomendasikan di artikel
-                          ini.
-                        </p>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 border rounded-xl bg-stone-50/30 max-h-64 overflow-y-auto">
-                        {products.map((product) => (
-                          <FormField
-                            key={product.id}
-                            control={form.control}
-                            name="productIds"
-                            render={({ field }) => {
-                              const isChecked = field.value?.includes(
-                                product.id,
-                              );
-                              return (
-                                <FormItem
-                                  key={product.id}
-                                  className={cn(
-                                    "flex flex-row items-center space-x-3 space-y-0 p-2 rounded-lg border bg-white transition-all hover:bg-stone-50",
-                                    isChecked &&
-                                      "border-stone-600 bg-stone-50 ring-1 ring-stone-600",
-                                  )}>
-                                  <FormControl>
-                                    <Checkbox
-                                      checked={isChecked}
-                                      onCheckedChange={(checked) =>
-                                        checked
-                                          ? field.onChange([
-                                              ...(field.value || []),
-                                              product.id,
-                                            ])
-                                          : field.onChange(
-                                              field.value?.filter(
-                                                (v: string) => v !== product.id,
-                                              ),
+                  render={({ field }) => {
+                    const selectedProductIds = field.value || [];
+                    // Temukan data lengkap produk dari ID yang dipilih
+                    const selectedProducts = products.filter((p) =>
+                      selectedProductIds.includes(p.id),
+                    );
+
+                    return (
+                      <FormItem className="flex flex-col pt-4">
+                        <div className="flex flex-col mb-2">
+                          <FormLabel className="text-base font-bold flex items-center gap-2">
+                            <PackageSearch className="w-4 h-4" /> Produk Terkait
+                          </FormLabel>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Cari dan pilih produk yang akan direkomendasikan di
+                            artikel ini.
+                          </p>
+                        </div>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className="w-full justify-between bg-white text-muted-foreground hover:text-stone-700 font-normal">
+                                Cari nama atau SKU produk...
+                                <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="w-(--radix-popover-trigger-width) p-0"
+                            align="start">
+                            <Command>
+                              <CommandInput
+                                placeholder="Ketik nama produk..."
+                                className="h-10"
+                              />
+                              <CommandList>
+                                <CommandEmpty>
+                                  Produk tidak ditemukan.
+                                </CommandEmpty>
+                                <CommandGroup>
+                                  {products.map((product) => (
+                                    <CommandItem
+                                      key={product.id}
+                                      value={product.name} // Diperlukan agar pencarian Command berfungsi berdasarkan nama
+                                      onSelect={() => {
+                                        const isSelected =
+                                          selectedProductIds.includes(
+                                            product.id,
+                                          );
+                                        const nextSelected = isSelected
+                                          ? selectedProductIds.filter(
+                                              (id: string) => id !== product.id,
                                             )
-                                      }
-                                    />
-                                  </FormControl>
-                                  <FormLabel className="text-[11px] font-medium leading-none cursor-pointer flex-1 line-clamp-2">
-                                    {product.name}
-                                  </FormLabel>
-                                </FormItem>
-                              );
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                                          : [...selectedProductIds, product.id];
+                                        field.onChange(nextSelected);
+                                      }}>
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          selectedProductIds.includes(
+                                            product.id,
+                                          )
+                                            ? "opacity-100"
+                                            : "opacity-0",
+                                        )}
+                                      />
+                                      {product.name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+
+                        {/* LIST PRODUK YANG SUDAH DIPILIH (MUNCUL DI BAWAH COMBOBOX) */}
+                        {selectedProducts.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-3 p-3 border rounded-lg bg-stone-50/50">
+                            {selectedProducts.map((prod) => (
+                              <div
+                                key={prod.id}
+                                className="inline-flex items-center px-2.5 py-1.5 rounded-md border bg-white shadow-sm transition-all hover:border-red-200 group max-w-full">
+                                <span className="text-[11px] font-medium truncate pr-2 max-w-50">
+                                  {prod.name}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 text-stone-400 group-hover:bg-rose-50 group-hover:text-rose-600 shrink-0 rounded-sm"
+                                  onClick={() => {
+                                    field.onChange(
+                                      selectedProductIds.filter(
+                                        (id: string) => id !== prod.id,
+                                      ),
+                                    );
+                                  }}>
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
 
@@ -664,7 +709,6 @@ export default function FormArticle({
               </div>
             </div>
 
-            {/* ✨ SECTION 3: EDITOR */}
             <div className="pt-6 border-t border-stone-200">
               <FormField
                 control={form.control}
@@ -694,13 +738,11 @@ export default function FormArticle({
             </div>
           </TabsContent>
 
-          {/* === TAB 2: PENGATURAN SEO === */}
           <TabsContent value="seo" className="mt-0 focus-visible:outline-none">
             <FormSeo control={form.control} />
           </TabsContent>
         </Tabs>
 
-        {/* ✨ SUBMIT BUTTON */}
         <div className="sticky bottom-4 z-20">
           <Button
             type="submit"
@@ -722,7 +764,6 @@ export default function FormArticle({
         </div>
       </form>
 
-      {/* Modal Preview Gambar */}
       <ImagePreviewModal
         src={previewUrl}
         isOpen={isPreviewOpen}

@@ -10,21 +10,21 @@ import {
   XCircle,
 } from "lucide-react";
 
-// ✨ UPDATE 1: Interface untuk Props dari API
+// ✨ PERBAIKAN 1: Sesuaikan nama properti dengan yang dikirim dari Backend & izinkan null
 export interface QuotationMetricsData {
-  draft: number;
-  sent: number;
-  accept: number;
-  reject: number;
-  avgLeadTime: number;
+  draft: number | null;
+  sent: number | null;
+  accepted: number | null; // Sebelumnya 'accept'
+  rejected: number | null; // Sebelumnya 'reject'
+  avgLeadTimeDays: number | null; // Sebelumnya 'avgLeadTime'
 }
 
 interface OpsQuotationSectionProps {
   data?: QuotationMetricsData;
 }
 
-// ✨ Helper untuk format angka (memberi titik ribuan)
-const formatNumber = (val: number) =>
+// ✨ Helper untuk format angka (memberi titik ribuan, aman dari null)
+const formatNumber = (val: number | null) =>
   new Intl.NumberFormat("id-ID").format(val || 0);
 
 export default function OpsQuotationSection({
@@ -34,9 +34,9 @@ export default function OpsQuotationSection({
   const safeData = data || {
     draft: 0,
     sent: 0,
-    accept: 0,
-    reject: 0,
-    avgLeadTime: 0,
+    accepted: 0,
+    rejected: 0,
+    avgLeadTimeDays: 0,
   };
 
   return (
@@ -61,7 +61,7 @@ export default function OpsQuotationSection({
             <FileEdit className="h-4 w-4 text-slate-400" />
           </CardHeader>
           <CardContent>
-            {/* ✨ Menggunakan format angka */}
+            {/* Menggunakan format angka */}
             <div className="text-2xl font-bold text-foreground">
               {formatNumber(safeData.draft)}
             </div>
@@ -77,7 +77,7 @@ export default function OpsQuotationSection({
             <SendHorizontal className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            {/* ✨ Menggunakan format angka */}
+            {/* Menggunakan format angka */}
             <div className="text-2xl font-bold text-foreground">
               {formatNumber(safeData.sent)}
             </div>
@@ -93,9 +93,9 @@ export default function OpsQuotationSection({
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            {/* ✨ Menggunakan format angka */}
+            {/* ✨ PERBAIKAN 2: Gunakan nama properti yang benar (accepted) */}
             <div className="text-2xl font-bold text-foreground">
-              {formatNumber(safeData.accept)}
+              {formatNumber(safeData.accepted)}
             </div>
           </CardContent>
         </Card>
@@ -112,9 +112,9 @@ export default function OpsQuotationSection({
             <XCircle className="h-4 w-4 text-rose-500" />
           </CardHeader>
           <CardContent>
-            {/* ✨ Menggunakan format angka */}
+            {/* ✨ PERBAIKAN 3: Gunakan nama properti yang benar (rejected) */}
             <div className="text-2xl font-bold text-foreground">
-              {formatNumber(safeData.reject)}
+              {formatNumber(safeData.rejected)}
             </div>
           </CardContent>
         </Card>
@@ -129,9 +129,9 @@ export default function OpsQuotationSection({
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2 mt-1">
-              {/* ✨ Memformat angka desimal (maks 1 angka di belakang koma) */}
+              {/* ✨ PERBAIKAN 4: Gunakan || 0 sebelum toFixed dan panggil nama properti yang benar */}
               <div className="text-2xl font-bold text-foreground">
-                {safeData.avgLeadTime.toFixed(1)}
+                {(safeData.avgLeadTimeDays || 0).toFixed(1)}
               </div>
               <span className="text-sm text-muted-foreground font-medium">
                 hari

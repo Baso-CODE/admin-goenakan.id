@@ -3,6 +3,8 @@
 import {
   EditorContent,
   EditorContext,
+  NodeViewWrapper,
+  ReactNodeViewRenderer,
   useCurrentEditor,
   useEditor,
 } from "@tiptap/react";
@@ -11,7 +13,7 @@ import { toast } from "sonner";
 
 // --- Tiptap Core Extensions ---
 import { Highlight } from "@tiptap/extension-highlight";
-import { Image } from "@tiptap/extension-image";
+import { Image as BaseImage } from "@tiptap/extension-image";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Subscript } from "@tiptap/extension-subscript";
 import { Superscript } from "@tiptap/extension-superscript";
@@ -21,7 +23,6 @@ import { Selection } from "@tiptap/extensions";
 import { StarterKit } from "@tiptap/starter-kit";
 
 // --- Tiptap Table Extensions ---
-
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import TableRow from "@tiptap/extension-table-row";
@@ -39,9 +40,9 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"; // Asumsi pakai shadcn tooltip
+} from "@/components/ui/tooltip";
 
-// --- Tiptap Node (Bawaan Template) ---
+// --- Tiptap Node & Styles ---
 import "@/components/tiptap-node/blockquote-node/blockquote-node.scss";
 import "@/components/tiptap-node/code-block-node/code-block-node.scss";
 import "@/components/tiptap-node/heading-node/heading-node.scss";
@@ -52,7 +53,7 @@ import { ImageUploadNode } from "@/components/tiptap-node/image-upload-node/imag
 import "@/components/tiptap-node/list-node/list-node.scss";
 import "@/components/tiptap-node/paragraph-node/paragraph-node.scss";
 
-// --- Tiptap UI (Bawaan Template) ---
+// --- Tiptap UI ---
 import { BlockquoteButton } from "@/components/tiptap-ui/blockquote-button";
 import { CodeBlockButton } from "@/components/tiptap-ui/code-block-button";
 import {
@@ -90,7 +91,7 @@ import { useCursorVisibility } from "@/hooks/use-cursor-visibility";
 import { useIsBreakpoint } from "@/hooks/use-is-breakpoint";
 import { useWindowSize } from "@/hooks/use-window-size";
 
-// --- Styles ---
+// --- Styles & Component ---
 import "@/components/tiptap-templates/simple/simple-editor.scss";
 import {
   Dialog,
@@ -105,6 +106,88 @@ import { Label } from "@/components/ui/label";
 import { useApi } from "@/hooks/useApi";
 import { Table } from "@tiptap/extension-table";
 
+// =========================================================================
+// ✨ KOMPONEN BARU: REACT NODE VIEW UNTUK RESIZE GAMBAR (DRAG TO RESIZE)
+// =========================================================================
+const ResizableImageNode = (props: any) => {
+  const { node, updateAttributes, selected } = props;
+  const imageRef = useRef<HTMLImageElement>(null);
+
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const initialX = e.clientX;
+    const initialWidth = imageRef.current?.clientWidth || 0;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      // Hitung lebar baru saat kursor digeser (batas minimal 50px)
+      const newWidth = Math.max(
+        50,
+        initialWidth + (moveEvent.clientX - initialX),
+      );
+      // Langsung simpan ukuran baru ke atribut gambar Tiptap
+      updateAttributes({ width: `${newWidth}px` });
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  };
+
+  return (
+    <NodeViewWrapper
+      className={`relative inline-block ${selected ? "ring-2 ring-blue-500 rounded-sm" : ""}`}
+      style={{ width: node.attrs.width || "auto", maxWidth: "100%" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        ref={imageRef}
+        src={node.attrs.src}
+        alt={node.attrs.alt}
+        title={node.attrs.title}
+        className="block w-full h-auto rounded-sm"
+      />
+
+      {/* Tombol Drag (Titik biru) hanya muncul jika gambar di-klik (selected) */}
+      {selected && (
+        <div
+          className="absolute bottom-0 right-0 w-4 h-4 bg-blue-600 border-2 border-white rounded-full cursor-nwse-resize z-10"
+          style={{ transform: "translate(50%, 50%)" }}
+          onMouseDown={startResize}
+        />
+      )}
+    </NodeViewWrapper>
+  );
+};
+
+// Ekstensi Image Custom yang memanggil React NodeView di atas
+const CustomResizableImage = BaseImage.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (element) => {
+          return element.style.width || element.getAttribute("width") || null;
+        },
+        renderHTML: (attributes) => {
+          if (!attributes.width) return {};
+          return {
+            style: `width: ${attributes.width}; height: auto;`,
+            width: attributes.width,
+          };
+        },
+      },
+      height: { default: null },
+    };
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableImageNode);
+  },
+});
+
 // ─── TYPES PROPS ───
 interface SimpleEditorProps {
   value?: string;
@@ -114,16 +197,13 @@ interface SimpleEditorProps {
 // ─── KOMPONEN TOMBOL TABEL KHUSUS ───
 const TableControls = () => {
   const { editor } = useCurrentEditor();
-
   if (!editor) return null;
-
   const isTableActive = editor.isActive("table");
 
   return (
     <>
       <ToolbarSeparator />
       <ToolbarGroup>
-        {/* Tombol Insert Table (Selalu Aktif) */}
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -145,7 +225,6 @@ const TableControls = () => {
           </Tooltip>
         </TooltipProvider>
 
-        {/* Tombol Manipulasi Tabel (Hanya Aktif jika kursor ada di dalam tabel) */}
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -307,30 +386,26 @@ const MobileToolbarContent = ({
   </>
 );
 
-// ─── KOMPONEN IMAGE ALT TEXT CONTROLS ───
+// ─── KOMPONEN IMAGE CONTROLS (ALT TEXT SAJA KARENA RESIZE SUDAH DRAG) ───
 const ImageControls = () => {
   const { editor } = useCurrentEditor();
-
-  // State untuk mengontrol Modal dan Input Value
   const [isOpen, setIsOpen] = useState(false);
   const [altInput, setAltInput] = useState("");
 
   if (!editor) return null;
 
-  // Tombol hanya aktif jika kursor sedang memilih gambar
   const isImageActive = editor.isActive("image");
 
   const handleOpenDialog = () => {
-    // Ambil alt text yang sudah ada (jika ada) lalu masukkan ke state
-    const currentAlt = editor.getAttributes("image").alt || "";
-    setAltInput(currentAlt);
-    setIsOpen(true); // Buka Modal
+    const currentAttrs = editor.getAttributes("image");
+    setAltInput(currentAttrs.alt || "");
+    setIsOpen(true);
   };
 
-  const handleSaveAlt = () => {
-    // Update attribute image di Tiptap
+  const handleSaveSettings = () => {
+    // Hanya simpan Alt text, biarkan width dikontrol oleh Drag (Mouse)
     editor.chain().focus().updateAttributes("image", { alt: altInput }).run();
-    setIsOpen(false); // Tutup Modal
+    setIsOpen(false);
   };
 
   return (
@@ -349,33 +424,32 @@ const ImageControls = () => {
               />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Set Image Alt Text</TooltipContent>
+          <TooltipContent>Set Alt Text Gambar</TooltipContent>
         </Tooltip>
       </TooltipProvider>
 
-      {/* MODAL DIALOG SHADCN */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-106.25">
           <DialogHeader>
-            <DialogTitle>Set Alt Text Gambar</DialogTitle>
+            <DialogTitle>Teks Alternatif Gambar</DialogTitle>
             <DialogDescription>
-              Masukkan teks alternatif untuk gambar ini. Sangat berguna untuk
-              SEO dan Aksesibilitas.
+              Atur teks alternatif (Alt Text) gambar agar lebih SEO-friendly.
+              (Untuk mengubah ukuran gambar, silakan klik gambar dan tarik
+              ujungnya).
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="alt-text">Alt Text</Label>
+              <Label htmlFor="alt-text">Alt Text (SEO)</Label>
               <Input
                 id="alt-text"
                 value={altInput}
                 onChange={(e) => setAltInput(e.target.value)}
                 placeholder="Contoh: Ilustrasi tumpukan kardus pengiriman"
                 onKeyDown={(e) => {
-                  // Tekan Enter untuk langsung simpan
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    handleSaveAlt();
+                    handleSaveSettings();
                   }
                 }}
               />
@@ -386,7 +460,7 @@ const ImageControls = () => {
               Batal
             </Button>
             <Button
-              onClick={handleSaveAlt}
+              onClick={handleSaveSettings}
               className="bg-blue-600 hover:bg-blue-700 text-white">
               Simpan
             </Button>
@@ -396,10 +470,10 @@ const ImageControls = () => {
     </>
   );
 };
+
 // ─── MAIN EDITOR COMPONENT ───
 export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
   const { fetchApi, status } = useApi();
-
   const isMobile = useIsBreakpoint();
   const { height } = useWindowSize();
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
@@ -467,7 +541,9 @@ export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
       TaskList,
       TaskItem.configure({ nested: true }),
       Highlight.configure({ multicolor: true }),
-      Image,
+
+      // ✨ UPDATE: Daftarkan CustomResizableImage yang mendukung drag resize
+      CustomResizableImage,
       Typography,
       Superscript,
       Subscript,
@@ -484,7 +560,6 @@ export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
         },
       }),
 
-      // 🟢 INISIALISASI EKSTENSI TABEL
       Table.configure({
         resizable: true,
       }),
@@ -504,9 +579,12 @@ export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
     editor,
     overlayHeight: toolbarRef.current?.getBoundingClientRect().height ?? 0,
   });
+
   useEffect(() => {
     if (editor && value && editor.getHTML() !== value) {
-      editor.commands.setContent(value);
+      setTimeout(() => {
+        editor.commands.setContent(value, { emitUpdate: false });
+      }, 0);
     }
   }, [value, editor]);
 
@@ -519,10 +597,11 @@ export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
   if (!editor) return null;
 
   return (
-    <div className="simple-editor-wrapper border rounded-md shadow-sm overflow-hidden bg-white">
+    // ✨ Pastikan "overflow-hidden" dihapus dari sini agar sticky bekerja
+    <div className="simple-editor-wrapper border rounded-md shadow-sm bg-white relative">
       <EditorContext.Provider value={{ editor }}>
-        {/* Toolbar Header */}
-        <div className="bg-stone-50 border-b">
+        {/* ✨ Menggunakan sticky top-0 z-50 untuk mengunci Toolbar */}
+        <div className="bg-stone-50 border-b sticky top-0 z-50">
           <Toolbar
             ref={toolbarRef}
             className="flex-wrap px-2 py-1"

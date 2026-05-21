@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckSquare, Clock, Timer } from "lucide-react";
 
 export interface LogisticsAveragesData {
-  avgProduction: number;
-  avgShipping: number;
-  avgFulfillment: number;
+  avgProductionDays: number | null;
+  avgShippingDays: number | null;
+  avgFulfillmentDays: number | null;
 }
 
 interface OpsLogisticsAveragesProps {
@@ -17,9 +17,9 @@ export default function OpsLogisticsAverages({
   data,
 }: OpsLogisticsAveragesProps) {
   const safeData = data || {
-    avgProduction: 0,
-    avgShipping: 0,
-    avgFulfillment: 0,
+    avgProductionDays: 0,
+    avgShippingDays: 0,
+    avgFulfillmentDays: 0,
   };
 
   return (
@@ -33,12 +33,12 @@ export default function OpsLogisticsAverages({
           <Timer className="h-4 w-4 text-slate-400" />
         </CardHeader>
         <CardContent>
-          {/* ✨ Format jadi persentase 1 desimal */}
+          {/* ✨ PERBAIKAN 3: Lindungi dari nilai null dari Backend (|| 0) sebelum toFixed */}
           <div className="text-2xl font-bold text-slate-800">
-            {safeData.avgProduction.toFixed(1)}%
+            {(safeData.avgProductionDays || 0).toFixed(1)} Hari
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Tingkat ketepatan waktu produksi
+            Rata-rata waktu produksi
           </p>
         </CardContent>
       </Card>
@@ -53,10 +53,10 @@ export default function OpsLogisticsAverages({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-slate-800">
-            {safeData.avgShipping.toFixed(1)}%
+            {(safeData.avgShippingDays || 0).toFixed(1)} Hari
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Tingkat pengiriman sesuai SLA
+            Rata-rata waktu pengiriman (SLA)
           </p>
         </CardContent>
       </Card>
@@ -71,10 +71,10 @@ export default function OpsLogisticsAverages({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-slate-800">
-            {safeData.avgFulfillment.toFixed(1)}%
+            {(safeData.avgFulfillmentDays || 0).toFixed(1)} Hari
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Rata-rata pesanan terselesaikan
+            Total waktu pemenuhan pesanan (Fulfillment)
           </p>
         </CardContent>
       </Card>

@@ -18,6 +18,9 @@ export default function SalesOverviewTab() {
   const [customEndDate, setCustomEndDate] = useState("");
 
   const [dashboardData, setDashboardData] = useState<any>(null);
+
+  console.log("ini adalah data", dashboardData);
+
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null); // ✨ Tambahan state untuk error
 

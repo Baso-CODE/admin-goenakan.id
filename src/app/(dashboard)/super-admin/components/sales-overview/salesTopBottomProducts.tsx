@@ -16,12 +16,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// ✨ UPDATE 1: Buat interface untuk data produk
+// ✨ PERBAIKAN 1: Sesuaikan interface dengan nama kunci dari Backend
 interface ProductData {
   sku: string;
   name: string;
-  totalOrder: number;
-  totalRevenue: number;
+  totalQuantity: number | null; // Namanya sekarang 'totalQuantity'
+  totalRevenue: number | null;
 }
 
 interface SalesTopBottomProductsProps {
@@ -34,17 +34,17 @@ interface SalesTopBottomProductsProps {
 export default function SalesTopBottomProducts({
   data,
 }: SalesTopBottomProductsProps) {
-  // ✨ UPDATE 2: Pisahkan data top dan bottom, gunakan array kosong jika undefined
+  // Pisahkan data top dan bottom, gunakan array kosong jika undefined
   const topProducts = data?.top || [];
   const bottomProducts = data?.bottom || [];
 
-  // Fungsi helper untuk memformat angka menjadi Rupiah
-  const formatIDR = (val: number) => {
+  // Fungsi helper untuk memformat angka menjadi Rupiah (aman dari null)
+  const formatIDR = (val: number | null) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
-    }).format(val);
+    }).format(val || 0);
   };
 
   return (
@@ -73,7 +73,7 @@ export default function SalesTopBottomProducts({
                     Name
                   </TableHead>
                   <TableHead className="text-right font-semibold text-slate-700">
-                    Total Order
+                    Total Qty
                   </TableHead>
                   <TableHead className="text-right font-semibold text-slate-700">
                     Total Revenue
@@ -88,9 +88,12 @@ export default function SalesTopBottomProducts({
                         {item.sku}
                       </TableCell>
                       <TableCell className="font-medium">{item.name}</TableCell>
+
                       <TableCell className="text-right">
-                        {item.totalOrder.toLocaleString("id-ID")}
+                        {/* ✨ PERBAIKAN 2: Panggil `totalQuantity` */}
+                        {(item.totalQuantity || 0).toLocaleString("id-ID")}
                       </TableCell>
+
                       <TableCell className="text-right font-semibold text-emerald-600">
                         {formatIDR(item.totalRevenue)}
                       </TableCell>
@@ -135,7 +138,7 @@ export default function SalesTopBottomProducts({
                     Name
                   </TableHead>
                   <TableHead className="text-right font-semibold text-slate-700">
-                    Total Order
+                    Total Qty
                   </TableHead>
                   <TableHead className="text-right font-semibold text-slate-700">
                     Total Revenue
@@ -150,9 +153,12 @@ export default function SalesTopBottomProducts({
                         {item.sku}
                       </TableCell>
                       <TableCell className="font-medium">{item.name}</TableCell>
+
                       <TableCell className="text-right">
-                        {item.totalOrder.toLocaleString("id-ID")}
+                        {/* ✨ PERBAIKAN 3: Panggil `totalQuantity` */}
+                        {(item.totalQuantity || 0).toLocaleString("id-ID")}
                       </TableCell>
+
                       <TableCell className="text-right font-semibold text-rose-600">
                         {formatIDR(item.totalRevenue)}
                       </TableCell>

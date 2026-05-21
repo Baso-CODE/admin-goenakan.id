@@ -1,4 +1,3 @@
-// app/super-admin/components/ops/opsSampleSection.tsx
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,24 +11,24 @@ import {
   UserCheck,
 } from "lucide-react";
 
-// ✨ UPDATE: Interface untuk Props dari API
+// ✨ PERBAIKAN 1: Tambahkan `| null` pada setiap tipe data karena Backend bisa mengirimkan null
 export interface SampleMetricsData {
-  totalSample: number;
-  totalCost: number;
-  convertedCustomer: number;
-  conversionRate: number;
-  returnOfSample: number;
-  avgConversionRate: number;
+  totalSample: number | null;
+  totalCost: number | null;
+  convertedCustomer: number | null;
+  conversionRate: number | null;
+  returnOfSample: number | null;
+  avgConversionRate: number | null;
 }
 
 interface OpsSampleSectionProps {
   data?: SampleMetricsData;
 }
 
-// ✨ Helper untuk format angka dan uang
-const formatNumber = (val: number) =>
+// ✨ Helper untuk format angka dan uang (Sudah aman karena pakai val || 0)
+const formatNumber = (val: number | null) =>
   new Intl.NumberFormat("id-ID").format(val || 0);
-const formatCurrency = (val: number) =>
+const formatCurrency = (val: number | null) =>
   new Intl.NumberFormat("id-ID", {
     style: "currency",
     currency: "IDR",
@@ -69,7 +68,7 @@ export default function OpsSampleSection({ data }: OpsSampleSectionProps) {
             <PackageSearch className="h-4 w-4 text-indigo-500" />
           </CardHeader>
           <CardContent>
-            {/* ✨ Menggunakan format angka biasa */}
+            {/* Menggunakan format angka biasa */}
             <div className="text-2xl font-bold text-foreground">
               {formatNumber(safeData.totalSample)}
             </div>
@@ -85,7 +84,7 @@ export default function OpsSampleSection({ data }: OpsSampleSectionProps) {
             <CircleDollarSign className="h-4 w-4 text-rose-500" />
           </CardHeader>
           <CardContent>
-            {/* ✨ Menggunakan format mata uang IDR */}
+            {/* Menggunakan format mata uang IDR */}
             <div className="text-2xl font-bold text-foreground">
               {formatCurrency(safeData.totalCost)}
             </div>
@@ -119,9 +118,9 @@ export default function OpsSampleSection({ data }: OpsSampleSectionProps) {
             <Percent className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            {/* ✨ Menggunakan toFixed(1) untuk menjamin 1 angka di belakang koma */}
+            {/* ✨ PERBAIKAN 2: Gunakan ( ... || 0) sebelum toFixed */}
             <div className="text-2xl font-bold text-foreground">
-              {safeData.conversionRate.toFixed(1)}%
+              {(safeData.conversionRate || 0).toFixed(1)}%
             </div>
           </CardContent>
         </Card>
@@ -150,8 +149,9 @@ export default function OpsSampleSection({ data }: OpsSampleSectionProps) {
             <ActivitySquare className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
+            {/* ✨ PERBAIKAN 3: Gunakan ( ... || 0) sebelum toFixed */}
             <div className="text-2xl font-bold text-foreground">
-              {safeData.avgConversionRate.toFixed(1)}%
+              {(safeData.avgConversionRate || 0).toFixed(1)}%
             </div>
           </CardContent>
         </Card>
