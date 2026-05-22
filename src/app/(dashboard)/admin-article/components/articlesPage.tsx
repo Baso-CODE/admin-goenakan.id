@@ -211,12 +211,20 @@ export default function ArticlesSection() {
                   <TableRow key={data.id}>
                     {/* Title & Slug */}
                     <TableCell className="font-medium">
-                      <div className="line-clamp-1" title={data.title}>
-                        {data.title}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                        /{data.slug}
-                      </div>
+                      <Link
+                        href={`${process.env.NEXT_PUBLIC_CLIENT_ARTICLE_URL || "https://client.edumatrixindonesia.cloud/en/article"}/${data.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block group cursor-pointer">
+                        <div
+                          className="line-clamp-1 transition-colors group-hover:text-blue-600 group-hover:underline"
+                          title={data.title}>
+                          {data.title}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                          /{data.slug}
+                        </div>
+                      </Link>
                     </TableCell>
 
                     {/* Category */}
