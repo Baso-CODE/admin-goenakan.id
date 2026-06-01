@@ -26,13 +26,16 @@ import { toast } from "sonner";
 interface AddItemCategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  // ✨ Mengharapkan 1 argumen data
+  onSuccess: (newItemCategory: any) => void;
+  parentCategoryId?: string;
 }
 
 export function AddItemCategoryModal({
   isOpen,
   onClose,
   onSuccess,
+  parentCategoryId = "", // ✨ Jangan lupa tangkap prop ini
 }: AddItemCategoryModalProps) {
   const { fetchApi } = useApi();
   const [loading, setLoading] = useState(false);
@@ -40,17 +43,24 @@ export function AddItemCategoryModal({
 
   // State form
   const [name, setName] = useState("");
-  const [productCategoryId, setProductCategoryId] = useState("");
+  const [productCategoryId, setProductCategoryId] = useState(parentCategoryId);
   const [description, setDescription] = useState("");
+
+  // Sync state ketika prop berubah atau modal dibuka
+  useEffect(() => {
+    if (isOpen) {
+      setProductCategoryId(parentCategoryId);
+    }
+  }, [isOpen, parentCategoryId]);
 
   // Ambil data Product Category (Induk) untuk Dropdown
   useEffect(() => {
     if (isOpen) {
       const fetchCategories = async () => {
         try {
-          const res = await fetchApi("/product-categories"); // Sesuaikan dengan endpoint list category kamu
+          const res = await fetchApi("/product-categories/list"); // Sesuaikan dengan endpoint list category kamu
           const result = await res.json();
-          setProductCategories(result.data || []);
+          setProductCategories(result || []); // Sesuaikan jika responsenya langsung array atau result.data
         } catch (error) {
           console.error("Gagal memuat kategori produk", error);
         }
@@ -78,8 +88,14 @@ export function AddItemCategoryModal({
         throw new Error(err.message || "Gagal menyimpan data");
       }
 
+      // ✨ PERBAIKAN: Ambil data dari respons API
+      const responseData = await res.json();
+
       toast.success("Item Category berhasil ditambahkan!");
-      onSuccess(); // Refresh tabel
+
+      // ✨ PERBAIKAN: Kirim data yang baru dibuat ke form utama (sesuaikan path .data dengan JSON API-mu)
+      onSuccess(responseData.data || responseData);
+
       handleClose(); // Tutup & Reset
     } catch (error: any) {
       toast.error(error.message);
@@ -90,8 +106,8 @@ export function AddItemCategoryModal({
 
   const handleClose = () => {
     setName("");
-    setProductCategoryId("");
     setDescription("");
+    // productCategoryId tidak direset agar tetap sinkron dengan form di background
     onClose();
   };
 
@@ -106,7 +122,9 @@ export function AddItemCategoryModal({
             <Label>Product Category (Parent)</Label>
             <Select
               onValueChange={setProductCategoryId}
-              value={productCategoryId}>
+              value={productCategoryId}
+              disabled={!!parentCategoryId} // Kunci dropdown jika sudah diisi dari luar
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Pilih kategori induk..." />
               </SelectTrigger>

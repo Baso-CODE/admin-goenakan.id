@@ -42,6 +42,9 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { AddItemCategoryModal } from "../../item-categories-product/components/addItemCategoryModal";
+import { AddItemNameModal } from "../../item-names-product/components/addItemNameModal";
+import CreateCategoryModal from "../../product-categories/components/createCategoryModal";
 import { AttributeSelector } from "./AttributeSelector";
 import { PriceTiers } from "./PriceTiers";
 import { UploadImages } from "./upload-images";
@@ -165,6 +168,9 @@ export default function ProductFormV2({
   const [materialTypes, setMaterialTypes] = useState<
     { id: string; name: string; code?: string }[]
   >([]);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isItemCategoryModalOpen, setIsItemCategoryModalOpen] = useState(false);
+  const [isItemNameModalOpen, setIsItemNameModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -515,12 +521,18 @@ export default function ProductFormV2({
                     <FormLabel>Kategori Produk</FormLabel>
                     <Select
                       onValueChange={(val) => {
+                        // ✨ LOGIKA PINTAR: Tangkap jika user klik opsi "Tambah Baru"
+                        if (val === "ADD_NEW_CATEGORY") {
+                          setIsCategoryModalOpen(true);
+                          return; // Berhenti di sini, jangan ubah value form
+                        }
+
                         field.onChange(val);
                         // Reset child ketika parent berubah
                         form.setValue("itemCategoryId", "");
                         form.setValue("itemNameId", "");
                       }}
-                      defaultValue={field.value}>
+                      value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Pilih kategori..." />
@@ -532,6 +544,14 @@ export default function ProductFormV2({
                             {cat.name} {cat.code && `(${cat.code})`}
                           </SelectItem>
                         ))}
+
+                        {/* ✨ PEMBATAS & TOMBOL TAMBAH DI DALAM DROPDOWN */}
+                        <div className="h-px bg-stone-200 my-1 mx-1" />
+                        <SelectItem
+                          value="ADD_NEW_CATEGORY"
+                          className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                          + Kategori Baru
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -548,25 +568,39 @@ export default function ProductFormV2({
                     <FormLabel>Item Category</FormLabel>
                     <Select
                       onValueChange={(val) => {
+                        if (val === "ADD_NEW_ITEM_CATEGORY") {
+                          setIsItemCategoryModalOpen(true);
+                          return;
+                        }
+
                         field.onChange(val);
-                        // Reset anak ketika berubah
                         form.setValue("itemNameId", "");
                       }}
-                      defaultValue={field.value}
-                      disabled={
-                        !selectedCategoryId || itemCategories.length === 0
-                      }>
+                      value={field.value}
+                      disabled={!selectedCategoryId}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Pilih item category..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        {itemCategories.length === 0 && (
+                          <div className="py-2 text-center text-xs text-muted-foreground italic">
+                            Belum ada item.
+                          </div>
+                        )}
                         {itemCategories.map((ic) => (
                           <SelectItem key={ic.id} value={ic.id}>
                             {ic.name} {ic.code && `(${ic.code})`}
                           </SelectItem>
                         ))}
+
+                        <div className="h-px bg-stone-200 my-1 mx-1" />
+                        <SelectItem
+                          value="ADD_NEW_ITEM_CATEGORY"
+                          className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                          + Tambah Item Category Baru
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -583,21 +617,39 @@ export default function ProductFormV2({
                     <FormLabel>Item Name</FormLabel>
                     <Select
                       value={field.value || ""}
-                      onValueChange={field.onChange}
-                      disabled={
-                        !selectedItemCategoryId || itemNames.length === 0
-                      }>
+                      onValueChange={(val) => {
+                        // ✨ TANGKAP KLIK "TAMBAH BARU"
+                        if (val === "ADD_NEW_ITEM_NAME") {
+                          setIsItemNameModalOpen(true);
+                          return;
+                        }
+                        field.onChange(val);
+                      }}
+                      disabled={!selectedItemCategoryId}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Pilih item name..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        {itemNames.length === 0 && (
+                          <div className="py-2 text-center text-xs text-muted-foreground italic">
+                            Belum ada item.
+                          </div>
+                        )}
                         {itemNames.map((inm) => (
                           <SelectItem key={inm.id} value={inm.id}>
                             {inm.name} {inm.code && `(${inm.code})`}
                           </SelectItem>
                         ))}
+
+                        {/* ✨ TOMBOL TAMBAH DI DALAM DROPDOWN */}
+                        <div className="h-px bg-stone-200 my-1 mx-1" />
+                        <SelectItem
+                          value="ADD_NEW_ITEM_NAME"
+                          className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                          + Tambah Item Name Baru
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -1048,6 +1100,45 @@ export default function ProductFormV2({
           </form>
         </Form>
       </CardContent>
+
+      <CreateCategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        onSuccess={(newCategory) => {
+          const formattedCategory = {
+            ...newCategory,
+            name: newCategory.name_id || newCategory.name,
+          };
+
+          setCategories((prev) => [...prev, formattedCategory]);
+          form.setValue("categoryId", formattedCategory.id);
+          form.setValue("itemCategoryId", "");
+          form.setValue("itemNameId", "");
+        }}
+      />
+      <AddItemCategoryModal
+        isOpen={isItemCategoryModalOpen}
+        onClose={() => setIsItemCategoryModalOpen(false)}
+        parentCategoryId={selectedCategoryId}
+        onSuccess={(newItemCategory) => {
+          setItemCategories((prev) => [...prev, newItemCategory]);
+          form.setValue("itemCategoryId", newItemCategory.id);
+          form.setValue("itemNameId", "");
+        }}
+      />
+
+      <AddItemNameModal
+        isOpen={isItemNameModalOpen}
+        onClose={() => setIsItemNameModalOpen(false)}
+        parentCategoryId={selectedCategoryId}
+        parentItemCategoryId={selectedItemCategoryId}
+        productCategories={categories}
+        itemCategories={itemCategories}
+        onSuccess={(newItemName) => {
+          setItemNames((prev) => [...prev, newItemName]);
+          form.setValue("itemNameId", newItemName.id);
+        }}
+      />
     </Card>
   );
 }

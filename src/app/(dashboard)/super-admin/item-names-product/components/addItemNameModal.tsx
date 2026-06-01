@@ -26,66 +26,42 @@ import { toast } from "sonner";
 interface AddItemNameModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (newItemName: any) => void;
+  parentCategoryId?: string;
+  parentItemCategoryId?: string;
+
+  // ✨ TAMBAHAN BARU: Terima data langsung dari form utama
+  productCategories: any[];
+  itemCategories: any[];
 }
 
 export function AddItemNameModal({
   isOpen,
   onClose,
   onSuccess,
+  parentCategoryId = "",
+  parentItemCategoryId = "",
+  productCategories = [], // ✨ Tangkap datanya
+  itemCategories = [], // ✨ Tangkap datanya
 }: AddItemNameModalProps) {
   const { fetchApi } = useApi();
   const [loading, setLoading] = useState(false);
 
-  // State untuk Dropdown Berjenjang
-  const [productCategories, setProductCategories] = useState<any[]>([]);
-  const [itemCategories, setItemCategories] = useState<any[]>([]);
-
   // State Form
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedPC, setSelectedPC] = useState("");
-  const [itemCategoryId, setItemCategoryId] = useState("");
+  const [selectedPC, setSelectedPC] = useState(parentCategoryId);
+  const [itemCategoryId, setItemCategoryId] = useState(parentItemCategoryId);
 
-  // 1. Fetch Product Categories saat modal dibuka
+  // Sync state ketika prop berubah atau modal dibuka
   useEffect(() => {
     if (isOpen) {
-      const fetchPC = async () => {
-        try {
-          const res = await fetchApi("/product-categories/list");
-          const result = await res.json();
-          setProductCategories(
-            Array.isArray(result) ? result : result.data || [],
-          );
-        } catch (error) {
-          console.error("Gagal memuat product categories", error);
-        }
-      };
-      fetchPC();
+      setSelectedPC(parentCategoryId);
+      setItemCategoryId(parentItemCategoryId);
     }
-  }, [isOpen, fetchApi]);
+  }, [isOpen, parentCategoryId, parentItemCategoryId]);
 
-  // 2. Fetch Item Categories ketika Product Category dipilih
-  useEffect(() => {
-    if (selectedPC) {
-      const fetchIC = async () => {
-        try {
-          const res = await fetchApi(
-            `/item-categories?productCategoryId=${selectedPC}&take=100`,
-          );
-          const result = await res.json();
-          setItemCategories(result.data || []);
-        } catch (error) {
-          console.error("Gagal memuat item categories", error);
-        }
-      };
-      fetchIC();
-    } else {
-      setItemCategories([]);
-    }
-    // Reset child dropdown saat parent berubah
-    setItemCategoryId("");
-  }, [selectedPC, fetchApi]);
+  // ❌ Kita HAPUS useEffect fetch API karena datanya sudah dilempar dari props! Ini bikin modal jadi instan (tanpa loading).
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,8 +82,9 @@ export function AddItemNameModal({
         throw new Error(err.message || "Gagal menyimpan data");
       }
 
+      const responseData = await res.json();
       toast.success("Item Name berhasil ditambahkan!");
-      onSuccess();
+      onSuccess(responseData.data || responseData);
       handleClose();
     } catch (error: any) {
       toast.error(error.message);
@@ -119,21 +96,22 @@ export function AddItemNameModal({
   const handleClose = () => {
     setName("");
     setDescription("");
-    setSelectedPC("");
-    setItemCategoryId("");
     onClose();
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-105.25">
+      <DialogContent className="sm:max-w-106.25">
         <DialogHeader>
           <DialogTitle>Add New Item Name</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>1. Product Category</Label>
-            <Select onValueChange={setSelectedPC} value={selectedPC}>
+            <Select
+              onValueChange={setSelectedPC}
+              value={selectedPC}
+              disabled={!!parentCategoryId}>
               <SelectTrigger>
                 <SelectValue placeholder="Pilih Kategori Produk..." />
               </SelectTrigger>
@@ -152,7 +130,11 @@ export function AddItemNameModal({
             <Select
               onValueChange={setItemCategoryId}
               value={itemCategoryId}
-              disabled={!selectedPC || itemCategories.length === 0}>
+              disabled={
+                !!parentItemCategoryId ||
+                !selectedPC ||
+                itemCategories.length === 0
+              }>
               <SelectTrigger>
                 <SelectValue placeholder="Pilih Item Category..." />
               </SelectTrigger>
