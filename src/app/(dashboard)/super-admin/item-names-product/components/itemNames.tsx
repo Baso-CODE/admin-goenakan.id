@@ -78,13 +78,35 @@ export default function ItemNames() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedItemForEdit, setSelectedItemForEdit] =
     useState<ItemName | null>(null);
-
+  const [categories, setCategories] = useState<any[]>([]);
+  const [itemCategories, setItemCategories] = useState<any[]>([]);
   // --- DELETE & EXPORT STATE ---
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [exportStartDate, setExportStartDate] = useState<string>("");
   const [exportEndDate, setExportEndDate] = useState<string>("");
   const [exporting, setExporting] = useState<boolean>(false);
+  // ✨ TAMBAHKAN FETCH KATEGORI
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      try {
+        const [catRes, itemCatRes] = await Promise.all([
+          fetchApi("/product-categories/list"),
+          fetchApi("/item-categories?take=100"),
+        ]);
+
+        const catData = await catRes.json();
+        const itemCatData = await itemCatRes.json();
+
+        setCategories(Array.isArray(catData) ? catData : catData.data || []);
+        setItemCategories(itemCatData.data || []);
+      } catch (error) {
+        console.error("Gagal load dropdown data:", error);
+      }
+    };
+
+    if (status === "authenticated") fetchDropdownData();
+  }, [status, fetchApi]);
 
   // --- FETCH DATA ---
   const fetchItemNames = async () => {
@@ -421,7 +443,9 @@ export default function ItemNames() {
       <AddItemNameModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onSuccess={() => {
+        productCategories={categories}
+        itemCategories={itemCategories}
+        onSuccess={(newItemName) => {
           setPage(1);
           fetchItemNames();
         }}
