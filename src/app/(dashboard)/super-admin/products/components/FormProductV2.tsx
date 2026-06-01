@@ -81,6 +81,7 @@ const variantMetaSchema = z.object({
   width: z.number().optional(),
   height: z.number().optional(),
   length: z.number().optional(),
+  priceTiers: z.array(priceTierSchema).optional(),
 });
 
 // Video meta schema tetap sama
@@ -416,6 +417,7 @@ export default function ProductFormV2({
       length: undefined,
       width: undefined,
       height: undefined,
+      priceTiers: [],
     }));
 
     setVariantMetas(newVariantMetas);

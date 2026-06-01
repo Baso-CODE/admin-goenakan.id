@@ -140,14 +140,16 @@ export default function EditProductPage() {
           description: v.description,
           sku: v.sku,
           price: v.price,
-          stock: 0,
-
+          stock: v.stock,
           weight: v.weight,
           width: v.width,
           height: v.height,
           length: v.length,
           // ---------------------------------
           attributeValueIds: v.attributeValueIds || [],
+
+          priceTiers: v.priceTiers || [],
+
           images: variantImages,
         });
       });

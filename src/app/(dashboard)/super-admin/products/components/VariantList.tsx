@@ -5,10 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Pencil, Plus, Star, X } from "lucide-react";
+import {
+  Check,
+  Layers,
+  Pencil,
+  Plus,
+  PlusCircle,
+  Star,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-// --- TIPE DATA ---
 type ImageMeta = {
   tempId: string;
   url: string;
@@ -22,7 +30,6 @@ type VariantState = {
   images: ImageMeta[];
 };
 
-// --- PROPS ---
 interface VariantListProps {
   combinations: { label: string; valueIds: string[] }[];
   variantMetas: {
@@ -36,12 +43,17 @@ interface VariantListProps {
     width?: number;
     height?: number;
     length?: number;
+    priceTiers?: {
+      minQuantity: number;
+      maxQuantity: number | null;
+      price: string | number;
+    }[];
   }[];
   onUpdateVariantMeta: (index: number, field: string, value: any) => void;
   onChangeMeta: (filesMap: File[][]) => void;
 }
 
-// --- MODAL (TIDAK BERUBAH) ---
+// --- MODAL IMAGE ---
 interface ImageDetailModalProps {
   image: ImageMeta;
   onClose: () => void;
@@ -172,14 +184,11 @@ export function VariantList({
       const nextState = prev.map((v) => {
         if (v.variantIndex !== idx) return v;
         const newImages: ImageMeta[] = newFiles.map((file, i) => ({
-          tempId: `v${idx}-${Date.now()}-${Math.random()
-            .toString(36)
-            .substr(2, 5)}-${i}`,
+          tempId: `v${idx}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}-${i}`,
           url: URL.createObjectURL(file),
           file,
           isFeatured: v.images.length === 0 && i === 0,
           altText: "",
-          isNew: true,
         }));
         return { ...v, images: [...v.images, ...newImages] };
       });
@@ -251,7 +260,7 @@ export function VariantList({
         Generated Variants ({combinations.length})
       </h3>
       <p className="text-sm text-gray-500">
-        Set price and upload images for each variant.
+        Set price, wholesale tiers, and upload images for each variant.
       </p>
       <hr />
 
@@ -259,6 +268,7 @@ export function VariantList({
         const meta = variantMetas.find((m) => m.variantIndex === idx);
         const images =
           variantStates.find((v) => v.variantIndex === idx)?.images || [];
+        const variantTiers = meta?.priceTiers || [];
 
         return (
           <div key={idx} className="border p-6 rounded-xl bg-gray-50 space-y-6">
@@ -294,7 +304,7 @@ export function VariantList({
                       placeholder="0"
                     />
                     <p className="text-[10px] text-muted-foreground italic">
-                      Harga spesifik untuk varian ini.
+                      Harga standar spesifik untuk varian ini.
                     </p>
                   </div>
 
@@ -322,6 +332,116 @@ export function VariantList({
                   </div>
                 </div>
 
+                {/* ✨ PRICE TIERS UNTUK VARIAN */}
+                <div className="pt-4 border-t border-gray-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-indigo-500" />
+                      <Label className="text-sm font-bold text-gray-700">
+                        Harga Grosir (Wholesale)
+                      </Label>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newTiers = [
+                          ...variantTiers,
+                          { minQuantity: 1, maxQuantity: null, price: "" },
+                        ];
+                        onUpdateVariantMeta(idx, "priceTiers", newTiers);
+                      }}>
+                      <PlusCircle className="w-3 h-3 mr-1.5" /> Tambah Tier
+                      Varian
+                    </Button>
+                  </div>
+
+                  {variantTiers.length === 0 ? (
+                    <div className="p-3 text-center text-xs text-gray-400 border border-dashed rounded-md bg-gray-50">
+                      Belum ada harga grosir khusus varian ini.
+                    </div>
+                  ) : (
+                    <div className="border rounded-md divide-y overflow-hidden shadow-sm">
+                      <div className="bg-muted/50 grid grid-cols-12 gap-2 p-2 px-3 text-[10px] font-bold text-gray-500 uppercase">
+                        <div className="col-span-3">Min Qty</div>
+                        <div className="col-span-3">Max Qty (Kosong = ∞)</div>
+                        <div className="col-span-5">Harga Satuan (Rp)</div>
+                        <div className="col-span-1 text-center">Aksi</div>
+                      </div>
+                      {variantTiers.map((tier, tierIdx) => (
+                        <div
+                          key={tierIdx}
+                          className="grid grid-cols-12 gap-2 p-2 px-3 items-center bg-white">
+                          <div className="col-span-3">
+                            <Input
+                              type="number"
+                              min={1}
+                              value={tier.minQuantity}
+                              onChange={(e) => {
+                                const val =
+                                  e.target.value === ""
+                                    ? 1
+                                    : e.target.valueAsNumber;
+                                const updated = [...variantTiers];
+                                updated[tierIdx].minQuantity = val;
+                                onUpdateVariantMeta(idx, "priceTiers", updated);
+                              }}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="col-span-3">
+                            <Input
+                              type="number"
+                              min={1}
+                              value={tier.maxQuantity ?? ""}
+                              onChange={(e) => {
+                                const val =
+                                  e.target.value === ""
+                                    ? null
+                                    : e.target.valueAsNumber;
+                                const updated = [...variantTiers];
+                                updated[tierIdx].maxQuantity = val;
+                                onUpdateVariantMeta(idx, "priceTiers", updated);
+                              }}
+                              placeholder="∞"
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="col-span-5">
+                            <Input
+                              type="number"
+                              value={tier.price}
+                              onChange={(e) => {
+                                const updated = [...variantTiers];
+                                updated[tierIdx].price = e.target.value;
+                                onUpdateVariantMeta(idx, "priceTiers", updated);
+                              }}
+                              placeholder="0"
+                              className="h-8 text-sm font-mono"
+                            />
+                          </div>
+                          <div className="col-span-1 flex justify-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                const updated = variantTiers.filter(
+                                  (_, i) => i !== tierIdx,
+                                );
+                                onUpdateVariantMeta(idx, "priceTiers", updated);
+                              }}
+                              className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="pt-4 border-t border-gray-100 space-y-3">
                   <Label className="text-xs font-bold text-gray-500 uppercase">
                     Dimensi & Berat
@@ -334,16 +454,16 @@ export function VariantList({
                       <Input
                         type="number"
                         min={0}
+                        step="any"
                         value={meta?.weight ?? ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const val = e.target.value.replace(",", ".");
                           onUpdateVariantMeta(
                             idx,
                             "weight",
-                            e.target.value
-                              ? parseFloat(e.target.value)
-                              : undefined,
-                          )
-                        }
+                            val ? parseFloat(val) : undefined,
+                          );
+                        }}
                         className="h-9 text-sm bg-gray-50"
                         placeholder="0"
                       />
@@ -355,16 +475,16 @@ export function VariantList({
                       <Input
                         type="number"
                         min={0}
+                        step="any"
                         value={meta?.length ?? ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const val = e.target.value.replace(",", ".");
                           onUpdateVariantMeta(
                             idx,
                             "length",
-                            e.target.value
-                              ? parseFloat(e.target.value)
-                              : undefined,
-                          )
-                        }
+                            val ? parseFloat(val) : undefined,
+                          );
+                        }}
                         className="h-9 text-sm bg-gray-50"
                         placeholder="0"
                       />
@@ -376,16 +496,16 @@ export function VariantList({
                       <Input
                         type="number"
                         min={0}
+                        step="any"
                         value={meta?.width ?? ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const val = e.target.value.replace(",", ".");
                           onUpdateVariantMeta(
                             idx,
                             "width",
-                            e.target.value
-                              ? parseFloat(e.target.value)
-                              : undefined,
-                          )
-                        }
+                            val ? parseFloat(val) : undefined,
+                          );
+                        }}
                         className="h-9 text-sm bg-gray-50"
                         placeholder="0"
                       />
@@ -397,16 +517,16 @@ export function VariantList({
                       <Input
                         type="number"
                         min={0}
+                        step="any"
                         value={meta?.height ?? ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const val = e.target.value.replace(",", ".");
                           onUpdateVariantMeta(
                             idx,
                             "height",
-                            e.target.value
-                              ? parseFloat(e.target.value)
-                              : undefined,
-                          )
-                        }
+                            val ? parseFloat(val) : undefined,
+                          );
+                        }}
                         className="h-9 text-sm bg-gray-50"
                         placeholder="0"
                       />
@@ -424,12 +544,12 @@ export function VariantList({
                     onChange={(e) =>
                       onUpdateVariantMeta(idx, "description", e.target.value)
                     }
-                    className="resize-y min-h-20 text-sm bg-gray-50 focus-visible:bg-white transition-colors placeholder:text-gray-400 focus-visible:ring-indigo-600 focus-visible:border-indigo-600"
+                    className="resize-y min-h-20 text-sm bg-gray-50 focus-visible:bg-white transition-colors"
                   />
                 </div>
               </div>
 
-              {/* BAGIAN BAWAH: Images - Full Width */}
+              {/* BAGIAN BAWAH: Images */}
               <div className="w-full space-y-4">
                 <Button
                   type="button"
@@ -453,8 +573,7 @@ export function VariantList({
                   }}
                 />
 
-                {/* Grid gambar di-adjust sedikit agar lebih banyak yang bisa tampil jika layarnya lebar */}
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
                   {images.length === 0 && (
                     <div className="col-span-full py-4 text-center text-sm text-gray-400 italic border-2 border-dashed rounded-lg bg-white/50">
                       No images yet
@@ -473,7 +592,7 @@ export function VariantList({
                         className="w-full h-full object-cover"
                       />
                       {img.isFeatured && (
-                        <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center z-10 shadow-sm">
+                        <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center z-10">
                           <Star className="w-3 h-3 mr-1 fill-white" /> Main
                         </span>
                       )}
@@ -486,19 +605,15 @@ export function VariantList({
                               e.stopPropagation();
                               handleRemoveFile(idx, img.tempId);
                             }}
-                            className="bg-white/90 hover:bg-red-500 hover:text-white p-1.5 rounded-full shadow-sm transition-colors"
+                            className="bg-white/90 hover:bg-red-500 hover:text-white p-1.5 rounded-full"
                             title="Delete Image">
                             <X className="w-4 h-4" />
                           </button>
                         </div>
-
                         <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                           <div className="bg-white/20 backdrop-blur-sm p-2 rounded-full border border-white/50 text-white mb-1">
                             <Pencil className="w-5 h-5" />
                           </div>
-                          <span className="text-white text-[10px] font-medium tracking-wide bg-black/30 px-2 py-0.5 rounded-full backdrop-blur-sm">
-                            Edit Info
-                          </span>
                         </div>
                       </div>
                     </div>

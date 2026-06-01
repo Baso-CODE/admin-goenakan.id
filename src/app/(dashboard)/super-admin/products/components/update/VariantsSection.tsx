@@ -1,9 +1,21 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Edit, Image as ImageIcon, Plus, Trash2 } from "lucide-react"; // Import ikon
+import {
+  Edit,
+  Image as ImageIcon,
+  Layers,
+  Plus,
+  PlusCircle,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
-import { FormProvider, useFieldArray, useForm } from "react-hook-form";
+import {
+  FormProvider,
+  useFieldArray,
+  useForm,
+  useFormContext,
+} from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -19,7 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { VariantImageDetail } from "./VariantImageDetail";
 
-// --- SCHEMA & TYPE (Tetap Sama) ---
+// --- SCHEMA & TYPE ---
 
 const ImageSchema = z.object({
   id: z.string().optional(),
@@ -29,6 +41,14 @@ const ImageSchema = z.object({
   file: z.any().optional(),
   _isDeleted: z.boolean().optional(),
   fileIndex: z.number().nullable().optional(),
+});
+
+// ✨ TAMBAHAN BARU: Skema untuk Price Tier
+const PriceTierSchema = z.object({
+  id: z.string().optional(),
+  minQuantity: z.coerce.number().min(1, "Minimal qty 1"),
+  maxQuantity: z.coerce.number().min(1).nullable().optional(),
+  price: z.coerce.number().min(0, "Harga tidak valid"),
 });
 
 const VariantSchema = z.object({
@@ -49,14 +69,147 @@ const VariantSchema = z.object({
       height: z.coerce.number().min(0).optional().nullable(),
       length: z.coerce.number().min(0).optional().nullable(),
       _isDeleted: z.boolean().optional(),
-      attributeValueIds: z.array(z.string()).optional(), // Penting untuk update
+      attributeValueIds: z.array(z.string()).optional(),
       images: z.array(ImageSchema).optional(),
+      // ✨ TAMBAHAN BARU: Field Price Tiers untuk Variant
+      priceTiers: z.array(PriceTierSchema).optional(),
     }),
   ),
 });
 
 export type VariantFormValues = z.infer<typeof VariantSchema>;
 
+// ==========================================
+// SUB-COMPONENT: NESTED PRICE TIERS
+// ==========================================
+function NestedVariantPriceTiers({ nestIndex }: { nestIndex: number }) {
+  const { control } = useFormContext();
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: `variants.${nestIndex}.priceTiers`,
+  });
+
+  return (
+    <div className="pt-4 border-t border-gray-200 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Layers className="w-4 h-4 text-indigo-500" />
+          <FormLabel className="text-sm font-bold text-gray-700 m-0">
+            Harga Grosir (Wholesale)
+          </FormLabel>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            append({ minQuantity: 1, maxQuantity: null, price: 0 })
+          }>
+          <PlusCircle className="w-3 h-3 mr-1.5" /> Tambah Tier Varian
+        </Button>
+      </div>
+
+      {fields.length === 0 ? (
+        <div className="p-3 text-center text-xs text-gray-400 border border-dashed rounded-md bg-gray-50">
+          Belum ada harga grosir khusus varian ini.
+        </div>
+      ) : (
+        <div className="border rounded-md divide-y overflow-hidden shadow-sm">
+          <div className="bg-muted/50 grid grid-cols-12 gap-2 p-2 px-3 text-[10px] font-bold text-gray-500 uppercase">
+            <div className="col-span-3">Min Qty</div>
+            <div className="col-span-3">Max Qty (Kosong = ∞)</div>
+            <div className="col-span-5">Harga Satuan (Rp)</div>
+            <div className="col-span-1 text-center">Aksi</div>
+          </div>
+          {fields.map((item, k) => (
+            <div
+              key={item.id}
+              className="grid grid-cols-12 gap-2 p-2 px-3 items-center bg-white">
+              <div className="col-span-3">
+                <FormField
+                  control={control}
+                  name={`variants.${nestIndex}.priceTiers.${k}.minQuantity`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={1}
+                          className="h-8 text-sm"
+                          {...field}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="col-span-3">
+                <FormField
+                  control={control}
+                  name={`variants.${nestIndex}.priceTiers.${k}.maxQuantity`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={1}
+                          placeholder="∞"
+                          className="h-8 text-sm"
+                          {...field}
+                          value={field.value ?? ""}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value === ""
+                                ? null
+                                : parseInt(e.target.value),
+                            )
+                          }
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="col-span-5">
+                <FormField
+                  control={control}
+                  name={`variants.${nestIndex}.priceTiers.${k}.price`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          placeholder="0"
+                          className="h-8 text-sm font-mono"
+                          {...field}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="col-span-1 flex justify-center">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => remove(k)}
+                  className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50">
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// MAIN COMPONENT: FormUpdateVariants
+// ==========================================
 export default function FormUpdateVariants({
   initialData,
   onSubmit,
@@ -78,7 +231,6 @@ export default function FormUpdateVariants({
     name: "variants",
   });
 
-  // State untuk mengelola Image Detail Editor
   const [editingImage, setEditingImage] = useState<{
     variantIndex: number;
     imageIndex: number;
@@ -100,9 +252,18 @@ export default function FormUpdateVariants({
           width: v.width ? Number(v.width) : undefined,
           height: v.height ? Number(v.height) : undefined,
           length: v.length ? Number(v.length) : undefined,
-
           attributeValueIds:
             v.attributeValues?.map((av: any) => av.attributeValueId) ?? [],
+
+          // ✨ TAMBAHAN BARU: Prefill Price Tiers
+          priceTiers:
+            v.priceTiers?.map((pt: any) => ({
+              id: pt.id,
+              minQuantity: Number(pt.minQuantity),
+              maxQuantity: pt.maxQuantity ? Number(pt.maxQuantity) : null,
+              price: Number(pt.price),
+            })) ?? [],
+
           images: v.images.map((img: any) => ({
             id: img.id,
             url: img.url,
@@ -114,14 +275,10 @@ export default function FormUpdateVariants({
         })),
       });
     }
-  }, [initialData]);
+  }, [initialData, form]);
 
-  // =========================
-  // DELETE / REPLACE VARIANT
-  // =========================
   const handleRemoveVariant = (index: number) => {
     const v = form.getValues(`variants.${index}`);
-
     if (v.id) {
       update(index, { ...v, _isDeleted: true });
     } else {
@@ -143,22 +300,17 @@ export default function FormUpdateVariants({
       length: undefined,
       _isDeleted: false,
       images: [],
+      priceTiers: [], // Inisialisasi kosong
     });
   };
 
-  // =========================
-  // IMAGE HANDLING
-  // =========================
   const handleUploadNewImage = (variantIndex: number, files: FileList) => {
     const images = form.getValues(`variants.${variantIndex}.images`) ?? [];
     const newImages: any[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-
-      // Set gambar pertama sebagai Featured jika belum ada yang Featured
       const isFirstImage = images.length === 0 && newImages.length === 0;
-
       newImages.push({
         id: undefined,
         url: URL.createObjectURL(file),
@@ -168,13 +320,11 @@ export default function FormUpdateVariants({
         _isDeleted: false,
       });
     }
-
     form.setValue(`variants.${variantIndex}.images`, [...images, ...newImages]);
   };
 
   const handleDeleteImage = (variantIndex: number, imgIndex: number) => {
     const img = form.getValues(`variants.${variantIndex}.images.${imgIndex}`);
-
     if (img?.id) {
       form.setValue(
         `variants.${variantIndex}.images.${imgIndex}._isDeleted`,
@@ -187,9 +337,6 @@ export default function FormUpdateVariants({
     }
   };
 
-  // =========================
-  // FORM UI
-  // =========================
   return (
     <FormProvider {...form}>
       <Form {...form}>
@@ -200,11 +347,11 @@ export default function FormUpdateVariants({
             📦 Product Variants Configuration
           </h3>
           <p className="text-sm text-gray-500">
-            Define basic properties and media for each product combination.
+            Define basic properties, wholesale pricing, and media for each
+            product combination.
           </p>
           <hr />
 
-          {/* GENERATE BUTTON */}
           <div className="flex justify-between items-center">
             <Button
               variant="secondary"
@@ -233,7 +380,7 @@ export default function FormUpdateVariants({
                     className="border border-red-300 p-3 rounded-lg bg-red-50 text-sm text-red-600 italic">
                     🗑️ Variant **
                     {form.getValues(`variants.${index}.variantName`)}** marked
-                    for deletion — will be removed on save.
+                    for deletion.
                   </div>
                 );
               }
@@ -273,7 +420,6 @@ export default function FormUpdateVariants({
                         </FormItem>
                       )}
                     />
-
                     <FormField
                       control={form.control}
                       name={`variants.${index}.sku`}
@@ -281,16 +427,12 @@ export default function FormUpdateVariants({
                         <FormItem>
                           <FormLabel>SKU</FormLabel>
                           <FormControl>
-                            <Input
-                              placeholder="SKU Code (Auto-generated if empty)"
-                              {...field}
-                            />
+                            <Input placeholder="SKU Code" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
                     <FormField
                       control={form.control}
                       name={`variants.${index}.price`}
@@ -302,38 +444,33 @@ export default function FormUpdateVariants({
                               type="number"
                               min="0"
                               placeholder="0"
+                              {...field}
                               value={(field.value as number) ?? ""}
-                              onChange={(e) => {
-                                const val =
+                              onChange={(e) =>
+                                field.onChange(
                                   e.target.value === ""
                                     ? 0
-                                    : parseFloat(e.target.value);
-                                field.onChange(val);
-                              }}
-                              onBlur={field.onBlur}
-                              name={field.name}
-                              ref={field.ref}
+                                    : parseFloat(e.target.value),
+                                )
+                              }
                             />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
                     <FormField
                       control={form.control}
                       name={`variants.${index}.stock`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className=" font-semibold">
-                            Stock
-                          </FormLabel>
+                          <FormLabel className="font-semibold">Stock</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               min="0"
-                              className=" focus:border-border"
                               placeholder="0"
+                              {...field}
                               value={(field.value as number) ?? ""}
                               onChange={(e) =>
                                 field.onChange(
@@ -349,121 +486,57 @@ export default function FormUpdateVariants({
                       )}
                     />
                   </div>
+
+                  {/* ✨ RENDER SUB-COMPONENT PRICE TIERS DI SINI */}
+                  <NestedVariantPriceTiers nestIndex={index} />
+
+                  {/* DIMENSI & BERAT */}
                   <div className="pt-4 border-t border-gray-200">
                     <FormLabel className="mb-3 block text-gray-700">
                       Dimensi & Berat (Opsional)
                     </FormLabel>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <FormField
-                        control={form.control}
-                        name={`variants.${index}.weight`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-xs text-gray-500">
-                              Berat (gram)
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                placeholder="0"
-                                value={(field.value as number) ?? ""}
-                                onChange={(e) =>
-                                  field.onChange(
-                                    e.target.value === ""
-                                      ? null
-                                      : parseFloat(e.target.value),
-                                  )
-                                }
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`variants.${index}.length`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-xs text-gray-500">
-                              Panjang (cm)
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                placeholder="0"
-                                value={(field.value as number) ?? ""}
-                                onChange={(e) =>
-                                  field.onChange(
-                                    e.target.value === ""
-                                      ? null
-                                      : parseFloat(e.target.value),
-                                  )
-                                }
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`variants.${index}.width`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-xs text-gray-500">
-                              Lebar (cm)
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                placeholder="0"
-                                value={(field.value as number) ?? ""}
-                                onChange={(e) =>
-                                  field.onChange(
-                                    e.target.value === ""
-                                      ? null
-                                      : parseFloat(e.target.value),
-                                  )
-                                }
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`variants.${index}.height`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-xs text-gray-500">
-                              Tinggi (cm)
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                placeholder="0"
-                                value={(field.value as number) ?? ""}
-                                onChange={(e) =>
-                                  field.onChange(
-                                    e.target.value === ""
-                                      ? null
-                                      : parseFloat(e.target.value),
-                                  )
-                                }
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      {[
+                        { name: "weight", label: "Berat (Gr)" },
+                        { name: "length", label: "Length (Cm)" },
+                        { name: "width", label: "Width (Cm)" },
+                        { name: "height", label: "Height (Cm)" },
+                      ].map((dim) => (
+                        <FormField
+                          key={dim.name}
+                          control={form.control}
+                          name={`variants.${index}.${dim.name}` as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium text-gray-800">
+                                {dim.label}
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  placeholder="0"
+                                  {...field}
+                                  value={(field.value as number) ?? ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(
+                                      ",",
+                                      ".",
+                                    );
+                                    field.onChange(
+                                      val === "" ? null : parseFloat(val),
+                                    );
+                                  }}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      ))}
                     </div>
                   </div>
+
                   <FormField
                     control={form.control}
                     name={`variants.${index}.description`}
@@ -472,13 +545,12 @@ export default function FormUpdateVariants({
                         <FormLabel>Variant Description (Optional)</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Deskripsi spesifik untuk varian ini..."
+                            placeholder="Deskripsi spesifik..."
                             className="resize-y min-h-20"
                             {...field}
                             value={field.value || ""}
                           />
                         </FormControl>
-                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -489,47 +561,35 @@ export default function FormUpdateVariants({
                       <ImageIcon className="h-4 w-4 text-indigo-600" /> Variant
                       Media
                     </div>
-
-                    {/* UPLOAD BUTTON AREA */}
-                    <div className="flex gap-4">
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={(e) => {
-                          if (e.target.files?.length) {
-                            handleUploadNewImage(index, e.target.files);
-                            e.target.value = ""; // Reset input
-                          }
-                        }}
-                      />
-                    </div>
-
-                    {/* IMAGE LIST - Grid Tampilan Rapi */}
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => {
+                        if (e.target.files?.length) {
+                          handleUploadNewImage(index, e.target.files);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
                       {variantImages.map((img: any, imgIndex) => {
                         if (img._isDeleted) return null;
-
                         return (
                           <div
                             key={imgIndex}
                             className="aspect-square border rounded-lg overflow-hidden relative shadow-sm hover:shadow-md transition-shadow group">
                             <img
                               src={img.url}
-                              alt={img.altText || "Variant Image"}
+                              alt="Variant"
                               className="object-cover w-full h-full"
                             />
-
-                            {/* Badge Featured */}
                             {img.isFeatured && (
                               <span className="absolute top-1 left-1 text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full font-medium">
                                 Featured
                               </span>
                             )}
-
-                            {/* Aksi Overlay (Minimalis) */}
                             <div className="absolute inset-0 bg-black/50 flex flex-col justify-center items-center opacity-0 group-hover:opacity-100 transition-opacity space-y-2">
-                              {/* Edit Button */}
                               <Button
                                 type="button"
                                 size="icon"
@@ -543,7 +603,6 @@ export default function FormUpdateVariants({
                                 }>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              {/* Delete Button */}
                               <Button
                                 type="button"
                                 size="icon"
@@ -566,13 +625,12 @@ export default function FormUpdateVariants({
           </div>
 
           <hr />
-          <Button disabled={isSubmitting} className="">
-            {isSubmitting ? "Saving Variant Changes" : " Save All Variants"}
+          <Button disabled={isSubmitting}>
+            {isSubmitting ? "Saving Variant Changes..." : "Save All Variants"}
           </Button>
         </form>
       </Form>
 
-      {/* RENDER IMAGE DETAIL EDITOR */}
       {editingImage && (
         <VariantImageDetail
           variantIndex={editingImage.variantIndex}
