@@ -502,7 +502,7 @@ export default function FormProductCore({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Stok Global{" "}
+                    Stok Global
                     {isCustomProduct && (
                       <span className="text-[10px] text-amber-600 font-normal italic">
                         (Diatur per Varian)

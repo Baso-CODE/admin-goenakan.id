@@ -192,7 +192,7 @@ export default function QuotationPrint() {
                     <tr>
                       <td className="py-0.5 pr-4 align-top">Qtn Date</td>
                       <td className="py-0.5 align-top font-medium">
-                        :{" "}
+                        :
                         {data.date
                           ? format(new Date(data.date), "dd MMMM yyyy", {
                               locale: idLocale,
@@ -203,7 +203,7 @@ export default function QuotationPrint() {
                     <tr>
                       <td className="py-0.5 pr-4 align-top">Valid Until</td>
                       <td className="py-0.5 align-top font-medium">
-                        :{" "}
+                        :
                         {data.validUntil
                           ? format(new Date(data.validUntil), "dd MMMM yyyy", {
                               locale: idLocale,
@@ -348,7 +348,7 @@ export default function QuotationPrint() {
                                 <div className="mt-2 text-[10px] text-slate-500 italic border-t border-slate-100 pt-1.5 bg-slate-50 p-1 rounded-sm">
                                   <span className="font-semibold text-slate-700 not-italic">
                                     Note:
-                                  </span>{" "}
+                                  </span>
                                   {item.remarks}
                                 </div>
                               )}

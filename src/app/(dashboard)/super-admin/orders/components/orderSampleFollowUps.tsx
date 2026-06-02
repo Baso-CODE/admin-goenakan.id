@@ -152,7 +152,7 @@ export function OrderSampleFollowUps({
                         )}
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Rencana:{" "}
+                        Rencana:
                         {format(new Date(fu.date), "dd MMM yyyy", {
                           locale: idLocale,
                         })}

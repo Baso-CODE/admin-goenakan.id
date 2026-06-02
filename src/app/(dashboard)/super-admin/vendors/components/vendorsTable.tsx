@@ -412,7 +412,7 @@ const VendorsTable = () => {
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
                               <span className="sr-only">Open menu</span>
-                              <LucideIcons.MoreHorizontal className="h-4 w-4" />{" "}
+                              <LucideIcons.MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
@@ -421,7 +421,7 @@ const VendorsTable = () => {
                               <Link
                                 href={`/super-admin/vendors/detail/${vendor.id}`}
                                 className="cursor-pointer">
-                                <LucideIcons.Eye className="mr-2 h-4 w-4" />{" "}
+                                <LucideIcons.Eye className="mr-2 h-4 w-4" />
                                 Detail
                               </Link>
                             </DropdownMenuItem>
@@ -430,7 +430,7 @@ const VendorsTable = () => {
                               <Link
                                 href={`/super-admin/vendors/edit/${vendor.id}`}
                                 className="cursor-pointer">
-                                <LucideIcons.Edit className="mr-2 h-4 w-4" />{" "}
+                                <LucideIcons.Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </Link>
                             </DropdownMenuItem>
@@ -438,7 +438,7 @@ const VendorsTable = () => {
                             <DropdownMenuItem
                               className="text-red-600 focus:text-red-600 cursor-pointer"
                               onClick={() => setDeleteId(vendor.id)}>
-                              <LucideIcons.Trash2 className="mr-2 h-4 w-4" />{" "}
+                              <LucideIcons.Trash2 className="mr-2 h-4 w-4" />
                               Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>

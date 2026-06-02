@@ -425,7 +425,7 @@ export default function DepartmentTable() {
             </Button>
           </div>
         </div>
-      )}{" "}
+      )}
       <ConfirmDeleteDialog
         isOpen={deleteId !== null}
         onClose={() => setDeleteId(null)}

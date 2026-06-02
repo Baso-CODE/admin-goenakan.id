@@ -378,7 +378,7 @@ export default function CashflowClient() {
       {meta && (
         <div className="flex items-center justify-between px-2">
           <div className="text-xs text-muted-foreground">
-            Page <strong>{meta.page}</strong> of{" "}
+            Page <strong>{meta.page}</strong> of
             <strong>{meta.totalPage}</strong>
           </div>
           <div className="flex gap-2">

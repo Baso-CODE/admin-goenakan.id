@@ -13,18 +13,30 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useApi } from "@/hooks/useApi";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   AlignLeft,
   Briefcase,
+  Calendar,
   ClipboardList,
   ImageIcon,
   ListOrdered,
   Loader2,
+  ShoppingCart,
+  Tag,
   Type,
+  UploadCloud,
 } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -35,6 +47,10 @@ const portfolioSchema = z.object({
   image: z.any().optional(),
   displayOrder: z.coerce.number().min(0).default(0),
   isActive: z.boolean().default(true),
+
+  orderQuantity: z.coerce.number().min(0).default(0),
+  projectDate: z.string().optional(),
+  eventCategoryId: z.string().optional(),
 });
 
 export type PortfolioFormValues = z.infer<typeof portfolioSchema>;
@@ -52,9 +68,15 @@ export default function PortfolioForm({
   isLoading = false,
   isSubmitting = false,
 }: PortfolioFormProps) {
+  const { fetchApi } = useApi();
+  const [categories, setCategories] = useState<{ id: string; title: string }[]>(
+    [],
+  );
+
   // === STATE FOR PREVIEW & FILE ===
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | undefined>(undefined);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<PortfolioFormValues>({
     resolver: zodResolver(portfolioSchema) as Resolver<PortfolioFormValues>,
@@ -64,16 +86,41 @@ export default function PortfolioForm({
       description: "",
       displayOrder: 0,
       isActive: true,
+      orderQuantity: 0,
+      projectDate: "",
+      eventCategoryId: "",
     },
   });
+
+  // Fetch Category List untuk Dropdown
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await fetchApi("/event-categories/list");
+        const json = await res.json();
+        if (json.success) setCategories(json.data);
+      } catch (error) {
+        console.error("Gagal memuat kategori event", error);
+      }
+    };
+    loadCategories();
+  }, [fetchApi]);
+
   useEffect(() => {
     if (initialData) {
+      const formattedDate = initialData.projectDate
+        ? new Date(initialData.projectDate).toISOString().split("T")[0]
+        : "";
+
       form.reset({
         title: initialData.title,
         clientName: initialData.clientName || "",
         description: initialData.description || "",
         displayOrder: initialData.displayOrder || 0,
         isActive: initialData.isActive ?? true,
+        orderQuantity: initialData.orderQuantity || 0,
+        projectDate: formattedDate,
+        eventCategoryId: initialData.eventCategoryId || "",
       });
 
       if (initialData.image) {
@@ -82,7 +129,6 @@ export default function PortfolioForm({
     }
   }, [initialData, form]);
 
-  // === HANDLE FILE CHANGE ===
   const handleFileChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     fieldChange: (value: any) => void,
@@ -101,9 +147,16 @@ export default function PortfolioForm({
 
     formData.append("title", values.title);
     formData.append("clientName", values.clientName);
-    if (values.description) formData.append("description", values.description);
     formData.append("displayOrder", String(values.displayOrder));
     formData.append("isActive", String(values.isActive));
+
+    // ✨ Append Data Baru
+    formData.append("orderQuantity", String(values.orderQuantity));
+    if (values.description) formData.append("description", values.description);
+    if (values.projectDate) formData.append("projectDate", values.projectDate);
+    if (values.eventCategoryId && values.eventCategoryId !== "none") {
+      formData.append("eventCategoryId", values.eventCategoryId);
+    }
 
     if (selectedFile) {
       formData.append("image", selectedFile);
@@ -126,7 +179,7 @@ export default function PortfolioForm({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-6 w-full">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* === IMAGE UPLOAD SECTION === */}
+              {/* === MODERN IMAGE UPLOAD SECTION === */}
               <div className="col-span-1 md:col-span-2">
                 <FormField
                   control={form.control}
@@ -135,41 +188,50 @@ export default function PortfolioForm({
                     <FormItem>
                       <FormLabel className="flex items-center gap-2 font-semibold">
                         <ImageIcon className="h-4 w-4 text-[#C4A48E]" />
-                        Project Image{" "}
-                        {initialData ? "(Optional)" : "(Required) *"}
+                        Project Image {initialData ? "(Optional)" : "*"}
                       </FormLabel>
                       <FormControl>
-                        <div className="flex flex-col sm:flex-row gap-4 items-start">
-                          <div className="flex-1 w-full space-y-3">
-                            <Input
-                              type="file"
-                              accept="image/*"
-                              disabled={isLoading || isSubmitting}
-                              onChange={(e) =>
-                                handleFileChange(e, field.onChange)
-                              }
-                              required={!initialData}
-                            />
-                            <p className="text-[10px] text-muted-foreground">
-                              Recommended: JPG/PNG format. High quality image
-                              recommended. Max 5MB.
-                            </p>
-                          </div>
-
-                          <div className="relative w-40 h-24 shrink-0 bg-stone-50 rounded border border-dashed flex items-center justify-center overflow-hidden">
-                            {preview ? (
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          className="relative w-full h-48 sm:h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden group">
+                          {preview ? (
+                            <>
                               <Image
                                 src={preview}
-                                alt="Portfolio Preview"
+                                alt="Preview"
                                 fill
                                 className="object-cover"
                               />
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground uppercase">
-                                No Image
-                              </span>
-                            )}
-                          </div>
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <p className="text-white font-medium flex items-center gap-2">
+                                  <UploadCloud className="h-5 w-5" /> Change
+                                  Image
+                                </p>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center space-y-2 p-4">
+                              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border">
+                                <UploadCloud className="h-6 w-6 text-stone-400" />
+                              </div>
+                              <div className="text-sm font-medium text-stone-700">
+                                Click to upload image
+                              </div>
+                              <p className="text-xs text-stone-500">
+                                PNG, JPG up to 5MB. High quality recommended.
+                              </p>
+                            </div>
+                          )}
+                          <Input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={isLoading || isSubmitting}
+                            onChange={(e) =>
+                              handleFileChange(e, field.onChange)
+                            }
+                          />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -179,7 +241,7 @@ export default function PortfolioForm({
               </div>
 
               {/* === Title / Project Name === */}
-              <div className="col-span-1 md:col-span-2">
+              <div className="col-span-1">
                 <FormField
                   control={form.control}
                   name="title"
@@ -190,7 +252,11 @@ export default function PortfolioForm({
                         Project Title *
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. CUSTOM GYM BAG" {...field} />
+                        <Input
+                          className="h-10"
+                          placeholder="e.g. GIFT SET"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -199,7 +265,7 @@ export default function PortfolioForm({
               </div>
 
               {/* === Client Name === */}
-              <div className="col-span-1 md:col-span-2">
+              <div className="col-span-1">
                 <FormField
                   control={form.control}
                   name="clientName"
@@ -211,6 +277,7 @@ export default function PortfolioForm({
                       </FormLabel>
                       <FormControl>
                         <Input
+                          className="h-10"
                           placeholder="e.g. Golden Tulip Bali"
                           {...field}
                         />
@@ -221,22 +288,87 @@ export default function PortfolioForm({
                 />
               </div>
 
-              {/* === Description (Optional) === */}
-              <div className="col-span-1 md:col-span-2">
+              {/* === Event Category Dropdown === */}
+              <div className="col-span-1">
                 <FormField
                   control={form.control}
-                  name="description"
+                  name="eventCategoryId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-2">
-                        <AlignLeft className="h-4 w-4 text-muted-foreground" />
-                        Short Description (Optional)
+                        <Tag className="h-4 w-4 text-muted-foreground" />
+                        Event Category
+                      </FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || "none"}>
+                        <FormControl>
+                          <SelectTrigger className="h-10 bg-white">
+                            <SelectValue placeholder="Pilih kategori event..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem
+                            value="none"
+                            className="text-muted-foreground italic">
+                            -- Tidak ada kategori --
+                          </SelectItem>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription className="text-[10px]">
+                        Kategori tempat portofolio ini akan muncul.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* === Order Quantity === */}
+              <div className="col-span-1">
+                <FormField
+                  control={form.control}
+                  name="orderQuantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                        Items Ordered
                       </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Brief details about the project..."
+                          type="number"
+                          min={0}
+                          className="h-10"
+                          placeholder="e.g. 500"
                           {...field}
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* === Project Date === */}
+              <div className="col-span-1">
+                <FormField
+                  control={form.control}
+                  name="projectDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        Project Date (Optional)
+                      </FormLabel>
+                      <FormControl>
+                        {/* Menggunakan input date bawaan HTML agar lebih simpel */}
+                        <Input type="date" className="h-10" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -256,7 +388,36 @@ export default function PortfolioForm({
                         Display Order
                       </FormLabel>
                       <FormControl>
-                        <Input type="number" min={0} {...field} />
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* === Description (Optional) === */}
+              <div className="col-span-1">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <AlignLeft className="h-4 w-4 text-muted-foreground" />
+                        Short Description
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-10"
+                          placeholder="Brief details..."
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -265,26 +426,33 @@ export default function PortfolioForm({
               </div>
 
               {/* === Active Status === */}
-              <div className="col-span-1 md:col-span-2">
+              <div className="col-span-1">
                 <FormField
                   control={form.control}
                   name="isActive"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-center gap-3 p-3 border rounded-lg bg-stone-50/50">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel className="cursor-pointer">
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2 opacity-0 select-none pointer-events-none">
+                        <ListOrdered className="h-4 w-4" />
+                        Status
+                      </FormLabel>
+                      <div
+                        className="flex flex-row items-center gap-3 px-3 h-10 border rounded-md bg-stone-50 hover:bg-stone-100 transition-colors shadow-sm cursor-pointer"
+                        onClick={() => field.onChange(!field.value)}>
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="pointer-events-none"
+                          />
+                        </FormControl>
+                        <span className="text-sm font-medium cursor-pointer text-stone-700">
                           Active Status
-                        </FormLabel>
-                        <FormDescription className="text-[10px]">
-                          Visible on the portfolio section of the website.
-                        </FormDescription>
+                        </span>
                       </div>
+                      <FormDescription className="text-[10px]">
+                        Visible on the website.
+                      </FormDescription>
                     </FormItem>
                   )}
                 />

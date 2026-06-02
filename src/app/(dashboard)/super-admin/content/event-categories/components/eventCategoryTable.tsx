@@ -36,6 +36,7 @@ type EventCategory = {
   title: string;
   image?: string | null;
   displayOrder: number;
+  orderCount: number; // ✨ TAMBAHAN: Menyimpan data ordered times
   isActive: boolean;
   createdAt: string;
 };
@@ -203,6 +204,8 @@ export default function EventCategoryTable() {
                   <TableHead className="w-16 text-center">Order</TableHead>
                   <TableHead className="w-24">Image</TableHead>
                   <TableHead className="min-w-64">Category Title</TableHead>
+                  <TableHead className="text-center">Ordered</TableHead>
+                  {/* ✨ HEADER BARU */}
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -213,7 +216,8 @@ export default function EventCategoryTable() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      <TableCell colSpan={6}>
+                      {/* ✨ colSpan diubah jadi 7 karena ada tambahan 1 kolom */}
+                      <TableCell colSpan={7}>
                         <Skeleton className="h-12 w-full" />
                       </TableCell>
                     </TableRow>
@@ -221,7 +225,7 @@ export default function EventCategoryTable() {
                 ) : error ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="text-center text-red-500 py-6">
                       Error: {error}
                     </TableCell>
@@ -236,7 +240,7 @@ export default function EventCategoryTable() {
                         </Badge>
                       </TableCell>
 
-                      {/* --- GAMBAR KATEGORI (Opsional) --- */}
+                      {/* --- GAMBAR KATEGORI --- */}
                       <TableCell>
                         <div className="relative w-16 h-12 bg-stone-50 rounded-md border p-1 overflow-hidden flex items-center justify-center">
                           {item.image ? (
@@ -265,6 +269,15 @@ export default function EventCategoryTable() {
                         </div>
                       </TableCell>
 
+                      {/* --- ORDER COUNT (BARU) --- */}
+                      <TableCell className="text-center">
+                        <Badge
+                          variant="secondary"
+                          className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200">
+                          {item.orderCount} times
+                        </Badge>
+                      </TableCell>
+
                       {/* --- STATUS --- */}
                       <TableCell>
                         {item.isActive ? (
@@ -281,7 +294,6 @@ export default function EventCategoryTable() {
 
                       {/* --- ACTIONS --- */}
                       <TableCell className="text-right space-x-2 whitespace-nowrap">
-                        {/* ✨ Sesuaikan rute menuju halaman Edit Category */}
                         <Link
                           href={`/super-admin/content/event-categories/edit/${item.id}`}>
                           <Button variant="outline" size="sm" className="h-8">
@@ -306,7 +318,7 @@ export default function EventCategoryTable() {
                 ) : (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="text-center py-8 text-muted-foreground text-sm">
                       <div className="flex flex-col items-center gap-2">
                         <Tag className="h-8 w-8 opacity-20" />

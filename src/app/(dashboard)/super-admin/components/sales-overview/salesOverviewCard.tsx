@@ -56,7 +56,7 @@ export default function SalesOverviewCard({
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">
-            Revenue{" "}
+            Revenue
             <span className="text-[10px] text-muted-foreground font-normal">
               (Berdasarkan filter)
             </span>
@@ -79,7 +79,7 @@ export default function SalesOverviewCard({
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">
-            Order{" "}
+            Order
             <span className="text-[10px] text-muted-foreground font-normal">
               (Berdasarkan filter)
             </span>

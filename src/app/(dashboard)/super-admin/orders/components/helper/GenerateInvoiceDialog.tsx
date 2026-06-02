@@ -260,7 +260,7 @@ export function GenerateInvoiceDialog({
                         }
                       />
                       <p className="text-xs text-muted-foreground">
-                        Nominal:{" "}
+                        Nominal:
                         {formatCurrency(
                           (totalOrderAmount * invoiceDPPercent) / 100,
                         )}
@@ -369,7 +369,7 @@ export function GenerateInvoiceDialog({
                                 <span>Qty: {item.quantity}</span>
                                 <span>•</span>
                                 <span>
-                                  Total:{" "}
+                                  Total:
                                   {formatCurrency(
                                     item.unitPrice * item.quantity,
                                   )}
@@ -378,12 +378,12 @@ export function GenerateInvoiceDialog({
                                   <>
                                     <span>•</span>
                                     <span className="text-blue-600">
-                                      Sudah ditagih:{" "}
+                                      Sudah ditagih:
                                       {formatCurrency(item.billedAmount || 0)}
                                     </span>
                                     <span>•</span>
                                     <span className="text-orange-600 font-medium">
-                                      Sisa:{" "}
+                                      Sisa:
                                       {formatCurrency(
                                         item.remainingBilledAmount || 0,
                                       )}
@@ -507,7 +507,7 @@ export function GenerateInvoiceDialog({
                           }
                         />
                         <p className="text-xs text-muted-foreground">
-                          Nominal DP:{" "}
+                          Nominal DP:
                           {formatCurrency(
                             (splitTotalAmount * splitDpPercent) / 100,
                           )}

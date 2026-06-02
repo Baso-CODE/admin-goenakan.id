@@ -1151,7 +1151,7 @@ export default function QuotationAddForm({
               <span className="flex items-center gap-1">
                 <span className="font-semibold text-slate-600">
                   ✨ Min/Max Qty
-                </span>{" "}
+                </span>
                 = Rentang Jumlah
               </span>
               <span className="flex items-center gap-1">

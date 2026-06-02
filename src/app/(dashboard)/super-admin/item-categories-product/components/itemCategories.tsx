@@ -409,11 +409,11 @@ export default function ItemCategories() {
       {meta && (
         <div className="flex items-center justify-between px-2">
           <p className="text-sm text-muted-foreground">
-            Showing{" "}
+            Showing
             <span className="font-medium text-foreground">
               {categories.length}
-            </span>{" "}
-            of <span className="font-medium text-foreground">{meta.total}</span>{" "}
+            </span>
+            of <span className="font-medium text-foreground">{meta.total}</span>
             categories
           </p>
           <div className="flex gap-2">

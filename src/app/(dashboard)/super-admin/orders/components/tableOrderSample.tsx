@@ -374,7 +374,7 @@ export default function TableOrderSample() {
       {meta && (
         <div className="flex items-center justify-between px-2">
           <div className="text-sm text-muted-foreground">
-            Page <strong>{meta.page}</strong> of{" "}
+            Page <strong>{meta.page}</strong> of
             <strong>{Math.ceil(meta.total / meta.perPage)}</strong> (
             {meta.total} samples)
           </div>

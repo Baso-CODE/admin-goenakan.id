@@ -787,7 +787,7 @@ export default function EditCashflowClient() {
                     {/* Margin Calc */}
                     {summary.totalRevenue > 0 && (
                       <div className="text-right text-xs text-slate-500">
-                        Margin:{" "}
+                        Margin:
                         {(
                           (summary.profit / summary.totalRevenue) *
                           100

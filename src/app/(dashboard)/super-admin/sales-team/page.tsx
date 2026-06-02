@@ -297,7 +297,7 @@ const Sales = () => {
                       "w-50 justify-start text-left font-normal pr-10",
                       !exportStartDate && "text-muted-foreground",
                     )}>
-                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />{" "}
+                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                     <span className="truncate">
                       {exportStartDate
                         ? format(exportStartDate, "PPP")
@@ -345,7 +345,7 @@ const Sales = () => {
                       "w-50 justify-start text-left font-normal pr-10",
                       !exportEndDate && "text-muted-foreground",
                     )}>
-                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />{" "}
+                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                     <span className="truncate">
                       {exportEndDate
                         ? format(exportEndDate, "PPP")

@@ -297,7 +297,7 @@ export default function AdminContactMessage() {
       {meta && (
         <div className="flex justify-between items-center mt-4 p-4 border-t text-sm text-muted-foreground">
           <p className="text-sm text-muted-foreground">
-            Halaman {meta.page} dari {Math.ceil(meta.total / meta.perPage)}{" "}
+            Halaman {meta.page} dari {Math.ceil(meta.total / meta.perPage)}
             (Total {meta.total} pesan)
           </p>
 

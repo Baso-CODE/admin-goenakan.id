@@ -56,20 +56,20 @@ export function OrderItemsTable({
                       {item.productName}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      SKU: {item.sku}{" "}
+                      SKU: {item.sku}
                       {item.variantName !== "-" && `• ${item.variantName}`}
                     </span>
                     {(item.customization !== "-" || item.remarks !== "-") && (
                       <div className="mt-2 bg-gray-50 p-2 rounded text-xs text-gray-600 border space-y-1">
                         {item.customization !== "-" && (
                           <p>
-                            <span className="font-semibold">Custom:</span>{" "}
+                            <span className="font-semibold">Custom:</span>
                             {item.customization}
                           </p>
                         )}
                         {item.remarks !== "-" && (
                           <p>
-                            <span className="font-semibold">Note:</span>{" "}
+                            <span className="font-semibold">Note:</span>
                             {item.remarks}
                           </p>
                         )}

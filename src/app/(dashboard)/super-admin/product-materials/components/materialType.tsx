@@ -298,7 +298,7 @@ export default function MaterialTypes() {
                 <TableHead className=" text-foreground">
                   Material Name
                 </TableHead>
-                <TableHead className=" text-foreground">Code</TableHead>{" "}
+                <TableHead className=" text-foreground">Code</TableHead>
                 {/* ✨ TAMBAH KOLOM HEADER */}
                 <TableHead className=" text-foreground">Slug</TableHead>
                 <TableHead className=" text-foreground">Description</TableHead>
@@ -387,11 +387,11 @@ export default function MaterialTypes() {
       {meta && (
         <div className="flex items-center justify-between px-2">
           <p className="text-sm text-muted-foreground">
-            Showing{" "}
+            Showing
             <span className="font-medium text-foreground">
               {materials.length}
-            </span>{" "}
-            of <span className="font-medium text-foreground">{meta.total}</span>{" "}
+            </span>
+            of <span className="font-medium text-foreground">{meta.total}</span>
             materials
           </p>
           <div className="flex gap-2">

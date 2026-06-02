@@ -40,7 +40,7 @@ export function UploadVideos({
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVideoItem, setSelectedVideoItem] = useState<VideoItem | null>(
-    null
+    null,
   );
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -83,7 +83,7 @@ export function UploadVideos({
         {
           method: "POST",
           body: formData,
-        }
+        },
       );
 
       if (!res.ok) throw new Error("Gagal upload ke Cloudinary");
@@ -155,12 +155,12 @@ export function UploadVideos({
 
   const setVideoMetaField = (
     tempId: string | number,
-    patch: Partial<VideoMeta>
+    patch: Partial<VideoMeta>,
   ) => {
     setVideoItems((prev) =>
       prev.map((item) =>
-        item.tempId === tempId ? { ...item, ...patch } : item
-      )
+        item.tempId === tempId ? { ...item, ...patch } : item,
+      ),
     );
   };
 
@@ -172,9 +172,9 @@ export function UploadVideos({
           item.tempId === tempId
             ? isFeatured
             : isFeatured
-            ? false // Unset yang lain jika ada yang baru diset true
-            : item.isFeatured,
-      }))
+              ? false // Unset yang lain jika ada yang baru diset true
+              : item.isFeatured,
+      })),
     );
   };
 
@@ -186,7 +186,7 @@ export function UploadVideos({
         render={() => (
           <FormItem className="space-y-4">
             <FormLabel className="text-md font-semibold flex items-center justify-between">
-              {label}{" "}
+              {label}
               <span className="text-sm font-normal text-gray-500">
                 (Max: {max}, Direct Upload)
               </span>

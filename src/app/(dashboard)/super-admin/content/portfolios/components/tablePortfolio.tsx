@@ -30,6 +30,8 @@ import {
   Loader2,
   Plus,
   Search,
+  ShoppingCart,
+  Tag,
   Trash2,
 } from "lucide-react";
 import Image from "next/image";
@@ -37,14 +39,21 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+// ✨ UPDATE TIPE DATA SESUAI SCHEMA BARU
 type Portfolio = {
   id: string;
   title: string;
   clientName: string;
   image: string;
   displayOrder: number;
+  orderQuantity: number;
+  projectDate: string | null;
   isActive: boolean;
   createdAt: string;
+  eventCategory?: {
+    id: string;
+    title: string;
+  };
 };
 
 type Meta = {
@@ -59,6 +68,8 @@ export default function PortfolioTable() {
   const { fetchApi, status } = useApi();
 
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
+  console.log("ini adalah portfolio", portfolios);
+
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -143,6 +154,7 @@ export default function PortfolioTable() {
       setIsDeleting(false);
     }
   };
+
   return (
     <div className="space-y-4 overflow-x-hidden w-full mx-auto">
       <Card>
@@ -206,10 +218,16 @@ export default function PortfolioTable() {
                 <TableRow>
                   <TableHead className="w-16 text-center">Order</TableHead>
                   <TableHead className="w-24">Image</TableHead>
-                  <TableHead className="min-w-37.5">Project Title</TableHead>
+                  <TableHead className="min-w-40">Project & Category</TableHead>
                   <TableHead>Client Name</TableHead>
+                  <TableHead className="text-center">Items Ordered</TableHead>
+                  {/* ✨ KOLOM BARU */}
+                  <TableHead className="whitespace-nowrap">
+                    Project Date
+                  </TableHead>
+                  {/* ✨ KOLOM BARU */}
                   <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead className="whitespace-nowrap">Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -218,7 +236,8 @@ export default function PortfolioTable() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      <TableCell colSpan={7}>
+                      {/* ✨ colSpan jadi 9 */}
+                      <TableCell colSpan={9}>
                         <Skeleton className="h-12 w-full" />
                       </TableCell>
                     </TableRow>
@@ -226,7 +245,7 @@ export default function PortfolioTable() {
                 ) : error ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={9}
                       className="text-center text-red-500 py-6">
                       Error: {error}
                     </TableCell>
@@ -253,22 +272,42 @@ export default function PortfolioTable() {
                         </div>
                       </TableCell>
 
-                      {/* --- JUDUL PROYEK --- */}
+                      {/* --- JUDUL PROYEK & KATEGORI --- */}
                       <TableCell>
                         <div className="font-semibold text-sm">
                           {item.title}
                         </div>
-                        <div className="text-[10px] text-muted-foreground uppercase tracking-tighter">
-                          ID: {item.id.substring(0, 8)}...
+                        <div className="flex items-center gap-1 mt-1 text-[11px] text-muted-foreground">
+                          <Tag className="h-3 w-3" />
+                          {item.eventCategory?.title || "Uncategorized"}
                         </div>
                       </TableCell>
 
                       {/* --- NAMA KLIEN --- */}
                       <TableCell>
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-stone-600">
-                          <Briefcase className="h-3 w-3 text-[#C4A48E]" />
+                        <div className="flex items-center gap-1.5 text-sm font-medium text-stone-700">
+                          <Briefcase className="h-3.5 w-3.5 text-[#C4A48E]" />
                           {item.clientName}
                         </div>
+                      </TableCell>
+
+                      {/* --- JUMLAH ORDER --- */}
+                      <TableCell className="text-center">
+                        <Badge
+                          variant="secondary"
+                          className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200">
+                          <ShoppingCart className="h-3 w-3 mr-1 inline-block" />
+                          {item.orderQuantity || 0}
+                        </Badge>
+                      </TableCell>
+
+                      {/* --- TANGGAL PROYEK --- */}
+                      <TableCell className="text-sm whitespace-nowrap">
+                        {item.projectDate ? (
+                          formatDate(item.projectDate, { style: "date" })
+                        ) : (
+                          <span className="text-stone-400 italic">Not set</span>
+                        )}
                       </TableCell>
 
                       {/* --- STATUS --- */}
@@ -282,7 +321,7 @@ export default function PortfolioTable() {
 
                       {/* --- TANGGAL DIBUAT --- */}
                       <TableCell className="text-sm whitespace-nowrap">
-                        {formatDate(item.createdAt)}
+                        {formatDate(item.createdAt, { style: "date" })}
                       </TableCell>
 
                       {/* --- ACTIONS --- */}
@@ -311,7 +350,7 @@ export default function PortfolioTable() {
                 ) : (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={9}
                       className="text-center py-8 text-muted-foreground text-sm">
                       <div className="flex flex-col items-center gap-2">
                         <ImageIcon className="h-8 w-8 opacity-20" />

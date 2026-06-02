@@ -7,9 +7,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Image as ImageIcon, Plus, Star, X, Pencil } from "lucide-react";
+import { Image as ImageIcon, Pencil, Plus, Star, X } from "lucide-react";
 import Image from "next/image";
-import { ChangeEvent, useRef, useState, useEffect, useCallback } from "react";
+import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { ImageDetailModalCore } from "./imageDetailCore";
 
@@ -51,7 +51,7 @@ export function UploadImages({
   const [imageItems, setImageItems] = useState<ImageItem[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedImageItem, setSelectedImageItem] = useState<ImageItem | null>(
-    null
+    null,
   );
   const [tempIdCounter, setTempIdCounter] = useState(0);
 
@@ -112,13 +112,13 @@ export function UploadImages({
 
   const handleRemoveItem = (tempIdToRemove: number) => {
     const itemToRemove = imageItems.find(
-      (item) => item.tempId === tempIdToRemove
+      (item) => item.tempId === tempIdToRemove,
     );
     if (itemToRemove && itemToRemove.isNew) {
       URL.revokeObjectURL(itemToRemove.url);
     }
     setImageItems((prev) =>
-      prev.filter((item) => item.tempId !== tempIdToRemove)
+      prev.filter((item) => item.tempId !== tempIdToRemove),
     );
   };
 
@@ -136,11 +136,11 @@ export function UploadImages({
     (tempId: string | number, patch: Partial<ImageMeta>) => {
       setImageItems((prev) =>
         prev.map((item) =>
-          item.tempId === tempId ? { ...item, ...patch } : item
-        )
+          item.tempId === tempId ? { ...item, ...patch } : item,
+        ),
       );
     },
-    []
+    [],
   );
 
   const setFeaturedImage = useCallback(
@@ -152,12 +152,12 @@ export function UploadImages({
             item.tempId === tempIdToFeature
               ? isFeatured
               : isFeatured
-              ? false
-              : item.isFeatured,
-        }))
+                ? false
+                : item.isFeatured,
+        })),
       );
     },
-    []
+    [],
   );
 
   return (
@@ -168,7 +168,7 @@ export function UploadImages({
         render={() => (
           <FormItem className="space-y-4">
             <FormLabel className="text-md font-semibold flex items-center justify-between">
-              {label}{" "}
+              {label}
               <span className="text-sm font-normal text-gray-500">
                 (Max: {max} files)
               </span>
@@ -179,8 +179,7 @@ export function UploadImages({
               {imageItems.map((item) => (
                 <div
                   key={item.tempId}
-                  className="relative w-24 h-24 rounded-md overflow-hidden border border-gray-300 shadow-sm group"
-                >
+                  className="relative w-24 h-24 rounded-md overflow-hidden border border-gray-300 shadow-sm group">
                   <Image
                     src={item.url}
                     alt={item.altText || "Product Image"}
@@ -202,8 +201,7 @@ export function UploadImages({
                       size="icon"
                       variant="secondary"
                       className="h-7 w-7 bg-white text-gray-800 hover:bg-gray-100"
-                      onClick={() => handleOpenModal(item)}
-                    >
+                      onClick={() => handleOpenModal(item)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
@@ -211,8 +209,7 @@ export function UploadImages({
                       size="icon"
                       variant="destructive"
                       className="h-7 w-7"
-                      onClick={() => handleRemoveItem(item.tempId)}
-                    >
+                      onClick={() => handleRemoveItem(item.tempId)}>
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
@@ -233,8 +230,7 @@ export function UploadImages({
               {imageItems.length < max && (
                 <div
                   onClick={() => inputRef.current?.click()}
-                  className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors"
-                >
+                  className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors">
                   <Plus className="h-6 w-6" />
                   <span className="text-xs mt-1">Add Image</span>
                 </div>

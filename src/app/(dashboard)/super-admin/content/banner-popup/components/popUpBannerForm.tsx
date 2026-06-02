@@ -172,7 +172,7 @@ export default function PopupBannerForm({
                     <FormItem>
                       <FormLabel className="flex items-center gap-2">
                         <Laptop className="h-4 w-4 text-blue-600" />
-                        Desktop Image{" "}
+                        Desktop Image
                         {initialData ? "(Optional)" : "(Required)"}
                       </FormLabel>
                       <FormControl>

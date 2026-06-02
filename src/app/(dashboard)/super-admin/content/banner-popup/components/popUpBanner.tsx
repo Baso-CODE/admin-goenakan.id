@@ -298,8 +298,8 @@ export default function PopupBannerTable() {
                             <span>
                               {banner.startDate
                                 ? formatDate(banner.startDate)
-                                : "Now"}{" "}
-                              -{" "}
+                                : "Now"}
+                              -
                               {banner.endDate
                                 ? formatDate(banner.endDate)
                                 : "Forever"}

@@ -515,7 +515,7 @@ export default function InvoiceDetailPage() {
                           <div className="flex">
                             <span className="w-3 mr-1">:</span>
                             <div className="flex-1">
-                              {departmentName || "-"}{" "}
+                              {departmentName || "-"}
                               {picName
                                 ? `(UP: ${picPrefix ? picPrefix + " " : ""}${picName})`
                                 : ""}
@@ -643,7 +643,7 @@ export default function InvoiceDetailPage() {
                   <span className="w-4 mr-2">-</span>
                   <div className="flex-1">
                     <span className="font-semibold">
-                      Total Purchase Order Value:{" "}
+                      Total Purchase Order Value:
                     </span>
                     <span>{formatCurrency(orderTotal)}</span>
                   </div>
@@ -676,14 +676,11 @@ export default function InvoiceDetailPage() {
                         <div className="flex items-start">
                           <span className="w-4 mr-2">-</span>
                           <div className="flex-1">
-                            <span className="font-semibold">
-                              Down Payment:{" "}
-                            </span>
+                            <span className="font-semibold">Down Payment:</span>
                             <span className="font-bold">
                               {formatCurrency(invoice.totalAmount)}
                             </span>
                             <span className="italic text-gray-600">
-                              {" "}
                               (Due: Immediately)
                             </span>
                           </div>
@@ -692,7 +689,7 @@ export default function InvoiceDetailPage() {
                           <span className="w-4 mr-2">-</span>
                           <div className="flex-1">
                             <span className="font-semibold">
-                              Remaining Balance:{" "}
+                              Remaining Balance:
                             </span>
                             <span>
                               {formatCurrency(
@@ -700,7 +697,6 @@ export default function InvoiceDetailPage() {
                               )}
                             </span>
                             <span className="italic text-gray-600">
-                              {" "}
                               (Due: Upon delivery or completion)
                             </span>
                           </div>
@@ -724,7 +720,7 @@ export default function InvoiceDetailPage() {
                                 {prev.category === "DP"
                                   ? "Down Payment"
                                   : "Previous Payment"}
-                                :{" "}
+                                :
                               </span>
                               <span>{formatCurrency(prev.totalAmount)}</span>
                               <span className="italic text-gray-600">
@@ -739,13 +735,12 @@ export default function InvoiceDetailPage() {
                           <span className="w-4 mr-2">-</span>
                           <div className="flex-1">
                             <span className="font-semibold">
-                              Balance Payment:{" "}
+                              Balance Payment:
                             </span>
                             <span className="font-bold">
                               {formatCurrency(invoice.totalAmount)}
                             </span>
                             <span className="italic text-gray-600">
-                              {" "}
                               (Due: Immediately)
                             </span>
                           </div>
@@ -754,11 +749,10 @@ export default function InvoiceDetailPage() {
                           <span className="w-4 mr-2">-</span>
                           <div className="flex-1">
                             <span className="font-semibold">
-                              Remaining Balance:{" "}
+                              Remaining Balance:
                             </span>
                             <span>Rp 0,-</span>
                             <span className="italic text-gray-600">
-                              {" "}
                               (Fully Paid upon this settlement)
                             </span>
                           </div>
@@ -800,7 +794,7 @@ export default function InvoiceDetailPage() {
                               {isFinal
                                 ? "Final Installment (Balance Payment)"
                                 : `${getOrdinal(history.length + 1)} Installment`}
-                              :{" "}
+                              :
                             </span>
                             <span className="font-bold">
                               {formatCurrency(invoice.totalAmount)}
@@ -816,7 +810,7 @@ export default function InvoiceDetailPage() {
                           <span className="w-4 mr-2">-</span>
                           <div className="flex-1">
                             <span className="font-semibold">
-                              Remaining Balance:{" "}
+                              Remaining Balance:
                             </span>
                             <span>
                               {isFinal

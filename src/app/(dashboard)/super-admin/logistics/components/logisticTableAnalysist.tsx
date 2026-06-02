@@ -347,7 +347,7 @@ export default function LogisticTableAnalysist() {
                             variant="outline"
                             size="icon"
                             className="h-8 w-8 mr-2 border-orange-200 text-orange-700 hover:bg-orange-50">
-                            <Pencil className="h-4 w-4" />{" "}
+                            <Pencil className="h-4 w-4" />
                             {/* Import Pencil dari lucide-react */}
                           </Button>
                         </Link>
@@ -376,8 +376,8 @@ export default function LogisticTableAnalysist() {
       {meta && (
         <div className="flex items-center justify-between px-2 pt-4">
           <div className="text-xs text-muted-foreground">
-            Halaman <strong>{meta.page}</strong> dari{" "}
-            <strong>{meta.totalPage}</strong> • Total{" "}
+            Halaman <strong>{meta.page}</strong> dari
+            <strong>{meta.totalPage}</strong> • Total
             <strong>{meta.total}</strong> Order
           </div>
           <div className="flex gap-2">

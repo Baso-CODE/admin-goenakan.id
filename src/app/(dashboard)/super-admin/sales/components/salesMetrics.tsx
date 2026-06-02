@@ -80,7 +80,7 @@ export default function SalesMetrics() {
           <Card key={i} className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <Skeleton className="h-4 w-24" /> {/* Title Skeleton */}
-              <Skeleton className="h-4 w-4 rounded-full" />{" "}
+              <Skeleton className="h-4 w-4 rounded-full" />
               {/* Icon Skeleton */}
             </CardHeader>
             <CardContent>

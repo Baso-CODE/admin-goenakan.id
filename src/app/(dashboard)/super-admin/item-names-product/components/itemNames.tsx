@@ -413,11 +413,11 @@ export default function ItemNames() {
       {meta && (
         <div className="flex items-center justify-between px-2">
           <p className="text-sm text-muted-foreground">
-            Showing{" "}
+            Showing
             <span className="font-medium text-foreground">
               {itemNames.length}
-            </span>{" "}
-            of <span className="font-medium text-foreground">{meta.total}</span>{" "}
+            </span>
+            of <span className="font-medium text-foreground">{meta.total}</span>
             items
           </p>
           <div className="flex gap-2">

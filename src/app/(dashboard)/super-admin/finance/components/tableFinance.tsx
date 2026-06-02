@@ -515,7 +515,7 @@ export default function TableFinance() {
       {meta && (
         <div className="flex items-center justify-between px-2">
           <div className="text-sm text-muted-foreground">
-            Showing Page <strong>{meta.page}</strong> of{" "}
+            Showing Page <strong>{meta.page}</strong> of
             <strong>{Math.ceil(meta.total / meta.perPage)}</strong> (
             {meta.total} total items)
           </div>

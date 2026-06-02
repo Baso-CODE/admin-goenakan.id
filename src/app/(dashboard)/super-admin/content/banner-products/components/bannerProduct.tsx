@@ -284,7 +284,7 @@ export default function BannerProductTable() {
                           </div>
                         )}
                         <div className="text-[10px] font-medium text-stone-400 mt-1.5 flex items-center gap-1 uppercase tracking-wider">
-                          <ListOrdered className="h-3 w-3" /> Order:{" "}
+                          <ListOrdered className="h-3 w-3" /> Order:
                           {banner.sortOrder}
                         </div>
                       </TableCell>

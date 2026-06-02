@@ -320,7 +320,7 @@ export default function DeliveryNotePrint() {
                           <div className="flex-1">
                             {departureDate
                               ? format(new Date(departureDate), "MMM dd, yyyy")
-                              : "-"}{" "}
+                              : "-"}
                             (Estimated)
                           </div>
                         </div>
@@ -383,7 +383,7 @@ export default function DeliveryNotePrint() {
                         Department
                       </td>
                       <td className="py-0.5 align-top">
-                        : {picDept !== "-" ? picDept : ""}{" "}
+                        : {picDept !== "-" ? picDept : ""}
                         {picName !== "Personal" ? `(UP: ${picName})` : ""}
                       </td>
                     </tr>
@@ -539,7 +539,7 @@ export default function DeliveryNotePrint() {
                           const isFullyDelivered = item.inProcessPcs === 0;
                           return (
                             <li key={item.id}>
-                              - {item.orderProduct?.product?.name}:{" "}
+                              - {item.orderProduct?.product?.name}:
                               {isFullyDelivered
                                 ? "Fully Delivered."
                                 : `${item.inProcessPcs} pcs remaining (to be shipped in next batch).`}

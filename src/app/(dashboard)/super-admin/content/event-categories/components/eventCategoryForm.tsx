@@ -19,10 +19,12 @@ import {
   ImageIcon,
   ListOrdered,
   Loader2,
+  ShoppingCart,
   Tag,
+  UploadCloud,
 } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -30,6 +32,7 @@ const eventCategorySchema = z.object({
   title: z.string().min(2, "Category title must be at least 2 characters"),
   image: z.any().optional(),
   displayOrder: z.coerce.number().min(0).default(0),
+  orderCount: z.coerce.number().min(0).default(0),
   isActive: z.boolean().default(true),
 });
 
@@ -48,9 +51,9 @@ export default function EventCategoryForm({
   isLoading = false,
   isSubmitting = false,
 }: EventCategoryFormProps) {
-  // === STATE FOR PREVIEW & FILE ===
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | undefined>(undefined);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<EventCategoryFormValues>({
     resolver: zodResolver(
@@ -59,6 +62,7 @@ export default function EventCategoryForm({
     defaultValues: {
       title: "",
       displayOrder: 0,
+      orderCount: 0,
       isActive: true,
     },
   });
@@ -68,6 +72,7 @@ export default function EventCategoryForm({
       form.reset({
         title: initialData.title,
         displayOrder: initialData.displayOrder || 0,
+        orderCount: initialData.orderCount || 0,
         isActive: initialData.isActive ?? true,
       });
 
@@ -77,7 +82,6 @@ export default function EventCategoryForm({
     }
   }, [initialData, form]);
 
-  // === HANDLE FILE CHANGE ===
   const handleFileChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     fieldChange: (value: any) => void,
@@ -96,6 +100,7 @@ export default function EventCategoryForm({
 
     formData.append("title", values.title);
     formData.append("displayOrder", String(values.displayOrder));
+    formData.append("orderCount", String(values.orderCount));
     formData.append("isActive", String(values.isActive));
 
     if (selectedFile) {
@@ -119,7 +124,7 @@ export default function EventCategoryForm({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-6 w-full">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* === IMAGE UPLOAD SECTION === */}
+              {/* === MODERN IMAGE UPLOAD SECTION === */}
               <div className="col-span-1 md:col-span-2">
                 <FormField
                   control={form.control}
@@ -128,39 +133,50 @@ export default function EventCategoryForm({
                     <FormItem>
                       <FormLabel className="flex items-center gap-2 font-semibold">
                         <ImageIcon className="h-4 w-4 text-[#C4A48E]" />
-                        Category Image{" "}
-                        {initialData ? "(Optional)" : "(Optional for Category)"}
+                        Category Image {initialData ? "(Optional)" : "*"}
                       </FormLabel>
                       <FormControl>
-                        <div className="flex flex-col sm:flex-row gap-4 items-start">
-                          <div className="flex-1 w-full space-y-3">
-                            <Input
-                              type="file"
-                              accept="image/*"
-                              disabled={isLoading || isSubmitting}
-                              onChange={(e) =>
-                                handleFileChange(e, field.onChange)
-                              }
-                            />
-                            <p className="text-[10px] text-muted-foreground">
-                              Recommended: JPG/PNG format. Max 5MB.
-                            </p>
-                          </div>
-
-                          <div className="relative w-40 h-24 shrink-0 bg-stone-50 rounded border border-dashed flex items-center justify-center overflow-hidden">
-                            {preview ? (
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          className="relative w-full h-48 sm:h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden group">
+                          {preview ? (
+                            <>
                               <Image
                                 src={preview}
-                                alt="Category Preview"
+                                alt="Preview"
                                 fill
                                 className="object-cover"
                               />
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground uppercase">
-                                No Image
-                              </span>
-                            )}
-                          </div>
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <p className="text-white font-medium flex items-center gap-2">
+                                  <UploadCloud className="h-5 w-5" /> Change
+                                  Image
+                                </p>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center space-y-2 p-4">
+                              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border">
+                                <UploadCloud className="h-6 w-6 text-stone-400" />
+                              </div>
+                              <div className="text-sm font-medium text-stone-700">
+                                Click to upload image
+                              </div>
+                              <p className="text-xs text-stone-500">
+                                PNG, JPG up to 5MB
+                              </p>
+                            </div>
+                          )}
+                          <Input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={isLoading || isSubmitting}
+                            onChange={(e) =>
+                              handleFileChange(e, field.onChange)
+                            }
+                          />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -170,7 +186,7 @@ export default function EventCategoryForm({
               </div>
 
               {/* === Title / Category Name === */}
-              <div className="col-span-1 md:col-span-2">
+              <div className="col-span-1">
                 <FormField
                   control={form.control}
                   name="title"
@@ -183,9 +199,38 @@ export default function EventCategoryForm({
                       <FormControl>
                         <Input
                           placeholder="e.g. Wedding, Corporate..."
+                          className="h-10"
                           {...field}
                         />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* === Order Count === */}
+              <div className="col-span-1">
+                <FormField
+                  control={form.control}
+                  name="orderCount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                        Ordered Times
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-[10px]">
+                        Shown as "ordered X times" on website.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -204,7 +249,12 @@ export default function EventCategoryForm({
                         Display Order
                       </FormLabel>
                       <FormControl>
-                        <Input type="number" min={0} {...field} />
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -213,26 +263,38 @@ export default function EventCategoryForm({
               </div>
 
               {/* === Active Status === */}
-              <div className="col-span-1 md:col-span-2">
+              <div className="col-span-1">
                 <FormField
                   control={form.control}
                   name="isActive"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-center gap-3 p-3 border rounded-lg bg-stone-50/50">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel className="cursor-pointer">
+                    <FormItem>
+                      {/* ✨ LABEL BAYANGAN: Memastikan strukturnya sejajar 100% dengan Display Order */}
+                      <FormLabel className="flex items-center gap-2 opacity-0 select-none pointer-events-none">
+                        <ListOrdered className="h-4 w-4" />
+                        Status
+                      </FormLabel>
+
+                      {/* ✨ KOTAK H-10: Memastikan tingginya sama persis dengan kotak Input */}
+                      <div
+                        className="flex flex-row items-center gap-3 px-3 h-10 border rounded-md bg-stone-50 hover:bg-stone-100 transition-colors shadow-sm cursor-pointer"
+                        onClick={() => field.onChange(!field.value)}>
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="pointer-events-none" // Biar div yg nangkep klik
+                          />
+                        </FormControl>
+                        <span className="text-sm font-medium cursor-pointer text-stone-700">
                           Active Status
-                        </FormLabel>
-                        <FormDescription className="text-[10px]">
-                          Visible on the category section of the website.
-                        </FormDescription>
+                        </span>
                       </div>
+
+                      {/* ✨ DESKRIPSI: Dipindah ke bawah agar sama seperti Ordered Times */}
+                      <FormDescription className="text-[10px]">
+                        Visible on the website.
+                      </FormDescription>
                     </FormItem>
                   )}
                 />

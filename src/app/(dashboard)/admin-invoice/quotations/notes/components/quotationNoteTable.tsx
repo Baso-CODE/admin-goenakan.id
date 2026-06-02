@@ -212,7 +212,7 @@ export default function QuotationNoteCategory() {
                       <Badge variant="outline">
                         {Array.isArray(item.templates)
                           ? item.templates.length
-                          : 0}{" "}
+                          : 0}
                         Items
                       </Badge>
                     </TableCell>

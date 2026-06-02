@@ -185,7 +185,7 @@ export default function OpsSampleSection({ data }: OpsSampleSectionProps) {
               </h4>
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                 Convert cust: Pemisahan data untuk melihat apakah pelanggan yang
-                terkonversi adalah <strong>Customer Baru</strong> atau{" "}
+                terkonversi adalah <strong>Customer Baru</strong> atau
                 <strong>Customer Lama</strong>.
               </p>
             </div>

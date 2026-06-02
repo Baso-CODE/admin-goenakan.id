@@ -35,7 +35,7 @@ export default function CustomerMetrics({ data }: CustomerMetricsProps) {
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">
-            New Customer{" "}
+            New Customer
             <span className="text-[10px] text-muted-foreground font-normal">
               (Berdasarkan filter)
             </span>
@@ -56,7 +56,7 @@ export default function CustomerMetrics({ data }: CustomerMetricsProps) {
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">
-            Returning Customer{" "}
+            Returning Customer
             <span className="text-[10px] text-muted-foreground font-normal">
               (Berdasarkan filter)
             </span>

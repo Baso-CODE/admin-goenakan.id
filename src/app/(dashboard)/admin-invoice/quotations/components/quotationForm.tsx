@@ -801,7 +801,7 @@ export default function QuotationForm({
           <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-muted-foreground" />{" "}
+                <CalendarIcon className="w-5 h-5 text-muted-foreground" />
                 Quotation Details
               </CardTitle>
             </CardHeader>
@@ -1226,7 +1226,7 @@ export default function QuotationForm({
               <span className="flex items-center gap-1">
                 <span className="font-semibold text-slate-600">
                   Min/Max Qty
-                </span>{" "}
+                </span>
                 = Rentang
               </span>
               <span className="flex items-center gap-1">
@@ -1306,7 +1306,7 @@ export default function QuotationForm({
               <div className="flex justify-between text-sm text-red-600">
                 <span>Total Discount</span>
                 <span>
-                  -{" "}
+                  -
                   {new Intl.NumberFormat("id-ID", {
                     style: "currency",
                     currency: "IDR",

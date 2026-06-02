@@ -422,7 +422,7 @@ export default function InvoicesPage() {
                           </span>
                           {inv.dueDate && (
                             <span className="text-[10px] text-muted-foreground">
-                              Due:{" "}
+                              Due:
                               {format(new Date(inv.dueDate), "dd MMM", {
                                 locale: idLocale,
                               })}
@@ -479,8 +479,8 @@ export default function InvoicesPage() {
       {meta && (
         <div className="flex items-center justify-between px-2 pt-4">
           <div className="text-xs text-muted-foreground">
-            Halaman <strong>{meta.page}</strong> dari{" "}
-            <strong>{meta.totalPage}</strong> • Total{" "}
+            Halaman <strong>{meta.page}</strong> dari
+            <strong>{meta.totalPage}</strong> • Total
             <strong>{meta.total}</strong> Data
           </div>
           <div className="flex gap-2">

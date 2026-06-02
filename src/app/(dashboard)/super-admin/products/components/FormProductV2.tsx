@@ -745,7 +745,7 @@ export default function ProductFormV2({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Stok{" "}
+                      Stok
                       {form.watch("isCustom") && (
                         <span className="text-[10px] text-amber-600 font-normal italic">
                           (Diatur per Varian)

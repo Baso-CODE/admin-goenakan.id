@@ -219,7 +219,7 @@ export default function ProductionTab({
                         {prod.productName}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        Total Order:{" "}
+                        Total Order:
                         <span className="font-semibold text-blue-600">
                           {prod.quantity} pcs
                         </span>
@@ -267,7 +267,7 @@ export default function ProductionTab({
                               </span>
                             </div>
                             <div className="font-bold text-base text-slate-800">
-                              {trackers[0].quantity}{" "}
+                              {trackers[0].quantity}
                               <span className="text-xs font-normal text-muted-foreground">
                                 pcs
                               </span>
@@ -296,7 +296,7 @@ export default function ProductionTab({
                           </Badge>
                           <div className="flex items-center gap-1 text-muted-foreground">
                             <Play className="h-3 w-3 text-orange-500" />
-                            Mulai:{" "}
+                            Mulai:
                             {format(
                               new Date(trackers[0].startDate),
                               "dd MMM yyyy",
@@ -361,7 +361,7 @@ export default function ProductionTab({
                           </span>
                         </div>
                         <div className="font-bold text-base text-slate-800">
-                          {track.quantity}{" "}
+                          {track.quantity}
                           <span className="text-xs font-normal text-muted-foreground">
                             pcs
                           </span>
@@ -390,7 +390,7 @@ export default function ProductionTab({
                       </Badge>
                       <div className="flex items-center gap-1 text-muted-foreground">
                         <Play className="h-3 w-3 text-orange-500" />
-                        Mulai:{" "}
+                        Mulai:
                         {format(new Date(track.startDate), "dd MMM yyyy", {
                           locale: idLocale,
                         })}

@@ -257,7 +257,7 @@ export default function QuotationDetail() {
                 </CardTitle>
                 <div className="flex items-center text-sm text-muted-foreground">
                   <CalendarIcon className="mr-1 h-3 w-3" />
-                  Dibuat pada{" "}
+                  Dibuat pada
                   {format(new Date(data.date), "dd MMMM yyyy", {
                     locale: idLocale,
                   })}
@@ -306,7 +306,7 @@ export default function QuotationDetail() {
                 {/* Shipping/Address */}
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />{" "}
+                    <FileText className="h-4 w-4 text-muted-foreground" />
                     Alamat Penagihan
                   </h4>
                   <p className="text-sm text-muted-foreground leading-relaxed">

@@ -391,7 +391,7 @@ export default function FormUpdateVariants({
                   className="border p-6 rounded-xl bg-gray-50 space-y-6">
                   <div className="flex justify-between items-center border-b pb-2">
                     <h4 className="font-semibold">
-                      Variant #{index + 1}:{" "}
+                      Variant #{index + 1}:
                       {form.watch(`variants.${index}.variantName`) ||
                         "New Variant"}
                     </h4>

@@ -505,12 +505,12 @@ export default function ShipmentManager({
                       </div>
                       <div className="flex items-center gap-3 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
-                          <Truck className="h-3.5 w-3.5" />{" "}
+                          <Truck className="h-3.5 w-3.5" />
                           {ship.vendor?.companyName}
                         </span>
                         <span>•</span>
                         <span className="flex items-center gap-1">
-                          <MapPin className="h-3.5 w-3.5" /> {ship.origin}{" "}
+                          <MapPin className="h-3.5 w-3.5" /> {ship.origin}
                           <span className="mx-1">→</span> {ship.destination}
                         </span>
                       </div>
@@ -750,7 +750,7 @@ export default function ShipmentManager({
               </div>
               <div className="space-y-2">
                 <Label>
-                  No. Resi{" "}
+                  No. Resi
                   <span className="text-muted-foreground text-xs">
                     (Opsional)
                   </span>
