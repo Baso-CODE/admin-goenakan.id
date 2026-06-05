@@ -60,6 +60,7 @@ type Order = {
   arrivalInCustDate: string | null;
   createdBy: string;
   createdTime: string;
+  updatedBy: string;
   updatedTime: string;
   totalAmount: number;
   currencyCode: string;
@@ -385,6 +386,7 @@ export default function TableOrder() {
                   <TableHead className="min-w-[150px]">Remarks</TableHead>
                   <TableHead className="min-w-[120px]">Created By</TableHead>
                   <TableHead className="min-w-[150px]">Created Time</TableHead>
+                  <TableHead className="min-w-[120px]">Updated By</TableHead>
                   <TableHead className="min-w-[150px]">Updated Time</TableHead>
                   <TableHead className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] min-w-[100px]">
                     Actions
@@ -492,6 +494,9 @@ export default function TableOrder() {
                       </TableCell>
                       <TableCell className="text-xs text-gray-400">
                         {format(new Date(order.createdTime), "dd/MM/yy HH:mm")}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {order.updatedBy}
                       </TableCell>
                       <TableCell className="text-xs text-gray-400">
                         {format(new Date(order.updatedTime), "dd/MM/yy HH:mm")}

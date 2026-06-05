@@ -84,3 +84,42 @@ export type SampleFollowUp = {
   isDone: boolean;
   createdAt: string;
 };
+
+export type PIC = { id: string; name: string; position?: string };
+export type PurchaseChannel = { id: string; name: string };
+export type Currency = { code: string; symbol: string; name: string };
+export type QuotationRef = {
+  id: string;
+  quotationNumber: string;
+  totalAmount: number;
+};
+export type SampleOrderRef = {
+  id: string;
+  orderNumber: string;
+  dateOrder: string;
+};
+
+export type Client = {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  custCode?: string;
+  type?: "B2B" | "B2C";
+  pics?: PIC[];
+  purchaseChannelId?: string;
+};
+
+export type Sales = { id: string; name: string; phone: string };
+export type Vendor = { id: string; companyName: string };
+
+export type ProductVariant = { id: string; variantName: string; price: number };
+export type PriceTier = { minQuantity: number; price: number };
+export type Product = {
+  id: string;
+  name: string;
+  basePrice: number;
+  isCustom: boolean;
+  productVariants: ProductVariant[];
+  priceTiers: PriceTier[];
+};

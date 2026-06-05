@@ -156,7 +156,6 @@ export function SampleFollowUpSection({
     newSteps: SampleStep[],
     newData: Record<number, SampleStepData>,
   ) => {
-    // 🔥 KIRIM DATA LENGKAP SAAT ADA PERUBAHAN
     onChange(
       newSteps.map((step, i) => ({
         name: getStepLabel(step),

@@ -44,10 +44,10 @@ export default function DashboardLayoutClient({
   return (
     <SidebarProvider>
       <SidebarRole />
-      <SidebarInset>
+      <SidebarInset className="overflow-x-hidden">
         {/* === FIXED HEADER === */}
         <header className="sticky top-0 z-40 flex h-16 items-center gap-2 border-b bg-background/80 backdrop-blur-md">
-          <div className="flex items-center gap-2 px-4 w-full">
+          <div className="flex items-center gap-2 px-4 ">
             <SidebarTrigger className="-ml-1" />
             <Separator
               orientation="vertical"
@@ -80,9 +80,10 @@ export default function DashboardLayoutClient({
             </Breadcrumb>
           </div>
         </header>
-
         {/* === MAIN CONTENT === */}
-        <main className="p-4 overflow-y-auto">{children}</main>
+        <main className="p-4 overflow-y-auto w-full min-w-0 overflow-x-hidden">
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

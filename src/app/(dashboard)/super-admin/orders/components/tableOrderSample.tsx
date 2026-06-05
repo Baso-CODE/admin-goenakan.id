@@ -31,17 +31,35 @@ import {
 
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
+import { cn } from "@/lib/utils";
 
 // === TYPES ===
-type Order = {
+type OrderSample = {
   id: string;
-  poNumber: string;
-  dateOrder: string;
-  salesCategory: "SALES" | "SAMPLE";
-  totalAmount: number;
-  clientName: string;
-  salesName: string;
-  totalItems: number;
+  orderDate: string;
+  sampleNumber: string;
+  customerName: string;
+  shippingAddress: string;
+  picCustomer: string;
+  quotationReference: string;
+
+  // Data Production & Logistics
+  productionData?: string;
+  packagingDate?: string;
+  shippingDate: string | null;
+  sendToCustDate: string | null;
+  arrivalInCustDate: string | null;
+
+  // Follow Up
+  lastFollowUpDate: string | null;
+  lastFollowUpRemark: string;
+
+  // Audit
+  createdBy: string;
+  createdTime: string;
+  updatedBy: string;
+  updatedTime: string;
+  status: string;
 };
 
 type Meta = {
@@ -59,32 +77,40 @@ interface OrderExportQuery {
   salesCategory?: string;
 }
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-  }).format(amount);
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "PENDING":
+      return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200";
+    case "PROCESSING":
+      return "bg-blue-100 text-blue-800 hover:bg-blue-200";
+    case "SHIPPED":
+      return "bg-purple-100 text-purple-800 hover:bg-purple-200";
+    case "COMPLETED":
+      return "bg-green-100 text-green-800 hover:bg-green-200";
+    case "CANCELLED":
+      return "bg-red-100 text-red-800 hover:bg-red-200";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
 };
 
 export default function TableOrderSample() {
   const { fetchApi, status } = useApi();
 
   // === STATE ===
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<OrderSample[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
 
-  // Filters State (Tanpa Sales Category karena sudah pasti SAMPLE)
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+
   // === FETCH ORDERS (SAMPLE ONLY) ===
   const fetchOrders = async () => {
-    // 🛑 Guard: Jangan eksekusi jika sesi belum siap atau belum terautentikasi
     if (status !== "authenticated") return;
 
     setLoading(true);
@@ -92,14 +118,13 @@ export default function TableOrderSample() {
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
-        salesCategory: "SAMPLE", // 🔥 HARDCODE SAMPLE DISINI
+        salesCategory: "SAMPLE", // Selalu panggil SAMPLE
       });
 
       if (debouncedSearch) params.append("search", debouncedSearch);
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
       const res = await fetchApi(`/orders/all?${params}`);
 
       if (!res.ok) {
@@ -120,7 +145,8 @@ export default function TableOrderSample() {
 
   useEffect(() => {
     fetchOrders();
-  }, [page, debouncedSearch, startDate, endDate, status, fetchApi]); // Tambahkan status dan fetchApi ke dependensi
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, debouncedSearch, startDate, endDate, status, fetchApi]);
 
   // === HANDLER EXPORT (SAMPLE ONLY) ===
   const handleExport = async () => {
@@ -128,7 +154,7 @@ export default function TableOrderSample() {
     setExporting(true);
     try {
       const exportFilters: OrderExportQuery = {
-        salesCategory: "SAMPLE", // 🔥 HARDCODE SAMPLE DISINI
+        salesCategory: "SAMPLE",
       };
 
       if (startDate) exportFilters.startDate = startDate;
@@ -172,9 +198,10 @@ export default function TableOrderSample() {
   };
 
   return (
-    <div className="space-y-6 w-full mx-auto pb-10">
+    // Struktur max-w-full dan overflow-hidden agar halaman tidak scroll memanjang
+    <div className="space-y-6 w-full min-w-0 max-w-full overflow-hidden mx-auto pb-10">
       {/* Header Card */}
-      <Card className="border-l-4 border-l-purple-500 shadow-sm">
+      <Card className="border-l-4 border-l-purple-500 shadow-sm w-full">
         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-100 rounded-lg">
@@ -185,7 +212,7 @@ export default function TableOrderSample() {
                 Sample Orders
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                Khusus pengelolaan data sample order.
+                Khusus pengelolaan data sample order dan follow up.
               </p>
             </div>
           </div>
@@ -195,7 +222,7 @@ export default function TableOrderSample() {
             <div className="relative w-full md:w-62.5">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search PO / Client..."
+                placeholder="Search Sample No / Client..."
                 className="pl-9"
                 value={search}
                 onChange={(e) => {
@@ -207,11 +234,9 @@ export default function TableOrderSample() {
           </div>
         </CardHeader>
       </Card>
-
       {/* Filter & Export Bar */}
-      <Card className="p-4 shadow-sm">
+      <Card className="p-4 shadow-sm w-full">
         <div className="flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between">
-          {/* Filter Date Only (Tanpa Category Dropdown) */}
           <div className="flex gap-2 w-full sm:w-auto">
             <div className="flex flex-col gap-1.5 w-full sm:w-35">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -243,7 +268,6 @@ export default function TableOrderSample() {
             </div>
           </div>
 
-          {/* Export Button */}
           <Button
             variant="outline"
             className="w-full lg:w-auto border-green-600 text-green-700 hover:bg-green-50 gap-2"
@@ -258,57 +282,77 @@ export default function TableOrderSample() {
           </Button>
         </div>
       </Card>
-
       {/* Main Table Card */}
-      <Card className="shadow-sm border-t-0">
-        <CardContent className="p-0">
-          <div className="rounded-md border">
-            <Table>
+      <Card className="shadow-sm border-t-0 w-full overflow-hidden">
+        <CardContent className="p-0 w-full overflow-hidden">
+          <div className="w-full overflow-x-auto">
+            <Table className="whitespace-nowrap w-full">
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="w-45">PO Number</TableHead>
-                  <TableHead className="w-37.5">Date</TableHead>
-                  <TableHead className="w-50">Client</TableHead>
-                  <TableHead className="w-37.5">Sales Rep</TableHead>
-                  {/* Kolom Type Dihapus karena semua SAMPLE */}
-                  <TableHead className="text-center w-25">Items</TableHead>
-                  <TableHead className="text-right w-45">
-                    Total Amount
+                  <TableHead className="min-w-[120px]">Order Date</TableHead>
+                  <TableHead className="min-w-[170px]">Sample Number</TableHead>
+                  <TableHead className="min-w-[150px]">Customer Name</TableHead>
+                  <TableHead className="min-w-[150px]">PIC Customer</TableHead>
+                  <TableHead className="min-w-[130px]">Status</TableHead>
+                  <TableHead className="min-w-[150px]">Quotation Ref</TableHead>
+
+                  {/* Bagian Production & Logistik */}
+                  <TableHead className="min-w-[140px] bg-blue-50/50">
+                    Production Data
                   </TableHead>
-                  <TableHead className="text-center w-37.5">Actions</TableHead>
+                  <TableHead className="min-w-[130px] bg-blue-50/50">
+                    Packaging Date
+                  </TableHead>
+                  <TableHead className="min-w-[130px] bg-green-50/50">
+                    Shipping Date
+                  </TableHead>
+                  <TableHead className="min-w-[140px] bg-green-50/50">
+                    Send to Cust
+                  </TableHead>
+                  <TableHead className="min-w-[140px] bg-green-50/50">
+                    Arrival in Cust
+                  </TableHead>
+
+                  {/* Bagian Follow up */}
+                  <TableHead className="min-w-[140px] bg-orange-50/50">
+                    Last Follow Up
+                  </TableHead>
+                  <TableHead className="min-w-[200px] bg-orange-50/50">
+                    Follow Up Remark
+                  </TableHead>
+
+                  {/* Bagian Detail Lainnya */}
+                  <TableHead className="min-w-[200px]">
+                    Shipping Address
+                  </TableHead>
+                  <TableHead className="min-w-[120px]">Created By</TableHead>
+                  <TableHead className="min-w-[140px]">Create Time</TableHead>
+                  <TableHead className="min-w-[120px]">Updated By</TableHead>
+                  <TableHead className="min-w-[140px]">Updated Time</TableHead>
+
+                  <TableHead className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] min-w-[100px]">
+                    Actions
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell>
-                        <Skeleton className="h-5 w-24" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-5 w-20" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-5 w-32" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-5 w-24" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-5 w-8 mx-auto" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-5 w-24 ml-auto" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-8 w-20 mx-auto" />
+                      {Array.from({ length: 18 }).map((_, col) => (
+                        <TableCell key={col}>
+                          <Skeleton className="h-5 w-full" />
+                        </TableCell>
+                      ))}
+                      <TableCell className="sticky right-0 bg-white">
+                        <Skeleton className="h-8 w-16 mx-auto" />
                       </TableCell>
                     </TableRow>
                   ))
                 ) : orders.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={19}
                       className="h-24 text-center text-muted-foreground">
                       No sample orders found.
                     </TableCell>
@@ -316,32 +360,104 @@ export default function TableOrderSample() {
                 ) : (
                   orders.map((order) => (
                     <TableRow key={order.id} className="hover:bg-muted/5">
-                      <TableCell className="font-mono font-medium text-purple-600">
-                        {order.poNumber}
-                      </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                        <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
                           <CalendarIcon className="h-3.5 w-3.5" />
-                          {format(new Date(order.dateOrder), "dd MMM yyyy", {
+                          {format(new Date(order.orderDate), "dd MMM yy", {
                             locale: idLocale,
                           })}
                         </div>
                       </TableCell>
+                      <TableCell className="font-mono font-medium text-purple-600">
+                        {order.sampleNumber}
+                      </TableCell>
                       <TableCell className="font-medium text-gray-700">
-                        {order.clientName}
+                        {order.customerName}
                       </TableCell>
                       <TableCell className="text-sm text-gray-600">
-                        {order.salesName}
+                        {order.picCustomer}
                       </TableCell>
-                      <TableCell className="text-center font-medium">
-                        <Badge variant="outline" className="text-xs">
-                          {order.totalItems} Items
+                      <TableCell>
+                        <Badge
+                          className={cn(
+                            "text-[10px] uppercase tracking-wider",
+                            getStatusColor(order.status),
+                          )}
+                          variant="outline">
+                          {order.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-gray-900">
-                        {formatCurrency(order.totalAmount)}
+                      <TableCell className="text-sm font-mono text-gray-500">
+                        {order.quotationReference}
                       </TableCell>
-                      <TableCell className="text-center">
+
+                      <TableCell className="text-sm font-medium text-blue-700 bg-blue-50/30">
+                        {order.productionData || "-"}
+                      </TableCell>
+                      <TableCell className="text-sm text-blue-600 bg-blue-50/30">
+                        {order.packagingDate
+                          ? format(
+                              new Date(order.packagingDate),
+                              "dd MMM yy HH:mm",
+                            )
+                          : "-"}
+                      </TableCell>
+
+                      <TableCell className="text-sm text-green-700 bg-green-50/30">
+                        {order.shippingDate
+                          ? format(
+                              new Date(order.shippingDate),
+                              "dd MMM yy HH:mm",
+                            )
+                          : "-"}
+                      </TableCell>
+                      <TableCell className="text-sm text-green-700 bg-green-50/30">
+                        {order.sendToCustDate
+                          ? format(new Date(order.sendToCustDate), "dd MMM yy")
+                          : "-"}
+                      </TableCell>
+                      <TableCell className="text-sm text-green-700 bg-green-50/30">
+                        {order.arrivalInCustDate
+                          ? format(
+                              new Date(order.arrivalInCustDate),
+                              "dd MMM yy",
+                            )
+                          : "-"}
+                      </TableCell>
+
+                      <TableCell className="text-sm font-medium text-orange-600 bg-orange-50/30">
+                        {order.lastFollowUpDate
+                          ? format(
+                              new Date(order.lastFollowUpDate),
+                              "dd MMM yy",
+                            )
+                          : "Belum di-follow up"}
+                      </TableCell>
+                      <TableCell
+                        className="text-sm text-orange-600 bg-orange-50/30 max-w-[200px] truncate"
+                        title={order.lastFollowUpRemark}>
+                        {order.lastFollowUpRemark}
+                      </TableCell>
+
+                      <TableCell
+                        className="text-sm text-gray-600 max-w-[200px] truncate"
+                        title={order.shippingAddress}>
+                        {order.shippingAddress}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {order.createdBy}
+                      </TableCell>
+                      <TableCell className="text-xs text-gray-400">
+                        {format(new Date(order.createdTime), "dd/MM/yy HH:mm")}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {order.updatedBy}
+                      </TableCell>
+                      <TableCell className="text-xs text-gray-400">
+                        {format(new Date(order.updatedTime), "dd/MM/yy HH:mm")}
+                      </TableCell>
+
+                      <TableCell className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)]">
                         <div className="flex items-center justify-center gap-2">
                           <Link href={`/super-admin/orders/detail/${order.id}`}>
                             <Button
@@ -369,7 +485,6 @@ export default function TableOrderSample() {
           </div>
         </CardContent>
       </Card>
-
       {/* Pagination Footer */}
       {meta && (
         <div className="flex items-center justify-between px-2">

@@ -53,42 +53,17 @@ import { toast } from "sonner";
 import { useApi } from "@/hooks/useApi";
 import { OrderFormValues, orderSchema } from "../order-schema";
 import { generatePoNumber, postOrder } from "../order-service";
+import {
+  Client,
+  Currency,
+  Product,
+  PurchaseChannel,
+  QuotationRef,
+  Sales,
+  SampleOrderRef,
+  Vendor,
+} from "../types/order.types";
 import { SampleFollowUpSection, SampleStepItem } from "./sampleFollowUpSection";
-
-type PIC = { id: string; name: string; position?: string };
-type PurchaseChannel = { id: string; name: string };
-type Currency = { code: string; symbol: string; name: string };
-type QuotationRef = {
-  id: string;
-  quotationNumber: string;
-  totalAmount: number;
-};
-type SampleOrderRef = { id: string; orderNumber: string; dateOrder: string };
-
-type Client = {
-  id: string;
-  name: string;
-  phone: string;
-  address: string;
-  custCode?: string;
-  type?: "B2B" | "B2C";
-  pics?: PIC[];
-  purchaseChannelId?: string;
-};
-
-type Sales = { id: string; name: string; phone: string };
-type Vendor = { id: string; companyName: string };
-
-type ProductVariant = { id: string; variantName: string; price: number };
-type PriceTier = { minQuantity: number; price: number };
-type Product = {
-  id: string;
-  name: string;
-  basePrice: number;
-  isCustom: boolean;
-  productVariants: ProductVariant[];
-  priceTiers: PriceTier[];
-};
 
 export default function AddOrderForm() {
   const { fetchApi, status } = useApi();
@@ -142,10 +117,8 @@ export default function AddOrderForm() {
   );
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [quotationRefs, setQuotationRefs] = useState<QuotationRef[]>([]);
-  console.log("ini adalah quotation ref", quotationRefs);
 
   const [sampleOrderRefs, setSampleOrderRefs] = useState<SampleOrderRef[]>([]);
-  console.log("ini adalah sample order ref", sampleOrderRefs);
 
   const [loading, setLoading] = useState(false);
   const [generatingPo, setGeneratingPo] = useState(false);
@@ -197,7 +170,6 @@ export default function AddOrderForm() {
         const jsonQ = resQ.ok ? await resQ.json() : null;
         const jsonSamp = resSamp.ok ? await resSamp.json() : null;
 
-        // ✨ PERBAIKAN: Ambil properti .data sesuai format console log kamu
         const curData = jsonCur?.data || jsonCur || [];
         const qData = jsonQ?.data || jsonQ || [];
         const sampData = jsonSamp?.data || jsonSamp || [];
@@ -213,7 +185,7 @@ export default function AddOrderForm() {
             ? curData
             : [{ code: "IDR", symbol: "Rp", name: "Rupiah" }],
         );
-        setQuotationRefs(qData); // 🟢 Sekarang qData isinya murni Array [ {id, quotationNumber} ]
+        setQuotationRefs(qData);
         setSampleOrderRefs(sampData);
       } catch (error) {
         console.error(error);
@@ -288,7 +260,6 @@ export default function AddOrderForm() {
       setLoading(true);
       const { phone, ...payload } = data;
 
-      // Bersihkan string kosong pada ID referensi opsional agar tidak memicu error UUID prisma
       if (!payload.referenceQuotationId) delete payload.referenceQuotationId;
       if (!payload.referenceSampleId) delete payload.referenceSampleId;
 
@@ -321,6 +292,7 @@ export default function AddOrderForm() {
       </CardHeader>
       <CardContent>
         <Form {...form}>
+          Ff
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
             {/* === SECTION 1: ORDER DETAILS === */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 border rounded-lg bg-gray-50/50">

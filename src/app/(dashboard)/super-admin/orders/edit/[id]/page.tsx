@@ -38,77 +38,57 @@ import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowLeft,
+  Bookmark,
   Check,
   ChevronsUpDown,
+  DollarSign,
+  FileText,
   Loader2,
   PlusCircle,
-  RefreshCcw,
+  Settings2,
   Trash2,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useEffect, useRef, useState } from "react";
+import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import {
   SampleFollowUpSection,
   SampleStepItem,
 } from "../../components/sampleFollowUpSection";
 import { OrderFormValues, orderSchema } from "../../order-schema";
-import { generatePoNumber, updateOrder } from "../../order-service";
-
-// === TYPES ===
-type PIC = {
-  id: string;
-  name: string;
-  position?: string;
-  phone?: string;
-};
-
-type PurchaseChannel = {
-  id: string;
-  name: string;
-};
-
-type Client = {
-  id: string;
-  name: string;
-  phone: string;
-  address: string;
-  custCode?: string;
-  type?: "B2B" | "B2C";
-  pics?: PIC[];
-  purchaseChannelId?: string;
-};
-
-type Sales = { id: string; name: string; phone: string };
-type Vendor = { id: string; companyName: string };
-type ProductVariant = { id: string; variantName: string; price: number };
-type PriceTier = { minQuantity: number; price: number };
-type Product = {
-  id: string;
-  name: string;
-  basePrice: number;
-  isCustom: boolean;
-  productVariants: ProductVariant[];
-  priceTiers: PriceTier[];
-};
+import { updateOrder } from "../../order-service";
+import {
+  Client,
+  Currency,
+  Product,
+  PurchaseChannel,
+  QuotationRef,
+  Sales,
+  SampleOrderRef,
+  Vendor,
+} from "../../types/order.types";
 
 export default function EditOrderForm() {
   const { fetchApi, status } = useApi();
-
   const params = useParams();
   const router = useRouter();
   const orderId = params.id as string;
 
   const form = useForm<OrderFormValues>({
-    resolver: zodResolver(orderSchema),
+    resolver: zodResolver(orderSchema) as Resolver<OrderFormValues>,
     defaultValues: {
       dateOrder: "",
       salesCategory: "SALES",
       poNumber: "",
+      clientPoNumber: "",
+      remark: "",
+      currencyCode: "IDR",
+      referenceQuotationId: "",
+      referenceSampleId: "",
       clientId: "",
-      clientB2BPICId: "", // Default value
-      purchaseChannelId: "", // Default value
+      clientB2BPICId: "",
+      purchaseChannelId: "",
       phone: "",
       shippingAddress: "",
       salesId: "",
@@ -117,73 +97,82 @@ export default function EditOrderForm() {
     },
   });
 
-  const { control, handleSubmit, watch, setValue, reset, getValues } = form;
+  const { control, handleSubmit, watch, setValue, reset } = form;
   const { fields, append, remove } = useFieldArray({
     control,
     name: "products",
   });
 
-  // === STATE ===
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Master data
   const [clients, setClients] = useState<Client[]>([]);
+  console.log("ini adalah console log", clients);
   const [sales, setSales] = useState<Sales[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  console.log("ini adalah console log", products);
+
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
     [],
-  ); // State untuk channel
-
-  const [loading, setLoading] = useState(true);
-  const [generatingPo, setGeneratingPo] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [clientOpen, setClientOpen] = useState(false);
+  );
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [quotationRefs, setQuotationRefs] = useState<QuotationRef[]>([]);
+  const [sampleOrderRefs, setSampleOrderRefs] = useState<SampleOrderRef[]>([]);
   const [sampleSteps, setSampleSteps] = useState<SampleStepItem[]>([]);
   const [initialFollowUps, setInitialFollowUps] = useState<any[]>([]);
 
-  const selectedClientId = watch("clientId");
-  const salesCategory = watch("salesCategory");
+  // Popover open states
+  const [clientOpen, setClientOpen] = useState(false);
+  const [vendorOpen, setVendorOpen] = useState(false);
+  const [vendorSearch, setVendorSearch] = useState("");
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [sampleOpen, setSampleOpen] = useState(false);
 
-  // === LOAD DATA ===
+  // Watchers
+  const salesCategory = watch("salesCategory");
+  const selectedClientId = watch("clientId");
+  const selectedCurrencyCode = watch("currencyCode");
+  const poNumber = watch("poNumber");
+  const selectedPicId = watch("clientB2BPICId");
+
+  const currentCurrencySymbol =
+    currencies.find((c) => c.code === selectedCurrencyCode)?.symbol || "Rp";
+
+  const selectedClientData = clients.find((c) => c.id === selectedClientId);
+  const isB2B = selectedClientData?.type === "B2B";
+  const availablePics = selectedClientData?.pics || [];
+
+  // Load semua data termasuk order yang akan diedit
   useEffect(() => {
     async function loadData() {
-      // 🛑 Guard: Tunggu hingga status 'authenticated' dan pastikan orderId ada
       if (status !== "authenticated" || !orderId) return;
-
       try {
         setLoading(true);
+        const [resC, resS, resV, resP, resPC, resCur, resQ, resSamp, resOrder] =
+          await Promise.all([
+            fetchApi("/clients/order"),
+            fetchApi("/sales/order"),
+            fetchApi("/vendors/order/add"),
+            fetchApi("/products/order"),
+            fetchApi("/purchase-channels/list"),
+            fetchApi("/currencies"),
+            fetchApi("/quotations/list-references"),
+            fetchApi("/orders/list-samples"),
+            fetchApi(`/orders/${orderId}/edit-data`),
+          ]);
 
-        // ✨ Gunakan fetchApi secara paralel
-        const [resC, resS, resV, resP, resPC, resOrder] = await Promise.all([
-          fetchApi("/clients/order"),
-          fetchApi("/sales/order"),
-          fetchApi("/vendors/order/add"),
-          fetchApi("/products/order"),
-          fetchApi("/purchase-channels/list"),
-          fetchApi(`/orders/${orderId}`), // Menggantikan fetchOrderById
-        ]);
-
-        // Validasi response
-        if (
-          !resC.ok ||
-          !resS.ok ||
-          !resV.ok ||
-          !resP.ok ||
-          !resPC.ok ||
-          !resOrder.ok
-        ) {
-          throw new Error("Gagal mengambil data master atau data order");
-        }
-
-        // Parsing JSON secara paralel
-        const [c, s, v, p, pc, orderResult] = await Promise.all([
-          resC.json(),
-          resS.json(),
-          resV.json(),
-          resP.json(),
-          resPC.json(),
-          resOrder.json(),
-        ]);
-
-        const orderData = orderResult; // Sesuaikan jika data order dibungkus result.data
+        const c = await resC.json();
+        const s = await resS.json();
+        const v = await resV.json();
+        const p = await resP.json();
+        const pc = await resPC.json();
+        const jsonCur = resCur.ok ? await resCur.json() : null;
+        const jsonQ = resQ.ok ? await resQ.json() : null;
+        const jsonSamp = resSamp.ok ? await resSamp.json() : null;
+        const orderData = await resOrder.json();
+        console.log("Ini adalah data order data", orderData);
 
         setClients(c);
         setSales(s);
@@ -191,96 +180,118 @@ export default function EditOrderForm() {
         setProducts(p);
         setPurchaseChannels(pc);
 
-        // Populate Form
-        if (orderData) {
-          const currentClient = c.find(
-            (cli: Client) => cli.id === orderData.clientId,
-          );
+        const curData = jsonCur?.data || jsonCur || [];
+        const qData = jsonQ?.data || jsonQ || [];
+        const sampData = jsonSamp?.data || jsonSamp || [];
 
-          reset({
-            ...orderData,
-            clientB2BPICId: orderData.clientB2BPICId || "",
-            purchaseChannelId: orderData.purchaseChannelId || "",
-            phone: currentClient?.phone || "",
-          });
+        setCurrencies(
+          curData.length
+            ? curData
+            : [{ code: "IDR", symbol: "Rp", name: "Rupiah" }],
+        );
+        setQuotationRefs(qData);
+        setSampleOrderRefs(sampData);
 
-          if (orderData.clientB2BPICId && currentClient?.type === "B2B") {
-            const selectedPic = currentClient.pics?.find(
-              (p: PIC) => p.id === orderData.clientB2BPICId,
-            );
-            if (selectedPic?.phone) {
-              setValue("phone", selectedPic.phone);
-            }
-          }
-
-          if (
-            orderData.sampleFollowUps &&
-            orderData.sampleFollowUps.length > 0
-          ) {
-            setInitialFollowUps(orderData.sampleFollowUps);
-          }
+        if (orderData.sampleFollowUps) {
+          setInitialFollowUps(orderData.sampleFollowUps);
         }
-      } catch (error) {
-        console.error("Error loading data:", error);
-        toast.error("Failed to load order data");
+
+        const selectedClient = c.find(
+          (cl: any) => cl.id === orderData.clientId,
+        );
+        const selectedPic = selectedClient?.pics?.find(
+          (pic: any) => pic.id === orderData.clientB2BPICId,
+        );
+        const phoneValue = selectedPic?.phone || selectedClient?.phone || "";
+
+        initialClientId.current = orderData.clientId;
+        initialPicId.current = orderData.clientB2BPICId || "";
+
+        reset({
+          dateOrder: orderData.dateOrder,
+          salesCategory: orderData.salesCategory,
+          poNumber: orderData.poNumber,
+          clientPoNumber: orderData.clientPoNumber || "",
+          remark: orderData.remark || "",
+          currencyCode: orderData.currencyCode || "IDR",
+          referenceQuotationId: orderData.referenceQuotationId || "",
+          referenceSampleId: orderData.referenceSampleId || "",
+          clientId: orderData.clientId,
+          clientB2BPICId: orderData.clientB2BPICId || "",
+          purchaseChannelId: orderData.purchaseChannelId || "",
+          phone: phoneValue,
+          shippingAddress: orderData.shippingAddress || "",
+          salesId: orderData.salesId || "",
+          vendorIds: orderData.vendorIds || [],
+          products: orderData.products.map((item: any) => ({
+            productId: item.productId,
+            variantId: item.variantId || "",
+            quantity: item.quantity,
+            price: item.price,
+            customization: item.customization || "",
+            remarks: item.remarks || "",
+          })),
+        });
+      } catch (e) {
+        toast.error("Gagal memuat data order");
       } finally {
         setLoading(false);
       }
     }
-
     loadData();
-  }, [orderId, reset, setValue, status, fetchApi]); // Tambahkan dependensi lengkap
+  }, [orderId, status, fetchApi, reset]);
 
-  // === LOGIC CLIENT & PIC ===
-  const selectedClientData = clients.find((c) => c.id === selectedClientId);
-  const isB2B = selectedClientData?.type === "B2B";
-  const availablePics = selectedClientData?.pics || [];
-  const selectedPicId = watch("clientB2BPICId");
+  const initialClientId = useRef<string | undefined>("");
+  const initialPicId = useRef<string | undefined>("");
+
   useEffect(() => {
-    if (!loading && isB2B && selectedPicId) {
-      const pic = availablePics.find((p) => p.id === selectedPicId);
-      if (pic && (pic as any).phone) {
-        setValue("phone", (pic as any).phone);
-      }
-    }
-  }, [selectedPicId, isB2B, availablePics, setValue, loading]);
+    if (!selectedClientData) return;
+    if (selectedClientId === initialClientId.current) return; // skip initial load
 
-  // Handler: Generate PO Number
-  const handleGeneratePO = async () => {
-    try {
-      setGeneratingPo(true);
-      const newPo = await generatePoNumber(fetchApi);
-      setValue("poNumber", newPo);
-      toast.success("PO Number generated");
-    } catch (e) {
-      toast.error("Failed to generate PO Number");
-    } finally {
-      setGeneratingPo(false);
-    }
-  };
+    setValue("shippingAddress", selectedClientData.address);
 
+    if (selectedClientData.type === "B2C") {
+      setValue("phone", selectedClientData.phone);
+    } else {
+      setValue("phone", "");
+      setValue("clientB2BPICId", "");
+    }
+
+    if (selectedClientData.purchaseChannelId) {
+      setValue("purchaseChannelId", selectedClientData.purchaseChannelId);
+    } else {
+      setValue("purchaseChannelId", "");
+    }
+  }, [selectedClientId, selectedClientData, setValue]);
+
+  // Sync phone dari PIC B2B — sama dengan AddOrderForm
+  useEffect(() => {
+    if (!isB2B || !selectedPicId) return;
+    if (selectedPicId === initialPicId.current) return; // skip initial load
+
+    const pic = availablePics.find((p) => p.id === selectedPicId);
+    if (pic && (pic as any).phone) {
+      setValue("phone", (pic as any).phone);
+    }
+  }, [selectedPicId, isB2B, availablePics, setValue]);
   const onSubmit = async (data: OrderFormValues) => {
     try {
       setSubmitting(true);
       const { phone, ...payload } = data;
-      if (!payload.clientB2BPICId) delete payload.clientB2BPICId;
-      if (!payload.purchaseChannelId) delete payload.purchaseChannelId;
-      if (payload.salesCategory === "SAMPLE") {
-        (payload as any).sampleFollowUps = sampleSteps
-          .filter((s) => s.enabled && s.date)
-          .map((s) => ({
-            name: s.name,
-            date: s.date,
-            method: s.method || undefined,
-            notes: s.notes || undefined,
-            nextAction: s.nextAction || undefined,
-          }));
-      }
-      await updateOrder(fetchApi, orderId, payload);
-      toast.success("Order updated successfully");
+      const finalPayload = {
+        ...payload,
+        sampleFollowUps:
+          salesCategory === "SAMPLE"
+            ? sampleSteps
+                .filter((s) => s.enabled)
+                .map((s) => ({ name: s.name, date: s.date, notes: s.notes }))
+            : [],
+      };
+      await updateOrder(fetchApi, orderId, finalPayload);
+      toast.success("Order berhasil diupdate!");
       router.push("/super-admin/orders");
     } catch {
-      toast.error("Failed to update order");
+      toast.error("Gagal mengupdate order");
     } finally {
       setSubmitting(false);
     }
@@ -302,18 +313,18 @@ export default function EditOrderForm() {
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <CardTitle className="text-2xl font-semibold">
-          Edit Order #{getValues("poNumber")}
+          Edit Order #{poNumber}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
             {/* === SECTION 1: ORDER DETAILS === */}
-            <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
-              <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 border rounded-lg bg-gray-50/50">
+              <h3 className="col-span-full font-medium text-lg text-gray-700">
                 Order Details
               </h3>
-              {/* ... (Date, SalesCategory, PONumber SAMA SEPERTI SEBELUMNYA) ... */}
+
               <FormField
                 control={control}
                 name="dateOrder"
@@ -321,12 +332,13 @@ export default function EditOrderForm() {
                   <FormItem>
                     <FormLabel>Date Order</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" className="h-10" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={control}
                 name="salesCategory"
@@ -334,8 +346,8 @@ export default function EditOrderForm() {
                   <FormItem>
                     <FormLabel>Sales Category</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
+                      <FormControl className="w-full">
+                        <SelectTrigger className="h-10">
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                       </FormControl>
@@ -348,50 +360,244 @@ export default function EditOrderForm() {
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={control}
+                name="currencyCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4 text-stone-500" /> Currency
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl className="w-full">
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Select Currency" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {currencies.map((cur) => (
+                          <SelectItem key={cur.code} value={cur.code}>
+                            {cur.code} ({cur.symbol}) - {cur.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* PO Number — read only di edit, tidak ada tombol Gen */}
+              <FormField
+                control={control}
+                name="poNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Internal PO Number</FormLabel>
+                    <FormControl>
+                      <Input className="h-10 bg-gray-100" readOnly {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="clientPoNumber"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Client PO Number (Optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter client PO reference number"
+                        className="h-10"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {salesCategory === "SAMPLE" && (
-                <div className="md:col-span-2">
+                <div className="col-span-full">
                   <SampleFollowUpSection
                     onChange={setSampleSteps}
                     initialData={initialFollowUps}
                   />
                 </div>
               )}
+            </div>
+
+            {/* === SECTION 2: DOCUMENT REFERENCES === */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
+              <h3 className="col-span-full font-medium text-lg text-gray-700">
+                Document References
+              </h3>
 
               <FormField
                 control={control}
-                name="poNumber"
+                name="referenceQuotationId"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>PO Number</FormLabel>
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <Input placeholder="Enter PO number" {...field} />
-                      </FormControl>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleGeneratePO}
-                        disabled={generatingPo}>
-                        {generatingPo ? (
-                          <RefreshCcw className="w-4 h-4 animate-spin" />
-                        ) : (
-                          "Generate"
-                        )}
-                      </Button>
-                    </div>
+                  <FormItem className="flex flex-col">
+                    <FormLabel className="flex items-center gap-1.5 mb-1.5">
+                      <FileText className="w-4 h-4 text-stone-500" /> Quotation
+                      No. Reference (Optional)
+                    </FormLabel>
+                    <Popover open={quoteOpen} onOpenChange={setQuoteOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between h-10 text-left font-normal",
+                              !field.value && "text-muted-foreground",
+                            )}>
+                            {field.value
+                              ? quotationRefs.find((q) => q.id === field.value)
+                                  ?.quotationNumber
+                              : "Pilih nomor penawaran / quotation..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Cari nomor quotation..." />
+                          <CommandList>
+                            <CommandEmpty>
+                              Quotation tidak ditemukan.
+                            </CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                value="none"
+                                onSelect={() => {
+                                  setValue("referenceQuotationId", "");
+                                  setQuoteOpen(false);
+                                }}
+                                className="italic text-muted-foreground">
+                                -- Tanpa Referensi Quotation --
+                              </CommandItem>
+                              {quotationRefs.map((q) => (
+                                <CommandItem
+                                  key={q.id}
+                                  value={`${q.quotationNumber}-${q.id}`}
+                                  onSelect={() => {
+                                    setValue("referenceQuotationId", q.id);
+                                    setQuoteOpen(false);
+                                  }}>
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      q.id === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0",
+                                    )}
+                                  />
+                                  {q.quotationNumber}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="referenceSampleId"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel className="flex items-center gap-1.5 mb-1.5">
+                      <Bookmark className="w-4 h-4 text-stone-500" /> Sample No.
+                      Reference (Optional)
+                    </FormLabel>
+                    <Popover open={sampleOpen} onOpenChange={setSampleOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            disabled={salesCategory === "SAMPLE"}
+                            className={cn(
+                              "w-full justify-between h-10 text-left font-normal",
+                              !field.value && "text-muted-foreground",
+                            )}>
+                            {field.value
+                              ? sampleOrderRefs.find(
+                                  (s) => s.id === field.value,
+                                )?.orderNumber
+                              : salesCategory === "SAMPLE"
+                                ? "Kategori berupa sample baru"
+                                : "Pilih nomor produksi sample terdahulu..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Cari nomor produksi sample..." />
+                          <CommandList>
+                            <CommandEmpty>
+                              Data sample tidak ditemukan.
+                            </CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                value="none"
+                                onSelect={() => {
+                                  setValue("referenceSampleId", "");
+                                  setSampleOpen(false);
+                                }}
+                                className="italic text-muted-foreground">
+                                -- Tanpa Referensi Sample --
+                              </CommandItem>
+                              {sampleOrderRefs.map((s) => (
+                                <CommandItem
+                                  key={s.id}
+                                  value={`${s.orderNumber}-${s.id}`}
+                                  onSelect={() => {
+                                    setValue("referenceSampleId", s.id);
+                                    setSampleOpen(false);
+                                  }}>
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      s.id === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0",
+                                    )}
+                                  />
+                                  {s.orderNumber}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormDescription>
+                      Hanya dapat diaktifkan jika Sales Category diatur ke
+                      "Sales".
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
-            {/* === SECTION 2: CUSTOMER & LOGISTICS (UPDATED) === */}
+            {/* === SECTION 3: CUSTOMER & LOGISTICS === */}
             <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
               <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
                 Customer & Logistics
               </h3>
 
-              {/* CLIENT SELECT */}
               <FormField
                 control={control}
                 name="clientId"
@@ -405,19 +611,17 @@ export default function EditOrderForm() {
                             variant="outline"
                             role="combobox"
                             className={cn(
-                              "w-full justify-between",
+                              "w-full justify-between h-10",
                               !field.value && "text-muted-foreground",
                             )}>
                             {field.value
-                              ? clients.find(
-                                  (client) => client.id === field.value,
-                                )?.name
+                              ? clients.find((c) => c.id === field.value)?.name
                               : "Select client..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-75 p-0">
+                      <PopoverContent className="w-full p-0">
                         <Command>
                           <CommandInput placeholder="Search client name..." />
                           <CommandList>
@@ -425,23 +629,12 @@ export default function EditOrderForm() {
                             <CommandGroup>
                               {clients.map((client) => (
                                 <CommandItem
-                                  value={`${client.name}-${client.id}`} // Unique
+                                  value={`${client.name}-${client.id}`}
                                   key={client.id}
                                   onSelect={() => {
                                     form.setValue("clientId", client.id);
-                                    // Reset Logic saat Ganti Client (Manual Change)
-                                    form.setValue("clientB2BPICId", "");
-
-                                    // Auto Select Channel
-                                    if (client.purchaseChannelId) {
-                                      form.setValue(
-                                        "purchaseChannelId",
-                                        client.purchaseChannelId,
-                                      );
-                                    } else {
-                                      form.setValue("purchaseChannelId", "");
-                                    }
-
+                                    if (client.type === "B2B")
+                                      form.setValue("clientB2BPICId", "");
                                     setClientOpen(false);
                                   }}>
                                   <Check
@@ -465,19 +658,18 @@ export default function EditOrderForm() {
                 )}
               />
 
-              {/* PIC SELECT (HANYA MUNCUL JIKA B2B) */}
               {isB2B && (
                 <FormField
                   control={control}
                   name="clientB2BPICId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Select PIC</FormLabel>
+                      <FormLabel>Select PIC (Person In Charge)</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value || ""}>
+                        value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="h-10">
                             <SelectValue placeholder="Select PIC from company" />
                           </SelectTrigger>
                         </FormControl>
@@ -490,21 +682,17 @@ export default function EditOrderForm() {
                             ))
                           ) : (
                             <div className="p-2 text-sm text-muted-foreground text-center">
-                              No PIC available
+                              No PIC data available.
                             </div>
                           )}
                         </SelectContent>
                       </Select>
-                      <FormDescription>
-                        Who is responsible for this invoice?
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               )}
 
-              {/* PHONE */}
               <FormField
                 control={control}
                 name="phone"
@@ -512,24 +700,26 @@ export default function EditOrderForm() {
                   <FormItem>
                     <FormLabel>Phone Number</FormLabel>
                     <FormControl>
-                      <Input {...field} readOnly className="bg-gray-100" />
+                      <Input
+                        {...field}
+                        readOnly
+                        className="bg-gray-100 h-10"
+                        placeholder="Auto-filled from client"
+                      />
                     </FormControl>
                   </FormItem>
                 )}
               />
 
-              {/* PURCHASE CHANNEL (ADDED) */}
               <FormField
                 control={control}
                 name="purchaseChannelId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Purchase Channel</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value || ""}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-10">
                           <SelectValue placeholder="Select channel" />
                         </SelectTrigger>
                       </FormControl>
@@ -541,13 +731,11 @@ export default function EditOrderForm() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormDescription>Source of this order.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* SHIPPING ADDRESS */}
               <FormField
                 control={control}
                 name="shippingAddress"
@@ -555,7 +743,11 @@ export default function EditOrderForm() {
                   <FormItem className="md:col-span-2">
                     <FormLabel>Shipping Address</FormLabel>
                     <FormControl>
-                      <Textarea {...field} rows={3} />
+                      <Textarea
+                        placeholder="Shipping address"
+                        {...field}
+                        rows={3}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -563,13 +755,12 @@ export default function EditOrderForm() {
               />
             </div>
 
-            {/* === SECTION 3: SALES & VENDOR === */}
-            {/* ... Bagian ini sama seperti sebelumnya, biarkan vendorIds apa adanya ... */}
+            {/* === SECTION 4: SALES, VENDOR, & REMARK === */}
             <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
               <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
                 Internal & Vendor
               </h3>
-              {/* SalesId Field ... */}
+
               <FormField
                 control={control}
                 name="salesId"
@@ -578,7 +769,7 @@ export default function EditOrderForm() {
                     <FormLabel>PIC Sales</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-10">
                           <SelectValue placeholder="Select sales person" />
                         </SelectTrigger>
                       </FormControl>
@@ -595,64 +786,134 @@ export default function EditOrderForm() {
                 )}
               />
 
-              {/* VendorIds Field */}
               <FormField
                 control={control}
                 name="vendorIds"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Vendors (Multiple)</FormLabel>
-                    <Select
-                      onValueChange={(val) => {
-                        const current = field.value || [];
-                        if (!current.includes(val)) {
-                          field.onChange([...current, val]);
-                        }
-                      }}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Add a vendor..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {vendors.map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {v.companyName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {field.value?.map((id) => {
-                        const vendor = vendors.find((v) => v.id === id);
-                        if (!vendor) return null;
-                        return (
-                          <div
-                            key={id}
-                            className="flex items-center gap-2 bg-white border px-3 py-1 rounded-full text-sm shadow-sm">
-                            <span>{vendor.companyName}</span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                field.onChange(
-                                  field.value.filter((vId) => vId !== id),
+                    <Popover open={vendorOpen} onOpenChange={setVendorOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="w-full justify-between font-normal h-10">
+                            <span className="text-muted-foreground">
+                              {field.value?.length > 0
+                                ? `${field.value.length} vendor dipilih`
+                                : "Cari & tambah vendor..."}
+                            </span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput
+                            placeholder="Cari nama vendor..."
+                            value={vendorSearch}
+                            onValueChange={setVendorSearch}
+                          />
+                          <CommandList>
+                            <CommandEmpty>Vendor tidak ditemukan.</CommandEmpty>
+                            <CommandGroup>
+                              {vendors
+                                .filter((v) =>
+                                  v.companyName
+                                    .toLowerCase()
+                                    .includes(vendorSearch.toLowerCase()),
                                 )
-                              }
-                              className="text-red-500 hover:text-red-700 rounded-full p-0.5">
-                              <XIcon className="w-3 h-3" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
+                                .map((v) => {
+                                  const isSelected = field.value?.includes(
+                                    v.id,
+                                  );
+                                  return (
+                                    <CommandItem
+                                      key={v.id}
+                                      value={`${v.companyName}-${v.id}`}
+                                      onSelect={() => {
+                                        const current = field.value || [];
+                                        field.onChange(
+                                          isSelected
+                                            ? current.filter(
+                                                (id) => id !== v.id,
+                                              )
+                                            : [...current, v.id],
+                                        );
+                                      }}>
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          isSelected
+                                            ? "opacity-100"
+                                            : "opacity-0",
+                                        )}
+                                      />
+                                      {v.companyName}
+                                    </CommandItem>
+                                  );
+                                })}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+
+                    {field.value?.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {field.value.map((id) => {
+                          const vendor = vendors.find((v) => v.id === id);
+                          if (!vendor) return null;
+                          return (
+                            <div
+                              key={id}
+                              className="flex items-center gap-1.5 bg-white border px-2.5 py-1 rounded-full text-sm shadow-sm">
+                              <span className="text-slate-700">
+                                {vendor.companyName}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  field.onChange(
+                                    field.value.filter((vId) => vId !== id),
+                                  )
+                                }
+                                className="text-slate-400 hover:text-red-500 rounded-full">
+                                <XIcon className="w-3 h-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="remark"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>
+                      Order Remark / Catatan Internal (Optional)
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Ketik keterangan atau informasi penting pelengkap order disini..."
+                        {...field}
+                        rows={2}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
-            {/* === SECTION 4: PRODUCTS === */}
-            {/* ... Bagian Product sama persis dengan Create, copy paste saja ... */}
+            {/* === SECTION 5: PRODUCTS === */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold text-xl text-gray-800">
@@ -677,7 +938,6 @@ export default function EditOrderForm() {
                 </Button>
               </div>
 
-              {/* Product List Header */}
               {fields.length > 0 && (
                 <div className="hidden md:grid md:grid-cols-12 gap-4 px-4 py-2 bg-[#975a3e] rounded-t-lg font-medium text-sm text-gray-100">
                   <div className="col-span-4">Product Details</div>
@@ -702,16 +962,19 @@ export default function EditOrderForm() {
                   return (
                     <div
                       key={field.id}
-                      className="border rounded-lg bg-white shadow-sm">
+                      className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
                       <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                        {/* 1. Product & Variant */}
                         <div className="md:col-span-4 space-y-3">
                           <FormField
                             control={control}
                             name={`products.${index}.productId`}
                             render={({ field }) => (
                               <FormItem>
+                                <FormLabel className="md:hidden">
+                                  Product
+                                </FormLabel>
                                 <Select
+                                  value={field.value}
                                   onValueChange={(val) => {
                                     field.onChange(val);
                                     form.setValue(
@@ -721,19 +984,13 @@ export default function EditOrderForm() {
                                     const prod = products.find(
                                       (p) => p.id === val,
                                     );
-                                    if (prod && !prod.isCustom) {
+                                    if (prod) {
                                       form.setValue(
                                         `products.${index}.price`,
-                                        prod.basePrice,
-                                      );
-                                    } else {
-                                      form.setValue(
-                                        `products.${index}.price`,
-                                        0,
+                                        prod.isCustom ? 0 : prod.basePrice,
                                       );
                                     }
-                                  }}
-                                  value={field.value}>
+                                  }}>
                                   <FormControl>
                                     <SelectTrigger className="h-10">
                                       <SelectValue placeholder="Select Product" />
@@ -743,23 +1000,27 @@ export default function EditOrderForm() {
                                     {products.map((p) => (
                                       <SelectItem key={p.id} value={p.id}>
                                         <div className="flex items-center justify-between w-full gap-4 min-w-50">
-                                          <span className="truncate">
+                                          <span className="font-medium truncate text-gray-700">
                                             {p.name}
                                           </span>
                                           {p.isCustom && (
-                                            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-100">
-                                              CUSTOM
-                                            </span>
+                                            <div className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
+                                              <Settings2 className="w-3 h-3" />
+                                              <span className="text-[10px] font-bold tracking-wide">
+                                                CUSTOM
+                                              </span>
+                                            </div>
                                           )}
                                         </div>
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
+                                <FormMessage />
                               </FormItem>
                             )}
                           />
-                          {/* Variant Select */}
+
                           {isCustomProduct && (
                             <FormField
                               control={control}
@@ -767,6 +1028,7 @@ export default function EditOrderForm() {
                               render={({ field }) => (
                                 <FormItem>
                                   <Select
+                                    value={field.value}
                                     onValueChange={(val) => {
                                       field.onChange(val);
                                       const variant =
@@ -778,8 +1040,7 @@ export default function EditOrderForm() {
                                           `products.${index}.price`,
                                           Number(variant.price),
                                         );
-                                    }}
-                                    value={field.value}>
+                                    }}>
                                     <FormControl>
                                       <SelectTrigger className="h-9 text-sm bg-gray-50 border-dashed">
                                         <SelectValue placeholder="Select Variant" />
@@ -795,47 +1056,79 @@ export default function EditOrderForm() {
                                       )}
                                     </SelectContent>
                                   </Select>
+                                  <FormMessage />
                                 </FormItem>
                               )}
                             />
                           )}
                         </div>
 
-                        {/* 2. Quantity */}
                         <div className="md:col-span-2">
                           <FormField
                             control={control}
                             name={`products.${index}.quantity`}
                             render={({ field }) => (
                               <FormItem>
+                                <FormLabel className="md:hidden">
+                                  Quantity
+                                </FormLabel>
                                 <FormControl>
-                                  <Input
-                                    type="number"
-                                    min={1}
-                                    {...field}
-                                    onChange={(e) => {
-                                      const val = parseInt(e.target.value) || 0;
-                                      field.onChange(val);
-                                    }}
-                                    className="text-center"
-                                  />
+                                  <div className="relative">
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      {...field}
+                                      onChange={(e) => {
+                                        const val = e.target.valueAsNumber;
+                                        field.onChange(isNaN(val) ? 0 : val);
+                                        if (
+                                          selectedProduct &&
+                                          !selectedProduct.isCustom &&
+                                          selectedProduct.priceTiers?.length > 0
+                                        ) {
+                                          const tiers = [
+                                            ...selectedProduct.priceTiers,
+                                          ].sort(
+                                            (a, b) =>
+                                              b.minQuantity - a.minQuantity,
+                                          );
+                                          const applicableTier = tiers.find(
+                                            (tier) => val >= tier.minQuantity,
+                                          );
+                                          form.setValue(
+                                            `products.${index}.price`,
+                                            applicableTier
+                                              ? Number(applicableTier.price)
+                                              : selectedProduct.basePrice,
+                                          );
+                                        }
+                                      }}
+                                      className="text-center h-10"
+                                    />
+                                    <span className="absolute right-3 top-2.5 text-xs text-gray-400 pointer-events-none">
+                                      pcs
+                                    </span>
+                                  </div>
                                 </FormControl>
+                                <FormMessage />
                               </FormItem>
                             )}
                           />
                         </div>
 
-                        {/* 3. Unit Price */}
                         <div className="md:col-span-3">
                           <FormField
                             control={control}
                             name={`products.${index}.price`}
                             render={({ field }) => (
                               <FormItem>
+                                <FormLabel className="md:hidden">
+                                  Unit Price
+                                </FormLabel>
                                 <FormControl>
                                   <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-xs text-gray-500">
-                                      Rp
+                                    <span className="absolute left-3 top-2.5 text-xs text-gray-500 font-medium">
+                                      {currentCurrencySymbol}
                                     </span>
                                     <Input
                                       type="number"
@@ -845,7 +1138,7 @@ export default function EditOrderForm() {
                                         const val = e.target.valueAsNumber;
                                         field.onChange(isNaN(val) ? 0 : val);
                                       }}
-                                      className="pl-9 text-right"
+                                      className="pl-9 h-10 text-right font-mono"
                                     />
                                   </div>
                                 </FormControl>
@@ -855,42 +1148,51 @@ export default function EditOrderForm() {
                           />
                         </div>
 
-                        {/* 4. Subtotal */}
-                        <div className="md:col-span-2 flex flex-col justify-center items-end h-10">
-                          <span className="font-semibold text-gray-900">
+                        <div className="md:col-span-2 flex flex-col justify-center items-end h-10 pt-8 md:pt-0">
+                          <span className="md:hidden text-xs text-gray-500 mb-1">
+                            Subtotal
+                          </span>
+                          <span className="font-semibold text-gray-900 font-mono">
+                            {currentCurrencySymbol}{" "}
                             {subtotal.toLocaleString("id-ID", {
-                              style: "currency",
-                              currency: "IDR",
+                              minimumFractionDigits: 0,
                             })}
                           </span>
                         </div>
 
-                        {/* 5. Delete */}
-                        <div className="md:col-span-1 flex justify-center">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => remove(index)}>
-                            <Trash2 className="w-5 h-5 text-gray-400 hover:text-red-600" />
-                          </Button>
+                        <div className="md:col-span-1 flex justify-center pt-8 md:pt-0">
+                          {fields.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => remove(index)}
+                              className="text-gray-400 hover:text-red-600 hover:bg-red-50">
+                              <Trash2 className="w-5 h-5" />
+                            </Button>
+                          )}
                         </div>
                       </div>
 
-                      {/* Remarks & Customization */}
-                      <div className="bg-gray-50/50 p-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-gray-50/50 p-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4 rounded-b-lg">
                         <FormField
                           control={control}
                           name={`products.${index}.customization`}
                           render={({ field }) => (
                             <FormItem>
                               <FormControl>
-                                <Input
-                                  placeholder="Customization details..."
-                                  {...field}
-                                  className="text-sm bg-white"
-                                />
+                                <div className="relative">
+                                  <Input
+                                    placeholder="Add Customization details..."
+                                    {...field}
+                                    className="text-sm border-gray-200 pl-8 bg-white"
+                                  />
+                                  <span className="absolute left-2.5 top-2.5 text-gray-400">
+                                    <Settings2 className="w-4 h-4" />
+                                  </span>
+                                </div>
                               </FormControl>
+                              <FormMessage />
                             </FormItem>
                           )}
                         />
@@ -900,12 +1202,32 @@ export default function EditOrderForm() {
                           render={({ field }) => (
                             <FormItem>
                               <FormControl>
-                                <Input
-                                  placeholder="Remarks..."
-                                  {...field}
-                                  className="text-sm bg-white"
-                                />
+                                <div className="relative">
+                                  <Input
+                                    placeholder="Internal remarks (optional)..."
+                                    {...field}
+                                    className="text-sm border-gray-200 pl-8 bg-white"
+                                  />
+                                  <span className="absolute left-2.5 top-2.5 text-gray-400">
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round">
+                                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                      <polyline points="14 2 14 8 20 8" />
+                                      <line x1="16" y1="13" x2="8" y2="13" />
+                                      <line x1="16" y1="17" x2="8" y2="17" />
+                                    </svg>
+                                  </span>
+                                </div>
                               </FormControl>
+                              <FormMessage />
                             </FormItem>
                           )}
                         />
@@ -916,20 +1238,16 @@ export default function EditOrderForm() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.back()}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Update Order
-              </Button>
-            </div>
+            <Button type="submit" className="text-md" disabled={submitting}>
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Menyimpan...
+                </>
+              ) : (
+                "Simpan Perubahan"
+              )}
+            </Button>
           </form>
         </Form>
       </CardContent>
