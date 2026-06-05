@@ -36,33 +36,34 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  Bookmark,
   Check,
   ChevronsUpDown,
+  DollarSign,
+  FileText,
   PlusCircle,
   RefreshCcw,
   Settings2,
   Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-// Import Schema & Type dari file schema kamu
 import { useApi } from "@/hooks/useApi";
 import { OrderFormValues, orderSchema } from "../order-schema";
 import { generatePoNumber, postOrder } from "../order-service";
 import { SampleFollowUpSection, SampleStepItem } from "./sampleFollowUpSection";
 
-type PIC = {
+type PIC = { id: string; name: string; position?: string };
+type PurchaseChannel = { id: string; name: string };
+type Currency = { code: string; symbol: string; name: string };
+type QuotationRef = {
   id: string;
-  name: string;
-  position?: string;
+  quotationNumber: string;
+  totalAmount: number;
 };
-
-type PurchaseChannel = {
-  id: string;
-  name: string;
-};
+type SampleOrderRef = { id: string; orderNumber: string; dateOrder: string };
 
 type Client = {
   id: string;
@@ -78,20 +79,10 @@ type Client = {
 type Sales = { id: string; name: string; phone: string };
 type Vendor = { id: string; companyName: string };
 
-// ID Product & Variant harus STRING (UUID)
-type ProductVariant = {
-  id: string;
-  variantName: string;
-  price: number;
-};
-
-type PriceTier = {
-  minQuantity: number;
-  price: number;
-};
-
+type ProductVariant = { id: string; variantName: string; price: number };
+type PriceTier = { minQuantity: number; price: number };
 type Product = {
-  id: string; // Updated to String
+  id: string;
   name: string;
   basePrice: number;
   isCustom: boolean;
@@ -103,14 +94,21 @@ export default function AddOrderForm() {
   const { fetchApi, status } = useApi();
 
   const form = useForm<OrderFormValues>({
-    resolver: zodResolver(orderSchema),
+    resolver: zodResolver(orderSchema) as Resolver<OrderFormValues>,
     defaultValues: {
       dateOrder: new Date().toISOString().split("T")[0],
       salesCategory: "SALES",
+
       poNumber: "",
+      clientPoNumber: "",
+      remark: "",
+      currencyCode: "IDR",
+      referenceQuotationId: "",
+      referenceSampleId: "",
+
       clientId: "",
-      purchaseChannelId: "",
       clientB2BPICId: "",
+      purchaseChannelId: "",
       phone: "",
       shippingAddress: "",
       salesId: "",
@@ -134,7 +132,7 @@ export default function AddOrderForm() {
     name: "products",
   });
 
-  // State
+  // Master Data States
   const [clients, setClients] = useState<Client[]>([]);
   const [sales, setSales] = useState<Sales[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -142,20 +140,29 @@ export default function AddOrderForm() {
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
     [],
   );
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [quotationRefs, setQuotationRefs] = useState<QuotationRef[]>([]);
+  console.log("ini adalah quotation ref", quotationRefs);
+
+  const [sampleOrderRefs, setSampleOrderRefs] = useState<SampleOrderRef[]>([]);
+  console.log("ini adalah sample order ref", sampleOrderRefs);
+
   const [loading, setLoading] = useState(false);
   const [generatingPo, setGeneratingPo] = useState(false);
 
   const [clientOpen, setClientOpen] = useState(false);
   const [vendorOpen, setVendorOpen] = useState(false);
   const [vendorSearch, setVendorSearch] = useState("");
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [sampleOpen, setSampleOpen] = useState(false);
 
   // Watchers
   const selectedClientId = watch("clientId");
-
-  const [sampleSteps, setSampleSteps] = useState<SampleStepItem[]>([]);
   const salesCategory = watch("salesCategory");
+  const selectedCurrencyCode = watch("currencyCode");
+  const [sampleSteps, setSampleSteps] = useState<SampleStepItem[]>([]);
 
-  // Load Initial Data
+  // Load Initial Master Data
   useEffect(() => {
     async function load() {
       if (status !== "authenticated") return;
@@ -163,33 +170,51 @@ export default function AddOrderForm() {
       try {
         setLoading(true);
 
-        const [resC, resS, resV, resP, resPC] = await Promise.all([
-          fetchApi("/clients/order"),
-          fetchApi("/sales/order"),
-          fetchApi("/vendors/order/add"),
-          fetchApi("/products/order"),
-          fetchApi("/purchase-channels/list"),
-        ]);
+        const [resC, resS, resV, resP, resPC, resCur, resQ, resSamp] =
+          await Promise.all([
+            fetchApi("/clients/order"),
+            fetchApi("/sales/order"),
+            fetchApi("/vendors/order/add"),
+            fetchApi("/products/order"),
+            fetchApi("/purchase-channels/list"),
+            fetchApi("/currencies"),
+            fetchApi("/quotations/list-references"),
+            fetchApi("/orders/list-samples"),
+          ]);
 
-        // Validasi semua response
         if (!resC.ok || !resS.ok || !resV.ok || !resP.ok || !resPC.ok) {
-          throw new Error("Gagal mengambil beberapa data master");
+          throw new Error("Gagal mengambil data master inti");
         }
 
-        // Parsing data JSON secara paralel
-        const [c, s, v, p, pc] = await Promise.all([
-          resC.json(),
-          resS.json(),
-          resV.json(),
-          resP.json(),
-          resPC.json(),
-        ]);
+        const c = await resC.json();
+        const s = await resS.json();
+        const v = await resV.json();
+        const p = await resP.json();
+        const pc = await resPC.json();
+
+        // --- PARSING JSON UTAMANYA ---
+        const jsonCur = resCur.ok ? await resCur.json() : null;
+        const jsonQ = resQ.ok ? await resQ.json() : null;
+        const jsonSamp = resSamp.ok ? await resSamp.json() : null;
+
+        // ✨ PERBAIKAN: Ambil properti .data sesuai format console log kamu
+        const curData = jsonCur?.data || jsonCur || [];
+        const qData = jsonQ?.data || jsonQ || [];
+        const sampData = jsonSamp?.data || jsonSamp || [];
 
         setClients(c);
         setSales(s);
         setVendors(v);
         setProducts(p);
         setPurchaseChannels(pc);
+
+        setCurrencies(
+          curData.length
+            ? curData
+            : [{ code: "IDR", symbol: "Rp", name: "Rupiah" }],
+        );
+        setQuotationRefs(qData); // 🟢 Sekarang qData isinya murni Array [ {id, quotationNumber} ]
+        setSampleOrderRefs(sampData);
       } catch (error) {
         console.error(error);
         toast.error("Failed to load master data");
@@ -201,12 +226,11 @@ export default function AddOrderForm() {
     load();
   }, [status, fetchApi]);
 
-  // === LOGIC: Tentukan Client Terpilih & PIC ===
   const selectedClientData = clients.find((c) => c.id === selectedClientId);
   const isB2B = selectedClientData?.type === "B2B";
   const availablePics = selectedClientData?.pics || [];
 
-  // Effect: Update Address, Phone, & Purchase Channel saat Client berubah
+  // Sync logistik dari data Client
   useEffect(() => {
     if (selectedClientData) {
       setValue("shippingAddress", selectedClientData.address);
@@ -236,15 +260,24 @@ export default function AddOrderForm() {
     }
   }, [selectedPicId, isB2B, availablePics, setValue]);
 
-  // Handler: Generate PO Number
+  const currentSalesCategory = watch("salesCategory");
+
   const handleGeneratePO = async () => {
     try {
       setGeneratingPo(true);
-      const newPo = await generatePoNumber(fetchApi);
+
+      const newPo = await generatePoNumber(fetchApi, currentSalesCategory);
+
       setValue("poNumber", newPo);
-      toast.success("PO Number generated");
+
+      const typeDoc =
+        currentSalesCategory === "SALES"
+          ? "Sales Order (SO)"
+          : "Sample Note (SN)";
+      toast.success(`${typeDoc} Number generated: ${newPo}`);
     } catch (e) {
-      toast.error("Failed to generate PO Number");
+      console.error(e);
+      toast.error("Failed to generate Order Number");
     } finally {
       setGeneratingPo(false);
     }
@@ -253,46 +286,31 @@ export default function AddOrderForm() {
   const onSubmit = async (data: OrderFormValues) => {
     try {
       setLoading(true);
-      // Remove phone from payload
       const { phone, ...payload } = data;
+
+      // Bersihkan string kosong pada ID referensi opsional agar tidak memicu error UUID prisma
+      if (!payload.referenceQuotationId) delete payload.referenceQuotationId;
+      if (!payload.referenceSampleId) delete payload.referenceSampleId;
 
       await postOrder(fetchApi, {
         ...payload,
-
         sampleFollowUps: sampleSteps
           .filter((s) => s.enabled && s.date)
           .map((s) => ({ name: s.name, date: s.date })),
       });
 
       toast.success("Order created successfully");
-
-      // Reset form
-      form.reset({
-        dateOrder: new Date().toISOString().split("T")[0],
-        salesCategory: "SALES",
-        poNumber: "",
-        clientId: "",
-        phone: "",
-        shippingAddress: "",
-        salesId: "",
-        vendorIds: [],
-
-        products: [
-          {
-            productId: "",
-            quantity: 1,
-            price: 0,
-            customization: "",
-            remarks: "",
-          },
-        ],
-      });
+      form.reset();
+      setSampleSteps([]);
     } catch {
       toast.error("Failed to create order");
     } finally {
       setLoading(false);
     }
   };
+
+  const currentCurrencySymbol =
+    currencies.find((c) => c.code === selectedCurrencyCode)?.symbol || "Rp";
 
   return (
     <Card className="space-y-4 mx-auto">
@@ -305,8 +323,8 @@ export default function AddOrderForm() {
         <Form {...form}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
             {/* === SECTION 1: ORDER DETAILS === */}
-            <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
-              <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 border rounded-lg bg-gray-50/50">
+              <h3 className="col-span-full font-medium text-lg text-gray-700">
                 Order Details
               </h3>
 
@@ -317,7 +335,7 @@ export default function AddOrderForm() {
                   <FormItem>
                     <FormLabel>Date Order</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" className="h-10" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -328,11 +346,11 @@ export default function AddOrderForm() {
                 control={control}
                 name="salesCategory"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="">
                     <FormLabel>Sales Category</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
+                      <FormControl className="w-full">
+                        <SelectTrigger className="h-10">
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                       </FormControl>
@@ -345,36 +363,245 @@ export default function AddOrderForm() {
                   </FormItem>
                 )}
               />
-              {salesCategory === "SAMPLE" && (
-                <div className="md:col-span-2">
-                  <SampleFollowUpSection onChange={setSampleSteps} />
-                </div>
-              )}
+
+              <FormField
+                control={control}
+                name="currencyCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4 text-stone-500" /> Currency
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl className="w-full">
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Select Currency" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {currencies.map((cur) => (
+                          <SelectItem key={cur.code} value={cur.code}>
+                            {cur.code} ({cur.symbol}) - {cur.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={control}
                 name="poNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>PO Number</FormLabel>
+                    <FormLabel>Internal PO Number</FormLabel>
                     <div className="flex gap-2">
                       <FormControl>
-                        <Input placeholder="Enter PO number" {...field} />
+                        <Input
+                          placeholder="Internal PO"
+                          className="h-10"
+                          {...field}
+                        />
                       </FormControl>
                       <Button
                         type="button"
                         variant="outline"
+                        className="h-10"
                         onClick={handleGeneratePO}
                         disabled={generatingPo}>
                         {generatingPo ? (
                           <RefreshCcw className="w-4 h-4 animate-spin" />
                         ) : (
-                          "Generate"
+                          "Gen"
                         )}
                       </Button>
                     </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="clientPoNumber"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Client PO Number (Optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter client PO reference number"
+                        className="h-10"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {salesCategory === "SAMPLE" && (
+                <div className="col-span-full">
+                  <SampleFollowUpSection onChange={setSampleSteps} />
+                </div>
+              )}
+            </div>
+
+            {/* === SECTION 2: DOCUMENT REFERENCES (Dinamis Sesuai Alur Proses) === */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
+              <h3 className="col-span-full font-medium text-lg text-gray-700">
+                Document References
+              </h3>
+
+              <FormField
+                control={control}
+                name="referenceQuotationId"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel className="flex items-center gap-1.5 mb-1.5">
+                      <FileText className="w-4 h-4 text-stone-500" /> Quotation
+                      No. Reference (Optional)
+                    </FormLabel>
+                    <Popover open={quoteOpen} onOpenChange={setQuoteOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between h-10 text-left font-normal",
+                              !field.value && "text-muted-foreground",
+                            )}>
+                            {field.value
+                              ? quotationRefs.find((q) => q.id === field.value)
+                                  ?.quotationNumber
+                              : "Pilih nomor penawaran / quotation..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Cari nomor quotation..." />
+                          <CommandList>
+                            <CommandEmpty>
+                              Quotation tidak ditemukan.
+                            </CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                value="none"
+                                onSelect={() => {
+                                  setValue("referenceQuotationId", "");
+                                  setQuoteOpen(false);
+                                }}
+                                className="italic text-muted-foreground">
+                                -- Tanpa Referensi Quotation --
+                              </CommandItem>
+                              {quotationRefs.map((q) => (
+                                <CommandItem
+                                  key={q.id}
+                                  value={`${q.quotationNumber}-${q.id}`}
+                                  onSelect={() => {
+                                    setValue("referenceQuotationId", q.id);
+                                    setQuoteOpen(false);
+                                  }}>
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      q.id === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0",
+                                    )}
+                                  />
+                                  {q.quotationNumber}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="referenceSampleId"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel className="flex items-center gap-1.5 mb-1.5">
+                      <Bookmark className="w-4 h-4 text-stone-500" /> Sample No.
+                      Reference (Optional)
+                    </FormLabel>
+                    <Popover open={sampleOpen} onOpenChange={setSampleOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            disabled={salesCategory === "SAMPLE"}
+                            className={cn(
+                              "w-full justify-between h-10 text-left font-normal",
+                              !field.value && "text-muted-foreground",
+                            )}>
+                            {field.value
+                              ? sampleOrderRefs.find(
+                                  (s) => s.id === field.value,
+                                )?.orderNumber
+                              : salesCategory === "SAMPLE"
+                                ? "Kategori berupa sample baru"
+                                : "Pilih nomor produksi sample terdahulu..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Cari nomor produksi sample..." />
+                          <CommandList>
+                            <CommandEmpty>
+                              Data sample tidak ditemukan.
+                            </CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                value="none"
+                                onSelect={() => {
+                                  setValue("referenceSampleId", "");
+                                  setSampleOpen(false);
+                                }}
+                                className="italic text-muted-foreground">
+                                -- Tanpa Referensi Sample --
+                              </CommandItem>
+                              {sampleOrderRefs.map((s) => (
+                                <CommandItem
+                                  key={s.id}
+                                  value={`${s.orderNumber}-${s.id}`}
+                                  onSelect={() => {
+                                    setValue("referenceSampleId", s.id);
+                                    setSampleOpen(false);
+                                  }}>
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      s.id === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0",
+                                    )}
+                                  />
+                                  {s.orderNumber}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <FormDescription>
-                      Click Generate if you don't have a PO Number.
+                      Hanya dapat diaktifkan jika Sales Category diatur ke
+                      "Sales".
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -382,7 +609,7 @@ export default function AddOrderForm() {
               />
             </div>
 
-            {/* === SECTION 2: CUSTOMER & LOGISTICS === */}
+            {/* === SECTION 3: CUSTOMER & LOGISTICS === */}
             <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
               <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
                 Customer & Logistics
@@ -401,19 +628,17 @@ export default function AddOrderForm() {
                             variant="outline"
                             role="combobox"
                             className={cn(
-                              "w-full justify-between",
+                              "w-full justify-between h-10",
                               !field.value && "text-muted-foreground",
                             )}>
                             {field.value
-                              ? clients.find(
-                                  (client) => client.id === field.value,
-                                )?.name
+                              ? clients.find((c) => c.id === field.value)?.name
                               : "Select client..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-75 p-0">
+                      <PopoverContent className="w-full p-0">
                         <Command>
                           <CommandInput placeholder="Search client name..." />
                           <CommandList>
@@ -425,9 +650,8 @@ export default function AddOrderForm() {
                                   key={client.id}
                                   onSelect={() => {
                                     form.setValue("clientId", client.id);
-                                    if (client.type === "B2B") {
+                                    if (client.type === "B2B")
                                       form.setValue("clientB2BPICId", "");
-                                    }
                                     setClientOpen(false);
                                   }}>
                                   <Check
@@ -462,7 +686,7 @@ export default function AddOrderForm() {
                         onValueChange={field.onChange}
                         value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="h-10">
                             <SelectValue placeholder="Select PIC from company" />
                           </SelectTrigger>
                         </FormControl>
@@ -496,13 +720,10 @@ export default function AddOrderForm() {
                       <Input
                         {...field}
                         readOnly
-                        className="bg-gray-100"
+                        className="bg-gray-100 h-10"
                         placeholder="Auto-filled from client"
                       />
                     </FormControl>
-                    <FormDescription>
-                      This info comes from the selected client.
-                    </FormDescription>
                   </FormItem>
                 )}
               />
@@ -515,7 +736,7 @@ export default function AddOrderForm() {
                     <FormLabel>Purchase Channel</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-10">
                           <SelectValue placeholder="Select channel" />
                         </SelectTrigger>
                       </FormControl>
@@ -551,7 +772,7 @@ export default function AddOrderForm() {
               />
             </div>
 
-            {/* === SECTION 3: SALES & VENDOR === */}
+            {/* === SECTION 4: SALES, VENDOR, & REMARK === */}
             <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
               <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
                 Internal & Vendor
@@ -565,7 +786,7 @@ export default function AddOrderForm() {
                     <FormLabel>PIC Sales</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-10">
                           <SelectValue placeholder="Select sales person" />
                         </SelectTrigger>
                       </FormControl>
@@ -588,15 +809,13 @@ export default function AddOrderForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Vendors (Multiple)</FormLabel>
-
-                    {/* ✅ Searchable combobox — sama polanya dengan clientId */}
                     <Popover open={vendorOpen} onOpenChange={setVendorOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
                             variant="outline"
                             role="combobox"
-                            className="w-full justify-between font-normal">
+                            className="w-full justify-between font-normal h-10">
                             <span className="text-muted-foreground">
                               {field.value?.length > 0
                                 ? `${field.value.length} vendor dipilih`
@@ -632,15 +851,13 @@ export default function AddOrderForm() {
                                       value={`${v.companyName}-${v.id}`}
                                       onSelect={() => {
                                         const current = field.value || [];
-                                        if (isSelected) {
-                                          // Deselect jika sudah dipilih
-                                          field.onChange(
-                                            current.filter((id) => id !== v.id),
-                                          );
-                                        } else {
-                                          // Select
-                                          field.onChange([...current, v.id]);
-                                        }
+                                        field.onChange(
+                                          isSelected
+                                            ? current.filter(
+                                                (id) => id !== v.id,
+                                              )
+                                            : [...current, v.id],
+                                        );
                                       }}>
                                       <Check
                                         className={cn(
@@ -660,7 +877,6 @@ export default function AddOrderForm() {
                       </PopoverContent>
                     </Popover>
 
-                    {/* ✅ Tags vendor yang sudah dipilih */}
                     {field.value?.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-2">
                         {field.value.map((id) => {
@@ -669,7 +885,7 @@ export default function AddOrderForm() {
                           return (
                             <div
                               key={id}
-                              className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-full text-sm shadow-sm">
+                              className="flex items-center gap-1.5 bg-white border px-2.5 py-1 rounded-full text-sm shadow-sm">
                               <span className="text-slate-700">
                                 {vendor.companyName}
                               </span>
@@ -680,7 +896,7 @@ export default function AddOrderForm() {
                                     field.value.filter((vId) => vId !== id),
                                   )
                                 }
-                                className="text-slate-400 hover:text-red-500 transition-colors rounded-full">
+                                className="text-slate-400 hover:text-red-500 rounded-full">
                                 <XIcon className="w-3 h-3" />
                               </button>
                             </div>
@@ -688,20 +904,33 @@ export default function AddOrderForm() {
                         })}
                       </div>
                     )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                    {field.value?.length === 0 && (
-                      <p className="text-sm text-gray-400 italic mt-1">
-                        Belum ada vendor yang dipilih.
-                      </p>
-                    )}
-
+              <FormField
+                control={control}
+                name="remark"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>
+                      Order Remark / Catatan Internal (Optional)
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Ketik keterangan atau informasi penting pelengkap order disini..."
+                        {...field}
+                        rows={2}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
-            {/* === SECTION 4: PRODUCTS === */}
+            {/* === SECTION 5: PRODUCTS === */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold text-xl text-gray-800">
@@ -752,9 +981,7 @@ export default function AddOrderForm() {
                     <div
                       key={field.id}
                       className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
-                      {/* === BARIS UTAMA (Product, Qty, Price) === */}
                       <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                        {/* 1. Product & Variant Selection */}
                         <div className="md:col-span-4 space-y-3">
                           <FormField
                             control={control}
@@ -765,34 +992,21 @@ export default function AddOrderForm() {
                                   Product
                                 </FormLabel>
                                 <Select
-                                  // VALUE STRING: Langsung pakai field.value karena tipe sudah string
                                   value={field.value}
                                   onValueChange={(val) => {
-                                    field.onChange(val); // Save as String
-
-                                    // Reset Variant (as string empty)
+                                    field.onChange(val);
                                     form.setValue(
                                       `products.${index}.variantId`,
                                       "",
                                     );
-
-                                    // Find product by string ID
                                     const prod = products.find(
                                       (p) => p.id === val,
                                     );
-
                                     if (prod) {
-                                      if (!prod.isCustom) {
-                                        form.setValue(
-                                          `products.${index}.price`,
-                                          prod.basePrice,
-                                        );
-                                      } else {
-                                        form.setValue(
-                                          `products.${index}.price`,
-                                          0,
-                                        );
-                                      }
+                                      form.setValue(
+                                        `products.${index}.price`,
+                                        prod.isCustom ? 0 : prod.basePrice,
+                                      );
                                     }
                                   }}>
                                   <FormControl>
@@ -802,7 +1016,6 @@ export default function AddOrderForm() {
                                   </FormControl>
                                   <SelectContent>
                                     {products.map((p) => (
-                                      // Value Select adalah string (p.id sudah string)
                                       <SelectItem key={p.id} value={p.id}>
                                         <div className="flex items-center justify-between w-full gap-4 min-w-50">
                                           <span className="font-medium truncate text-gray-700">
@@ -833,21 +1046,18 @@ export default function AddOrderForm() {
                               render={({ field }) => (
                                 <FormItem>
                                   <Select
-                                    // VALUE STRING
                                     value={field.value}
                                     onValueChange={(val) => {
-                                      field.onChange(val); // Save as String
-
+                                      field.onChange(val);
                                       const variant =
                                         selectedProduct?.productVariants.find(
                                           (v) => v.id === val,
                                         );
-                                      if (variant) {
+                                      if (variant)
                                         form.setValue(
                                           `products.${index}.price`,
                                           Number(variant.price),
                                         );
-                                      }
                                     }}>
                                     <FormControl>
                                       <SelectTrigger className="h-9 text-sm bg-gray-50 border-dashed">
@@ -857,7 +1067,6 @@ export default function AddOrderForm() {
                                     <SelectContent>
                                       {selectedProduct?.productVariants.map(
                                         (v) => (
-                                          // v.id sudah string
                                           <SelectItem key={v.id} value={v.id}>
                                             {v.variantName}
                                           </SelectItem>
@@ -872,7 +1081,6 @@ export default function AddOrderForm() {
                           )}
                         </div>
 
-                        {/* 2. Quantity Input (HANDLED AS NUMBER) */}
                         <div className="md:col-span-2">
                           <FormField
                             control={control}
@@ -888,12 +1096,10 @@ export default function AddOrderForm() {
                                       type="number"
                                       min={1}
                                       {...field}
-                                      // PENTING: Paksa valueAsNumber agar state TS tetap number
                                       onChange={(e) => {
                                         const val = e.target.valueAsNumber;
                                         field.onChange(isNaN(val) ? 0 : val);
 
-                                        // Logic Price Tiers
                                         if (
                                           selectedProduct &&
                                           !selectedProduct.isCustom &&
@@ -908,21 +1114,12 @@ export default function AddOrderForm() {
                                           const applicableTier = tiers.find(
                                             (tier) => val >= tier.minQuantity,
                                           );
-
-                                          if (applicableTier) {
-                                            form.setValue(
-                                              `products.${index}.price`,
-                                              Number(applicableTier.price),
-                                            );
-                                            toast.info(
-                                              `Price updated to tier ≥${applicableTier.minQuantity}`,
-                                            );
-                                          } else {
-                                            form.setValue(
-                                              `products.${index}.price`,
-                                              selectedProduct.basePrice,
-                                            );
-                                          }
+                                          form.setValue(
+                                            `products.${index}.price`,
+                                            applicableTier
+                                              ? Number(applicableTier.price)
+                                              : selectedProduct.basePrice,
+                                          );
                                         }
                                       }}
                                       className="text-center h-10"
@@ -938,7 +1135,6 @@ export default function AddOrderForm() {
                           />
                         </div>
 
-                        {/* 3. Unit Price Input (HANDLED AS NUMBER) */}
                         <div className="md:col-span-3">
                           <FormField
                             control={control}
@@ -951,13 +1147,12 @@ export default function AddOrderForm() {
                                 <FormControl>
                                   <div className="relative">
                                     <span className="absolute left-3 top-2.5 text-xs text-gray-500 font-medium">
-                                      Rp
+                                      {currentCurrencySymbol}
                                     </span>
                                     <Input
                                       type="number"
                                       min={0}
                                       {...field}
-                                      // PENTING: Paksa valueAsNumber
                                       onChange={(e) => {
                                         const val = e.target.valueAsNumber;
                                         field.onChange(isNaN(val) ? 0 : val);
@@ -972,20 +1167,18 @@ export default function AddOrderForm() {
                           />
                         </div>
 
-                        {/* 4. Subtotal */}
                         <div className="md:col-span-2 flex flex-col justify-center items-end h-10 pt-8 md:pt-0">
                           <span className="md:hidden text-xs text-gray-500 mb-1">
                             Subtotal
                           </span>
                           <span className="font-semibold text-gray-900 font-mono">
+                            {currentCurrencySymbol}{" "}
                             {subtotal.toLocaleString("id-ID", {
-                              style: "currency",
-                              currency: "IDR",
+                              minimumFractionDigits: 0,
                             })}
                           </span>
                         </div>
 
-                        {/* 5. Delete Action */}
                         <div className="md:col-span-1 flex justify-center pt-8 md:pt-0">
                           {fields.length > 1 && (
                             <Button
@@ -993,15 +1186,13 @@ export default function AddOrderForm() {
                               variant="ghost"
                               size="icon"
                               onClick={() => remove(index)}
-                              className="text-gray-400 hover:text-red-600 hover:bg-red-50"
-                              title="Remove Item">
+                              className="text-gray-400 hover:text-red-600 hover:bg-red-50">
                               <Trash2 className="w-5 h-5" />
                             </Button>
                           )}
                         </div>
                       </div>
 
-                      {/* Customization & Remarks */}
                       <div className="bg-gray-50/50 p-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4 rounded-b-lg">
                         <FormField
                           control={control}
@@ -1013,7 +1204,7 @@ export default function AddOrderForm() {
                                   <Input
                                     placeholder="Add Customization details..."
                                     {...field}
-                                    className="text-sm border-gray-200 focus:border-blue-300 pl-8 bg-white"
+                                    className="text-sm border-gray-200 pl-8 bg-white"
                                   />
                                   <span className="absolute left-2.5 top-2.5 text-gray-400">
                                     <Settings2 className="w-4 h-4" />
@@ -1034,7 +1225,7 @@ export default function AddOrderForm() {
                                   <Input
                                     placeholder="Internal remarks (optional)..."
                                     {...field}
-                                    className="text-sm border-gray-200 focus:border-blue-300 pl-8 bg-white"
+                                    className="text-sm border-gray-200 pl-8 bg-white"
                                   />
                                   <span className="absolute left-2.5 top-2.5 text-gray-400">
                                     <svg
@@ -1051,7 +1242,6 @@ export default function AddOrderForm() {
                                       <polyline points="14 2 14 8 20 8" />
                                       <line x1="16" y1="13" x2="8" y2="13" />
                                       <line x1="16" y1="17" x2="8" y2="17" />
-                                      <polyline points="10 9 9 9 8 9" />
                                     </svg>
                                   </span>
                                 </div>
@@ -1067,7 +1257,7 @@ export default function AddOrderForm() {
               </div>
             </div>
 
-            <Button type="submit" className=" text-md" disabled={loading}>
+            <Button type="submit" className="text-md" disabled={loading}>
               {loading ? "Submitting Order..." : "Create Order"}
             </Button>
           </form>

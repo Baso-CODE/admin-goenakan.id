@@ -39,7 +39,7 @@ import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, ChevronsUpDown, Loader2, RefreshCw, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { AddItemCategoryModal } from "../../item-categories-product/components/addItemCategoryModal";
@@ -205,7 +205,7 @@ export default function ProductFormV2({
   }, [status, fetchApi]);
 
   const form = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema) as any,
+    resolver: zodResolver(productSchema) as Resolver<ProductFormValues>,
     defaultValues: {
       name: "",
       sku: "",

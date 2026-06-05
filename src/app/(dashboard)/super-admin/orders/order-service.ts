@@ -12,30 +12,44 @@ export async function postOrder(fetchApi: any, data: any) {
 }
 
 // 2. Fungsi Generate PO Number
-export async function generatePoNumber(fetchApi: any) {
+export async function generatePoNumber(
+  fetchApi: any,
+  salesCategory: "SALES" | "SAMPLE" = "SALES",
+) {
   try {
-    const res = await fetchApi("/orders/generate-po", {
-      method: "GET",
-      cache: "no-store",
-    });
+    const res = await fetchApi(
+      `/orders/generate-po?category=${salesCategory}`,
+      {
+        method: "GET",
+        cache: "no-store",
+      },
+    );
 
     if (!res.ok) throw new Error(`API Error: ${res.status}`);
 
-    const data = await res.json();
-    return data.poNumber;
+    const json = await res.json();
+
+    if (json.success && json.data) {
+      return json.data;
+    }
+
+    return json.poNumber || json;
   } catch (error) {
     console.error(
-      "Gagal generate PO dari server, menggunakan fallback:",
+      `Gagal generate ${salesCategory === "SALES" ? "SO" : "SN"} dari server, menggunakan fallback:`,
       error,
     );
-    // Fallback logic tetap sama
+
+    const prefix = salesCategory === "SALES" ? "GI-SO-FB" : "GI-SN-FB";
+
     const date = new Date();
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const random = Math.floor(Math.random() * 1000)
       .toString()
       .padStart(3, "0");
-    return `GI-FB-${year}${month}-${random}`;
+
+    return `${prefix}-${year}${month}-${random}`;
   }
 }
 
