@@ -11,7 +11,11 @@ export const orderSchema = z.object({
   phone: z.string().optional(),
   shippingAddress: z.string().min(1, "Shipping address required"),
   salesId: z.string().min(1, "Sales PIC is required"),
-
+  clientPoNumber: z.string().optional(),
+  remark: z.string().optional(),
+  currencyCode: z.string().default("IDR"),
+  referenceQuotationId: z.string().optional(),
+  referenceSampleId: z.string().optional(),
   vendorIds: z.array(z.string()).min(1, "At least one vendor required"),
   products: z
     .array(
