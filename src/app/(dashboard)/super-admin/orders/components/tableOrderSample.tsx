@@ -289,48 +289,46 @@ export default function TableOrderSample() {
             <Table className="whitespace-nowrap w-full">
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="min-w-[120px]">Order Date</TableHead>
-                  <TableHead className="min-w-[170px]">Sample Number</TableHead>
-                  <TableHead className="min-w-[150px]">Customer Name</TableHead>
-                  <TableHead className="min-w-[150px]">PIC Customer</TableHead>
-                  <TableHead className="min-w-[130px]">Status</TableHead>
-                  <TableHead className="min-w-[150px]">Quotation Ref</TableHead>
+                  <TableHead className="min-w-30">Order Date</TableHead>
+                  <TableHead className="min-w-42.5">Sample Number</TableHead>
+                  <TableHead className="min-w-37.5">Customer Name</TableHead>
+                  <TableHead className="min-w-37.5">PIC Customer</TableHead>
+                  <TableHead className="min-w-32.5">Status</TableHead>
+                  <TableHead className="min-w-37.5">Quotation Ref</TableHead>
 
                   {/* Bagian Production & Logistik */}
-                  <TableHead className="min-w-[140px] bg-blue-50/50">
+                  <TableHead className="min-w-35 bg-blue-50/50">
                     Production Data
                   </TableHead>
-                  <TableHead className="min-w-[130px] bg-blue-50/50">
+                  <TableHead className="min-w-32.5 bg-blue-50/50">
                     Packaging Date
                   </TableHead>
-                  <TableHead className="min-w-[130px] bg-green-50/50">
+                  <TableHead className="min-w-32.5 bg-green-50/50">
                     Shipping Date
                   </TableHead>
-                  <TableHead className="min-w-[140px] bg-green-50/50">
+                  <TableHead className="min-w-35 bg-green-50/50">
                     Send to Cust
                   </TableHead>
-                  <TableHead className="min-w-[140px] bg-green-50/50">
+                  <TableHead className="min-w-35 bg-green-50/50">
                     Arrival in Cust
                   </TableHead>
 
                   {/* Bagian Follow up */}
-                  <TableHead className="min-w-[140px] bg-orange-50/50">
+                  <TableHead className="min-w-35 bg-orange-50/50">
                     Last Follow Up
                   </TableHead>
-                  <TableHead className="min-w-[200px] bg-orange-50/50">
+                  <TableHead className="min-w-50 bg-orange-50/50">
                     Follow Up Remark
                   </TableHead>
 
                   {/* Bagian Detail Lainnya */}
-                  <TableHead className="min-w-[200px]">
-                    Shipping Address
-                  </TableHead>
-                  <TableHead className="min-w-[120px]">Created By</TableHead>
-                  <TableHead className="min-w-[140px]">Create Time</TableHead>
-                  <TableHead className="min-w-[120px]">Updated By</TableHead>
-                  <TableHead className="min-w-[140px]">Updated Time</TableHead>
+                  <TableHead className="min-w-50">Shipping Address</TableHead>
+                  <TableHead className="min-w-30">Created By</TableHead>
+                  <TableHead className="min-w-35">Create Time</TableHead>
+                  <TableHead className="min-w-30">Updated By</TableHead>
+                  <TableHead className="min-w-35">Updated Time</TableHead>
 
-                  <TableHead className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] min-w-[100px]">
+                  <TableHead className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] min-w-25">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -434,13 +432,13 @@ export default function TableOrderSample() {
                           : "Belum di-follow up"}
                       </TableCell>
                       <TableCell
-                        className="text-sm text-orange-600 bg-orange-50/30 max-w-[200px] truncate"
+                        className="text-sm text-orange-600 bg-orange-50/30 max-w-50 truncate"
                         title={order.lastFollowUpRemark}>
                         {order.lastFollowUpRemark}
                       </TableCell>
 
                       <TableCell
-                        className="text-sm text-gray-600 max-w-[200px] truncate"
+                        className="text-sm text-gray-600 max-w-50 truncate"
                         title={order.shippingAddress}>
                         {order.shippingAddress}
                       </TableCell>

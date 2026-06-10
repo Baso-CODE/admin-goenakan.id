@@ -122,6 +122,7 @@ export default function EditOrderForm() {
   const [sampleOrderRefs, setSampleOrderRefs] = useState<SampleOrderRef[]>([]);
   const [sampleSteps, setSampleSteps] = useState<SampleStepItem[]>([]);
   const [initialFollowUps, setInitialFollowUps] = useState<any[]>([]);
+  const [orderStatus, setOrderStatus] = useState<string>("PENDING");
 
   // Popover open states
   const [clientOpen, setClientOpen] = useState(false);
@@ -136,6 +137,7 @@ export default function EditOrderForm() {
   const selectedCurrencyCode = watch("currencyCode");
   const poNumber = watch("poNumber");
   const selectedPicId = watch("clientB2BPICId");
+  const isPending = orderStatus === "PENDING";
 
   const currentCurrencySymbol =
     currencies.find((c) => c.code === selectedCurrencyCode)?.symbol || "Rp";
@@ -195,6 +197,7 @@ export default function EditOrderForm() {
         if (orderData.sampleFollowUps) {
           setInitialFollowUps(orderData.sampleFollowUps);
         }
+        setOrderStatus(orderData.status || "PENDING");
 
         const selectedClient = c.find(
           (cl: any) => cl.id === orderData.clientId,
@@ -284,7 +287,13 @@ export default function EditOrderForm() {
           salesCategory === "SAMPLE"
             ? sampleSteps
                 .filter((s) => s.enabled)
-                .map((s) => ({ name: s.name, date: s.date, notes: s.notes }))
+                .map((s) => ({
+                  name: s.name,
+                  date: s.date,
+                  notes: s.notes,
+                  method: s.method,
+                  nextAction: s.nextAction,
+                }))
             : [],
       };
       await updateOrder(fetchApi, orderId, finalPayload);
@@ -345,10 +354,13 @@ export default function EditOrderForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Sales Category</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled>
                       <FormControl className="w-full">
-                        <SelectTrigger className="h-10">
-                          <SelectValue placeholder="Select category" />
+                        <SelectTrigger className="h-10 bg-gray-100 cursor-not-allowed">
+                          <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -356,11 +368,12 @@ export default function EditOrderForm() {
                         <SelectItem value="SAMPLE">Sample</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormMessage />
+                    <FormDescription className="text-xs text-amber-600">
+                      Sales category tidak dapat diubah setelah order dibuat.
+                    </FormDescription>
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={control}
                 name="currencyCode"
@@ -604,14 +617,17 @@ export default function EditOrderForm() {
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Client / PIC</FormLabel>
-                    <Popover open={clientOpen} onOpenChange={setClientOpen}>
+                    <Popover
+                      open={clientOpen}
+                      onOpenChange={isPending ? setClientOpen : undefined}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
                             variant="outline"
                             role="combobox"
+                            disabled
                             className={cn(
-                              "w-full justify-between h-10",
+                              "w-full justify-between h-10 bg-gray-100 cursor-not-allowed",
                               !field.value && "text-muted-foreground",
                             )}>
                             {field.value
@@ -621,38 +637,10 @@ export default function EditOrderForm() {
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-full p-0">
-                        <Command>
-                          <CommandInput placeholder="Search client name..." />
-                          <CommandList>
-                            <CommandEmpty>No client found.</CommandEmpty>
-                            <CommandGroup>
-                              {clients.map((client) => (
-                                <CommandItem
-                                  value={`${client.name}-${client.id}`}
-                                  key={client.id}
-                                  onSelect={() => {
-                                    form.setValue("clientId", client.id);
-                                    if (client.type === "B2B")
-                                      form.setValue("clientB2BPICId", "");
-                                    setClientOpen(false);
-                                  }}>
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      client.id === field.value
-                                        ? "opacity-100"
-                                        : "opacity-0",
-                                    )}
-                                  />
-                                  {client.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
                     </Popover>
+                    <FormDescription className="text-xs text-amber-600">
+                      Client tidak dapat diubah setelah order dibuat.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -916,26 +904,35 @@ export default function EditOrderForm() {
             {/* === SECTION 5: PRODUCTS === */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <h3 className="font-semibold text-xl text-gray-800">
-                  Order Products
-                </h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    append({
-                      productId: "",
-                      variantId: "",
-                      quantity: 1,
-                      price: 0,
-                      customization: "",
-                      remarks: "",
-                    })
-                  }
-                  className="border-dashed border-gray-400 hover:border-gray-600 hover:bg-gray-50">
-                  <PlusCircle className="w-4 h-4 mr-2" /> Add Product
-                </Button>
+                <div className="flex items-center gap-3">
+                  <h3 className="font-semibold text-xl text-gray-800">
+                    Order Products
+                  </h3>
+                  {!isPending && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                      ⚠ Produk tidak dapat diedit — status {orderStatus}
+                    </span>
+                  )}
+                </div>
+                {isPending && ( // ✅ tombol Add hanya muncul kalau PENDING
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      append({
+                        productId: "",
+                        variantId: "",
+                        quantity: 1,
+                        price: 0,
+                        customization: "",
+                        remarks: "",
+                      })
+                    }
+                    className="border-dashed border-gray-400 hover:border-gray-600 hover:bg-gray-50">
+                    <PlusCircle className="w-4 h-4 mr-2" /> Add Product
+                  </Button>
+                )}
               </div>
 
               {fields.length > 0 && (
@@ -962,7 +959,12 @@ export default function EditOrderForm() {
                   return (
                     <div
                       key={field.id}
-                      className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
+                      className={cn(
+                        "border rounded-lg bg-white shadow-sm transition-shadow duration-200",
+                        !isPending
+                          ? "opacity-60 pointer-events-none"
+                          : "hover:shadow-md",
+                      )}>
                       <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                         <div className="md:col-span-4 space-y-3">
                           <FormField
@@ -1161,7 +1163,7 @@ export default function EditOrderForm() {
                         </div>
 
                         <div className="md:col-span-1 flex justify-center pt-8 md:pt-0">
-                          {fields.length > 1 && (
+                          {fields.length > 1 && isPending && (
                             <Button
                               type="button"
                               variant="ghost"

@@ -359,36 +359,30 @@ export default function TableOrder() {
             <Table className="whitespace-nowrap min-w-full">
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="min-w-[120px]">Order Date</TableHead>
-                  <TableHead className="min-w-[150px]">SO Number</TableHead>
-                  <TableHead className="min-w-[150px]">Internal PO</TableHead>
-                  <TableHead className="min-w-[150px]">Customer Name</TableHead>
-                  <TableHead className="min-w-[150px]">PIC Customer</TableHead>
-                  <TableHead className="min-w-[130px]">Status</TableHead>
-                  <TableHead className="min-w-[140px]">PO Customer</TableHead>
-                  <TableHead className="text-right min-w-[130px]">
+                  <TableHead className="min-w-30">Order Date</TableHead>
+                  <TableHead className="min-w-37.5">SO Number</TableHead>
+                  <TableHead className="min-w-37.5">Internal PO</TableHead>
+                  <TableHead className="min-w-37.5">Customer Name</TableHead>
+                  <TableHead className="min-w-37.5">PIC Customer</TableHead>
+                  <TableHead className="min-w-37.5">Status</TableHead>
+                  <TableHead className="min-w-37.5">PO Customer</TableHead>
+                  <TableHead className="text-right min-w-37.5">
                     Total Amount
                   </TableHead>
-                  <TableHead className="text-center min-w-[80px]">
-                    Items
-                  </TableHead>
+                  <TableHead className="text-center min-w-20">Items</TableHead>
                   {/* Kolom Type dihapus karena ini sudah pasti SALES */}
-                  <TableHead className="min-w-[140px]">Sales Rep</TableHead>
-                  <TableHead className="min-w-[150px]">Sample Ref</TableHead>
-                  <TableHead className="min-w-[150px]">Quotation Ref</TableHead>
-                  <TableHead className="min-w-[140px]">Send to Cust</TableHead>
-                  <TableHead className="min-w-[140px]">
-                    Arrival in Cust
-                  </TableHead>
-                  <TableHead className="min-w-[200px]">
-                    Shipping Address
-                  </TableHead>
-                  <TableHead className="min-w-[150px]">Remarks</TableHead>
-                  <TableHead className="min-w-[120px]">Created By</TableHead>
-                  <TableHead className="min-w-[150px]">Created Time</TableHead>
-                  <TableHead className="min-w-[120px]">Updated By</TableHead>
-                  <TableHead className="min-w-[150px]">Updated Time</TableHead>
-                  <TableHead className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] min-w-[100px]">
+                  <TableHead className="min-w-37.5">Sales Rep</TableHead>
+                  <TableHead className="min-w-37.5">Sample Ref</TableHead>
+                  <TableHead className="min-w-37.5">Quotation Ref</TableHead>
+                  <TableHead className="min-w-37.5">Send to Cust</TableHead>
+                  <TableHead className="min-w-37.5">Arrival in Cust</TableHead>
+                  <TableHead className="min-w-50">Shipping Address</TableHead>
+                  <TableHead className="min-w-37.5">Remarks</TableHead>
+                  <TableHead className="min-w-30">Created By</TableHead>
+                  <TableHead className="min-w-37.5">Created Time</TableHead>
+                  <TableHead className="min-w-30">Updated By</TableHead>
+                  <TableHead className="min-w-37.5">Updated Time</TableHead>
+                  <TableHead className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] min-w-25">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -480,12 +474,12 @@ export default function TableOrder() {
                           : "-"}
                       </TableCell>
                       <TableCell
-                        className="text-sm text-gray-600 max-w-[200px] truncate"
+                        className="text-sm text-gray-600 max-w-50 truncate"
                         title={order.shippingAddress}>
                         {order.shippingAddress}
                       </TableCell>
                       <TableCell
-                        className="text-sm text-gray-600 max-w-[150px] truncate"
+                        className="text-sm text-gray-600 max-w-37.5 truncate"
                         title={order.remark}>
                         {order.remark}
                       </TableCell>
