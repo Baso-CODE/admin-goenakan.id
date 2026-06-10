@@ -3,6 +3,20 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -25,10 +39,13 @@ import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { formatDate } from "@/utils/formatDate";
+import { DropdownMenu } from "@radix-ui/react-dropdown-menu";
 import { format } from "date-fns";
 import {
   FileDown,
+  Globe,
   Loader2,
+  MoreHorizontal,
   Package,
   Pencil,
   ScanEye,
@@ -38,6 +55,7 @@ import {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ProductSeoForm } from "./productSeoForm";
 
 type Product = {
   id: string;
@@ -465,31 +483,79 @@ export default function ProductsAll() {
                         <TableCell>
                           {formatDate(product.createdAt, { style: "relative" })}
                         </TableCell>
-                        <TableCell className="text-center space-x-2">
-                          <Link
-                            href={`/super-admin/products/detail/${product.id}`}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="cursor-pointer">
-                              <ScanEye className="h-3 w-3 mr-1" /> Detail
-                            </Button>
-                          </Link>
-                          <Link
-                            href={`/super-admin/products/update/${product.id}`}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="cursor-pointer">
-                              <Pencil className="h-3 w-3 mr-1" /> Edit
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="text-xs cursor-pointer">
-                            <Trash2 className="h-3 w-3 mr-1" /> Delete
-                          </Button>
+                        <TableCell className="text-center">
+                          {/* Bungkus semuanya di dalam komponen Dialog */}
+                          <Dialog>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                {/* Tombol Titik Tiga */}
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreHorizontal className="h-4 w-4 text-slate-500" />
+                                </Button>
+                              </DropdownMenuTrigger>
+
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+
+                                {/* ACTION: DETAIL */}
+                                <DropdownMenuItem
+                                  asChild
+                                  className="cursor-pointer">
+                                  <Link
+                                    href={`/super-admin/products/detail/${product.id}`}>
+                                    <ScanEye className="mr-2 h-4 w-4 text-blue-500" />
+                                    <span>Detail</span>
+                                  </Link>
+                                </DropdownMenuItem>
+
+                                {/* ACTION: EDIT */}
+                                <DropdownMenuItem
+                                  asChild
+                                  className="cursor-pointer">
+                                  <Link
+                                    href={`/super-admin/products/update/${product.id}`}>
+                                    <Pencil className="mr-2 h-4 w-4 text-orange-500" />
+                                    <span>Edit</span>
+                                  </Link>
+                                </DropdownMenuItem>
+
+                                {/* ACTION: EDIT SEO (Membuka Modal) */}
+                                <DialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    // Penting: mencegah dropdown menutup secara brutal dan memblokir modal
+                                    onSelect={(e) => e.preventDefault()}>
+                                    <Globe className="mr-2 h-4 w-4 text-emerald-600" />
+                                    <span>Edit SEO</span>
+                                  </DropdownMenuItem>
+                                </DialogTrigger>
+
+                                <DropdownMenuSeparator />
+
+                                {/* ACTION: DELETE */}
+                                <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50">
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  <span>Delete</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {/* ISI MODAL UNTUK SEO FORM */}
+                            <DialogContent className="max-w-5xl overflow-y-auto max-h-[90vh]">
+                              <DialogHeader>
+                                <DialogTitle className="text-xl">
+                                  Setup Product SEO
+                                </DialogTitle>
+                              </DialogHeader>
+
+                              {/* Panggil komponen Form SEO-mu di sini, lempar ID produknya */}
+                              <div className="mt-4">
+                                <ProductSeoForm productId={product.id} />
+                              </div>
+                            </DialogContent>
+                          </Dialog>
                         </TableCell>
                       </TableRow>
                     );

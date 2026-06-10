@@ -8,9 +8,11 @@ import {
   FileDown,
   FileText,
   Loader2,
+  MoreHorizontal,
   Pencil,
   Search,
   ShoppingCart,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -31,6 +33,14 @@ import {
 } from "@/components/ui/table";
 
 import { Calendar } from "@/components/ui/calendar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Popover,
   PopoverContent,
@@ -118,6 +128,8 @@ export default function TableOrder() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Filters State
   const [search, setSearch] = useState("");
@@ -217,6 +229,34 @@ export default function TableOrder() {
       toast.error("Gagal melakukan export data");
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId || status !== "authenticated") return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetchApi(`/orders/${deleteId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal menghapus data");
+      }
+
+      toast.success("Data berhasil dihapus");
+
+      // Refresh tabel setelah delete
+      setPage(1);
+      fetchOrders();
+    } catch (error: any) {
+      console.error("❌ Error delete data:", error);
+      toast.error(error.message || "Terjadi kesalahan saat menghapus data");
+    } finally {
+      setIsDeleting(false);
+      setDeleteId(null);
     }
   };
 
@@ -497,34 +537,61 @@ export default function TableOrder() {
                       </TableCell>
 
                       <TableCell className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)]">
-                        <div className="flex items-center justify-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setSelectedInvoiceOrderId(order.id)}
-                            title="Generate Invoice"
-                            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50">
-                            <FileText className="h-4 w-4" />
-                          </Button>
-
-                          <Link href={`/super-admin/orders/detail/${order.id}`}>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
-                              <Eye className="h-4 w-4" />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4 text-slate-500" />
                             </Button>
-                          </Link>
+                          </DropdownMenuTrigger>
 
-                          <Link href={`/super-admin/orders/edit/${order.id}`}>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50">
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                        </div>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+
+                            {/* ACTION: GENERATE INVOICE */}
+                            <DropdownMenuItem
+                              className="cursor-pointer"
+                              onSelect={() =>
+                                setSelectedInvoiceOrderId(order.id)
+                              }>
+                              <FileText className="mr-2 h-4 w-4 text-green-600" />
+                              <span>Generate Invoice</span>
+                            </DropdownMenuItem>
+
+                            {/* ACTION: DETAIL */}
+                            <DropdownMenuItem
+                              asChild
+                              className="cursor-pointer">
+                              <Link
+                                href={`/super-admin/orders/detail/${order.id}`}>
+                                <Eye className="mr-2 h-4 w-4 text-blue-600" />
+                                <span>Detail</span>
+                              </Link>
+                            </DropdownMenuItem>
+
+                            {/* ACTION: EDIT */}
+                            <DropdownMenuItem
+                              asChild
+                              className="cursor-pointer">
+                              <Link
+                                href={`/super-admin/orders/edit/${order.id}`}>
+                                <Pencil className="mr-2 h-4 w-4 text-orange-600" />
+                                <span>Edit</span>
+                              </Link>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+
+                            {/* ACTION: DELETE */}
+                            <DropdownMenuItem
+                              className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50"
+                              onSelect={() => setDeleteId(order.id)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))

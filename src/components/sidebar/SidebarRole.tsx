@@ -112,6 +112,14 @@ export default function SidebarRole({ ...props }) {
           },
         ],
       },
+      {
+        title: "Purchase Orders",
+        url: "/super-admin/purchase-orders",
+        icon: FileText,
+        items: [
+          { title: "All Purchase Orders", url: "/super-admin/purchase-orders" },
+        ],
+      },
     ],
 
     // 2. DATABASE SECTION

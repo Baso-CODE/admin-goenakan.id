@@ -52,23 +52,18 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
-
+        // Jangan membuat token JWT baru di dalam callback jwt
+        // jika strategy-nya sudah "jwt", biarkan NextAuth mengelola sign-nya
         token.accessToken = sign(
-          {
-            id: user.id,
-            email: user.email,
-            role: user.role,
-          },
+          { id: user.id, email: user.email, role: user.role },
           process.env.NEXTAUTH_SECRET!,
           { expiresIn: "7d" },
         );
       }
       return token;
     },
-
     async session({ session, token }) {
       if (session.user) {
-        // ✨ 3. Map token ke session persis seperti di Client
         session.user.id = token.id as string;
         session.user.role = token.role as any;
         session.user.accessToken = token.accessToken as string;

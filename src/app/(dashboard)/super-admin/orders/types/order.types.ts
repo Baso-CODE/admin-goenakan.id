@@ -122,4 +122,5 @@ export type Product = {
   isCustom: boolean;
   productVariants: ProductVariant[];
   priceTiers: PriceTier[];
+  stock: number;
 };

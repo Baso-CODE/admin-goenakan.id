@@ -29,7 +29,12 @@ interface ProductDetail {
   description: string;
   basePrice: number;
   isCustom: boolean;
-  materialType?: string;
+  materialType?: {
+    id: string;
+    name: string;
+    code?: string;
+    slug?: string;
+  };
   createdAt: string;
   updatedAt: string;
   category: { id: string; name: string };
@@ -80,7 +85,7 @@ interface ProductDetail {
 }
 
 export default function ProductDetailPage() {
-  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status dari hook
+  const { fetchApi, status } = useApi();
   const { id } = useParams();
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -177,7 +182,9 @@ export default function ProductDetailPage() {
             <span className="text-xs text-muted-foreground">
               Jenis Material
             </span>
-            <span className="font-medium">{product.materialType || "-"}</span>
+            <span className="font-medium">
+              {product.materialType?.name || "-"}
+            </span>
           </div>
 
           {/* Custom */}

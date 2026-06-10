@@ -44,6 +44,7 @@ import {
   PlusCircle,
   RefreshCcw,
   Settings2,
+  ShoppingBag,
   Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -284,15 +285,15 @@ export default function AddOrderForm() {
     currencies.find((c) => c.code === selectedCurrencyCode)?.symbol || "Rp";
 
   return (
-    <Card className="space-y-4 mx-auto">
-      <CardHeader>
-        <CardTitle className="text-2xl font-semibold">
-          Create New Order
+    <Card className="space-y-4 mx-auto w-full">
+      <CardHeader className=" border-b">
+        <CardTitle className="text-2xl font-semibold flex items-center gap-2 text-slate-800">
+          <ShoppingBag className="h-6 w-6 text-blue-600" />
+          Create Order
         </CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          Ff
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
             {/* === SECTION 1: ORDER DETAILS === */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 border rounded-lg bg-gray-50/50">
