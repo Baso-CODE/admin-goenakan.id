@@ -10,6 +10,7 @@ import {
   Loader2,
   MoreHorizontal,
   Pencil,
+  Plus,
   Search,
   ShoppingCart,
   Trash2,
@@ -392,8 +393,14 @@ export default function TableOrder() {
           </Button>
         </div>
       </Card>
+
+      <Link href="/super-admin/orders/add?type=SALES" className=" items-end">
+        <Button>
+          <Plus className="mr-2 h-4 w-4" /> Create Sales Order
+        </Button>
+      </Link>
       {/* Main Table Card */}
-      <Card className="shadow-sm border-t-0 w-full overflow-hidden">
+      <Card className="shadow-sm border-t-0 w-full overflow-hidden mt-2">
         <CardContent className="p-0">
           <div className="rounded-md border overflow-x-auto w-full">
             <Table className="whitespace-nowrap min-w-full">

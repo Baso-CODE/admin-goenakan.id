@@ -9,6 +9,7 @@ import {
   FlaskConical,
   Loader2,
   Pencil,
+  Plus,
   Search,
 } from "lucide-react";
 import Link from "next/link";
@@ -282,8 +283,14 @@ export default function TableOrderSample() {
           </Button>
         </div>
       </Card>
+
+      <Link href="/super-admin/orders/add?type=SAMPLE">
+        <Button>
+          <Plus className="mr-2 h-4 w-4" /> Create Sample Order
+        </Button>
+      </Link>
       {/* Main Table Card */}
-      <Card className="shadow-sm border-t-0 w-full overflow-hidden">
+      <Card className="shadow-sm border-t-0 w-full overflow-hidden mt-4">
         <CardContent className="p-0 w-full overflow-hidden">
           <div className="w-full overflow-x-auto">
             <Table className="whitespace-nowrap w-full">

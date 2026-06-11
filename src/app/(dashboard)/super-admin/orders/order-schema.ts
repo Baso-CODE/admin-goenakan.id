@@ -16,7 +16,13 @@ export const orderSchema = z.object({
   currencyCode: z.string().default("IDR"),
   referenceQuotationId: z.string().optional(),
   referenceSampleId: z.string().optional(),
-  vendorIds: z.array(z.string()).min(1, "At least one vendor required"),
+
+  warrantyDays: z
+    .number()
+    .int()
+    .min(0, "Warranty days cannot be negative")
+    .default(30),
+
   products: z
     .array(
       z.object({

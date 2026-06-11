@@ -49,7 +49,6 @@ export default function LogisticsTrackingDetail() {
     try {
       setLoading(true);
 
-      // ✨ Parallel Fetching menggunakan fetchApi (Otomatis handle Base URL & Token)
       const [orderRes, vendorRes] = await Promise.all([
         fetchApi(`/orders/${orderId}/tracking`),
         fetchApi(`/vendors/by-order/${orderId}`),

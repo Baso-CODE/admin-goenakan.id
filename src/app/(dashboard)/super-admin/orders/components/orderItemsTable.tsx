@@ -37,7 +37,7 @@ export function OrderItemsTable({
           Daftar produk dan detail customization
         </CardDescription>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="p-4">
         <Table>
           <TableHeader>
             <TableRow>

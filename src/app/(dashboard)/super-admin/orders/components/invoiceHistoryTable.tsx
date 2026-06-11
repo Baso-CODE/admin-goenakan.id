@@ -38,7 +38,7 @@ export function InvoiceHistoryTable({ invoices }: InvoiceHistoryTableProps) {
           Riwayat tagihan yang telah dibuat untuk order ini
         </CardDescription>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="p-4">
         <Table>
           <TableHeader>
             <TableRow>

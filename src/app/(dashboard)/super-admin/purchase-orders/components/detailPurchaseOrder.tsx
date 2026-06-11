@@ -269,7 +269,7 @@ export default function PurchaseOrderDetail() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="whitespace-nowrap">
+            <Table className="whitespace-nowrap p-4">
               <TableHeader className="bg-slate-100">
                 <TableRow>
                   <TableHead>Item / Service</TableHead>
@@ -299,16 +299,16 @@ export default function PurchaseOrderDetail() {
                       {item.order?.orderNumber || "-"}
                     </TableCell>
                     <TableCell className="text-center text-slate-600">
-                      {item.quantityOrder}{" "}
+                      {item.quantityOrder}
                       <span className="text-xs">{item.uom}</span>
                     </TableCell>
                     <TableCell className="text-center text-slate-500">
-                      {item.quantityStock}{" "}
+                      {item.quantityStock}
                       <span className="text-xs">{item.uom}</span>
                     </TableCell>
                     {/* 2. Hapus bg-green-50/50 di sini agar latar belakangnya menyatu dengan baris */}
                     <TableCell className="text-center font-bold text-green-700">
-                      {item.quantityPurchase}{" "}
+                      {item.quantityPurchase}
                       <span className="text-xs">{item.uom}</span>
                     </TableCell>
                     <TableCell className="text-right font-mono text-slate-700">

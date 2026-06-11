@@ -37,7 +37,7 @@ import { useApi } from "@/hooks/useApi";
 // === TYPES ===
 type LogisticsData = {
   orderId: string;
-  poNumber: string;
+  orderNumber: string;
   clientName: string;
   waktuPenyelesaian: string;
   waktuProduksi: string;
@@ -60,6 +60,7 @@ export default function LogisticTableAnalysist() {
 
   // === STATE ===
   const [data, setData] = useState<LogisticsData[]>([]);
+
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -93,6 +94,8 @@ export default function LogisticTableAnalysist() {
       if (!res.ok) throw new Error("Gagal mengambil data logistik");
 
       const result = await res.json();
+      console.log("ini adalah result", result);
+
       setData(result.data || []);
       setMeta(result.meta);
     } catch (error) {
@@ -151,7 +154,7 @@ export default function LogisticTableAnalysist() {
           <div className="relative w-full md:w-72">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Cari PO / Client..."
+              placeholder="Cari Order / Client..." // ✨ UPDATE: Placeholder disesuaikan
               className="pl-9"
               value={search}
               onChange={(e) => {
@@ -166,15 +169,12 @@ export default function LogisticTableAnalysist() {
       {/* Filter Bar */}
       <Card className="p-4 shadow-sm bg-gray-50/50 border-gray-100">
         <div className="flex flex-wrap items-end gap-4">
-          {/* 1. Label Filter Icon */}
           <div className="flex items-center gap-2 h-10 bg-white px-4 border rounded-md shadow-sm text-muted-foreground">
             <Filter className="h-4 w-4" />
             <span className="text-sm font-medium">Filter Tanggal</span>
           </div>
 
-          {/* 2. Grup Input Tanggal */}
           <div className="flex flex-wrap items-center gap-3">
-            {/* Input: Dari */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider pl-1">
                 Dari
@@ -189,7 +189,6 @@ export default function LogisticTableAnalysist() {
               />
             </div>
 
-            {/* Input: Sampai */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider pl-1">
                 Sampai
@@ -205,7 +204,6 @@ export default function LogisticTableAnalysist() {
             </div>
           </div>
 
-          {/* 3. Tombol Reset */}
           {(startDate || endDate) && (
             <Button
               variant="ghost"
@@ -229,11 +227,9 @@ export default function LogisticTableAnalysist() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="w-45">PO Number</TableHead>
+                  <TableHead className="w-45">Order Number</TableHead>
                   <TableHead className="w-50">Client</TableHead>
                   <TableHead className="w-62.5">Current Status</TableHead>
-
-                  {/* Kolom Waktu dengan Icon */}
                   <TableHead className="text-center bg-orange-50/50">
                     <div className="flex flex-col items-center gap-1 py-1">
                       <Factory className="h-3.5 w-3.5 text-orange-600" />
@@ -258,7 +254,6 @@ export default function LogisticTableAnalysist() {
                       </span>
                     </div>
                   </TableHead>
-
                   <TableHead className="text-center font-bold">
                     Total Waktu
                   </TableHead>
@@ -314,7 +309,8 @@ export default function LogisticTableAnalysist() {
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                          {item.poNumber}
+                          {item.orderNumber}{" "}
+                          {/* ✨ UPDATE: merender item.orderNumber */}
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
@@ -324,7 +320,6 @@ export default function LogisticTableAnalysist() {
                         {getStatusBadge(item.currentStatus)}
                       </TableCell>
 
-                      {/* Kolom Durasi */}
                       <TableCell className="text-center text-sm font-medium text-orange-700 bg-orange-50/30">
                         {item.waktuProduksi}
                       </TableCell>
@@ -340,7 +335,6 @@ export default function LogisticTableAnalysist() {
                       </TableCell>
 
                       <TableCell className="text-right">
-                        {/* Tombol Edit / Pencil -> Ke Halaman Khusus Tracking */}
                         <Link
                           href={`/super-admin/logistics/track/${item.orderId}`}>
                           <Button
@@ -348,11 +342,9 @@ export default function LogisticTableAnalysist() {
                             size="icon"
                             className="h-8 w-8 mr-2 border-orange-200 text-orange-700 hover:bg-orange-50">
                             <Pencil className="h-4 w-4" />
-                            {/* Import Pencil dari lucide-react */}
                           </Button>
                         </Link>
 
-                        {/* Tombol View -> Ke Detail Order (Optional, untuk cek invoice dll) */}
                         <Link
                           href={`/super-admin/orders/detail/${item.orderId}`}>
                           <Button

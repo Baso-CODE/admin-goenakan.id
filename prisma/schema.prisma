@@ -8,17 +8,24 @@ generator client {
 
 datasource db {
   provider = "mysql"
+  // url      = env("DATABASE_URL")
 }
 
 // ===============================================
 // ENUMS & MASTER TABLES
-// ===============================================
 enum OrderStatus {
   PENDING // Menunggu pembayaran / konfirmasi
   PROCESSING // Sedang diproses / diproduksi
   SHIPPED // Sedang dikirim (jika ada pengiriman fisik)
   COMPLETED // Selesai
   CANCELLED // Dibatalkan (baik dari web maupun manual)
+}
+
+enum WarrantyStatus {
+  NOT_STARTED
+  ACTIVE
+  EXPIRED
+  VOID
 }
 
 enum QuotationStatus {
@@ -140,6 +147,35 @@ enum TransactionType {
   EXPENSE
 }
 
+enum PurchaseType {
+  DIRECT_MATERIAL // Pembelian produk berdasarkan SO
+  DIRECT_EXPENSES // Pembelian selain produk (ex: logistik) berdasarkan SO
+  INDIRECT_EXPENSES // Pembelian diluar SO (listrik, air, dll)
+  STOCK // Pembelian produk bukan berdasarkan SO
+}
+
+enum ExpenseCategory {
+  PRODUCT
+  PACKAGING
+  LOGISTIC
+  UTILITY
+}
+
+enum PaymentTerm {
+  IMMEDIATELY
+  NET_14 // 14 Days
+  NET_30 // 30 Days
+  NET_60 // 60 Days
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  APPROVED
+  SENT
+  COMPLETED
+  CANCELLED
+}
+
 // ===============================================
 // USER TABLE
 // ===============================================
@@ -162,6 +198,12 @@ model User {
   customerProfile     CustomerProfile?
   accounts            Account[]
   client              Client?
+  createdOrders       Order[]              @relation("OrderCreatedBy")
+  updatedOrders       Order[]              @relation("OrderUpdatedBy")
+  createdPOs          PurchaseOrder[]      @relation("POCreatedBy")
+  updatedPOs          PurchaseOrder[]      @relation("POUpdatedBy")
+  approvedPOs         PurchaseOrder[]      @relation("POApprovedBy")
+  orders              Order[]
 
   @@map("users")
 }
@@ -409,6 +451,7 @@ model Product {
   articleProducts ArticleProduct[]
   cartItems       CartItem[]
   webOrderItems   WebOrderItem[]
+  purchaseItems   PurchaseOrderItem[]
 
   @@map("products")
 }
@@ -512,6 +555,7 @@ model ProductVariant {
   quotationItems  QuotationItem[]
   cartItems       CartItem[]
   webOrderItems   WebOrderItem[]
+  priceTiers      PriceTier[]
 
   @@map("product_variants")
 }
@@ -534,10 +578,13 @@ model PriceTier {
   minQuantity Int      @default(1)
   maxQuantity Int?
   price       Decimal
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @default(now()) @updatedAt
 
   @@map("price_tiers")
 }
@@ -718,6 +765,7 @@ model Vendor {
   contacts       VendorContact[]
   productionJobs ProductionTracker[]
   shipments      Shipment[]
+  purchaseOrders PurchaseOrder[]
 
   @@map("vendors")
 }
@@ -832,38 +880,74 @@ model SalesBank {
 // ===============================================
 
 model Order {
-  id                 String                @id @default(uuid())
-  orderNumber        String?               @unique
-  dateOrder          DateTime
-  salesCategory      SalesCategory
-  poNumber           String?
-  clientId           String
-  salesId            String?
-  shippingAddress    String
-  totalAmount        Decimal
-  status             OrderStatus           @default(PENDING)
-  webOrderId         String?               @unique
-  webOrder           WebOrder?             @relation(fields: [webOrderId], references: [id])
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  clientB2BPICId     String?
-  pic                ClientB2BPIC?         @relation(fields: [clientB2BPICId], references: [id])
-  purchaseChannelId  String?
-  purchaseChannel    PurchaseChannel?      @relation(fields: [purchaseChannelId], references: [id])
-  client             Client                @relation(fields: [clientId], references: [id])
-  sales              Sales?                @relation(fields: [salesId], references: [id])
-  products           OrderProduct[]
-  vendors            OrderVendor[]
-  cashflows          Cashflow[]
-  productionTrackers ProductionTracker[]
-  shipments          Shipment[]
-  invoices           Invoice[]
-  deliveryNotes      DeliveryNote[]
-  quotations         Quotation[]
-  cashflowSummary    CashflowSummary[]
-  sampleFollowUps    OrderSampleFollowUp[]
+  id                   String                @id @default(uuid())
+  orderNumber          String?               @unique
+  dateOrder            DateTime
+  salesCategory        SalesCategory
+  poNumber             String?
+  clientPoNumber       String?
+  remark               String?               @db.Text
+  currencyCode         String                @default("IDR")
+  currency             Currency              @relation(fields: [currencyCode], references: [code])
+  referenceQuotationId String?
+  referenceQuotation   Quotation?            @relation("OrderSourcedFromQuotation", fields: [referenceQuotationId], references: [id])
+  referenceSampleId    String?
+  referenceSample      Order?                @relation("SampleToSalesOrder", fields: [referenceSampleId], references: [id])
+  resultingOrders      Order[]               @relation("SampleToSalesOrder")
+  clientId             String
+  salesId              String?
+  shippingAddress      String
+  totalAmount          Decimal
+  status               OrderStatus           @default(PENDING)
+  webOrderId           String?               @unique
+  webOrder             WebOrder?             @relation(fields: [webOrderId], references: [id])
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  clientB2BPICId       String?
+  pic                  ClientB2BPIC?         @relation(fields: [clientB2BPICId], references: [id])
+  purchaseChannelId    String?
+  purchaseChannel      PurchaseChannel?      @relation(fields: [purchaseChannelId], references: [id])
+  client               Client                @relation(fields: [clientId], references: [id])
+  sales                Sales?                @relation(fields: [salesId], references: [id])
+  createdById          String?
+  createdBy            User?                 @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  updatedById          String?
+  updatedBy            User?                 @relation("OrderUpdatedBy", fields: [updatedById], references: [id])
+  products             OrderProduct[]
+  vendors              OrderVendor[]
+  cashflows            Cashflow[]
+  productionTrackers   ProductionTracker[]
+  shipments            Shipment[]
+  invoices             Invoice[]
+  deliveryNotes        DeliveryNote[]
+  quotations           Quotation[]           @relation("OrderQuotations")
+  cashflowSummary      CashflowSummary[]
+  sampleFollowUps      OrderSampleFollowUp[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  warrantyDays         Int?
+  warranties           OrderWarranty[]
+  user                 User?                 @relation(fields: [userId], references: [id])
+  userId               String?
 
   @@map("orders")
+}
+
+model OrderWarranty {
+  id              String         @id @default(uuid())
+  orderId         String
+  order           Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shipmentId      String
+  shipment        Shipment       @relation(fields: [shipmentId], references: [id])
+  warrantyDays    Int            @default(30)
+  startDate       DateTime
+  expiryDate      DateTime
+  status          WarrantyStatus @default(NOT_STARTED)
+  isFinalShipment Boolean        @default(false)
+  notes           String?        @db.Text
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@map("order_warranties")
 }
 
 model OrderProduct {
@@ -898,23 +982,81 @@ model OrderVendor {
 }
 
 model OrderSampleFollowUp {
-  id      String   @id @default(uuid())
-  orderId String
-  date    DateTime @default(now())
-
+  id         String   @id @default(uuid())
+  orderId    String
+  date       DateTime @default(now())
   name       String?
   method     String?
-  notes      String? @db.Text
+  notes      String?  @db.Text
   nextAction String?
-
-  isDone Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isDone     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("order_sample_follow_ups")
+}
+
+// ===============================================
+// PURCHASE ORDER SECTION
+// ===============================================
+model PurchaseOrder {
+  id              String              @id @default(uuid())
+  poNumber        String              @unique
+  poDate          DateTime            @default(now())
+  purchaseType    PurchaseType
+  expenseCategory ExpenseCategory
+  paymentTerms    PaymentTerm
+  // Relasi Vendor
+  vendorId        String
+  vendor          Vendor              @relation(fields: [vendorId], references: [id])
+  vendorAddress   String              @db.Text
+  // Relasi Mata Uang
+  currencyCode    String              @default("IDR")
+  currency        Currency            @relation(fields: [currencyCode], references: [code])
+  // Total Keseluruhan
+  totalAmount     Decimal             @default(0)
+  status          PurchaseOrderStatus @default(DRAFT)
+  notes           String?             @db.Text
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  items           PurchaseOrderItem[]
+  createdById     String?
+  createdBy       User?               @relation("POCreatedBy", fields: [createdById], references: [id])
+  updatedById     String?
+  updatedBy       User?               @relation("POUpdatedBy", fields: [updatedById], references: [id])
+  approvedById    String?
+  approvedBy      User?               @relation("POApprovedBy", fields: [approvedById], references: [id])
+  approvalDate    DateTime?
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               String        @id @default(uuid())
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  itemName         String
+  productId        String?
+  product          Product?      @relation(fields: [productId], references: [id])
+  // === REFERENSI SO / SN ===
+  // Relasi ke tabel Order (Opsional: karena tipe INDIRECT_EXPENSES / STOCK tidak pakai SO)
+  orderId          String?
+  order            Order?        @relation(fields: [orderId], references: [id])
+  // === KALKULASI KUANTITAS ===
+  quantityOrder    Int
+  quantityStock    Int           @default(0)
+  quantityPurchase Int
+  uom              String
+  // === KALKULASI HARGA ===
+  unitPrice        Decimal
+  totalAmount      Decimal
+  remarks          String?       @db.Text
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@map("purchase_order_items")
 }
 
 // ===============================================
@@ -961,14 +1103,11 @@ model ProductionTracker {
   endDate        DateTime?
   status         ProductionStatus @default(PENDING)
   remarks        String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  order        Order        @relation(fields: [orderId], references: [id])
-  orderProduct OrderProduct @relation(fields: [orderProductId], references: [id])
-  vendor       Vendor       @relation(fields: [vendorId], references: [id])
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  order          Order            @relation(fields: [orderId], references: [id])
+  orderProduct   OrderProduct     @relation(fields: [orderProductId], references: [id], onDelete: Cascade)
+  vendor         Vendor           @relation(fields: [vendorId], references: [id])
 
   @@map("production_trackers")
 }
@@ -994,16 +1133,13 @@ model Shipment {
   destination        String?
   departureDate      DateTime?
   arrivalDate        DateTime?
-
-  notes ShipmentNote[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  order  Order          @relation(fields: [orderId], references: [id])
-  vendor Vendor?        @relation(fields: [vendorId], references: [id])
-  items  ShipmentItem[]
+  warranties         OrderWarranty[]
+  notes              ShipmentNote[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  order              Order             @relation(fields: [orderId], references: [id])
+  vendor             Vendor?           @relation(fields: [vendorId], references: [id])
+  items              ShipmentItem[]
 
   @@map("shipments")
 }
@@ -1016,32 +1152,28 @@ model ShipmentHistory {
   note       String?
   city       String?
   date       DateTime @default(now())
-
-  createdAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 }
 
 model ShipmentItem {
-  id             String @id @default(uuid())
+  id             String       @id @default(uuid())
   shipmentId     String
   orderProductId String
-  totalCarton    Int?   @default(0)
+  totalCarton    Int?         @default(0)
   quantity       Int
-
-  // Relations
-  shipment     Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  orderProduct OrderProduct @relation(fields: [orderProductId], references: [id])
+  shipment       Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  orderProduct   OrderProduct @relation(fields: [orderProductId], references: [id], onDelete: Cascade)
 
   @@map("shipment_items")
 }
 
 model ShipmentNoteCategory {
-  id        String   @id @default(uuid())
+  id        String         @id @default(uuid())
   name      String
   templates Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  notes ShipmentNote[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  notes     ShipmentNote[]
 
   @@map("shipment_note_categories")
 }
@@ -1079,7 +1211,7 @@ model DeliveryNote {
 
 model Quotation {
   id              String          @id @default(uuid())
-  quotationNumber String          @unique
+  quotationNumber String?         @unique
   date            DateTime        @default(now())
   validUntil      DateTime?
   status          QuotationStatus @default(DRAFT)
@@ -1096,19 +1228,19 @@ model Quotation {
   manualClientAddress String? @db.Text
 
   // === FINANCIALS ===
-  subTotal       Decimal  @default(0)
-  taxAmount      Decimal? @default(0)
-  discountAmount Decimal? @default(0)
-  totalAmount    Decimal  @default(0)
-
-  notes QuotationNote[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  subTotal       Decimal         @default(0)
+  taxAmount      Decimal?        @default(0)
+  discountAmount Decimal?        @default(0)
+  totalAmount    Decimal         @default(0)
+  notes          QuotationNote[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   // === RELATIONS ===
-  orderId   String?
-  order     Order?              @relation(fields: [orderId], references: [id])
+  orderId         String?
+  order           Order?  @relation("OrderQuotations", fields: [orderId], references: [id])
+  resultingOrders Order[] @relation("OrderSourcedFromQuotation")
+
   salesId   String?
   sales     Sales?              @relation(fields: [salesId], references: [id])
   items     QuotationItem[]
@@ -1253,7 +1385,7 @@ model CashflowRevenue {
   unitPrice    Decimal
   quantity     Int
   total        Decimal
-  currency     String
+  currency     String   @default("IDR")
   exchangeRate Decimal?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -1274,7 +1406,7 @@ model CashflowCost {
   costPerUnit  Decimal
   quantity     Int
   total        Decimal
-  currency     String
+  currency     String   @default("IDR")
   exchangeRate Decimal?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -1292,13 +1424,14 @@ model CashflowCost {
 // ===============================================
 
 model Currency {
-  code   String @id // ex: IDR, USD
-  symbol String // ex: Rp, $
-  name   String // ex: Rupiah, US Dollar
-
+  code              String            @id
+  symbol            String
+  name              String
   cashflowSummaries CashflowSummary[]
   cashflowRevenues  CashflowRevenue[]
   cashflowCosts     CashflowCost[]
+  orders            Order[]
+  purchaseOrders    PurchaseOrder[]
 
   @@map("currencies")
 }
@@ -1412,15 +1545,15 @@ model AppSetting {
 }
 
 model FinanceCategory {
-  id          String          @id @default(uuid())
-  name        String          @unique // Contoh: "Gaji Karyawan", "Listrik", "Sewa Gedung"
-  slug        String          @unique
-  type        TransactionType
-  description String?
-  isActive    Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-
+  id           String               @id @default(uuid())
+  name         String               @unique
+  slug         String               @unique
+  type         TransactionType
+  description  String?
+  isActive     Boolean              @default(true)
+  isMarketing  Boolean              @default(false)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
   transactions FinanceTransaction[]
 
   @@map("finance_categories")
@@ -1433,14 +1566,11 @@ model FinanceTransaction {
   amount          Decimal         @default(0)
   referenceNumber String?
   description     String          @db.Text
-
-  method PaymentMethod?
-
-  createdBy String
-  user      User   @relation(fields: [createdBy], references: [id])
-
-  categoryId String
-  category   FinanceCategory @relation(fields: [categoryId], references: [id])
+  method          PaymentMethod?
+  createdBy       String
+  user            User            @relation(fields: [createdBy], references: [id])
+  categoryId      String
+  category        FinanceCategory @relation(fields: [categoryId], references: [id])
 
   salesId String?
   sales   Sales?  @relation(fields: [salesId], references: [id])
@@ -1550,7 +1680,7 @@ model WebOrder {
   guestPhone      String?
   shippingAddress Json
   subtotal        Decimal
-  shippingCost    Decimal
+  shippingCost    Decimal?
   customerNote    String?          @db.Text
   taxAmount       Decimal?         @default(0)
   totalAmount     Decimal
@@ -1718,23 +1848,9 @@ model BrandClient {
   @@map("brand_clients")
 }
 
-model Portfolio {
-  id              String         @id @default(cuid())
-  title           String
-  slug            String         @unique
-  clientName      String
-  description     String?        @db.Text
-  image           String
-  imageId         String
-  displayOrder    Int            @default(0)
-  isActive        Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  eventCategory   EventCategory? @relation(fields: [eventCategoryId], references: [id])
-  eventCategoryId String?
-
-  @@map("portfolios")
-}
+// ===============================================
+// PORTFOLIO & EVENT CATEGORY SECTION
+// ===============================================
 
 model EventCategory {
   id           String      @id @default(cuid())
@@ -1750,6 +1866,26 @@ model EventCategory {
   portfolios   Portfolio[]
 
   @@map("event_categories")
+}
+
+model Portfolio {
+  id              String         @id @default(cuid())
+  title           String
+  slug            String         @unique
+  clientName      String
+  description     String?        @db.Text
+  image           String
+  imageId         String
+  orderQuantity   Int?           @default(0)
+  projectDate     DateTime?
+  displayOrder    Int            @default(0)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  eventCategoryId String?
+  eventCategory   EventCategory? @relation(fields: [eventCategoryId], references: [id], onDelete: SetNull)
+
+  @@map("portfolios")
 }
 
 model ContactMessage {

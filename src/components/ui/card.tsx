@@ -8,7 +8,7 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
       className={cn(
         // 1. Hapus flex-col, gap-6, dan py-6.
         // 2. Tambahkan overflow-hidden agar warna background header ikut melengkung di sudut
-        "bg-card text-card-foreground rounded-xl border shadow-sm overflow-hidden px-2",
+        "bg-card text-card-foreground rounded-xl border shadow-sm overflow-hidden ",
         className,
       )}
       {...props}

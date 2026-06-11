@@ -41,12 +41,14 @@ import {
   ChevronsUpDown,
   DollarSign,
   FileText,
+  FlaskConical,
   PlusCircle,
   RefreshCcw,
   Settings2,
   ShoppingBag,
   Trash2,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation"; // ✨ Import useSearchParams
 import { useEffect, useState } from "react";
 import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -62,18 +64,22 @@ import {
   QuotationRef,
   Sales,
   SampleOrderRef,
-  Vendor,
 } from "../types/order.types";
 import { SampleFollowUpSection, SampleStepItem } from "./sampleFollowUpSection";
 
 export default function AddOrderForm() {
   const { fetchApi, status } = useApi();
 
+  const searchParams = useSearchParams();
+  const typeParam = searchParams.get("type");
+  const defaultCategory = typeParam === "SAMPLE" ? "SAMPLE" : "SALES";
+
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderSchema) as Resolver<OrderFormValues>,
     defaultValues: {
       dateOrder: new Date().toISOString().split("T")[0],
-      salesCategory: "SALES",
+      salesCategory: defaultCategory,
+      warrantyDays: 30,
 
       poNumber: "",
       clientPoNumber: "",
@@ -88,7 +94,7 @@ export default function AddOrderForm() {
       phone: "",
       shippingAddress: "",
       salesId: "",
-      vendorIds: [],
+      // vendorIds: [], <-- ✨ 4. Vendor Dihapus
       products: [
         {
           productId: "",
@@ -111,22 +117,18 @@ export default function AddOrderForm() {
   // Master Data States
   const [clients, setClients] = useState<Client[]>([]);
   const [sales, setSales] = useState<Sales[]>([]);
-  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
     [],
   );
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [quotationRefs, setQuotationRefs] = useState<QuotationRef[]>([]);
-
   const [sampleOrderRefs, setSampleOrderRefs] = useState<SampleOrderRef[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [generatingPo, setGeneratingPo] = useState(false);
 
   const [clientOpen, setClientOpen] = useState(false);
-  const [vendorOpen, setVendorOpen] = useState(false);
-  const [vendorSearch, setVendorSearch] = useState("");
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [sampleOpen, setSampleOpen] = useState(false);
 
@@ -136,7 +138,7 @@ export default function AddOrderForm() {
   const selectedCurrencyCode = watch("currencyCode");
   const [sampleSteps, setSampleSteps] = useState<SampleStepItem[]>([]);
 
-  // Load Initial Master Data
+  // Load Initial Master Data (Tanpa Vendor)
   useEffect(() => {
     async function load() {
       if (status !== "authenticated") return;
@@ -144,11 +146,10 @@ export default function AddOrderForm() {
       try {
         setLoading(true);
 
-        const [resC, resS, resV, resP, resPC, resCur, resQ, resSamp] =
+        const [resC, resS, resP, resPC, resCur, resQ, resSamp] =
           await Promise.all([
             fetchApi("/clients/order"),
             fetchApi("/sales/order"),
-            fetchApi("/vendors/order/add"),
             fetchApi("/products/order"),
             fetchApi("/purchase-channels/list"),
             fetchApi("/currencies"),
@@ -156,17 +157,15 @@ export default function AddOrderForm() {
             fetchApi("/orders/list-samples"),
           ]);
 
-        if (!resC.ok || !resS.ok || !resV.ok || !resP.ok || !resPC.ok) {
+        if (!resC.ok || !resS.ok || !resP.ok || !resPC.ok) {
           throw new Error("Gagal mengambil data master inti");
         }
 
         const c = await resC.json();
         const s = await resS.json();
-        const v = await resV.json();
         const p = await resP.json();
         const pc = await resPC.json();
 
-        // --- PARSING JSON UTAMANYA ---
         const jsonCur = resCur.ok ? await resCur.json() : null;
         const jsonQ = resQ.ok ? await resQ.json() : null;
         const jsonSamp = resSamp.ok ? await resSamp.json() : null;
@@ -177,7 +176,6 @@ export default function AddOrderForm() {
 
         setClients(c);
         setSales(s);
-        setVendors(v);
         setProducts(p);
         setPurchaseChannels(pc);
 
@@ -284,12 +282,18 @@ export default function AddOrderForm() {
   const currentCurrencySymbol =
     currencies.find((c) => c.code === selectedCurrencyCode)?.symbol || "Rp";
 
+  const titleText =
+    salesCategory === "SAMPLE" ? "Create Sample Order" : "Create Sales Order";
   return (
     <Card className="space-y-4 mx-auto w-full">
-      <CardHeader className=" border-b">
+      <CardHeader className="border-b p-6">
         <CardTitle className="text-2xl font-semibold flex items-center gap-2 text-slate-800">
-          <ShoppingBag className="h-6 w-6 text-blue-600" />
-          Create Order
+          {salesCategory === "SAMPLE" ? (
+            <FlaskConical className="h-6 w-6 text-indigo-600" />
+          ) : (
+            <ShoppingBag className="h-6 w-6 text-blue-600" />
+          )}
+          {titleText}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -414,6 +418,39 @@ export default function AddOrderForm() {
                 )}
               />
 
+              {/* ✨ TAMBAHAN: Warranty Days Field */}
+              <FormField
+                control={control}
+                name="warrantyDays"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Warranty Period (After Arrival)</FormLabel>
+                    <Select
+                      onValueChange={(val) => field.onChange(Number(val))}
+                      value={String(field.value)}>
+                      <FormControl>
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Select warranty period" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="0">Tidak Ada Garansi</SelectItem>
+                        <SelectItem value="10">10 Hari</SelectItem>
+                        <SelectItem value="20">20 Hari</SelectItem>
+                        <SelectItem value="30">30 Hari</SelectItem>
+                        <SelectItem value="60">60 Hari</SelectItem>
+                        <SelectItem value="90">90 Hari</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Masa aktif garansi dimulai otomatis ketika barang diterima
+                      oleh pelanggan.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {salesCategory === "SAMPLE" && (
                 <div className="col-span-full">
                   <SampleFollowUpSection onChange={setSampleSteps} />
@@ -421,7 +458,7 @@ export default function AddOrderForm() {
               )}
             </div>
 
-            {/* === SECTION 2: DOCUMENT REFERENCES (Dinamis Sesuai Alur Proses) === */}
+            {/* === SECTION 2: DOCUMENT REFERENCES === */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
               <h3 className="col-span-full font-medium text-lg text-gray-700">
                 Document References
@@ -745,10 +782,10 @@ export default function AddOrderForm() {
               />
             </div>
 
-            {/* === SECTION 4: SALES, VENDOR, & REMARK === */}
+            {/* === SECTION 4: SALES & REMARK (Vendor Dihapus) === */}
             <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
               <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
-                Internal & Vendor
+                Internal
               </h3>
 
               <FormField
@@ -771,112 +808,6 @@ export default function AddOrderForm() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={control}
-                name="vendorIds"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Vendors (Multiple)</FormLabel>
-                    <Popover open={vendorOpen} onOpenChange={setVendorOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            className="w-full justify-between font-normal h-10">
-                            <span className="text-muted-foreground">
-                              {field.value?.length > 0
-                                ? `${field.value.length} vendor dipilih`
-                                : "Cari & tambah vendor..."}
-                            </span>
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-0" align="start">
-                        <Command>
-                          <CommandInput
-                            placeholder="Cari nama vendor..."
-                            value={vendorSearch}
-                            onValueChange={setVendorSearch}
-                          />
-                          <CommandList>
-                            <CommandEmpty>Vendor tidak ditemukan.</CommandEmpty>
-                            <CommandGroup>
-                              {vendors
-                                .filter((v) =>
-                                  v.companyName
-                                    .toLowerCase()
-                                    .includes(vendorSearch.toLowerCase()),
-                                )
-                                .map((v) => {
-                                  const isSelected = field.value?.includes(
-                                    v.id,
-                                  );
-                                  return (
-                                    <CommandItem
-                                      key={v.id}
-                                      value={`${v.companyName}-${v.id}`}
-                                      onSelect={() => {
-                                        const current = field.value || [];
-                                        field.onChange(
-                                          isSelected
-                                            ? current.filter(
-                                                (id) => id !== v.id,
-                                              )
-                                            : [...current, v.id],
-                                        );
-                                      }}>
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          isSelected
-                                            ? "opacity-100"
-                                            : "opacity-0",
-                                        )}
-                                      />
-                                      {v.companyName}
-                                    </CommandItem>
-                                  );
-                                })}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-
-                    {field.value?.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {field.value.map((id) => {
-                          const vendor = vendors.find((v) => v.id === id);
-                          if (!vendor) return null;
-                          return (
-                            <div
-                              key={id}
-                              className="flex items-center gap-1.5 bg-white border px-2.5 py-1 rounded-full text-sm shadow-sm">
-                              <span className="text-slate-700">
-                                {vendor.companyName}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  field.onChange(
-                                    field.value.filter((vId) => vId !== id),
-                                  )
-                                }
-                                className="text-slate-400 hover:text-red-500 rounded-full">
-                                <XIcon className="w-3 h-3" />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -1237,22 +1168,5 @@ export default function AddOrderForm() {
         </Form>
       </CardContent>
     </Card>
-  );
-}
-
-function XIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}>
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
-    </svg>
   );
 }
