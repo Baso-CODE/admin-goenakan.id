@@ -4,8 +4,8 @@ import { useApi } from "@/hooks/useApi";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import ProductFormV2 from "../components/formProductV2";
 import { ProductFormValues } from "../components/product.schema";
+import ProductFormV2 from "../components/productFormV2";
 
 type FileUploads = {
   images: File[] | null;

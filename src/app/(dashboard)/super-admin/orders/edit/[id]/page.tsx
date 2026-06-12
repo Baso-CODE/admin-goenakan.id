@@ -806,7 +806,7 @@ export default function EditOrderForm() {
                     </span>
                   )}
                 </div>
-                {isPending && ( // ✅ tombol Add hanya muncul kalau PENDING
+                {isPending && (
                   <Button
                     type="button"
                     variant="outline"
