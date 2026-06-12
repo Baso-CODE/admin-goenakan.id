@@ -92,7 +92,6 @@ export default function EditOrderForm() {
       phone: "",
       shippingAddress: "",
       salesId: "",
-      vendorIds: [],
       products: [],
     },
   });
@@ -225,7 +224,6 @@ export default function EditOrderForm() {
           phone: phoneValue,
           shippingAddress: orderData.shippingAddress || "",
           salesId: orderData.salesId || "",
-          vendorIds: orderData.vendorIds || [],
           products: orderData.products.map((item: any) => ({
             productId: item.productId,
             variantId: item.variantId || "",
@@ -769,112 +767,6 @@ export default function EditOrderForm() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={control}
-                name="vendorIds"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Vendors (Multiple)</FormLabel>
-                    <Popover open={vendorOpen} onOpenChange={setVendorOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            className="w-full justify-between font-normal h-10">
-                            <span className="text-muted-foreground">
-                              {field.value?.length > 0
-                                ? `${field.value.length} vendor dipilih`
-                                : "Cari & tambah vendor..."}
-                            </span>
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-0" align="start">
-                        <Command>
-                          <CommandInput
-                            placeholder="Cari nama vendor..."
-                            value={vendorSearch}
-                            onValueChange={setVendorSearch}
-                          />
-                          <CommandList>
-                            <CommandEmpty>Vendor tidak ditemukan.</CommandEmpty>
-                            <CommandGroup>
-                              {vendors
-                                .filter((v) =>
-                                  v.companyName
-                                    .toLowerCase()
-                                    .includes(vendorSearch.toLowerCase()),
-                                )
-                                .map((v) => {
-                                  const isSelected = field.value?.includes(
-                                    v.id,
-                                  );
-                                  return (
-                                    <CommandItem
-                                      key={v.id}
-                                      value={`${v.companyName}-${v.id}`}
-                                      onSelect={() => {
-                                        const current = field.value || [];
-                                        field.onChange(
-                                          isSelected
-                                            ? current.filter(
-                                                (id) => id !== v.id,
-                                              )
-                                            : [...current, v.id],
-                                        );
-                                      }}>
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          isSelected
-                                            ? "opacity-100"
-                                            : "opacity-0",
-                                        )}
-                                      />
-                                      {v.companyName}
-                                    </CommandItem>
-                                  );
-                                })}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-
-                    {field.value?.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {field.value.map((id) => {
-                          const vendor = vendors.find((v) => v.id === id);
-                          if (!vendor) return null;
-                          return (
-                            <div
-                              key={id}
-                              className="flex items-center gap-1.5 bg-white border px-2.5 py-1 rounded-full text-sm shadow-sm">
-                              <span className="text-slate-700">
-                                {vendor.companyName}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  field.onChange(
-                                    field.value.filter((vId) => vId !== id),
-                                  )
-                                }
-                                className="text-slate-400 hover:text-red-500 rounded-full">
-                                <XIcon className="w-3 h-3" />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
                     <FormMessage />
                   </FormItem>
                 )}
