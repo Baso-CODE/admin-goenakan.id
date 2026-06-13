@@ -93,7 +93,7 @@ export default function EditBannerProduct() {
   }
 
   return (
-    <div className="space-y-4 mx-auto max-w-5xl">
+    <div className="space-y-4 mx-auto ">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold tracking-tight uppercase text-stone-800">

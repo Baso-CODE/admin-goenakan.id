@@ -23,7 +23,9 @@ import {
   ChevronLeft,
   ChevronsUpDown,
   ClipboardList,
+  ImagePlus,
   Trash2,
+  X,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -88,7 +90,9 @@ interface ClientFormData {
   // ======================================================
   // ========================== B2B ========================
   // ======================================================
-
+  b2b_brandName?: string;
+  b2b_brandWebsiteUrl?: string;
+  b2b_brandLogoFile?: File | null;
   b2b_companyName?: string;
   b2b_departmentId?: string;
   b2b_phone?: string;
@@ -137,6 +141,9 @@ const initialFormData: ClientFormData = {
   // ============================
   // B2B FIELDS
   // ============================
+  b2b_brandName: "",
+  b2b_brandWebsiteUrl: "",
+  b2b_brandLogoFile: null,
   b2b_companyName: "",
   b2b_departmentId: "",
 
@@ -378,7 +385,6 @@ export default function ClientAddForm() {
       return;
     }
 
-    // Validasi manual field required B2B
     if (clientType === "B2B") {
       if (!formData.b2b_companyName)
         return toast.error("Nama perusahaan wajib diisi");
@@ -386,64 +392,115 @@ export default function ClientAddForm() {
         return toast.error("Departemen wajib dipilih");
       if (!formData.b2b_purchaseChannelId)
         return toast.error("Saluran pembelian wajib dipilih");
+      // Validasi logo jika nama brand diisi
+      if (formData.b2b_brandName && !formData.b2b_brandLogoFile) {
+        return toast.error("File Logo wajib diunggah jika Nama Brand diisi!");
+      }
     }
 
-    // Validasi manual field required B2C
     if (clientType === "B2C") {
       if (!formData.b2c_name) return toast.error("Nama lengkap wajib diisi");
       if (!formData.b2c_purchaseChannelIdB2C)
         return toast.error("Saluran pembelian wajib dipilih");
     }
+
     try {
       if (status !== "authenticated") {
         toast.error("Sesi berakhir, silakan login kembali.");
         return;
       }
 
-      const payload =
-        clientType === "B2C"
-          ? {
-              type: "B2C",
-              name: formData.b2c_name,
-              prefix: formData.b2c_prefix,
-              phone: formData.b2c_phone,
+      // ✨ MENGGUNAKAN FORMDATA KARENA MENGIRIM FILE
+      const formDataPayload = new FormData();
+      formDataPayload.append("type", clientType);
 
-              // ✅ BENAR - pakai suffix B2C sesuai DTO
-              countryB2C: formData.b2c_country,
-              provinceB2C: formData.b2c_province,
-              cityB2C: formData.b2c_city,
-              districtB2C: formData.b2c_district,
-              subDistrictB2C: formData.b2c_subDistrict,
-              postalCodeB2C: formData.b2c_postalCode,
-              fullAddressB2C: formData.b2c_fullAddressB2C,
-              purchaseChannelIdB2C: formData.b2c_purchaseChannelIdB2C,
-            }
-          : {
-              type: "B2B",
-              companyName: formData.b2b_companyName,
-              departmentId: formData.b2b_departmentId,
-              phone: formData.b2b_phone,
-              email: formData.b2b_email,
-              website: formData.b2b_website,
-              country: formData.b2b_country,
-              province: formData.b2b_province,
-              city: formData.b2b_city,
-              district: formData.b2b_district,
-              subDistrict: formData.b2b_subDistrict,
-              postalCode: formData.b2b_postalCode,
-              fullAddress: formData.b2b_fullAddress,
-              purchaseChannelId: formData.b2b_purchaseChannelId,
-              pics: formData.b2b_pics.map((pic) => ({
-                prefix: pic.prefix,
-                name: pic.name,
-                email: pic.email,
-                phone: pic.phone,
-              })),
-            };
+      if (clientType === "B2B") {
+        formDataPayload.append("companyName", formData.b2b_companyName || "");
+        formDataPayload.append("departmentId", formData.b2b_departmentId || "");
+        formDataPayload.append(
+          "purchaseChannelId",
+          formData.b2b_purchaseChannelId || "",
+        );
+
+        if (formData.b2b_phone)
+          formDataPayload.append("phone", formData.b2b_phone);
+        if (formData.b2b_email)
+          formDataPayload.append("email", formData.b2b_email);
+        if (formData.b2b_website)
+          formDataPayload.append("website", formData.b2b_website);
+        if (formData.b2b_country)
+          formDataPayload.append("country", formData.b2b_country);
+        if (formData.b2b_province)
+          formDataPayload.append("province", formData.b2b_province);
+        if (formData.b2b_city)
+          formDataPayload.append("city", formData.b2b_city);
+        if (formData.b2b_district)
+          formDataPayload.append("district", formData.b2b_district);
+        if (formData.b2b_subDistrict)
+          formDataPayload.append("subDistrict", formData.b2b_subDistrict);
+        if (formData.b2b_postalCode)
+          formDataPayload.append("postalCode", formData.b2b_postalCode);
+        if (formData.b2b_fullAddress)
+          formDataPayload.append("fullAddress", formData.b2b_fullAddress);
+
+        // Kirim array PIC sebagai string JSON
+        formDataPayload.append(
+          "pics",
+          JSON.stringify(
+            formData.b2b_pics.map((pic) => ({
+              prefix: pic.prefix,
+              name: pic.name,
+              email: pic.email,
+              phone: pic.phone,
+            })),
+          ),
+        );
+
+        // ✨ APPEND DATA BRAND JIKA ADA
+        if (formData.b2b_brandName) {
+          formDataPayload.append("brandName", formData.b2b_brandName);
+        }
+        if (formData.b2b_brandWebsiteUrl) {
+          formDataPayload.append(
+            "brandWebsiteUrl",
+            formData.b2b_brandWebsiteUrl,
+          );
+        }
+        if (formData.b2b_brandLogoFile) {
+          // 'logoFile' harus persis sama dengan yang ditangkap oleh multer upload.single("logoFile") di backend
+          formDataPayload.append("logoFile", formData.b2b_brandLogoFile);
+        }
+      } else {
+        // ... (B2C Payload Append Logic)
+        formDataPayload.append("name", formData.b2c_name || "");
+        formDataPayload.append(
+          "purchaseChannelIdB2C",
+          formData.b2c_purchaseChannelIdB2C || "",
+        );
+        if (formData.b2c_prefix)
+          formDataPayload.append("prefix", formData.b2c_prefix);
+        if (formData.b2c_phone)
+          formDataPayload.append("phone", formData.b2c_phone);
+        if (formData.b2c_country)
+          formDataPayload.append("countryB2C", formData.b2c_country);
+        if (formData.b2c_province)
+          formDataPayload.append("provinceB2C", formData.b2c_province);
+        if (formData.b2c_city)
+          formDataPayload.append("cityB2C", formData.b2c_city);
+        if (formData.b2c_district)
+          formDataPayload.append("districtB2C", formData.b2c_district);
+        if (formData.b2c_subDistrict)
+          formDataPayload.append("subDistrictB2C", formData.b2c_subDistrict);
+        if (formData.b2c_postalCode)
+          formDataPayload.append("postalCodeB2C", formData.b2c_postalCode);
+        if (formData.b2c_fullAddressB2C)
+          formDataPayload.append("fullAddressB2C", formData.b2c_fullAddressB2C);
+      }
 
       const res = await fetchApi("/clients", {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: formDataPayload,
+        headers: {} as any,
       });
 
       if (!res.ok) {
@@ -462,7 +519,6 @@ export default function ClientAddForm() {
       console.error(err);
     }
   };
-
   return (
     <div className="w-full max-w-full">
       <Link
@@ -616,7 +672,6 @@ export default function ClientAddForm() {
                           )}>
                           {formData.b2b_country ? (
                             <span className="flex items-center gap-2 truncate">
-                              {/* Mencari flag berdasarkan negara yang dipilih */}
                               <span>
                                 {
                                   countries.find(
@@ -662,8 +717,9 @@ export default function ClientAddForm() {
                                         : "opacity-0",
                                     )}
                                   />
-                                  <span className="mr-2">{c.flag}</span>
-                                  {c.name}
+                                  <span>
+                                    {c.flag} {c.name}
+                                  </span>
                                 </CommandItem>
                               ))}
                             </CommandGroup>
@@ -904,6 +960,107 @@ export default function ClientAddForm() {
                     onChange={handleChange}
                     required
                   />
+                </div>
+
+                {/* === BRAND CLIENT (OPSIONAL) === */}
+                <h4 className="font-medium mt-8 mb-2 border-b pb-2">
+                  Brand Client (Opsional)
+                </h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Isi bagian ini jika perusahaan ini memiliki brand spesifik
+                  yang ingin ditampilkan logonya.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Nama Brand</Label>
+                    <Input
+                      name="b2b_brandName"
+                      placeholder="Contoh: Chitato, Indomie..."
+                      value={formData.b2b_brandName}
+                      onChange={handleChange}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Website Brand</Label>
+                    <Input
+                      name="b2b_brandWebsiteUrl"
+                      placeholder="https://brand-website.com"
+                      value={formData.b2b_brandWebsiteUrl}
+                      onChange={handleChange}
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Logo Brand</Label>
+
+                    {formData.b2b_brandLogoFile ? (
+                      // === TAMPILAN PREVIEW GAMBAR ===
+                      <div className="relative w-40 h-40 rounded-xl border border-gray-200 overflow-hidden group shadow-sm">
+                        {/* Generate URL sementara untuk preview */}
+                        <img
+                          src={URL.createObjectURL(formData.b2b_brandLogoFile)}
+                          alt="Preview Logo"
+                          className="w-full h-full object-contain bg-white p-2"
+                        />
+                        {/* Tombol Hapus (Muncul saat di-hover) */}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                b2b_brandLogoFile: null,
+                              }))
+                            }
+                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      // === TAMPILAN AREA UPLOAD ===
+                      <div className="flex items-center justify-center w-full max-w-md">
+                        <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 border-gray-300 hover:border-primary transition-all">
+                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <div className="p-3 bg-white rounded-full shadow-sm mb-3">
+                              <ImagePlus className="w-6 h-6 text-gray-400" />
+                            </div>
+                            <p className="mb-1 text-sm text-gray-600">
+                              <span className="font-semibold text-primary">
+                                Klik untuk unggah
+                              </span>{" "}
+                              gambar
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              SVG, PNG, JPG atau WEBP
+                            </p>
+                          </div>
+                          {/* Input file disembunyikan */}
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              setFormData((prev) => ({
+                                ...prev,
+                                b2b_brandLogoFile: file,
+                              }));
+                            }}
+                          />
+                        </label>
+                      </div>
+                    )}
+
+                    {/* Validasi Peringatan */}
+                    {formData.b2b_brandName && !formData.b2b_brandLogoFile && (
+                      <p className="text-xs text-amber-600 mt-2 font-medium">
+                        ⚠️ Logo wajib diunggah karena Anda mengisi Nama Brand.
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {/* === MULTIPLE PIC === */}

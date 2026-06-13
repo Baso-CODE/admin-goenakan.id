@@ -27,12 +27,14 @@ import {
   CalendarIcon,
   Check,
   ClipboardList,
+  ImagePlus,
   Laptop,
   LayoutTemplate,
   Link as LinkIcon,
   Loader2,
   Smartphone,
   Type,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -164,42 +166,73 @@ export default function PopupBannerForm({
             {/* === IMAGES SECTION (GRID) === */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* 1. DESKTOP IMAGE */}
+              {/* 1. DESKTOP IMAGE */}
               <div className="col-span-1">
                 <FormField
                   control={form.control}
                   name="desktopImage"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="flex items-center gap-2">
+                      <FormLabel className="flex items-center gap-2 mb-2">
                         <Laptop className="h-4 w-4 text-blue-600" />
                         Desktop Image
                         {initialData ? "(Optional)" : "(Required)"}
                       </FormLabel>
                       <FormControl>
                         <div className="space-y-3">
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            disabled={isLoading || isSubmitting}
-                            onChange={(e) =>
-                              handleFileChange(e, "desktop", field.onChange)
-                            }
-                            // Required hanya jika Create mode
-                            required={!initialData}
-                          />
                           {desktopPreview ? (
-                            <div className="relative w-full h-32 bg-slate-100 rounded-lg overflow-hidden border border-border">
+                            // === TAMPILAN PREVIEW DESKTOP ===
+                            <div className="relative w-full h-40 bg-slate-100 rounded-xl overflow-hidden border border-border group shadow-sm">
                               <Image
                                 src={desktopPreview}
                                 alt="Desktop Preview"
                                 fill
                                 className="object-cover"
                               />
+                              {/* Overlay Hapus */}
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    field.onChange(undefined);
+                                    // ✨ Pastikan Anda memanggil fungsi untuk mereset state preview Anda di sini
+                                    // contoh: setDesktopPreview(null);
+                                  }}
+                                  className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
+                                  <X className="w-5 h-5" />
+                                </button>
+                              </div>
                             </div>
                           ) : (
-                            <div className="flex items-center justify-center w-full h-32 bg-muted/50 rounded-lg border border-dashed text-xs text-muted-foreground">
-                              Desktop (Landscape)
-                            </div>
+                            // === AREA UPLOAD DESKTOP ===
+                            <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 border-gray-300 hover:border-blue-400 transition-all">
+                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <div className="p-3 bg-white rounded-full shadow-sm mb-3">
+                                  <ImagePlus className="w-6 h-6 text-gray-400" />
+                                </div>
+                                <p className="mb-1 text-sm text-gray-600">
+                                  <span className="font-semibold text-blue-600">
+                                    Klik untuk unggah
+                                  </span>{" "}
+                                  Desktop Image
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  Format Landscape (16:9)
+                                </p>
+                              </div>
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={isLoading || isSubmitting}
+                                onChange={(e) =>
+                                  handleFileChange(e, "desktop", field.onChange)
+                                }
+                                // RHF / Browser kadang menolak submit jika input type file hidden & required.
+                                // Sebaiknya validasi required diatasi oleh skema Zod (form.handleSubmit).
+                                // required={!initialData}
+                              />
+                            </label>
                           )}
                         </div>
                       </FormControl>
@@ -216,34 +249,63 @@ export default function PopupBannerForm({
                   name="mobileImage"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="flex items-center gap-2">
+                      <FormLabel className="flex items-center gap-2 mb-2">
                         <Smartphone className="h-4 w-4 text-purple-600" />
                         Mobile Image {initialData ? "(Optional)" : "(Required)"}
                       </FormLabel>
                       <FormControl>
                         <div className="space-y-3">
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            disabled={isLoading || isSubmitting}
-                            onChange={(e) =>
-                              handleFileChange(e, "mobile", field.onChange)
-                            }
-                            required={!initialData}
-                          />
                           {mobilePreview ? (
-                            <div className="relative w-24 mx-auto h-32 bg-slate-100 rounded-lg overflow-hidden border border-border">
+                            // === TAMPILAN PREVIEW MOBILE ===
+                            <div className="relative w-32 mx-auto h-40 bg-slate-100 rounded-xl overflow-hidden border border-border group shadow-sm">
                               <Image
                                 src={mobilePreview}
                                 alt="Mobile Preview"
                                 fill
                                 className="object-cover"
                               />
+                              {/* Overlay Hapus */}
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    field.onChange(undefined);
+                                    // ✨ Pastikan Anda memanggil fungsi untuk mereset state preview Anda di sini
+                                    // contoh: setMobilePreview(null);
+                                  }}
+                                  className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
+                                  <X className="w-5 h-5" />
+                                </button>
+                              </div>
                             </div>
                           ) : (
-                            <div className="flex items-center justify-center w-full h-32 bg-muted/50 rounded-lg border border-dashed text-xs text-muted-foreground">
-                              Mobile (Portrait)
-                            </div>
+                            // === AREA UPLOAD MOBILE ===
+                            <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 border-gray-300 hover:border-purple-400 transition-all">
+                              <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                                <div className="p-3 bg-white rounded-full shadow-sm mb-3">
+                                  <ImagePlus className="w-6 h-6 text-gray-400" />
+                                </div>
+                                <p className="mb-1 text-sm text-gray-600">
+                                  <span className="font-semibold text-purple-600">
+                                    Klik unggah
+                                  </span>{" "}
+                                  Mobile
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  Format Portrait (9:16)
+                                </p>
+                              </div>
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={isLoading || isSubmitting}
+                                onChange={(e) =>
+                                  handleFileChange(e, "mobile", field.onChange)
+                                }
+                                // required={!initialData}
+                              />
+                            </label>
                           )}
                         </div>
                       </FormControl>
