@@ -43,6 +43,12 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -50,6 +56,12 @@ import {
 import { useApi } from "@/hooks/useApi";
 import { countries } from "@/lib/countries";
 import { cn } from "@/lib/utils";
+import DepartmentForm, {
+  DepartmentFormValues,
+} from "../../departments/components/formDepartment";
+import PurchaseChannelForm, {
+  PurchaseChannelFormValues,
+} from "../../purchase-channel/components/formPurchaseChannel";
 
 const clientSchema = z.object({
   type: z.enum(["B2B", "B2C"]),
@@ -218,8 +230,82 @@ export default function ClientAddForm() {
   const [manualDistrictB2C, setManualDistrictB2C] = useState(false);
   const [manualSubDistrictB2C, setManualSubDistrictB2C] = useState(false);
 
+  // ✨ STATE UNTUK MODAL TAMBAH BARU
+  const [isPcModalOpen, setIsPcModalOpen] = useState(false);
+  const [isDepModalOpen, setIsDepModalOpen] = useState(false);
+  // Track dari mana modal PC dipanggil agar saat success bisa auto-select field yang tepat
+  const [pcModalTrigger, setPcModalTrigger] = useState<"B2B" | "B2C" | null>(
+    null,
+  );
+
   const { data: session } = useSession();
   const router = useRouter();
+
+  // ==================================================
+  // === HANDLERS UNTUK SUBMIT DARI DALAM MODAL
+  // ==================================================
+  const handleAddPurchaseChannel = async (data: PurchaseChannelFormValues) => {
+    if (status !== "authenticated") return;
+    try {
+      const res = await fetchApi("/purchase-channels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal membuat purchase channel");
+      }
+
+      const newPc = await res.json();
+
+      // Update state dropdown
+      setPurchaseChannels((prev) => [...prev, newPc]);
+
+      // Auto-select field yang memicu modal
+      if (pcModalTrigger === "B2B") {
+        setFormData((prev) => ({ ...prev, b2b_purchaseChannelId: newPc.id }));
+      } else if (pcModalTrigger === "B2C") {
+        setFormData((prev) => ({
+          ...prev,
+          b2c_purchaseChannelIdB2C: newPc.id,
+        }));
+      }
+
+      toast.success("Saluran Pembelian berhasil ditambahkan!");
+      setIsPcModalOpen(false); // Tutup modal
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat menambahkan data");
+    }
+  };
+
+  const handleAddDepartment = async (data: DepartmentFormValues) => {
+    if (status !== "authenticated") return;
+    try {
+      const res = await fetchApi("/departments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal membuat departemen");
+      }
+
+      const newDep = await res.json();
+
+      // Update state dropdown & auto-select
+      setDepartments((prev) => [...prev, newDep]);
+      setFormData((prev) => ({ ...prev, b2b_departmentId: newDep.id }));
+
+      toast.success("Departemen berhasil ditambahkan!");
+      setIsDepModalOpen(false); // Tutup modal
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat menambahkan data");
+    }
+  };
 
   useEffect(() => {
     const fetchMasterData = async () => {
@@ -410,7 +496,6 @@ export default function ClientAddForm() {
         return;
       }
 
-      // ✨ MENGGUNAKAN FORMDATA KARENA MENGIRIM FILE
       const formDataPayload = new FormData();
       formDataPayload.append("type", clientType);
 
@@ -456,7 +541,6 @@ export default function ClientAddForm() {
           ),
         );
 
-        // ✨ APPEND DATA BRAND JIKA ADA
         if (formData.b2b_brandName) {
           formDataPayload.append("brandName", formData.b2b_brandName);
         }
@@ -467,7 +551,6 @@ export default function ClientAddForm() {
           );
         }
         if (formData.b2b_brandLogoFile) {
-          // 'logoFile' harus persis sama dengan yang ditangkap oleh multer upload.single("logoFile") di backend
           formDataPayload.append("logoFile", formData.b2b_brandLogoFile);
         }
       } else {
@@ -500,7 +583,6 @@ export default function ClientAddForm() {
       const res = await fetchApi("/clients", {
         method: "POST",
         body: formDataPayload,
-        headers: {} as any,
       });
 
       if (!res.ok) {
@@ -519,6 +601,7 @@ export default function ClientAddForm() {
       console.error(err);
     }
   };
+
   return (
     <div className="w-full max-w-full">
       <Link
@@ -610,21 +693,32 @@ export default function ClientAddForm() {
                     <Label>Saluran Pembelian *</Label>
                     <Select
                       value={formData.b2b_purchaseChannelId}
-                      onValueChange={(value) =>
+                      onValueChange={(value) => {
+                        if (value === "ADD_NEW_PC") {
+                          setPcModalTrigger("B2B");
+                          setIsPcModalOpen(true);
+                          return;
+                        }
                         setFormData((prev) => ({
                           ...prev,
                           b2b_purchaseChannelId: value,
-                        }))
-                      }>
+                        }));
+                      }}>
                       <SelectTrigger>
                         <SelectValue placeholder="Pilih Saluran Pembelian" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="w-full">
                         {purchaseChannels.map((pc) => (
                           <SelectItem key={pc.id} value={pc.id}>
                             {pc.name}
                           </SelectItem>
                         ))}
+                        <div className="h-px bg-stone-200 my-1 mx-1" />
+                        <SelectItem
+                          value="ADD_NEW_PC"
+                          className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                          + Tambah Saluran Baru
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -634,12 +728,17 @@ export default function ClientAddForm() {
                     <Label>Departemen *</Label>
                     <Select
                       value={formData.b2b_departmentId}
-                      onValueChange={(value) =>
+                      onValueChange={(value) => {
+                        // ✨ TRIGGER MODAL JIKA "ADD_NEW_DEP" DIPILIH
+                        if (value === "ADD_NEW_DEP") {
+                          setIsDepModalOpen(true);
+                          return;
+                        }
                         setFormData((prev) => ({
                           ...prev,
                           b2b_departmentId: value,
-                        }))
-                      }>
+                        }));
+                      }}>
                       <SelectTrigger>
                         <SelectValue placeholder="Pilih Departemen" />
                       </SelectTrigger>
@@ -649,6 +748,13 @@ export default function ClientAddForm() {
                             {dep.name}
                           </SelectItem>
                         ))}
+                        {/* ✨ TOMBOL TAMBAH DI DALAM DROPDOWN */}
+                        <div className="h-px bg-stone-200 my-1 mx-1" />
+                        <SelectItem
+                          value="ADD_NEW_DEP"
+                          className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                          + Tambah Departemen Baru
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1109,8 +1215,11 @@ export default function ClientAddForm() {
                             onValueChange={(value) =>
                               updateField("prefix", value)
                             }>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select prefix" />
+                            <SelectTrigger className="w-full">
+                              <SelectValue
+                                placeholder="Select prefix"
+                                className="w-full"
+                              />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Mr.">Mr.</SelectItem>
@@ -1231,12 +1340,18 @@ export default function ClientAddForm() {
                     <Label>Saluran Pembelian *</Label>
                     <Select
                       value={formData.b2c_purchaseChannelIdB2C}
-                      onValueChange={(value) =>
+                      onValueChange={(value) => {
+                        // ✨ TRIGGER MODAL JIKA "ADD_NEW_PC" DIPILIH
+                        if (value === "ADD_NEW_PC") {
+                          setPcModalTrigger("B2C");
+                          setIsPcModalOpen(true);
+                          return;
+                        }
                         setFormData((prev) => ({
                           ...prev,
                           b2c_purchaseChannelIdB2C: value,
-                        }))
-                      }>
+                        }));
+                      }}>
                       <SelectTrigger>
                         <SelectValue placeholder="Pilih saluran pembelian" />
                       </SelectTrigger>
@@ -1246,6 +1361,13 @@ export default function ClientAddForm() {
                             {pc.name}
                           </SelectItem>
                         ))}
+                        {/* ✨ TOMBOL TAMBAH DI DALAM DROPDOWN */}
+                        <div className="h-px bg-stone-200 my-1 mx-1" />
+                        <SelectItem
+                          value="ADD_NEW_PC"
+                          className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                          + Tambah Saluran Baru
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1529,6 +1651,24 @@ export default function ClientAddForm() {
           </Button>
         </div>
       </form>
+
+      <Dialog open={isPcModalOpen} onOpenChange={setIsPcModalOpen}>
+        <DialogContent className="sm:max-w-135">
+          <DialogHeader>
+            <DialogTitle>Tambah Saluran Pembelian</DialogTitle>
+          </DialogHeader>
+          <PurchaseChannelForm onSubmit={handleAddPurchaseChannel} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDepModalOpen} onOpenChange={setIsDepModalOpen}>
+        <DialogContent className="sm:max-w-135">
+          <DialogHeader>
+            <DialogTitle>Tambah Departemen</DialogTitle>
+          </DialogHeader>
+          <DepartmentForm onSubmit={handleAddDepartment} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
