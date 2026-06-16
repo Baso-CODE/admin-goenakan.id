@@ -1,6 +1,7 @@
-import type { Role } from "@prisma/client";
 import "next-auth";
 import "next-auth/jwt";
+
+// Hapus import type { Role } dari "@prisma/client"
 
 declare module "next-auth" {
   interface Session {
@@ -8,7 +9,7 @@ declare module "next-auth" {
       id: string;
       name?: string | null;
       email?: string | null;
-      role: Role;
+      role: string; // 👈 Ubah menjadi string
       accessToken: string;
     };
   }
@@ -17,14 +18,14 @@ declare module "next-auth" {
     id: string;
     name?: string | null;
     email?: string | null;
-    role: Role;
+    role: string; // 👈 Ubah menjadi string
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
     id: string;
-    role: Role;
+    role: string; // 👈 Ubah menjadi string
     accessToken: string;
   }
 }

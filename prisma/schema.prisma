@@ -47,12 +47,12 @@ enum WebOrderStatus {
   CANCELLED
 }
 
-enum Role {
-  SUPER_ADMIN
-  ADMIN_ARTICLE
-  ADMIN_INVOICE
-  CUSTOMER
-}
+// enum Role {
+//   SUPER_ADMIN
+//   ADMIN_ARTICLE
+//   ADMIN_INVOICE
+//   CUSTOMER
+// }
 
 enum AccountType {
   INDIVIDUAL
@@ -181,16 +181,14 @@ enum PurchaseOrderStatus {
 // ===============================================
 
 model User {
-  id            String    @id @default(uuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  password      String?
-  image         String?
-  role          Role      @default(CUSTOMER)
-
-  createdAt DateTime @default(now())
-
+  id                  String               @id @default(uuid())
+  name                String?
+  email               String               @unique
+  emailVerified       DateTime?
+  password            String?
+  image               String?
+  roleId              String
+  createdAt           DateTime             @default(now())
   articles            Article[]
   invoices            Invoice[]
   sessions            Session[]
@@ -204,8 +202,19 @@ model User {
   updatedPOs          PurchaseOrder[]      @relation("POUpdatedBy")
   approvedPOs         PurchaseOrder[]      @relation("POApprovedBy")
   orders              Order[]
+  role                Role                 @relation(fields: [roleId], references: [id])
 
   @@map("users")
+}
+
+model Role {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+
+  users User[]
+
+  @@map("roles")
 }
 
 model Account {
@@ -327,8 +336,9 @@ model ClientB2B {
   purchaseChannelId String
   purchaseChannel   PurchaseChannel @relation(fields: [purchaseChannelId], references: [id])
 
-  pics   ClientB2BPIC[]
-  client Client         @relation(fields: [id], references: [id])
+  pics         ClientB2BPIC[]
+  client       Client         @relation(fields: [id], references: [id])
+  brandClients BrandClient[]
 
   @@map("clients_b2b")
 }
@@ -761,7 +771,7 @@ model Vendor {
   // === RELATIONS ===
   vendorItems    VendorVendorItem[]
   cashflowCost   CashflowCost[]
-  orderVendors   OrderVendor[]
+  // orderVendors   OrderVendor[]
   contacts       VendorContact[]
   productionJobs ProductionTracker[]
   shipments      Shipment[]
@@ -884,7 +894,7 @@ model Order {
   orderNumber          String?               @unique
   dateOrder            DateTime
   salesCategory        SalesCategory
-  poNumber             String?
+  // poNumber             String?
   clientPoNumber       String?
   remark               String?               @db.Text
   currencyCode         String                @default("IDR")
@@ -914,7 +924,7 @@ model Order {
   updatedById          String?
   updatedBy            User?                 @relation("OrderUpdatedBy", fields: [updatedById], references: [id])
   products             OrderProduct[]
-  vendors              OrderVendor[]
+  // vendors              OrderVendor[]
   cashflows            Cashflow[]
   productionTrackers   ProductionTracker[]
   shipments            Shipment[]
@@ -968,18 +978,18 @@ model OrderProduct {
   @@map("order_products")
 }
 
-model OrderVendor {
-  id             String @id @default(uuid())
-  orderId        String
-  vendorId       String
-  vendorPicName  String
-  vendorPicPhone String
-  roleInOrder    String
-  order          Order  @relation(fields: [orderId], references: [id])
-  vendor         Vendor @relation(fields: [vendorId], references: [id])
+// model OrderVendor {
+//   id             String @id @default(uuid())
+//   orderId        String
+//   vendorId       String
+//   vendorPicName  String
+//   vendorPicPhone String
+//   roleInOrder    String
+//   order          Order  @relation(fields: [orderId], references: [id])
+//   vendor         Vendor @relation(fields: [vendorId], references: [id])
 
-  @@map("order_vendors")
-}
+//   @@map("order_vendors")
+// }
 
 model OrderSampleFollowUp {
   id         String   @id @default(uuid())
@@ -1361,7 +1371,7 @@ model QuotationItemTier {
 model CashflowSummary {
   id             String   @id @default(uuid())
   orderId        String
-  poNumber       String
+  orderNumber    String?
   totalRevenue   Decimal
   totalCost      Decimal
   profitLoss     Decimal
@@ -1832,15 +1842,17 @@ model ArticleSEO {
 }
 
 model BrandClient {
-  id           String  @id @default(cuid())
+  id           String     @id @default(cuid())
   name         String
-  slug         String  @unique
+  slug         String     @unique
   country      String
   logo         String
   logoId       String
   websiteUrl   String?
-  displayOrder Int     @default(0)
-  isActive     Boolean @default(true)
+  displayOrder Int        @default(0)
+  isActive     Boolean    @default(true)
+  clientB2bId  String?
+  clientB2b    ClientB2B? @relation(fields: [clientB2bId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

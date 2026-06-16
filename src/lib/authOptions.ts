@@ -20,8 +20,10 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email dan password wajib diisi");
         }
 
+        // PERUBAHAN: Tambahkan include: { role: true } untuk mengambil data relasi
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
+          include: { role: true },
         });
 
         if (!user || !user.password) {
@@ -41,7 +43,8 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role,
+          // PERUBAHAN: Ambil properti 'name' dari objek role, dengan fallback aman
+          role: user.role?.name || "CUSTOMER",
         };
       },
     }),
@@ -51,7 +54,8 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = user.role;
+        token.role = user.role; // Ini sekarang akan berisi string seperti "SUPER_ADMIN"
+
         // Jangan membuat token JWT baru di dalam callback jwt
         // jika strategy-nya sudah "jwt", biarkan NextAuth mengelola sign-nya
         token.accessToken = sign(
@@ -65,7 +69,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as any;
+        session.user.role = token.role as string;
         session.user.accessToken = token.accessToken as string;
       }
       return session;
