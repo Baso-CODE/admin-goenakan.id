@@ -26,7 +26,7 @@ export default async function DashboardGuardLayout({
   const userRole = session.user.role as string;
 
   // 2. Dapatkan URL (pathname) saat ini
-  const headersList = headers();
+  const headersList = await headers(); // <-- Tambahkan 'await' di sini
   const currentPath = headersList.get("x-invoke-path") || "/dashboard";
 
   // 3. Cek akses menggunakan fungsi yang kita buat
