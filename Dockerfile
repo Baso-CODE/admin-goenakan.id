@@ -24,13 +24,13 @@ COPY . .
 RUN bunx prisma generate
 
 # 6. Build Next.js
-# (Solusi agar env variable terbaca & tidak localhost)
+# Tangkap ARG dari platform deployment (Dokploy/Docker)
 ARG NEXT_PUBLIC_BASE_URL_API
 ARG NEXT_PUBLIC_BASE_URL_WEB
-ENV NEXT_PUBLIC_BASE_URL_API="https://api.edumatrixindonesia.cloud"
-ENV NEXT_PUBLIC_BASE_URL_WEB="https://admin.edumatrixindonesia.cloud"
 
-# (Opsional) Matikan telemetry
+# Jadikan ARG sebagai ENV agar Next.js bisa membacanya saat build
+ENV NEXT_PUBLIC_BASE_URL_API=$NEXT_PUBLIC_BASE_URL_API
+ENV NEXT_PUBLIC_BASE_URL_WEB=$NEXT_PUBLIC_BASE_URL_WEB
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN bun run build

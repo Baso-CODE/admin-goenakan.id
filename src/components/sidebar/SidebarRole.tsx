@@ -7,12 +7,11 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
-  SidebarRail,
 } from "@/components/ui/sidebar";
 import { useSession } from "next-auth/react";
 
 // === ICONS ===
-import { ThemeToggle } from "@/app/(dashboard)/components/themeToggle";
+import { checkAccess } from "@/lib/roleAccess";
 import {
   AlignHorizontalDistributeStart,
   AudioWaveform,
@@ -37,18 +36,26 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { NavMain } from "./NavMain";
-import { NavProjects } from "./nav-project";
 import { NavUser } from "./nav-user";
 import { TeamSwitcher } from "./team-switcher";
 
 export default function SidebarRole({ ...props }) {
   const { data: session } = useSession();
 
-  const role = session?.user?.role as
-    | "SUPER_ADMIN"
-    | "ADMIN_INVOICE"
-    | "ADMIN_ARTICLE"
-    | undefined;
+  // Ambil role langsung dari session (string)
+  const role = (session?.user?.role as string) || "";
+
+  // ... (Data Anda tetap sama seperti di atas) ...
+
+  // === FUNGSI FILTER DINAMIS ===
+  const getVisibleItems = (items: any[]) => {
+    return items
+      .map((group) => ({
+        ...group,
+        items: group.items?.filter((item: any) => checkAccess(role, item.url)),
+      }))
+      .filter((group) => group.items?.length > 0);
+  };
 
   // === BASE DATA ===
   const data = {
@@ -281,7 +288,6 @@ export default function SidebarRole({ ...props }) {
   };
 
   // === ROLE VISIBILITY LOGIC ===
-  const isSuperAdmin = role === "SUPER_ADMIN";
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -290,54 +296,53 @@ export default function SidebarRole({ ...props }) {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* -- DASHBOARD MANDIRI (PALING ATAS) -- */}
-        {isSuperAdmin && (
+        {/* Sekarang, cukup panggil getVisibleItems() */}
+
+        {/* DASHBOARD */}
+        {checkAccess(role, "/super-admin") && (
           <SidebarMenu className="p-2">
             <SidebarMenuItem>
-              <Link
-                href="/super-admin"
-                className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+              <Link href="/super-admin" className="...">
                 <LucideChartNetwork className="h-4 w-4" />
-                <span className="group-data-[collapsible=icon]:hidden">
-                  Sales Dashboard
-                </span>
+                <span>Sales Dashboard</span>
               </Link>
             </SidebarMenuItem>
           </SidebarMenu>
         )}
 
-        {/* -- SECTION 1: ORDER MANAGEMENT -- */}
-        {(isSuperAdmin || role === "ADMIN_INVOICE") && (
-          <NavMain label="Order Management" items={data.navOrder} />
-        )}
+        {/* -- SECTION DINAMIS -- */}
+        {(() => {
+          const orderItems = getVisibleItems(data.navOrder);
+          return orderItems.length > 0 ? (
+            <NavMain label="Order Management" items={orderItems} />
+          ) : null;
+        })()}
 
-        {/* -- SECTION 2: DATABASE -- */}
-        {isSuperAdmin && <NavMain label="Database" items={data.navDatabase} />}
+        {(() => {
+          const dbItems = getVisibleItems(data.navDatabase);
+          return dbItems.length > 0 ? (
+            <NavMain label="Database" items={dbItems} />
+          ) : null;
+        })()}
 
-        {/* -- SECTION 3: USER MANAGEMENT -- */}
-        {isSuperAdmin && (
-          <NavMain label="User Management" items={data.navUserManagement} />
-        )}
+        {(() => {
+          const userItems = getVisibleItems(data.navUserManagement);
+          return userItems.length > 0 ? (
+            <NavMain label="User Management" items={userItems} />
+          ) : null;
+        })()}
 
-        {/* -- SECTION 4: MARKETING & CONTENT -- */}
-        {(isSuperAdmin || role === "ADMIN_ARTICLE") && (
-          <NavMain label="Marketing & Content" items={data.navMarketing} />
-        )}
-
-        {/* -- ETC -- */}
-        {isSuperAdmin && <NavProjects projects={data.Etc} />}
+        {(() => {
+          const marketingItems = getVisibleItems(data.navMarketing);
+          return marketingItems.length > 0 ? (
+            <NavMain label="Marketing & Content" items={marketingItems} />
+          ) : null;
+        })()}
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem className="px-2 py-1 flex justify-center group-data-[collapsible=icon]:justify-center md:justify-start">
-            <ThemeToggle />
-          </SidebarMenuItem>
-        </SidebarMenu>
         <NavUser user={data.user} />
       </SidebarFooter>
-
-      <SidebarRail />
     </Sidebar>
   );
 }

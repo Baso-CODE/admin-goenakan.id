@@ -1,13 +1,9 @@
 import { authOptions } from "@/lib/authOptions";
+import { checkAccess } from "@/lib/roleAccess";
 import { getServerSession } from "next-auth";
+import { headers } from "next/headers"; // Untuk mendapatkan URL saat ini
 import { redirect } from "next/navigation";
 import DashboardLayoutClient from "./DashboardLayoutClient";
-
-const ALLOWED_DASHBOARD_ROLES = [
-  "SUPER_ADMIN",
-  "ADMIN_INVOICE",
-  "ADMIN_ARTICLE",
-];
 
 export default async function DashboardGuardLayout({
   children,
@@ -16,26 +12,29 @@ export default async function DashboardGuardLayout({
 }) {
   const session = await getServerSession(authOptions);
 
-  // 1. Cek keberadaan sesi
   if (!session || !session.user) {
     return redirect("/login");
   }
 
-  // 2. CEK KEDALUWARSA TOKEN
-  // Kita mengambil 'exp' dari token.
-  // Jika callback jwt kamu menyimpan 'exp', kita bisa memanfaatkannya.
-  // Namun, getServerSession kadang tidak mengembalikan 'exp'.
-  // Solusi aman: Cek apakah session.expires sudah lewat.
   const isExpired = new Date(session.expires) < new Date();
-
   if (isExpired) {
     return redirect("/login");
   }
 
-  // 3. Cek Role
-  const userRole = session.user.role;
-  if (!ALLOWED_DASHBOARD_ROLES.includes(userRole as string)) {
-    return redirect("/");
+  // === PENGECEKAN DINAMIS ===
+  // 1. Dapatkan role dari session (dari backend/database)
+  const userRole = session.user.role as string;
+
+  // 2. Dapatkan URL (pathname) saat ini
+  const headersList = headers();
+  const currentPath = headersList.get("x-invoke-path") || "/dashboard";
+
+  // 3. Cek akses menggunakan fungsi yang kita buat
+  const hasAccess = checkAccess(userRole, currentPath);
+
+  if (!hasAccess) {
+    // Jika tidak punya akses, lempar ke halaman unauthorized atau dashboard utama
+    return redirect("/dashboard?error=unauthorized");
   }
 
   return <DashboardLayoutClient>{children}</DashboardLayoutClient>;
