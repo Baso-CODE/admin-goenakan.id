@@ -18,6 +18,12 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Form,
   FormControl,
   FormField,
@@ -45,8 +51,10 @@ import { cn } from "@/lib/utils";
 import {
   Check,
   FileImage,
+  Languages,
   Loader2,
   PackageSearch,
+  Plus,
   Save,
   Search,
   Smartphone,
@@ -55,21 +63,34 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { toast } from "sonner";
+import ArticleCategoryForm, {
+  ArticleCategoryFormValues,
+} from "../categories/components/formArticleCategories";
+import ArticleTagForm, {
+  ArticleTagFormValues,
+} from "../tags/components/formArticleTag";
 import { FormSeo } from "./formArticleSEO";
 import { ImagePreviewModal } from "./imagePreviewModal";
 import { SEOAnalyzer } from "./seoAnalyzer";
 
+// =========================================================================
+// 1. UPDATE ZOD SCHEMA
+// =========================================================================
 const articleSchema = z.object({
   title: z.string().min(5, "Judul minimal 5 karakter"),
+  title_en: z.string().optional(),
   authorName: z.string().min(2, "Nama penulis wajib diisi"),
   categoryId: z.string().min(1, "Kategori wajib dipilih"),
   content: z.string().min(20, "Konten artikel terlalu pendek"),
+  content_en: z.string().optional(),
+  autoTranslate: z.boolean().optional(),
   source: z.string().optional(),
   published: z.boolean().default(false),
   productIds: z.array(z.string()).optional().default([]),
   tagIds: z.array(z.string()).optional().default([]),
   coverImageAlt: z.string().optional(),
-  focusKeywords: z.string().optional().default(""),
+  focusKeywords_id: z.string().optional().default(""),
+  focusKeywords_en: z.string().optional().default(""),
   seo: z
     .object({
       metaTitle: z.string().max(255, "Maksimal 255 karakter").optional(),
@@ -84,11 +105,11 @@ const articleSchema = z.object({
     })
     .optional(),
 });
-
 export type ArticleFormValues = z.infer<typeof articleSchema>;
 export interface ArticleInitialData extends ArticleFormValues {
   coverImage?: string;
   coverImageMobile?: string;
+  autoTranslate?: boolean;
 }
 
 export default function FormArticle({
@@ -113,24 +134,32 @@ export default function FormArticle({
   const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isSubmittingCategory, setIsSubmittingCategory] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverMobileFile, setCoverMobileFile] = useState<File | null>(null);
+  const [isTagModalOpen, setIsTagModalOpen] = useState(false);
+  const [isSubmittingTag, setIsSubmittingTag] = useState(false);
+  const [tagSearchQuery, setTagSearchQuery] = useState("");
 
   const form = useForm<any>({
     resolver: zodResolver(articleSchema),
     defaultValues: {
       title: "",
+      title_en: "",
       authorName: "",
       categoryId: "",
       content: "",
+      content_en: "",
+      autoTranslate: false,
       source: "",
       published: false,
       productIds: [],
       tagIds: [],
       coverImageAlt: "",
-      focusKeywords: "",
+      focusKeywords_id: "",
+      focusKeywords_en: "",
       seo: {
         metaTitle: "",
         metaDescription: "",
@@ -147,7 +176,7 @@ export default function FormArticle({
 
   const watchedTitle = form.watch("title");
   const watchedContent = form.watch("content");
-  const watchedKeywords = form.watch("focusKeywords");
+  const watchedKeywords = form.watch("focusKeywords_id");
 
   useEffect(() => {
     if (initialData) {
@@ -195,6 +224,64 @@ export default function FormArticle({
   const handlePreview = (url: string) => {
     setPreviewUrl(url);
     setIsPreviewOpen(true);
+  };
+
+  const handleAddCategoryFast = async (data: ArticleCategoryFormValues) => {
+    if (status !== "authenticated") return;
+    setIsSubmittingCategory(true);
+    try {
+      const res = await fetchApi("/article-categories", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        throw new Error("Gagal membuat kategori baru");
+      }
+
+      const responseData = await res.json();
+      const newCat = responseData.data || responseData;
+
+      setCategories((prev) => [...prev, newCat]);
+      form.setValue("categoryId", newCat.id);
+
+      setIsCategoryModalOpen(false);
+      toast.success("Kategori berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat menyimpan kategori.");
+    } finally {
+      setIsSubmittingCategory(false);
+    }
+  };
+
+  const handleAddTagFast = async (data: ArticleTagFormValues) => {
+    if (status !== "authenticated") return;
+    setIsSubmittingTag(true);
+    try {
+      const res = await fetchApi("/article-tags", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) throw new Error("Gagal membuat tag baru");
+
+      const responseData = await res.json();
+      const newTag = responseData.data || responseData;
+
+      setAvailableTags((prev) => [...prev, newTag]);
+
+      const currentSelectedTags = form.getValues("tagIds") || [];
+      form.setValue("tagIds", [...currentSelectedTags, newTag.id]);
+
+      // 3. Tutup modal & bersihkan pencarian
+      setIsTagModalOpen(false);
+      setTagSearchQuery("");
+      toast.success("Tag berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat menyimpan tag.");
+    } finally {
+      setIsSubmittingTag(false);
+    }
   };
 
   return (
@@ -417,9 +504,28 @@ export default function FormArticle({
                   name="tagIds"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel className="font-bold flex items-center gap-2">
-                        <TagIcon className="w-4 h-4" /> Tags Artikel
-                      </FormLabel>
+                      <div className="flex items-center justify-between">
+                        <FormLabel className="font-bold flex items-center gap-2">
+                          <TagIcon className="w-4 h-4" /> Tags Artikel
+                        </FormLabel>
+                      </div>
+
+                      {/* ✨ MODAL TAG (Diletakkan di luar Popover) */}
+                      <Dialog
+                        open={isTagModalOpen}
+                        onOpenChange={setIsTagModalOpen}>
+                        <DialogContent className="sm:max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Tambah Tag Artikel Baru</DialogTitle>
+                          </DialogHeader>
+                          <ArticleTagForm
+                            initialData={{ name: tagSearchQuery }}
+                            onSubmit={handleAddTagFast}
+                            isSubmitting={isSubmittingTag}
+                          />
+                        </DialogContent>
+                      </Dialog>
+
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -451,9 +557,29 @@ export default function FormArticle({
                         </PopoverTrigger>
                         <PopoverContent className="w-full p-0" align="start">
                           <Command>
-                            <CommandInput placeholder="Ketik nama tag..." />
+                            {/* ✨ Tangkap teks yang diketik untuk diteruskan ke modal */}
+                            <CommandInput
+                              placeholder="Ketik nama tag..."
+                              value={tagSearchQuery}
+                              onValueChange={setTagSearchQuery}
+                            />
                             <CommandList>
-                              <CommandEmpty>Tag tidak ditemukan.</CommandEmpty>
+                              {/* ✨ JIKA TAG TIDAK DITEMUKAN MUNCUL TOMBOL INI */}
+                              <CommandEmpty className="py-4 flex flex-col items-center justify-center gap-2">
+                                <span className="text-sm text-muted-foreground">
+                                  Tag tidak ditemukan.
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                                  onClick={() => setIsTagModalOpen(true)}>
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  Buat Tag "{tagSearchQuery}"
+                                </Button>
+                              </CommandEmpty>
+
                               <CommandGroup>
                                 {availableTags.map((tag) => (
                                   <CommandItem
@@ -479,6 +605,19 @@ export default function FormArticle({
                                   </CommandItem>
                                 ))}
                               </CommandGroup>
+
+                              {/* ✨ OPSI TAMBAH TAG YANG SELALU MUNCUL DI BAWAH */}
+                              {availableTags.length > 0 && (
+                                <>
+                                  <div className="h-1px bg-stone-100 my-1 mx-2" />
+                                  <CommandItem
+                                    onSelect={() => setIsTagModalOpen(true)}
+                                    className="text-blue-600 font-medium justify-center cursor-pointer py-2">
+                                    <Plus className="mr-2 h-4 w-4" /> Buat Tag
+                                    Baru
+                                  </CommandItem>
+                                </>
+                              )}
                             </CommandList>
                           </Command>
                         </PopoverContent>
@@ -611,13 +750,59 @@ export default function FormArticle({
                   <div className="space-y-5">
                     <FormField
                       control={form.control}
+                      name="autoTranslate"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-3 shadow-sm">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-sm font-bold flex items-center gap-2 text-blue-800">
+                              <Languages className="w-4 h-4" /> Auto Translate
+                            </FormLabel>
+                            <p className="text-[10px] text-blue-600">
+                              Terjemahkan otomatis ke Bahasa Inggris.
+                            </p>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
                       name="categoryId"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="font-bold">Kategori</FormLabel>
+
+                          <Dialog
+                            open={isCategoryModalOpen}
+                            onOpenChange={setIsCategoryModalOpen}>
+                            <DialogContent className="sm:max-w-md">
+                              <DialogHeader>
+                                <DialogTitle>
+                                  Tambah Kategori Artikel
+                                </DialogTitle>
+                              </DialogHeader>
+                              <ArticleCategoryForm
+                                onSubmit={handleAddCategoryFast}
+                                isSubmitting={isSubmittingCategory}
+                              />
+                            </DialogContent>
+                          </Dialog>
+
                           <Select
-                            onValueChange={field.onChange}
-                            value={field.value}>
+                            value={field.value}
+                            onValueChange={(value) => {
+                              // ✨ CEGAT VALUE DI SINI
+                              if (value === "add_new_category") {
+                                setIsCategoryModalOpen(true); // Buka modal
+                              } else {
+                                field.onChange(value); // Simpan ID kategori seperti biasa
+                              }
+                            }}>
                             <FormControl>
                               <SelectTrigger className="bg-white">
                                 <SelectValue placeholder="Pilih Kategori" />
@@ -629,6 +814,19 @@ export default function FormArticle({
                                   {cat.name}
                                 </SelectItem>
                               ))}
+
+                              {/* Garis Pemisah Visual */}
+                              <div className="h-1px bg-stone-200 my-1 mx-2" />
+
+                              {/* ✨ OPSI TAMBAH KATEGORI */}
+                              <SelectItem
+                                value="add_new_category"
+                                className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer">
+                                <div className="flex items-center gap-2 text-xs">
+                                  <Plus className="w-4 h-4" />
+                                  Buat Kategori Baru...
+                                </div>
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -679,7 +877,7 @@ export default function FormArticle({
                 <div className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="focusKeywords"
+                    name="focusKeywords_id"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-sm font-bold text-blue-600">

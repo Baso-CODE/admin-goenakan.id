@@ -24,19 +24,32 @@ export default function AddArticle() {
     setIsSubmitting(true);
     try {
       const formData = new FormData();
+
+      // Data Utama
       formData.append("title", values.title);
       formData.append("authorName", values.authorName);
       formData.append("content", values.content);
       formData.append("categoryId", values.categoryId);
       formData.append("published", String(values.published));
       formData.append("coverImageAlt", values.coverImageAlt || "");
-      formData.append("focusKeywords", values.focusKeywords || "");
+
+      formData.append("focusKeywords_id", values.focusKeywords_id || "");
+
+      formData.append("autoTranslate", String(values.autoTranslate));
+
+      if (values.title_en) formData.append("title_en", values.title_en);
+      if (values.content_en) formData.append("content_en", values.content_en);
+      if (values.focusKeywords_en)
+        formData.append("focusKeywords_en", values.focusKeywords_en);
 
       if (values.source) {
         formData.append("source", values.source);
       }
+
+      // Relasi
       formData.append("productIds", values.productIds?.join(",") || "");
       formData.append("tagIds", values.tagIds?.join(",") || "");
+
       if (values.seo) {
         formData.append("seo", JSON.stringify(values.seo));
       }
@@ -46,7 +59,7 @@ export default function AddArticle() {
         formData.append("coverFile", coverFile);
       }
 
-      // ✨ TAMBAHAN: Mengirimkan file gambar mobile (opsional)
+      // Mengirimkan file gambar mobile (opsional)
       if (coverMobileFile) {
         formData.append("coverMobileFile", coverMobileFile);
       }

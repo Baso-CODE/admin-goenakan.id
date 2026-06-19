@@ -1,9 +1,7 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardList, FlaskConical, Plus } from "lucide-react";
-import Link from "next/link";
+import { ClipboardList, FlaskConical } from "lucide-react";
 
 import OrderStats from "./components/orderStats";
 import SampleStats from "./components/sampleStats";
@@ -23,12 +21,12 @@ export default function OrderPage() {
           </p>
         </div>
         {/* TOMBOL CREATE ORDER */}
-        <Link href="/super-admin/orders/add">
+        {/* <Link href="/super-admin/orders/add">
           <Button className="w-full sm:w-auto shadow-sm transition-all hover:shadow-md">
             <Plus className="mr-2 h-4 w-4" />
             Create New Order
           </Button>
-        </Link>
+        </Link> */}
       </div>
       {/* TABS CONTAINER */}
       <Tabs defaultValue="all" className="w-full min-w-0">

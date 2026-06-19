@@ -42,8 +42,8 @@ import {
   DollarSign,
   FileText,
   FlaskConical,
+  Plus,
   PlusCircle,
-  RefreshCcw,
   Settings2,
   ShoppingBag,
   Trash2,
@@ -53,16 +53,24 @@ import { useEffect, useState } from "react";
 import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useApi } from "@/hooks/useApi";
+import PurchaseChannelForm, {
+  PurchaseChannelFormValues,
+} from "../../purchase-channel/components/formPurchaseChannel";
 import { OrderFormValues, orderSchema } from "../order-schema";
-import { generatePoNumber, postOrder } from "../order-service";
+import { postOrder } from "../order-service";
 import {
   Client,
   Currency,
   Product,
   PurchaseChannel,
   QuotationRef,
-  Sales,
   SampleOrderRef,
 } from "../types/order.types";
 import { SampleFollowUpSection, SampleStepItem } from "./sampleFollowUpSection";
@@ -81,7 +89,7 @@ export default function AddOrderForm() {
       salesCategory: defaultCategory,
       warrantyDays: 30,
 
-      poNumber: "",
+      // poNumber: "",
       clientPoNumber: "",
       remark: "",
       currencyCode: "IDR",
@@ -116,17 +124,16 @@ export default function AddOrderForm() {
 
   // Master Data States
   const [clients, setClients] = useState<Client[]>([]);
-  const [sales, setSales] = useState<Sales[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
     [],
   );
+  const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [quotationRefs, setQuotationRefs] = useState<QuotationRef[]>([]);
   const [sampleOrderRefs, setSampleOrderRefs] = useState<SampleOrderRef[]>([]);
 
   const [loading, setLoading] = useState(false);
-  const [generatingPo, setGeneratingPo] = useState(false);
 
   const [clientOpen, setClientOpen] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
@@ -175,7 +182,6 @@ export default function AddOrderForm() {
         const sampData = jsonSamp?.data || jsonSamp || [];
 
         setClients(c);
-        setSales(s);
         setProducts(p);
         setPurchaseChannels(pc);
 
@@ -231,29 +237,6 @@ export default function AddOrderForm() {
     }
   }, [selectedPicId, isB2B, availablePics, setValue]);
 
-  const currentSalesCategory = watch("salesCategory");
-
-  const handleGeneratePO = async () => {
-    try {
-      setGeneratingPo(true);
-
-      const newPo = await generatePoNumber(fetchApi, currentSalesCategory);
-
-      setValue("poNumber", newPo);
-
-      const typeDoc =
-        currentSalesCategory === "SALES"
-          ? "Sales Order (SO)"
-          : "Sample Note (SN)";
-      toast.success(`${typeDoc} Number generated: ${newPo}`);
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to generate Order Number");
-    } finally {
-      setGeneratingPo(false);
-    }
-  };
-
   const onSubmit = async (data: OrderFormValues) => {
     try {
       setLoading(true);
@@ -279,6 +262,37 @@ export default function AddOrderForm() {
     }
   };
 
+  // 3. Tambahkan fungsi handler ini
+  const handleAddChannelFast = async (data: PurchaseChannelFormValues) => {
+    if (status !== "authenticated") return;
+
+    try {
+      const res = await fetchApi("/purchase-channels", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to create purchase channel");
+      }
+
+      const responseData = await res.json();
+      const newChannel = responseData.data || responseData;
+
+      // Update state purchaseChannels agar opsi baru langsung muncul
+      setPurchaseChannels((prev) => [...prev, newChannel]);
+
+      // Otomatis pilih channel yang baru dibuat di dalam form
+      form.setValue("purchaseChannelId", newChannel.id);
+
+      // Tutup modal
+      setIsChannelModalOpen(false);
+      toast.success("Purchase Channel berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat membuat channel.");
+    }
+  };
   const currentCurrencySymbol =
     currencies.find((c) => c.code === selectedCurrencyCode)?.symbol || "Rp";
 
@@ -300,7 +314,7 @@ export default function AddOrderForm() {
         <Form {...form}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
             {/* === SECTION 1: ORDER DETAILS === */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 border rounded-lg bg-gray-50/50">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 border rounded-lg bg-gray-50/50 items-start">
               <h3 className="col-span-full font-medium text-lg text-gray-700">
                 Order Details
               </h3>
@@ -323,11 +337,14 @@ export default function AddOrderForm() {
                 control={control}
                 name="salesCategory"
                 render={({ field }) => (
-                  <FormItem className="">
+                  <FormItem>
                     <FormLabel>Sales Category</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={true}>
                       <FormControl className="w-full">
-                        <SelectTrigger className="h-10">
+                        <SelectTrigger className="h-10 opacity-70 cursor-not-allowed">
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                       </FormControl>
@@ -336,11 +353,13 @@ export default function AddOrderForm() {
                         <SelectItem value="SAMPLE">Sample</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormDescription className="text-xs">
+                      Kategori dikunci berdasarkan tipe order yang dipilih.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={control}
                 name="currencyCode"
@@ -368,7 +387,7 @@ export default function AddOrderForm() {
                 )}
               />
 
-              <FormField
+              {/* <FormField
                 control={control}
                 name="poNumber"
                 render={({ field }) => (
@@ -398,7 +417,7 @@ export default function AddOrderForm() {
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+              /> */}
 
               <FormField
                 control={control}
@@ -418,7 +437,6 @@ export default function AddOrderForm() {
                 )}
               />
 
-              {/* ✨ TAMBAHAN: Warranty Days Field */}
               <FormField
                 control={control}
                 name="warrantyDays"
@@ -744,7 +762,31 @@ export default function AddOrderForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Purchase Channel</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    {/* ✨ MODAL TAMBAH CHANNEL */}
+                    <Dialog
+                      open={isChannelModalOpen}
+                      onOpenChange={setIsChannelModalOpen}>
+                      <DialogContent className="sm:max-w-lg">
+                        <DialogHeader>
+                          <DialogTitle>
+                            Tambah Purchase Channel Baru
+                          </DialogTitle>
+                        </DialogHeader>
+                        <PurchaseChannelForm onSubmit={handleAddChannelFast} />
+                      </DialogContent>
+                    </Dialog>
+                    const DEFAULT_AUTHOR_ID =
+                    "2085fd83-af3a-4224-b33a-318ffb63710b"; const
+                    DEFAULT_CATEGORY_ID = "656a434b-e98c-4c89-9fb7-7e0de2dd88c3
+                    <Select
+                      value={field.value}
+                      onValueChange={(val) => {
+                        if (val === "add_new_channel") {
+                          setIsChannelModalOpen(true);
+                        } else {
+                          field.onChange(val);
+                        }
+                      }}>
                       <FormControl>
                         <SelectTrigger className="h-10">
                           <SelectValue placeholder="Select channel" />
@@ -756,13 +798,23 @@ export default function AddOrderForm() {
                             {pc.name}
                           </SelectItem>
                         ))}
+
+                        {/* Garis Pemisah */}
+                        <div className="h-px bg-stone-200 my-1 mx-2" />
+                        <SelectItem
+                          value="add_new_channel"
+                          className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer">
+                          <div className="flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Buat Channel Baru...
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={control}
                 name="shippingAddress"
@@ -788,7 +840,7 @@ export default function AddOrderForm() {
                 Internal
               </h3>
 
-              <FormField
+              {/* <FormField
                 control={control}
                 name="salesId"
                 render={({ field }) => (
@@ -811,7 +863,7 @@ export default function AddOrderForm() {
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+              /> */}
 
               <FormField
                 control={control}
