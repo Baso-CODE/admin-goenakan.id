@@ -284,6 +284,16 @@ export default function FormArticle({
     }
   };
 
+  if (loadingData) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-stone-500">
+        <Loader2 className="w-8 h-8 animate-spin mb-4 text-primary" />
+        <p className="text-sm font-medium animate-pulse">
+          Menyiapkan data kategori, produk, dan tags...
+        </p>
+      </div>
+    );
+  }
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
