@@ -4,8 +4,10 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useSession } from "next-auth/react";
@@ -300,14 +302,19 @@ export default function SidebarRole({ ...props }) {
 
         {/* DASHBOARD */}
         {checkAccess(role, "/super-admin") && (
-          <SidebarMenu className="p-2">
-            <SidebarMenuItem>
-              <Link href="/super-admin" className="...">
-                <LucideChartNetwork className="h-4 w-4" />
-                <span>Sales Dashboard</span>
-              </Link>
-            </SidebarMenuItem>
-          </SidebarMenu>
+          <SidebarGroup>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                {/* Gunakan SidebarMenuButton dengan asChild agar styling shadcn masuk ke Link */}
+                <SidebarMenuButton asChild tooltip="Sales Dashboard">
+                  <Link href="/super-admin">
+                    <LucideChartNetwork />
+                    <span>Sales Dashboard</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
         )}
 
         {/* -- SECTION DINAMIS -- */}
