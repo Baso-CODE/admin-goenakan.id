@@ -53,6 +53,7 @@ import { useEffect, useState } from "react";
 import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import FastCurrencyForm from "@/app/(dashboard)/admin-invoice/currency/components/formCurrencyFast";
 import {
   Dialog,
   DialogContent,
@@ -128,6 +129,7 @@ export default function AddOrderForm() {
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
     [],
   );
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [quotationRefs, setQuotationRefs] = useState<QuotationRef[]>([]);
@@ -293,6 +295,32 @@ export default function AddOrderForm() {
       toast.error(err.message || "Terjadi kesalahan saat membuat channel.");
     }
   };
+
+  const handleAddCurrencyFast = async (data: any) => {
+    if (status !== "authenticated") return;
+    try {
+      const res = await fetchApi("/currencies", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal membuat currency");
+      }
+
+      const responseData = await res.json();
+      const newCurrency = responseData.data || responseData;
+
+      setCurrencies((prev) => [...prev, newCurrency]);
+      form.setValue("currencyCode", newCurrency.code);
+      setIsCurrencyModalOpen(false);
+      toast.success("Currency berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat membuat currency.");
+    }
+  };
+
   const currentCurrencySymbol =
     currencies.find((c) => c.code === selectedCurrencyCode)?.symbol || "Rp";
 
@@ -368,7 +396,28 @@ export default function AddOrderForm() {
                     <FormLabel className="flex items-center gap-1.5">
                       <DollarSign className="w-4 h-4 text-stone-500" /> Currency
                     </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+
+                    {/* ✨ MODAL TAMBAH CURRENCY */}
+                    <Dialog
+                      open={isCurrencyModalOpen}
+                      onOpenChange={setIsCurrencyModalOpen}>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Tambah Currency Baru</DialogTitle>
+                        </DialogHeader>
+                        <FastCurrencyForm onSubmit={handleAddCurrencyFast} />
+                      </DialogContent>
+                    </Dialog>
+
+                    <Select
+                      onValueChange={(val) => {
+                        if (val === "add_new_currency") {
+                          setIsCurrencyModalOpen(true);
+                        } else {
+                          field.onChange(val);
+                        }
+                      }}
+                      value={field.value}>
                       <FormControl className="w-full">
                         <SelectTrigger className="h-10">
                           <SelectValue placeholder="Select Currency" />
@@ -380,44 +429,23 @@ export default function AddOrderForm() {
                             {cur.code} ({cur.symbol}) - {cur.name}
                           </SelectItem>
                         ))}
+
+                        {/* ✨ OPSI TAMBAH CURRENCY */}
+                        <div className="h-px bg-stone-200 my-1 mx-2" />
+                        <SelectItem
+                          value="add_new_currency"
+                          className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer">
+                          <div className="flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Buat Currency Baru...
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
-              {/* <FormField
-                control={control}
-                name="poNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Internal PO Number</FormLabel>
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <Input
-                          placeholder="Internal PO"
-                          className="h-10"
-                          {...field}
-                        />
-                      </FormControl>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10"
-                        onClick={handleGeneratePO}
-                        disabled={generatingPo}>
-                        {generatingPo ? (
-                          <RefreshCcw className="w-4 h-4 animate-spin" />
-                        ) : (
-                          "Gen"
-                        )}
-                      </Button>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              /> */}
 
               <FormField
                 control={control}
