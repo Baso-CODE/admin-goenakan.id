@@ -110,6 +110,7 @@ export interface ArticleInitialData extends ArticleFormValues {
   coverImage?: string;
   coverImageMobile?: string;
   autoTranslate?: boolean;
+  isTranslated?: boolean;
 }
 
 export default function FormArticle({
@@ -761,24 +762,48 @@ export default function FormArticle({
                     <FormField
                       control={form.control}
                       name="autoTranslate"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-3 shadow-sm">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-sm font-bold flex items-center gap-2 text-blue-800">
-                              <Languages className="w-4 h-4" /> Auto Translate
-                            </FormLabel>
-                            <p className="text-[10px] text-blue-600">
-                              Terjemahkan otomatis ke Bahasa Inggris.
-                            </p>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        // Cek apakah ini mode edit dan artikel sudah pernah ditranslate
+                        const hasBeenTranslated =
+                          isEditing && initialData?.isTranslated;
+
+                        return (
+                          <FormItem className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-3 shadow-sm">
+                            <div className="space-y-1">
+                              <FormLabel className="text-sm font-bold flex items-center gap-2 text-blue-800">
+                                <Languages className="w-4 h-4" />
+                                {hasBeenTranslated
+                                  ? "Terjemahkan Bagian Baru?"
+                                  : "Auto Translate"}
+                              </FormLabel>
+                              <p className="text-[10px] text-blue-600 leading-tight">
+                                {hasBeenTranslated
+                                  ? "Nyalakan jika ada tambahan teks Indonesia baru yang ingin diterjemahkan otomatis."
+                                  : "Terjemahkan otomatis ke Bahasa Inggris saat disimpan."}
+                              </p>
+
+                              {/* Badge Status */}
+                              {hasBeenTranslated && (
+                                <div className="pt-1">
+                                  <Badge
+                                    variant="outline"
+                                    className="bg-green-100 text-green-700 border-green-300 text-[9px] px-1.5 py-0">
+                                    <Check className="w-3 h-3 mr-1" /> Sudah
+                                    Terjemahan
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
+
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        );
+                      }}
                     />
                     <FormField
                       control={form.control}

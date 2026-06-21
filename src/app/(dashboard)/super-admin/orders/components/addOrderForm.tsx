@@ -775,9 +775,6 @@ export default function AddOrderForm() {
                         <PurchaseChannelForm onSubmit={handleAddChannelFast} />
                       </DialogContent>
                     </Dialog>
-                    const DEFAULT_AUTHOR_ID =
-                    "2085fd83-af3a-4224-b33a-318ffb63710b"; const
-                    DEFAULT_CATEGORY_ID = "656a434b-e98c-4c89-9fb7-7e0de2dd88c3
                     <Select
                       value={field.value}
                       onValueChange={(val) => {

@@ -43,6 +43,7 @@ export default function EditArticle() {
         focusKeywords_id: article.focusKeywords_id || "",
         focusKeywords_en: article.focusKeywords_en || "",
         autoTranslate: false,
+        isTranslated: article.isTranslated,
         authorName: article.authorName || "",
         categoryId: article.categoryId,
         published: article.published,
