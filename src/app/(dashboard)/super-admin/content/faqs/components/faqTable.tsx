@@ -28,7 +28,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-// ✅ Type Definitions
 type FaqItem = {
   id: string;
   question: string;

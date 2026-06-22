@@ -250,6 +250,10 @@ export default function SidebarRole({ ...props }) {
             url: "/super-admin/content/faqs",
           },
           {
+            title: "Policies",
+            url: "/super-admin/content/policies",
+          },
+          {
             title: "Portfolios",
             url: "/super-admin/content/portfolios",
           },
@@ -298,14 +302,10 @@ export default function SidebarRole({ ...props }) {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Sekarang, cukup panggil getVisibleItems() */}
-
-        {/* DASHBOARD */}
         {checkAccess(role, "/super-admin") && (
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem>
-                {/* Gunakan SidebarMenuButton dengan asChild agar styling shadcn masuk ke Link */}
                 <SidebarMenuButton asChild tooltip="Sales Dashboard">
                   <Link href="/super-admin">
                     <LucideChartNetwork />
