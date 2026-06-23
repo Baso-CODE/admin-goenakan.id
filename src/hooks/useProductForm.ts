@@ -42,7 +42,7 @@ export function useProductForm(
 
   // === VARIANT STATES ===
   const [attributeSelections, setAttributeSelections] = useState<
-    { attributeId: string; valueIds: string[] }[]
+    { attributeId: string; valueIds: string[]; priceModifiers?: Record<string, number>; isVariantGenerator?: boolean }[]
   >([]);
   const [combinations, setCombinations] = useState<
     { label: string; valueIds: string[] }[]
@@ -258,9 +258,18 @@ export function useProductForm(
   const handleGenerateVariants = () => {
     if (!attributeSelections.length)
       return toast.error("Tambahkan minimal 1 attribute.");
-    const groups = attributeSelections.map((a) => a.valueIds);
+
+    const variantGeneratingSelections = attributeSelections.filter(
+      (a) => a.isVariantGenerator !== false
+    );
+
+    if (!variantGeneratingSelections.length) {
+      return setCombinations([]);
+    }
+
+    const groups = variantGeneratingSelections.map((a) => a.valueIds);
     if (groups.some((g) => g.length === 0))
-      return toast.error("Semua attribute wajib memiliki nilai.");
+      return toast.error("Semua attribute untuk variasi kombinasi wajib memiliki nilai.");
 
     const combos = cartesianProduct(groups);
     if (combos.length === 0) return setCombinations([]);
@@ -268,10 +277,13 @@ export function useProductForm(
     const comboObjects = combos.map((combo) => {
       const names: string[] = [];
       attributesList.forEach((attr: any) => {
-        combo.forEach((valueId) => {
-          const found = attr.values.find((v: any) => v.id === valueId);
-          if (found) names.push(`${attr.name} - ${found.value}`);
-        });
+        const selection = attributeSelections.find((s) => s.attributeId === attr.id);
+        if (selection && selection.isVariantGenerator !== false) {
+          combo.forEach((valueId) => {
+            const found = attr.values.find((v: any) => v.id === valueId);
+            if (found) names.push(`${attr.name} - ${found.value}`);
+          });
+        }
       });
       return { valueIds: combo, label: names.join(" | ") };
     });

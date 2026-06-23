@@ -522,14 +522,17 @@ export default function EditProductPage() {
   };
 
   const generateCrossProduct = (selections: any[], fullList: any[]) => {
-    if (selections.length === 0) return [];
+    const variantGeneratingSelections = selections.filter(
+      (sel) => sel.isVariantGenerator !== false
+    );
+    if (variantGeneratingSelections.length === 0) return [];
     const activeAttributes = fullList
-      .filter((attr) => selections.some((sel) => sel.attributeId === attr.id))
+      .filter((attr) => variantGeneratingSelections.some((sel) => sel.attributeId === attr.id))
       .map((attr) => ({
         ...attr,
         // Filter values hanya yang dipilih
         values: attr.values.filter((val: any) =>
-          selections
+          variantGeneratingSelections
             .find((sel) => sel.attributeId === attr.id)
             ?.valueIds.includes(val.id),
         ),
@@ -624,14 +627,16 @@ export default function EditProductPage() {
         let modifierSum = 0;
         const valueIdsInCombo = Object.values(newComb.attributeMap) as string[];
         currentSelections.forEach((selection: any) => {
-          selection.valueIds.forEach((valId: string) => {
-            if (valueIdsInCombo.includes(valId)) {
-              const modVal = selection.priceModifiers?.[valId];
-              if (modVal !== undefined) {
-                modifierSum += Number(modVal) || 0;
+          if (selection.isVariantGenerator !== false) {
+            selection.valueIds.forEach((valId: string) => {
+              if (valueIdsInCombo.includes(valId)) {
+                const modVal = selection.priceModifiers?.[valId];
+                if (modVal !== undefined) {
+                  modifierSum += Number(modVal) || 0;
+                }
               }
-            }
-          });
+            });
+          }
         });
 
         const basePrice = Number(productData?.basePrice) || 0;
