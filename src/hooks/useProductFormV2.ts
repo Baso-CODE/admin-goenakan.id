@@ -42,7 +42,7 @@ export function useProductFormV2(
 
   // === VARIANT STATES ===
   const [attributeSelections, setAttributeSelections] = useState<
-    { attributeId: string; valueIds: string[] }[]
+    { attributeId: string; valueIds: string[]; priceModifiers?: Record<string, number> }[]
   >([]);
   const [combinations, setCombinations] = useState<
     { label: string; valueIds: string[] }[]
@@ -86,6 +86,7 @@ export function useProductFormV2(
   const selectedCategoryId = form.watch("categoryId");
   const selectedItemCategoryId = form.watch("itemCategoryId");
   const isCustomProduct = form.watch("isCustom");
+  const basePrice = form.watch("basePrice");
 
   // === EFFECTS (Data Fetching) ===
   useEffect(() => {
@@ -152,6 +153,41 @@ export function useProductFormV2(
       form.setValue("stock", 0);
     }
   }, [isCustomProduct, form]);
+
+  useEffect(() => {
+    if (!variantMetas.length || !combinations.length) return;
+    const currentBasePrice = Number(basePrice) || 0;
+    let isChanged = false;
+
+    const updated = variantMetas.map((m) => {
+      const comb = combinations[m.variantIndex];
+      if (!comb || m.isPriceOverridden) return m;
+
+      let modifierSum = 0;
+      attributeSelections.forEach((selection) => {
+        selection.valueIds.forEach((valId) => {
+          if (comb.valueIds.includes(valId)) {
+            const modVal = selection.priceModifiers?.[valId];
+            if (modVal !== undefined) {
+              modifierSum += Number(modVal) || 0;
+            }
+          }
+        });
+      });
+
+      const newPrice = currentBasePrice + modifierSum;
+      if (m.price !== newPrice) {
+        isChanged = true;
+        return { ...m, price: newPrice };
+      }
+      return m;
+    });
+
+    if (isChanged) {
+      setVariantMetas(updated);
+      form.setValue("variantImagesMetadata", updated);
+    }
+  }, [basePrice, attributeSelections, combinations, variantMetas, form]);
 
   // === HANDLERS ===
   const handleBulkCreateTags = async () => {
@@ -288,7 +324,7 @@ export function useProductFormV2(
       attributeSelections.forEach((selection) => {
         selection.valueIds.forEach((valId) => {
           if (comb.valueIds.includes(valId)) {
-            const modVal = (selection as any).priceModifiers?.[valId];
+            const modVal = selection.priceModifiers?.[valId];
             if (modVal !== undefined) {
               modifierSum += Number(modVal) || 0;
             }
@@ -390,9 +426,17 @@ export function useProductFormV2(
       handleGenerateSku,
       handleGenerateVariants,
       handleUpdateVariantMeta: (idx: number, field: string, val: any) => {
-        const updated = variantMetas.map((m) =>
-          m.variantIndex === idx ? { ...m, [field]: val } : m,
-        );
+        const updated = variantMetas.map((m) => {
+          if (m.variantIndex === idx) {
+            const isPriceEdit = field === "price";
+            return {
+              ...m,
+              [field]: val,
+              ...(isPriceEdit ? { isPriceOverridden: true } : {}),
+            };
+          }
+          return m;
+        });
         setVariantMetas(updated);
         form.setValue("variantImagesMetadata", updated);
       },

@@ -4,7 +4,7 @@
 
 **Goal:** Automatically calculate the default price of each generated variant as `basePrice + sum of modifiers of selected attributes` while maintaining manual overrides.
 
-**Architecture:** Update the `handleGenerateVariants` function in the React hook `useProductFormV2.ts` to sum the price modifiers from `attributeSelections` matching the value IDs of each variant combination and apply them to the variant metadata.
+**Architecture:** Update the state definitions, the `handleGenerateVariants` function, and add a reactive `useEffect` inside `useProductFormV2.ts` to dynamically calculate and update variant prices while checking the `isPriceOverridden` metadata flag.
 
 **Tech Stack:** React, Next.js, React Hook Form, TypeScript.
 
@@ -14,41 +14,29 @@
 
 ---
 
-### Task 1: Update Variant Price Calculation logic in useProductFormV2.ts
+### Task 1: Update State Definition & Price Calculation in useProductFormV2.ts
 
 **Files:**
-- Modify: `src/hooks/useProductFormV2.ts:262-298`
+- Modify: `src/hooks/useProductFormV2.ts`
 
-**Interfaces:**
-- Consumes: `attributeSelections` state (specifically `priceModifiers`), `form` basePrice value.
-- Produces: Updated variant metadata schema populated with dynamic default prices.
-
-- [ ] **Step 1: Modify handleGenerateVariants in useProductFormV2.ts**
-
-  Locate the mapping logic for `newVariantMetas` inside `handleGenerateVariants` and update it to sum matching `priceModifiers`:
-
+- [ ] **Step 1: Update attributeSelections State Type Definition**
+  Update the hook state `attributeSelections` to include the `priceModifiers` record type definition:
   ```typescript
-  // Replace:
-  const currentBasePrice = Number(form.getValues("basePrice")) || 0;
-  const newVariantMetas = comboObjects.map((_, idx) => ({
-    variantIndex: idx,
-    price: currentBasePrice,
-    stock: 0,
-    isFeatured: false,
-    altText: "",
-    description: "",
-    priceTiers: [],
-  }));
+  const [attributeSelections, setAttributeSelections] = useState<
+    { attributeId: string; valueIds: string[]; priceModifiers?: Record<string, number> }[]
+  >([]);
+  ```
 
-  // With:
+- [ ] **Step 2: Update handleGenerateVariants pricing calculation**
+  Update `handleGenerateVariants` to sum the modifiers clean of `as any` casting:
+  ```typescript
   const currentBasePrice = Number(form.getValues("basePrice")) || 0;
   const newVariantMetas = comboObjects.map((comb, idx) => {
-    // Sum modifiers for valueIds in this combo
     let modifierSum = 0;
     attributeSelections.forEach((selection) => {
       selection.valueIds.forEach((valId) => {
         if (comb.valueIds.includes(valId)) {
-          const modVal = (selection as any).priceModifiers?.[valId];
+          const modVal = selection.priceModifiers?.[valId];
           if (modVal !== undefined) {
             modifierSum += Number(modVal) || 0;
           }
@@ -68,12 +56,73 @@
   });
   ```
 
-- [ ] **Step 2: Run TypeScript compile verification**
+- [ ] **Step 3: Update handleUpdateVariantMeta to track manual overrides**
+  Update `handleUpdateVariantMeta` to mark `isPriceOverridden: true` if the modified field is `"price"`.
+  ```typescript
+  handleUpdateVariantMeta: (idx: number, field: string, val: any) => {
+    const updated = variantMetas.map((m) => {
+      if (m.variantIndex === idx) {
+        const isPriceEdit = field === "price";
+        return {
+          ...m,
+          [field]: val,
+          ...(isPriceEdit ? { isPriceOverridden: true } : {}),
+        };
+      }
+      return m;
+    });
+    setVariantMetas(updated);
+    form.setValue("variantImagesMetadata", updated);
+  },
+  ```
 
+- [ ] **Step 4: Add reactive useEffect for live price sync**
+  Watch `basePrice`, `attributeSelections`, and `combinations`. Recalculate variant prices dynamically for all items that do not have `isPriceOverridden` set to true.
+  ```typescript
+  const basePrice = form.watch("basePrice");
+
+  useEffect(() => {
+    if (!variantMetas.length || !combinations.length) return;
+    const currentBasePrice = Number(basePrice) || 0;
+    let isChanged = false;
+
+    const updated = variantMetas.map((m) => {
+      const comb = combinations[m.variantIndex];
+      if (!comb || m.isPriceOverridden) return m;
+
+      let modifierSum = 0;
+      attributeSelections.forEach((selection) => {
+        selection.valueIds.forEach((valId) => {
+          if (comb.valueIds.includes(valId)) {
+            const modVal = selection.priceModifiers?.[valId];
+            if (modVal !== undefined) {
+              modifierSum += Number(modVal) || 0;
+            }
+          }
+        });
+      });
+
+      const newPrice = currentBasePrice + modifierSum;
+      if (m.price !== newPrice) {
+        isChanged = true;
+        return { ...m, price: newPrice };
+      }
+      return m;
+    });
+
+    if (isChanged) {
+      setVariantMetas(updated);
+      form.setValue("variantImagesMetadata", updated);
+    }
+  }, [basePrice, attributeSelections, combinations, variantMetas, form]);
+  ```
+
+### Task 2: Verify & Compile Verification
+
+- [ ] **Step 1: Run TypeScript compile verification**
   Run: `cd admin-goenakan.id && bun run tsc --noEmit`
   Expected: Command completes successfully with exit code 0 and no type errors.
 
-- [ ] **Step 3: Commit changes**
-
+- [ ] **Step 2: Commit changes**
   Run: `git add src/hooks/useProductFormV2.ts`
-  Run: `git commit -m "feat(products): auto-calculate variant prices from base price and attribute modifiers"`
+  Run: `git commit -m "feat(products): reactive variant price auto-calculation with manual override"`

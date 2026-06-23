@@ -27,3 +27,11 @@ The admin still retains the ability to manually override these calculated prices
   - For each variant combo (`comb.valueIds`):
     - Sum up any modifiers matching the value IDs.
     - Set the calculated price as the default variant price.
+
+- Add Reactive Sync `useEffect` in `useProductFormV2.ts`:
+  - Listen to `combinations`, `attributeSelections`, and `form.watch("basePrice")`.
+  - Recalculate variant prices dynamically for all items that do not have `isPriceOverridden` set to true.
+  
+- Update `handleUpdateVariantMeta`:
+  - When the modified field is `price`, set `isPriceOverridden = true` on the modified variant metadata object.
+
