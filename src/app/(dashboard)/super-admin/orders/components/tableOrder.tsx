@@ -22,7 +22,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-// Hapus import Select karena filter kategori dihapus
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -57,7 +56,7 @@ import { InvoiceDialogWrapper } from "./helper/invoiceDialogWrapper";
 type Order = {
   id: string;
   orderDate: string;
-  soNumber: string;
+  orderNumber: string;
   poNumber: string;
   customerName: string;
   shippingAddress: string;
@@ -126,6 +125,8 @@ export default function TableOrder() {
 
   // === STATE ===
   const [orders, setOrders] = useState<Order[]>([]);
+  console.log("ini adalah data", orders);
+
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -408,7 +409,6 @@ export default function TableOrder() {
                 <TableRow>
                   <TableHead className="min-w-30">Order Date</TableHead>
                   <TableHead className="min-w-37.5">SO Number</TableHead>
-                  <TableHead className="min-w-37.5">Internal PO</TableHead>
                   <TableHead className="min-w-37.5">Customer Name</TableHead>
                   <TableHead className="min-w-37.5">PIC Customer</TableHead>
                   <TableHead className="min-w-37.5">Status</TableHead>
@@ -417,7 +417,6 @@ export default function TableOrder() {
                     Total Amount
                   </TableHead>
                   <TableHead className="text-center min-w-20">Items</TableHead>
-                  {/* Kolom Type dihapus karena ini sudah pasti SALES */}
                   <TableHead className="min-w-37.5">Sales Rep</TableHead>
                   <TableHead className="min-w-37.5">Sample Ref</TableHead>
                   <TableHead className="min-w-37.5">Quotation Ref</TableHead>
@@ -468,10 +467,7 @@ export default function TableOrder() {
                         </div>
                       </TableCell>
                       <TableCell className="font-mono font-medium text-primary">
-                        {order.soNumber}
-                      </TableCell>
-                      <TableCell className="font-mono font-medium text-orange-600">
-                        {order.poNumber}
+                        {order.orderNumber}
                       </TableCell>
                       <TableCell className="font-medium text-gray-700">
                         {order.customerName}
@@ -639,7 +635,7 @@ export default function TableOrder() {
           orderId={selectedInvoiceOrderId}
           onClose={() => setSelectedInvoiceOrderId(null)}
           onSuccess={() => {
-            fetchOrders(); // Refresh data tabel jika invoice berhasil terbuat
+            fetchOrders();
           }}
         />
       )}

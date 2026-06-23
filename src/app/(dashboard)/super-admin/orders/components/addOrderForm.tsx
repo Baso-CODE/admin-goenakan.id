@@ -89,11 +89,9 @@ export default function AddOrderForm() {
       dateOrder: new Date().toISOString().split("T")[0],
       salesCategory: defaultCategory,
       warrantyDays: 30,
-
-      // poNumber: "",
       clientPoNumber: "",
       remark: "",
-      currencyCode: "IDR",
+      currencyCode: "",
       referenceQuotationId: "",
       referenceSampleId: "",
 
@@ -102,8 +100,6 @@ export default function AddOrderForm() {
       purchaseChannelId: "",
       phone: "",
       shippingAddress: "",
-      salesId: "",
-      // vendorIds: [], <-- ✨ 4. Vendor Dihapus
       products: [
         {
           productId: "",
@@ -126,6 +122,8 @@ export default function AddOrderForm() {
   // Master Data States
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  console.log("products", products);
+
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
     [],
   );
@@ -155,23 +153,20 @@ export default function AddOrderForm() {
       try {
         setLoading(true);
 
-        const [resC, resS, resP, resPC, resCur, resQ, resSamp] =
-          await Promise.all([
-            fetchApi("/clients/order"),
-            fetchApi("/sales/order"),
-            fetchApi("/products/order"),
-            fetchApi("/purchase-channels/list"),
-            fetchApi("/currencies"),
-            fetchApi("/quotations/list-references"),
-            fetchApi("/orders/list-samples"),
-          ]);
+        const [resC, resP, resPC, resCur, resQ, resSamp] = await Promise.all([
+          fetchApi("/clients/order"),
+          fetchApi("/products/order"),
+          fetchApi("/purchase-channels/list"),
+          fetchApi("/currencies"),
+          fetchApi("/quotations/list-references"),
+          fetchApi("/orders/list-samples"),
+        ]);
 
-        if (!resC.ok || !resS.ok || !resP.ok || !resPC.ok) {
+        if (!resC.ok || !resP.ok || !resPC.ok) {
           throw new Error("Gagal mengambil data master inti");
         }
 
         const c = await resC.json();
-        const s = await resS.json();
         const p = await resP.json();
         const pc = await resPC.json();
 
@@ -397,7 +392,6 @@ export default function AddOrderForm() {
                       <DollarSign className="w-4 h-4 text-stone-500" /> Currency
                     </FormLabel>
 
-                    {/* ✨ MODAL TAMBAH CURRENCY */}
                     <Dialog
                       open={isCurrencyModalOpen}
                       onOpenChange={setIsCurrencyModalOpen}>
@@ -430,10 +424,10 @@ export default function AddOrderForm() {
                           </SelectItem>
                         ))}
 
-                        {/* ✨ OPSI TAMBAH CURRENCY */}
                         <div className="h-px bg-stone-200 my-1 mx-2" />
                         <SelectItem
                           value="add_new_currency"
+                          textValue="Buat Currency Baru"
                           className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer">
                           <div className="flex items-center gap-2">
                             <Plus className="w-4 h-4" />
@@ -447,23 +441,25 @@ export default function AddOrderForm() {
                 )}
               />
 
-              <FormField
-                control={control}
-                name="clientPoNumber"
-                render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Client PO Number (Optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter client PO reference number"
-                        className="h-10"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {salesCategory === "SALES" && (
+                <FormField
+                  control={control}
+                  name="clientPoNumber"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Client PO Number (Optional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter client PO reference number"
+                          className="h-10"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={control}
@@ -583,86 +579,81 @@ export default function AddOrderForm() {
                 )}
               />
 
-              <FormField
-                control={control}
-                name="referenceSampleId"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel className="flex items-center gap-1.5 mb-1.5">
-                      <Bookmark className="w-4 h-4 text-stone-500" /> Sample No.
-                      Reference (Optional)
-                    </FormLabel>
-                    <Popover open={sampleOpen} onOpenChange={setSampleOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            disabled={salesCategory === "SAMPLE"}
-                            className={cn(
-                              "w-full justify-between h-10 text-left font-normal",
-                              !field.value && "text-muted-foreground",
-                            )}>
-                            {field.value
-                              ? sampleOrderRefs.find(
-                                  (s) => s.id === field.value,
-                                )?.orderNumber
-                              : salesCategory === "SAMPLE"
-                                ? "Kategori berupa sample baru"
+              {salesCategory === "SALES" && (
+                <FormField
+                  control={control}
+                  name="referenceSampleId"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel className="flex items-center gap-1.5 mb-1.5">
+                        <Bookmark className="w-4 h-4 text-stone-500" /> Sample
+                        No. Reference (Optional)
+                      </FormLabel>
+                      <Popover open={sampleOpen} onOpenChange={setSampleOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between h-10 text-left font-normal",
+                                !field.value && "text-muted-foreground",
+                              )}>
+                              {field.value
+                                ? sampleOrderRefs.find(
+                                    (s) => s.id === field.value,
+                                  )?.orderNumber
                                 : "Pilih nomor produksi sample terdahulu..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Cari nomor produksi sample..." />
-                          <CommandList>
-                            <CommandEmpty>
-                              Data sample tidak ditemukan.
-                            </CommandEmpty>
-                            <CommandGroup>
-                              <CommandItem
-                                value="none"
-                                onSelect={() => {
-                                  setValue("referenceSampleId", "");
-                                  setSampleOpen(false);
-                                }}
-                                className="italic text-muted-foreground">
-                                -- Tanpa Referensi Sample --
-                              </CommandItem>
-                              {sampleOrderRefs.map((s) => (
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Cari nomor produksi sample..." />
+                            <CommandList>
+                              <CommandEmpty>
+                                Data sample tidak ditemukan.
+                              </CommandEmpty>
+                              <CommandGroup>
                                 <CommandItem
-                                  key={s.id}
-                                  value={`${s.orderNumber}-${s.id}`}
+                                  value="none"
                                   onSelect={() => {
-                                    setValue("referenceSampleId", s.id);
+                                    setValue("referenceSampleId", "");
                                     setSampleOpen(false);
-                                  }}>
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      s.id === field.value
-                                        ? "opacity-100"
-                                        : "opacity-0",
-                                    )}
-                                  />
-                                  {s.orderNumber}
+                                  }}
+                                  className="italic text-muted-foreground">
+                                  -- Tanpa Referensi Sample --
                                 </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    <FormDescription>
-                      Hanya dapat diaktifkan jika Sales Category diatur ke
-                      "Sales".
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                                {sampleOrderRefs.map((s) => (
+                                  <CommandItem
+                                    key={s.id}
+                                    value={`${s.orderNumber}-${s.id}`}
+                                    onSelect={() => {
+                                      setValue("referenceSampleId", s.id);
+                                      setSampleOpen(false);
+                                    }}>
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        s.id === field.value
+                                          ? "opacity-100"
+                                          : "opacity-0",
+                                      )}
+                                    />
+                                    {s.orderNumber}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
             {/* === SECTION 3: CUSTOMER & LOGISTICS === */}
@@ -828,6 +819,7 @@ export default function AddOrderForm() {
                         <div className="h-px bg-stone-200 my-1 mx-2" />
                         <SelectItem
                           value="add_new_channel"
+                          textValue="Buat Channel Baru"
                           className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer">
                           <div className="flex items-center gap-2">
                             <Plus className="w-4 h-4" />
@@ -997,7 +989,10 @@ export default function AddOrderForm() {
                                   </FormControl>
                                   <SelectContent>
                                     {products.map((p) => (
-                                      <SelectItem key={p.id} value={p.id}>
+                                      <SelectItem
+                                        key={p.id}
+                                        value={p.id}
+                                        textValue={p.name}>
                                         <div className="flex items-center justify-between w-full gap-4 min-w-50">
                                           <span className="font-medium truncate text-gray-700">
                                             {p.name}
@@ -1019,6 +1014,23 @@ export default function AddOrderForm() {
                               </FormItem>
                             )}
                           />
+
+                          {selectedProduct && (
+                            <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                              <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                                SKU:{" "}
+                                <span className="font-medium text-gray-800">
+                                  {(selectedProduct as any).sku || "-"}
+                                </span>
+                              </span>
+                              <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                                UOM:{" "}
+                                <span className="font-medium text-gray-800">
+                                  {(selectedProduct as any).uom || "-"}
+                                </span>
+                              </span>
+                            </div>
+                          )}
 
                           {isCustomProduct && (
                             <FormField
@@ -1105,8 +1117,8 @@ export default function AddOrderForm() {
                                       }}
                                       className="text-center h-10"
                                     />
-                                    <span className="absolute right-3 top-2.5 text-xs text-gray-400 pointer-events-none">
-                                      pcs
+                                    <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium pointer-events-none">
+                                      {selectedProduct?.uom}
                                     </span>
                                   </div>
                                 </FormControl>
@@ -1237,7 +1249,6 @@ export default function AddOrderForm() {
                 })}
               </div>
             </div>
-
             <Button type="submit" className="text-md" disabled={loading}>
               {loading ? "Submitting Order..." : "Create Order"}
             </Button>

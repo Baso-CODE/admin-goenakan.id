@@ -689,7 +689,7 @@ export default function ClientAddForm() {
                   </div>
 
                   {/* PURCHASE CHANNEL */}
-                  <div className="space-y-2">
+                  {/* <div className="space-y-2">
                     <Label>Saluran Pembelian *</Label>
                     <Select
                       value={formData.b2b_purchaseChannelId}
@@ -721,7 +721,7 @@ export default function ClientAddForm() {
                         </SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
+                  </div> */}
 
                   {/* DEPARTMENT */}
                   <div className="space-y-2">

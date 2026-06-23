@@ -117,6 +117,8 @@ export type ProductVariant = { id: string; variantName: string; price: number };
 export type PriceTier = { minQuantity: number; price: number };
 export type Product = {
   id: string;
+  sku: string;
+  uom: string;
   name: string;
   basePrice: number;
   isCustom: boolean;

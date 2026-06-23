@@ -119,7 +119,7 @@ export default function TableOrderSample() {
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
-        salesCategory: "SAMPLE", // Selalu panggil SAMPLE
+        salesCategory: "SAMPLE",
       });
 
       if (debouncedSearch) params.append("search", debouncedSearch);
