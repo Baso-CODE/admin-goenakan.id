@@ -250,6 +250,10 @@ export default function SidebarRole({ ...props }) {
             url: "/super-admin/content/faqs",
           },
           {
+            title: "Best Price Guarantee",
+            url: "/super-admin/content/best-price-guarantee",
+          },
+          {
             title: "Policies",
             url: "/super-admin/content/policies",
           },
