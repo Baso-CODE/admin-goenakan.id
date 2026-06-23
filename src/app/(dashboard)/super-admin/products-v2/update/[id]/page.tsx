@@ -181,7 +181,7 @@ export default function EditProductPage() {
 
       setProductData((prev: any) => ({
         ...prev,
-        variants: updated.variants,
+        productVariants: updated.variants,
       }));
     } catch (err) {
       toast.error(
