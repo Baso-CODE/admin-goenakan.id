@@ -21,9 +21,6 @@ export default function EditFaqItem() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ============================
-  // 1. FETCH DATA (Load Initial Data)
-  // ============================
   useEffect(() => {
     const fetchData = async () => {
       if (!id || status !== "authenticated") return;
@@ -41,9 +38,11 @@ export default function EditFaqItem() {
         const data = await res.json();
 
         setFaqData({
-          question: data.question,
-          answer: data.answer,
-          categoryId: data.categoryId,
+          questionId: data.questionId,
+          questionEn: data.questionEn,
+          answerId: data.answerId,
+          answerEn: data.answerEn,
+          categoryId: data.categoryId.toString(),
           displayOrder: data.displayOrder,
           isFeatured: data.isFeatured,
           isActive: data.isActive,
@@ -93,7 +92,7 @@ export default function EditFaqItem() {
   };
 
   return (
-    <div className="space-y-4  mx-auto">
+    <div className="space-y-4 mx-auto">
       <h2 className="text-xl font-semibold tracking-tight uppercase">
         Edit FAQ Item
       </h2>
