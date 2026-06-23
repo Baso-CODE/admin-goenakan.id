@@ -80,7 +80,6 @@ export default function EditOrderForm() {
     defaultValues: {
       dateOrder: "",
       salesCategory: "SALES",
-      poNumber: "",
       clientPoNumber: "",
       remark: "",
       currencyCode: "IDR",
@@ -91,7 +90,6 @@ export default function EditOrderForm() {
       purchaseChannelId: "",
       phone: "",
       shippingAddress: "",
-      salesId: "",
       products: [],
     },
   });
@@ -134,7 +132,6 @@ export default function EditOrderForm() {
   const salesCategory = watch("salesCategory");
   const selectedClientId = watch("clientId");
   const selectedCurrencyCode = watch("currencyCode");
-  const poNumber = watch("poNumber");
   const selectedPicId = watch("clientB2BPICId");
   const isPending = orderStatus === "PENDING";
 
@@ -212,7 +209,6 @@ export default function EditOrderForm() {
         reset({
           dateOrder: orderData.dateOrder,
           salesCategory: orderData.salesCategory,
-          poNumber: orderData.poNumber,
           clientPoNumber: orderData.clientPoNumber || "",
           remark: orderData.remark || "",
           currencyCode: orderData.currencyCode || "IDR",
@@ -223,7 +219,6 @@ export default function EditOrderForm() {
           purchaseChannelId: orderData.purchaseChannelId || "",
           phone: phoneValue,
           shippingAddress: orderData.shippingAddress || "",
-          salesId: orderData.salesId || "",
           products: orderData.products.map((item: any) => ({
             productId: item.productId,
             variantId: item.variantId || "",
@@ -319,9 +314,7 @@ export default function EditOrderForm() {
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <CardTitle className="text-2xl font-semibold">
-          Edit Order #{poNumber}
-        </CardTitle>
+        <CardTitle className="text-2xl font-semibold">Edit Order</CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -394,21 +387,6 @@ export default function EditOrderForm() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* PO Number — read only di edit, tidak ada tombol Gen */}
-              <FormField
-                control={control}
-                name="poNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Internal PO Number</FormLabel>
-                    <FormControl>
-                      <Input className="h-10 bg-gray-100" readOnly {...field} />
-                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -746,31 +724,6 @@ export default function EditOrderForm() {
               <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
                 Internal & Vendor
               </h3>
-
-              <FormField
-                control={control}
-                name="salesId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>PIC Sales</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="h-10">
-                          <SelectValue placeholder="Select sales person" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {sales.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <FormField
                 control={control}
