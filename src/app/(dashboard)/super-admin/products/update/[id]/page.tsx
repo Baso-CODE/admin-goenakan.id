@@ -506,11 +506,16 @@ export default function EditProductPage() {
     const usedExistingVariantIds = new Set();
 
     const getVariantSignature = (variant: any) => {
-      const attributeIds = variant.attributeValues
-        .map((av: any) => av.attributeValueId)
-        .sort()
-        .join("|");
-      return attributeIds;
+      if (variant.attributeValues) {
+        return variant.attributeValues
+          .map((av: any) => av.attributeValueId)
+          .sort()
+          .join("|");
+      }
+      if (variant.attributeValueIds) {
+        return [...variant.attributeValueIds].sort().join("|");
+      }
+      return "";
     };
 
     for (const newComb of newCombinations) {
