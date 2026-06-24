@@ -146,13 +146,10 @@ export default function VendorForm({
   });
 
   // === 2. USE MEMO UNTUK MERGE DATA (SOLUSI INTI) ===
-  // Ini akan otomatis jalan setiap kali apiVendorItems (fetch selesai)
-  // ATAU existingItems (data parent masuk) berubah.
+
   const allVendorItems = useMemo(() => {
-    // Mulai dengan data dari API
     const combined = [...apiVendorItems];
 
-    // Masukkan item existing jika belum ada di data API
     existingItems.forEach((existing) => {
       const exists = combined.some((apiItem) => apiItem.id === existing.id);
 
@@ -160,8 +157,6 @@ export default function VendorForm({
         combined.push({
           id: existing.id,
           name: existing.name,
-          // Hack: Kita set categoryId sama dengan initial data
-          // Supaya saat pertama load, item ini lolos filter kategori
           categoryId: initialData?.categoryId || "mixed",
         });
       }
@@ -174,12 +169,11 @@ export default function VendorForm({
   const { filteredCategories, filteredItems } = useVendorFormFilter({
     form,
     vendorCategories,
-    vendorItems: allVendorItems, // Kirim yang sudah dimerge
+    vendorItems: allVendorItems,
   });
 
   const currentCategoryId = form.watch("categoryId");
 
-  // Logic deteksi perubahan kategori (Tetap sama)
   useEffect(() => {
     if (!initialData) {
       setHasCategoryChanged(true);
@@ -238,7 +232,6 @@ export default function VendorForm({
   };
 
   // 5. PILIH ITEM YANG DITAMPILKAN
-  // Gunakan allVendorItems (hasil merge) jika belum ada perubahan kategori
   const itemsToDisplay =
     initialData && !hasCategoryChanged ? allVendorItems : filteredItems;
   return (

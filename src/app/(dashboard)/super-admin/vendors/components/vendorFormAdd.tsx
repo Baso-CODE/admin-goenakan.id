@@ -201,12 +201,8 @@ export default function AddVendorForm({
 
       const responseData = await res.json();
       const newPlatform = responseData.data || responseData;
-
-      // Update state data master
       setContactPlatforms((prev) => [...prev, newPlatform]);
-      // Set value di form utama
       form.setValue("platformId", newPlatform.id);
-      // Tutup modal
       setIsPlatformModalOpen(false);
       toast.success("Platform berhasil ditambahkan!");
     } catch (err: any) {
@@ -346,7 +342,6 @@ export default function AddVendorForm({
                       value={field.value}
                       disabled={isLoading || isSubmitting}
                       onValueChange={(val) => {
-                        // ✨ CEGAT VALUE "add_new"
                         if (val === "add_new_platform") {
                           setIsPlatformModalOpen(true);
                         } else {
@@ -441,11 +436,6 @@ export default function AddVendorForm({
                     <Select
                       onValueChange={(val) => {
                         field.onChange(val);
-                        // Hapus reset categoryId jika Anda ingin category tetap terpilih (opsional)
-                        // form.setValue("categoryId", "");
-
-                        // Hapus reset itemIds agar item tidak hilang saat Type berubah
-                        // form.setValue("itemIds", []);
                       }}
                       value={field.value}
                       disabled={isLoading || isSubmitting}>
@@ -473,8 +463,6 @@ export default function AddVendorForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-
-                    {/* ✨ MODAL CATEGORY */}
                     <Dialog
                       open={isCategoryModalOpen}
                       onOpenChange={setIsCategoryModalOpen}>
@@ -566,7 +554,6 @@ export default function AddVendorForm({
                             variant="outline"
                             role="combobox"
                             className="w-full justify-between"
-                            // Disable jika Category belum dipilih (Optional, UX preference)
                             disabled={
                               !form.watch("categoryId") ||
                               isLoading ||
@@ -630,7 +617,6 @@ export default function AddVendorForm({
                     {/* BADGE LIST */}
                     <div className="flex flex-wrap gap-2 mt-2">
                       {(field.value ?? []).map((selectedId) => {
-                        // Cari Nama Item dari Master Data (vendorItems)
                         const item = vendorItems.find(
                           (i) => i.id === selectedId,
                         );

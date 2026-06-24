@@ -65,7 +65,6 @@ export default function ProductFormV2({
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
-  // Panggil Custom Hook
   const { form, submit, state, setters, handlers } = useProductForm(onSubmit);
 
   return (
@@ -150,7 +149,7 @@ export default function ProductFormV2({
                       <SelectContent>
                         {state.itemCategories.map((ic) => (
                           <SelectItem key={ic.id} value={ic.id}>
-                            {ic.name}
+                            {ic.name} {ic.code ? `(${ic.code})` : ""}
                           </SelectItem>
                         ))}
                         <div className="h-px bg-stone-200 my-1 mx-1" />
@@ -188,7 +187,7 @@ export default function ProductFormV2({
                       <SelectContent>
                         {state.itemNames.map((inm) => (
                           <SelectItem key={inm.id} value={inm.id}>
-                            {inm.name}
+                            {inm.name} {inm.code ? `(${inm.code})` : ""}
                           </SelectItem>
                         ))}
                         <div className="h-px bg-stone-200 my-1 mx-1" />
@@ -618,8 +617,13 @@ export default function ProductFormV2({
         isOpen={state.isCategoryModalOpen}
         onClose={() => setters.setIsCategoryModalOpen(false)}
         onSuccess={(newCat) => {
-          setters.setCategories((p) => [...p, newCat]);
-          form.setValue("categoryId", newCat.id);
+          const mappedCategory = {
+            ...newCat,
+            name: newCat.name || newCat.name_id || newCat.name_en,
+          };
+
+          setters.setCategories((p) => [...p, mappedCategory]);
+          form.setValue("categoryId", mappedCategory.id);
           form.setValue("itemCategoryId", "");
           form.setValue("itemNameId", "");
         }}

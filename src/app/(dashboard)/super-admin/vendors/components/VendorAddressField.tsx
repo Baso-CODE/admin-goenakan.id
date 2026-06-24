@@ -26,11 +26,14 @@ import { countries } from "@/lib/countries";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
+const WILAYAH_API = "https://wilayah.web.id/api";
+
 export default function VendorAddressField({ form }: any) {
   const [provinces, setProvinces] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
   const [subDistricts, setSubDistricts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const country = form.watch("country");
   const province = form.watch("province");
@@ -39,10 +42,27 @@ export default function VendorAddressField({ form }: any) {
 
   // Fetch provinces (once)
   useEffect(() => {
-    fetch("https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json")
-      .then((res) => res.json())
-      .then(setProvinces)
-      .catch((err) => console.error("Error provinces:", err));
+    const fetchProvinces = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`${WILAYAH_API}/provinces`);
+        const json = await res.json();
+
+        if (json.status === "success" && Array.isArray(json.data)) {
+          const formatted = json.data.map((item: any) => ({
+            code: item.code,
+            name: item.name,
+          }));
+          setProvinces(formatted);
+        }
+      } catch (err) {
+        console.error("Error fetching provinces:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProvinces();
   }, []);
 
   // Fetch cities when province selected
@@ -52,15 +72,31 @@ export default function VendorAddressField({ form }: any) {
       return;
     }
 
-    const prov = provinces.find((p) => p.name === province);
-    if (!prov) return;
+    const fetchCities = async () => {
+      try {
+        setLoading(true);
+        const prov = provinces.find((p) => p.name === province);
+        if (!prov) return;
 
-    fetch(
-      `https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${prov.id}.json`
-    )
-      .then((r) => r.json())
-      .then(setCities);
-  }, [province, country]);
+        const res = await fetch(`${WILAYAH_API}/regencies/${prov.code}`);
+        const json = await res.json();
+
+        if (json.status === "success" && Array.isArray(json.data)) {
+          const formatted = json.data.map((item: any) => ({
+            code: item.code,
+            name: item.name,
+          }));
+          setCities(formatted);
+        }
+      } catch (err) {
+        console.error("Error fetching cities:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCities();
+  }, [province, country, provinces]);
 
   // Fetch districts when city selected
   useEffect(() => {
@@ -69,15 +105,31 @@ export default function VendorAddressField({ form }: any) {
       return;
     }
 
-    const c = cities.find((p) => p.name === city);
-    if (!c) return;
+    const fetchDistricts = async () => {
+      try {
+        setLoading(true);
+        const c = cities.find((p) => p.name === city);
+        if (!c) return;
 
-    fetch(
-      `https://www.emsifa.com/api-wilayah-indonesia/api/districts/${c.id}.json`
-    )
-      .then((r) => r.json())
-      .then(setDistricts);
-  }, [city, country]);
+        const res = await fetch(`${WILAYAH_API}/districts/${c.code}`);
+        const json = await res.json();
+
+        if (json.status === "success" && Array.isArray(json.data)) {
+          const formatted = json.data.map((item: any) => ({
+            code: item.code,
+            name: item.name,
+          }));
+          setDistricts(formatted);
+        }
+      } catch (err) {
+        console.error("Error fetching districts:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDistricts();
+  }, [city, country, cities]);
 
   // Fetch sub-district
   useEffect(() => {
@@ -86,15 +138,31 @@ export default function VendorAddressField({ form }: any) {
       return;
     }
 
-    const dist = districts.find((p) => p.name === district);
-    if (!dist) return;
+    const fetchSubDistricts = async () => {
+      try {
+        setLoading(true);
+        const dist = districts.find((p) => p.name === district);
+        if (!dist) return;
 
-    fetch(
-      `https://www.emsifa.com/api-wilayah-indonesia/api/villages/${dist.id}.json`
-    )
-      .then((r) => r.json())
-      .then(setSubDistricts);
-  }, [district, country]);
+        const res = await fetch(`${WILAYAH_API}/villages/${dist.code}`);
+        const json = await res.json();
+
+        if (json.status === "success" && Array.isArray(json.data)) {
+          const formatted = json.data.map((item: any) => ({
+            code: item.code,
+            name: item.name,
+          }));
+          setSubDistricts(formatted);
+        }
+      } catch (err) {
+        console.error("Error fetching villages:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSubDistricts();
+  }, [district, country, districts]);
 
   // REUSABLE select popover item
   const SelectPopover = ({
@@ -118,10 +186,9 @@ export default function VendorAddressField({ form }: any) {
               <FormControl>
                 <Button
                   variant="outline"
-                  disabled={disabled}
-                  className="w-full justify-between rounded-xl h-11"
-                >
-                  {field.value || placeholder}
+                  disabled={disabled || loading}
+                  className="w-full justify-between rounded-xl h-11">
+                  {loading ? "Loading..." : field.value || placeholder}
                   <ChevronsUpDown className="h-4 w-4 opacity-50" />
                 </Button>
               </FormControl>
@@ -134,18 +201,19 @@ export default function VendorAddressField({ form }: any) {
                 />
 
                 <CommandList>
-                  <CommandEmpty>No data found</CommandEmpty>
+                  <CommandEmpty>
+                    {loading ? "Loading data..." : "No data found"}
+                  </CommandEmpty>
 
                   <CommandGroup>
                     {list?.map((item: any) => (
                       <CommandItem
-                        key={item.id || item.name}
+                        key={item.code || item.name}
                         value={item.name}
                         onSelect={() => {
                           field.onChange(item.name);
                           if (onSelect) onSelect(item.name);
-                        }}
-                      >
+                        }}>
                         {item.flag && (
                           <span className="mr-2 text-xl">{item.flag}</span>
                         )}
@@ -276,7 +344,7 @@ export default function VendorAddressField({ form }: any) {
         <SelectPopover
           label="Sub-District"
           name="subDistrict"
-          value={district}
+          value={form.watch("subDistrict")}
           list={subDistricts}
           placeholder="Select sub-district"
           disabled={!district}

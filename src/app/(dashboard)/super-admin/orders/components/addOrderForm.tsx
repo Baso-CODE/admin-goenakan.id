@@ -60,7 +60,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useApi } from "@/hooks/useApi";
+import { format } from "date-fns";
 import PurchaseChannelForm, {
   PurchaseChannelFormValues,
 } from "../../purchase-channel/components/formPurchaseChannel";
@@ -277,10 +279,8 @@ export default function AddOrderForm() {
       const responseData = await res.json();
       const newChannel = responseData.data || responseData;
 
-      // Update state purchaseChannels agar opsi baru langsung muncul
       setPurchaseChannels((prev) => [...prev, newChannel]);
 
-      // Otomatis pilih channel yang baru dibuat di dalam form
       form.setValue("purchaseChannelId", newChannel.id);
 
       // Tutup modal
@@ -345,15 +345,31 @@ export default function AddOrderForm() {
               <FormField
                 control={control}
                 name="dateOrder"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date Order</FormLabel>
-                    <FormControl>
-                      <Input type="date" className="h-10" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  let parsedDate: Date | undefined = undefined;
+                  if (field.value) {
+                    const d = new Date(field.value);
+                    if (!isNaN(d.getTime())) {
+                      parsedDate = d;
+                    }
+                  }
+
+                  return (
+                    <FormItem className="flex flex-col gap-1 mt-1.5">
+                      <FormLabel>Date Order</FormLabel>
+                      <DatePickerHelper
+                        date={parsedDate}
+                        setDate={(date) => {
+                          field.onChange(
+                            date ? format(date, "yyyy-MM-dd") : "",
+                          );
+                        }}
+                        placeholder="Pilih Tanggal Order"
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
 
               <FormField
@@ -978,7 +994,9 @@ export default function AddOrderForm() {
                                     if (prod) {
                                       form.setValue(
                                         `products.${index}.price`,
-                                        prod.isCustom ? 0 : prod.basePrice,
+                                        prod.isCustom
+                                          ? 0
+                                          : Number(prod.basePrice),
                                       );
                                     }
                                   }}>
@@ -1111,7 +1129,9 @@ export default function AddOrderForm() {
                                             `products.${index}.price`,
                                             applicableTier
                                               ? Number(applicableTier.price)
-                                              : selectedProduct.basePrice,
+                                              : Number(
+                                                  selectedProduct.basePrice,
+                                                ),
                                           );
                                         }
                                       }}

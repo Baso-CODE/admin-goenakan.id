@@ -574,7 +574,7 @@ export default function EditOrderForm() {
             </div>
 
             {/* === SECTION 3: CUSTOMER & LOGISTICS === */}
-            <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
+            <div className="grid md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50 items-start">
               <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
                 Customer & Logistics
               </h3>
