@@ -81,7 +81,7 @@ export default function SidebarRole({ ...props }) {
         items: [
           // { title: "Sales Dashboard", url: "/super-admin" },
           // { title: "Dashboard Overview", url: "/" },
-          { title: "Order Form", url: "/super-admin/orders/add" },
+          // { title: "Order Form", url: "/super-admin/orders/add" },
           { title: "All Orders List", url: "/super-admin/orders" },
         ],
       },

@@ -57,7 +57,6 @@ type Order = {
   id: string;
   orderDate: string;
   orderNumber: string;
-  poNumber: string;
   customerName: string;
   shippingAddress: string;
   picCustomer: string;
@@ -300,8 +299,6 @@ export default function TableOrder() {
       <Card className="p-4 shadow-sm">
         <div className="flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between">
           <div className="flex flex-wrap gap-3 w-full lg:w-auto">
-            {/* ✨ Filter UI untuk Category sudah dihapus karena ini halaman khusus SALES */}
-
             {/* Filter Date Range */}
             <div className="flex gap-2 w-full sm:w-auto">
               <div className="flex flex-col gap-1.5 w-full sm:w-35">

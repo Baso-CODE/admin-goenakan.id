@@ -33,9 +33,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { format } from "date-fns";
 import {
   ArrowLeft,
   Bookmark,
@@ -64,9 +66,7 @@ import {
   Product,
   PurchaseChannel,
   QuotationRef,
-  Sales,
   SampleOrderRef,
-  Vendor,
 } from "../../types/order.types";
 
 export default function EditOrderForm() {
@@ -105,11 +105,7 @@ export default function EditOrderForm() {
 
   // Master data
   const [clients, setClients] = useState<Client[]>([]);
-  console.log("ini adalah console log", clients);
-  const [sales, setSales] = useState<Sales[]>([]);
-  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  console.log("ini adalah console log", products);
 
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
     [],
@@ -123,8 +119,6 @@ export default function EditOrderForm() {
 
   // Popover open states
   const [clientOpen, setClientOpen] = useState(false);
-  const [vendorOpen, setVendorOpen] = useState(false);
-  const [vendorSearch, setVendorSearch] = useState("");
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [sampleOpen, setSampleOpen] = useState(false);
 
@@ -162,19 +156,14 @@ export default function EditOrderForm() {
           ]);
 
         const c = await resC.json();
-        const s = await resS.json();
-        const v = await resV.json();
         const p = await resP.json();
         const pc = await resPC.json();
         const jsonCur = resCur.ok ? await resCur.json() : null;
         const jsonQ = resQ.ok ? await resQ.json() : null;
         const jsonSamp = resSamp.ok ? await resSamp.json() : null;
         const orderData = await resOrder.json();
-        console.log("Ini adalah data order data", orderData);
 
         setClients(c);
-        setSales(s);
-        setVendors(v);
         setProducts(p);
         setPurchaseChannels(pc);
 
@@ -242,7 +231,7 @@ export default function EditOrderForm() {
 
   useEffect(() => {
     if (!selectedClientData) return;
-    if (selectedClientId === initialClientId.current) return; // skip initial load
+    if (selectedClientId === initialClientId.current) return;
 
     setValue("shippingAddress", selectedClientData.address);
 
@@ -263,7 +252,7 @@ export default function EditOrderForm() {
   // Sync phone dari PIC B2B — sama dengan AddOrderForm
   useEffect(() => {
     if (!isB2B || !selectedPicId) return;
-    if (selectedPicId === initialPicId.current) return; // skip initial load
+    if (selectedPicId === initialPicId.current) return;
 
     const pic = availablePics.find((p) => p.id === selectedPicId);
     if (pic && (pic as any).phone) {
@@ -320,20 +309,23 @@ export default function EditOrderForm() {
         <Form {...form}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
             {/* === SECTION 1: ORDER DETAILS === */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 border rounded-lg bg-gray-50/50">
+            <div className="grid grid-cols-1 items-start md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 border rounded-lg bg-gray-50/50">
               <h3 className="col-span-full font-medium text-lg text-gray-700">
                 Order Details
               </h3>
-
               <FormField
                 control={control}
                 name="dateOrder"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col gap-1 mt-1.5">
                     <FormLabel>Date Order</FormLabel>
-                    <FormControl>
-                      <Input type="date" className="h-10" {...field} />
-                    </FormControl>
+                    <DatePickerHelper
+                      date={field.value ? new Date(field.value) : undefined}
+                      setDate={(date) => {
+                        field.onChange(date ? format(date, "yyyy-MM-dd") : "");
+                      }}
+                      placeholder="Pilih Tanggal Order"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}

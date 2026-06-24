@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
@@ -38,13 +39,12 @@ import { cn } from "@/lib/utils";
 type OrderSample = {
   id: string;
   orderDate: string;
-  sampleNumber: string;
+  orderNumber: string;
   customerName: string;
   shippingAddress: string;
   picCustomer: string;
   quotationReference: string;
 
-  // Data Production & Logistics
   productionData?: string;
   packagingDate?: string;
   shippingDate: string | null;
@@ -107,8 +107,8 @@ export default function TableOrderSample() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
 
   // === FETCH ORDERS (SAMPLE ONLY) ===
   const fetchOrders = async () => {
@@ -123,9 +123,9 @@ export default function TableOrderSample() {
       });
 
       if (debouncedSearch) params.append("search", debouncedSearch);
-      if (startDate) params.append("startDate", startDate);
-      if (endDate) params.append("endDate", endDate);
-
+      if (startDate)
+        params.append("startDate", format(startDate, "yyyy-MM-dd"));
+      if (endDate) params.append("endDate", format(endDate, "yyyy-MM-dd"));
       const res = await fetchApi(`/orders/all?${params}`);
 
       if (!res.ok) {
@@ -146,7 +146,6 @@ export default function TableOrderSample() {
 
   useEffect(() => {
     fetchOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, debouncedSearch, startDate, endDate, status, fetchApi]);
 
   // === HANDLER EXPORT (SAMPLE ONLY) ===
@@ -158,8 +157,8 @@ export default function TableOrderSample() {
         salesCategory: "SAMPLE",
       };
 
-      if (startDate) exportFilters.startDate = startDate;
-      if (endDate) exportFilters.endDate = endDate;
+      if (startDate) exportFilters.startDate = format(startDate, "yyyy-MM-dd");
+      if (endDate) exportFilters.endDate = format(endDate, "yyyy-MM-dd");
       if (debouncedSearch) exportFilters.search = debouncedSearch;
 
       const queryString = new URLSearchParams(
@@ -238,33 +237,32 @@ export default function TableOrderSample() {
       {/* Filter & Export Bar */}
       <Card className="p-4 shadow-sm w-full">
         <div className="flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between">
-          <div className="flex gap-2 w-full sm:w-auto">
-            <div className="flex flex-col gap-1.5 w-full sm:w-35">
+          <div className="flex flex-wrap sm:flex-nowrap gap-4 w-full sm:w-auto">
+            <div className="flex flex-col gap-1.5 w-full sm:w-auto">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Start Date
               </span>
-              <Input
-                type="date"
-                className="text-sm"
-                value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value);
-                  setPage(1);
+              <DatePickerHelper
+                date={startDate}
+                setDate={(date) => {
+                  setStartDate(date);
+                  setPage(1); // Reset page saat ganti tanggal
                 }}
+                placeholder="Pilih Tanggal..."
               />
             </div>
-            <div className="flex flex-col gap-1.5 w-full sm:w-35">
+
+            <div className="flex flex-col gap-1.5 w-full sm:w-auto">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 End Date
               </span>
-              <Input
-                type="date"
-                className="text-sm"
-                value={endDate}
-                onChange={(e) => {
-                  setEndDate(e.target.value);
-                  setPage(1);
+              <DatePickerHelper
+                date={endDate}
+                setDate={(date) => {
+                  setEndDate(date);
+                  setPage(1); // Reset page saat ganti tanggal
                 }}
+                placeholder="Pilih Tanggal..."
               />
             </div>
           </div>
@@ -374,7 +372,7 @@ export default function TableOrderSample() {
                         </div>
                       </TableCell>
                       <TableCell className="font-mono font-medium text-purple-600">
-                        {order.sampleNumber}
+                        {order.orderNumber}
                       </TableCell>
                       <TableCell className="font-medium text-gray-700">
                         {order.customerName}
