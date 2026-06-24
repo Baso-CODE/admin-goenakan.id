@@ -26,7 +26,7 @@ import { countries } from "@/lib/countries";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
-const WILAYAH_API = "https://wilayah.web.id/api";
+const WILAYAH_API = "https://wilayah.id/api";
 
 export default function VendorAddressField({ form }: any) {
   const [provinces, setProvinces] = useState<any[]>([]);
@@ -45,10 +45,10 @@ export default function VendorAddressField({ form }: any) {
     const fetchProvinces = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`${WILAYAH_API}/provinces`);
+        const res = await fetch(`${WILAYAH_API}/provinces.json`);
         const json = await res.json();
 
-        if (json.status === "success" && Array.isArray(json.data)) {
+        if (Array.isArray(json.data)) {
           const formatted = json.data.map((item: any) => ({
             code: item.code,
             name: item.name,
@@ -78,10 +78,10 @@ export default function VendorAddressField({ form }: any) {
         const prov = provinces.find((p) => p.name === province);
         if (!prov) return;
 
-        const res = await fetch(`${WILAYAH_API}/regencies/${prov.code}`);
+        const res = await fetch(`${WILAYAH_API}/regencies/${prov.code}.json`);
         const json = await res.json();
 
-        if (json.status === "success" && Array.isArray(json.data)) {
+        if (Array.isArray(json.data)) {
           const formatted = json.data.map((item: any) => ({
             code: item.code,
             name: item.name,
@@ -111,10 +111,10 @@ export default function VendorAddressField({ form }: any) {
         const c = cities.find((p) => p.name === city);
         if (!c) return;
 
-        const res = await fetch(`${WILAYAH_API}/districts/${c.code}`);
+        const res = await fetch(`${WILAYAH_API}/districts/${c.code}.json`);
         const json = await res.json();
 
-        if (json.status === "success" && Array.isArray(json.data)) {
+        if (Array.isArray(json.data)) {
           const formatted = json.data.map((item: any) => ({
             code: item.code,
             name: item.name,
@@ -144,10 +144,10 @@ export default function VendorAddressField({ form }: any) {
         const dist = districts.find((p) => p.name === district);
         if (!dist) return;
 
-        const res = await fetch(`${WILAYAH_API}/villages/${dist.code}`);
+        const res = await fetch(`${WILAYAH_API}/villages/${dist.code}.json`);
         const json = await res.json();
 
-        if (json.status === "success" && Array.isArray(json.data)) {
+        if (Array.isArray(json.data)) {
           const formatted = json.data.map((item: any) => ({
             code: item.code,
             name: item.name,
