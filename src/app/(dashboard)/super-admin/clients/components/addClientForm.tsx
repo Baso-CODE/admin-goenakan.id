@@ -9,14 +9,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -24,11 +16,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -38,17 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/useApi";
-import { countries } from "@/lib/countries";
-import { cn } from "@/lib/utils";
-import {
-  Check,
-  ChevronLeft,
-  ChevronsUpDown,
-  ClipboardList,
-  ImagePlus,
-  Trash2,
-  X,
-} from "lucide-react";
+import { ChevronLeft, ClipboardList, ImagePlus, Trash2, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -58,8 +35,7 @@ import { z } from "zod";
 import DepartmentForm, {
   DepartmentFormValues,
 } from "../../departments/components/formDepartment";
-
-const WILAYAH_API = "https://wilayah.web.id/api";
+import AddressField from "./addressField";
 
 const clientSchema = z.object({
   type: z.enum(["B2B", "B2C"]),
@@ -67,14 +43,6 @@ const clientSchema = z.object({
 
 type ClientType = "B2B" | "B2C" | "";
 
-interface PurchaseChannel {
-  id: string;
-  name: string;
-  slug: string;
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
 interface Departement {
   id: string;
   name: string;
@@ -131,8 +99,6 @@ interface ClientFormData {
 const initialFormData: ClientFormData = {
   type: "",
   custCode: "",
-
-  // B2B FIELDS
   b2b_brandName: "",
   b2b_brandWebsiteUrl: "",
   b2b_brandLogoFile: null,
@@ -150,8 +116,6 @@ const initialFormData: ClientFormData = {
   b2b_fullAddress: "",
   b2b_purchaseChannelId: "",
   b2b_pics: [{ prefix: "", name: "", email: "", phone: "" }],
-
-  // B2C FIELDS
   b2c_name: "",
   b2c_prefix: "",
   b2c_phone: "",
@@ -165,112 +129,17 @@ const initialFormData: ClientFormData = {
   b2c_purchaseChannelIdB2C: "",
 };
 
-// ==========================================
-// REUSABLE COMBOBOX UNTUK REGION
-// ==========================================
-function RegionCombobox({
-  label,
-  value,
-  list,
-  placeholder,
-  disabled,
-  loading,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  list: any[];
-  placeholder: string;
-  disabled: boolean;
-  loading?: boolean;
-  onChange: (val: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            disabled={disabled || loading}
-            className={cn(
-              "w-full justify-between h-10 font-normal",
-              !value && "text-muted-foreground",
-            )}>
-            <span className="truncate">
-              {loading ? "Loading..." : value || placeholder}
-            </span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-[--radix-popover-trigger-width] p-0"
-          align="start">
-          <Command>
-            <CommandInput placeholder={`Cari ${label.toLowerCase()}...`} />
-            <CommandList>
-              <CommandEmpty>
-                {loading ? "Loading..." : "Tidak ditemukan"}
-              </CommandEmpty>
-              <CommandGroup>
-                {list.map((item) => (
-                  <CommandItem
-                    key={item.code}
-                    value={item.name}
-                    onSelect={() => {
-                      onChange(item.name);
-                      setOpen(false);
-                    }}>
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        value === item.name ? "opacity-100" : "opacity-0",
-                      )}
-                    />
-                    {item.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-}
-
 export default function ClientAddForm() {
   const { fetchApi, status } = useApi();
   const [formData, setFormData] = useState(initialFormData);
   const [clientType, setClientType] = useState<ClientType>("");
-
-  // STATE WILAYAH SHARED PROVINCES
-  const [provinces, setProvinces] = useState<any[]>([]);
-
-  // STATE WILAYAH B2B
-  const [cities, setCities] = useState<any[]>([]);
-  const [districts, setDistricts] = useState<any[]>([]);
-  const [subDistricts, setSubDistricts] = useState<any[]>([]);
-
-  // STATE WILAYAH B2C
-  const [citiesB2C, setCitiesB2C] = useState<any[]>([]);
-  const [districtsB2C, setDistrictsB2C] = useState<any[]>([]);
-  const [subDistrictsB2C, setSubDistrictsB2C] = useState<any[]>([]);
-
   const [departments, setDepartments] = useState<Departement[]>([]);
-  const [openB2BCountry, setOpenB2BCountry] = useState(false);
-
   const [isDepModalOpen, setIsDepModalOpen] = useState(false);
-
   const { data: session } = useSession();
   const router = useRouter();
 
   // ==========================================
-  // FETCH DEPARTMENTS & PURCHASE CHANNELS
+  // FETCH DEPARTMENTS
   // ==========================================
   useEffect(() => {
     const fetchMasterData = async () => {
@@ -296,137 +165,16 @@ export default function ClientAddForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-
       if (!res.ok) throw new Error("Gagal membuat departemen");
       const newDep = await res.json();
       setDepartments((prev) => [...prev, newDep]);
       setFormData((prev) => ({ ...prev, b2b_departmentId: newDep.id }));
-
       toast.success("Departemen berhasil ditambahkan!");
       setIsDepModalOpen(false);
     } catch (err: any) {
       toast.error(err.message || "Terjadi kesalahan saat menambahkan data");
     }
   };
-
-  // ==========================================
-  // FETCH WILAYAH API (PROVINCES)
-  // ==========================================
-  useEffect(() => {
-    fetch(`${WILAYAH_API}/provinces`)
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.status === "success") setProvinces(json.data);
-      })
-      .catch((err) => console.error("Error fetch provinces:", err));
-  }, []);
-
-  // ==========================================
-  // FETCH WILAYAH API (CITIES)
-  // ==========================================
-  useEffect(() => {
-    // B2B City
-    const provB2B = provinces.find((p) => p.name === formData.b2b_province);
-    if (provB2B && formData.b2b_country === "Indonesia") {
-      fetch(`${WILAYAH_API}/regencies/${provB2B.code}`)
-        .then((res) => res.json())
-        .then((json) => {
-          if (json.status === "success") setCities(json.data);
-        });
-    } else {
-      setCities([]);
-    }
-
-    // B2C City
-    const provB2C = provinces.find((p) => p.name === formData.b2c_province);
-    if (provB2C && formData.b2c_country === "Indonesia") {
-      fetch(`${WILAYAH_API}/regencies/${provB2C.code}`)
-        .then((res) => res.json())
-        .then((json) => {
-          if (json.status === "success") setCitiesB2C(json.data);
-        });
-    } else {
-      setCitiesB2C([]);
-    }
-  }, [
-    formData.b2b_province,
-    formData.b2c_province,
-    formData.b2b_country,
-    formData.b2c_country,
-    provinces,
-  ]);
-
-  // ==========================================
-  // FETCH WILAYAH API (DISTRICTS)
-  // ==========================================
-  useEffect(() => {
-    // B2B District
-    const cityB2B = cities.find((c) => c.name === formData.b2b_city);
-    if (cityB2B && formData.b2b_country === "Indonesia") {
-      fetch(`${WILAYAH_API}/districts/${cityB2B.code}`)
-        .then((res) => res.json())
-        .then((json) => {
-          if (json.status === "success") setDistricts(json.data);
-        });
-    } else {
-      setDistricts([]);
-    }
-
-    // B2C District
-    const cityB2C = citiesB2C.find((c) => c.name === formData.b2c_city);
-    if (cityB2C && formData.b2c_country === "Indonesia") {
-      fetch(`${WILAYAH_API}/districts/${cityB2C.code}`)
-        .then((res) => res.json())
-        .then((json) => {
-          if (json.status === "success") setDistrictsB2C(json.data);
-        });
-    } else {
-      setDistrictsB2C([]);
-    }
-  }, [
-    formData.b2b_city,
-    formData.b2c_city,
-    formData.b2b_country,
-    formData.b2c_country,
-    cities,
-    citiesB2C,
-  ]);
-
-  // ==========================================
-  // FETCH WILAYAH API (SUB-DISTRICTS/VILLAGES)
-  // ==========================================
-  useEffect(() => {
-    // B2B SubDistrict
-    const distB2B = districts.find((d) => d.name === formData.b2b_district);
-    if (distB2B && formData.b2b_country === "Indonesia") {
-      fetch(`${WILAYAH_API}/villages/${distB2B.code}`)
-        .then((res) => res.json())
-        .then((json) => {
-          if (json.status === "success") setSubDistricts(json.data);
-        });
-    } else {
-      setSubDistricts([]);
-    }
-
-    // B2C SubDistrict
-    const distB2C = districtsB2C.find((d) => d.name === formData.b2c_district);
-    if (distB2C && formData.b2c_country === "Indonesia") {
-      fetch(`${WILAYAH_API}/villages/${distB2C.code}`)
-        .then((res) => res.json())
-        .then((json) => {
-          if (json.status === "success") setSubDistrictsB2C(json.data);
-        });
-    } else {
-      setSubDistrictsB2C([]);
-    }
-  }, [
-    formData.b2b_district,
-    formData.b2c_district,
-    formData.b2b_country,
-    formData.b2c_country,
-    districts,
-    districtsB2C,
-  ]);
 
   // ==========================================
   // HANDLERS
@@ -451,22 +199,18 @@ export default function ClientAddForm() {
       toast.error("Pilih tipe klien terlebih dahulu!");
       return;
     }
-
     if (!session) {
       toast.error("Kamu belum login!");
       return;
     }
-
     if (clientType === "B2B") {
       if (!formData.b2b_companyName)
         return toast.error("Nama perusahaan wajib diisi");
       if (!formData.b2b_departmentId)
         return toast.error("Departemen wajib dipilih");
-      if (formData.b2b_brandName && !formData.b2b_brandLogoFile) {
+      if (formData.b2b_brandName && !formData.b2b_brandLogoFile)
         return toast.error("File Logo wajib diunggah jika Nama Brand diisi!");
-      }
     }
-
     if (clientType === "B2C") {
       if (!formData.b2c_name) return toast.error("Nama lengkap wajib diisi");
     }
@@ -487,7 +231,6 @@ export default function ClientAddForm() {
           "purchaseChannelId",
           formData.b2b_purchaseChannelId || "",
         );
-
         if (formData.b2b_phone)
           formDataPayload.append("phone", formData.b2b_phone);
         if (formData.b2b_email)
@@ -508,7 +251,6 @@ export default function ClientAddForm() {
           formDataPayload.append("postalCode", formData.b2b_postalCode);
         if (formData.b2b_fullAddress)
           formDataPayload.append("fullAddress", formData.b2b_fullAddress);
-
         formDataPayload.append(
           "pics",
           JSON.stringify(
@@ -520,7 +262,6 @@ export default function ClientAddForm() {
             })),
           ),
         );
-
         if (formData.b2b_brandName)
           formDataPayload.append("brandName", formData.b2b_brandName);
         if (formData.b2b_brandWebsiteUrl)
@@ -556,7 +297,6 @@ export default function ClientAddForm() {
         method: "POST",
         body: formDataPayload,
       });
-
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         toast.error(
@@ -653,7 +393,6 @@ export default function ClientAddForm() {
                       required
                     />
                   </div>
-
                   <div className="space-y-2">
                     <Label>Departemen *</Label>
                     <Select
@@ -691,224 +430,29 @@ export default function ClientAddForm() {
                 <h3 className="text-lg font-semibold border-b pb-2 mt-6">
                   Alamat Perusahaan
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* COUNTRY B2B */}
-                  <div className="space-y-2 flex flex-col">
-                    <Label>Negara</Label>
-                    <Popover
-                      open={openB2BCountry}
-                      onOpenChange={setOpenB2BCountry}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className={cn(
-                            "w-full justify-between pl-3 font-normal",
-                            !formData.b2b_country && "text-muted-foreground",
-                          )}>
-                          {formData.b2b_country ? (
-                            <span className="flex items-center gap-2 truncate">
-                              <span>
-                                {
-                                  countries.find(
-                                    (c) => c.name === formData.b2b_country,
-                                  )?.flag
-                                }
-                              </span>
-                              {formData.b2b_country}
-                            </span>
-                          ) : (
-                            "Pilih Negara"
-                          )}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-75 p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Cari negara..." />
-                          <CommandList>
-                            <CommandEmpty>Negara tidak ditemukan.</CommandEmpty>
-                            <CommandGroup>
-                              {countries.map((c) => (
-                                <CommandItem
-                                  key={c.code}
-                                  value={c.name}
-                                  onSelect={() => {
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      b2b_country: c.name,
-                                      b2b_province: "",
-                                      b2b_city: "",
-                                      b2b_district: "",
-                                      b2b_subDistrict: "",
-                                      b2b_postalCode: "",
-                                    }));
-                                    setOpenB2BCountry(false);
-                                  }}>
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      formData.b2b_country === c.name
-                                        ? "opacity-100"
-                                        : "opacity-0",
-                                    )}
-                                  />
-                                  <span>
-                                    {c.flag} {c.name}
-                                  </span>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
 
-                  {/* PROVINCE B2B */}
-                  {formData.b2b_country === "Indonesia" ? (
-                    <RegionCombobox
-                      label="Provinsi"
-                      placeholder="Pilih Provinsi"
-                      list={provinces}
-                      value={formData.b2b_province || ""}
-                      disabled={!formData.b2b_country}
-                      onChange={(val) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          b2b_province: val,
-                          b2b_city: "",
-                          b2b_district: "",
-                          b2b_subDistrict: "",
-                        }))
-                      }
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      <Label>Provinsi</Label>
-                      <Input
-                        placeholder="Masukkan Provinsi"
-                        value={formData.b2b_province}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            b2b_province: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  )}
-
-                  {/* CITY B2B */}
-                  {formData.b2b_country === "Indonesia" ? (
-                    <RegionCombobox
-                      label="Kota / Kabupaten"
-                      placeholder="Pilih Kota / Kabupaten"
-                      list={cities}
-                      value={formData.b2b_city || ""}
-                      disabled={!formData.b2b_province}
-                      onChange={(val) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          b2b_city: val,
-                          b2b_district: "",
-                          b2b_subDistrict: "",
-                        }))
-                      }
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      <Label>Kota / Kabupaten</Label>
-                      <Input
-                        placeholder="Masukkan Kota"
-                        value={formData.b2b_city}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            b2b_city: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  )}
-
-                  {/* DISTRICT B2B */}
-                  {formData.b2b_country === "Indonesia" ? (
-                    <RegionCombobox
-                      label="Kecamatan"
-                      placeholder="Pilih Kecamatan"
-                      list={districts}
-                      value={formData.b2b_district || ""}
-                      disabled={!formData.b2b_city}
-                      onChange={(val) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          b2b_district: val,
-                          b2b_subDistrict: "",
-                        }))
-                      }
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      <Label>Kecamatan</Label>
-                      <Input
-                        placeholder="Masukkan Kecamatan"
-                        value={formData.b2b_district}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            b2b_district: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  )}
-
-                  {/* SUBDISTRICT B2B */}
-                  {formData.b2b_country === "Indonesia" ? (
-                    <RegionCombobox
-                      label="Kelurahan"
-                      placeholder="Pilih Kelurahan"
-                      list={subDistricts}
-                      value={formData.b2b_subDistrict || ""}
-                      disabled={!formData.b2b_district}
-                      onChange={(val) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          b2b_subDistrict: val,
-                        }))
-                      }
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      <Label>Kelurahan</Label>
-                      <Input
-                        placeholder="Masukkan Kelurahan"
-                        value={formData.b2b_subDistrict}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            b2b_subDistrict: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label>Kode Pos</Label>
-                    <Input
-                      placeholder="Kode Pos"
-                      value={formData.b2b_postalCode}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          b2b_postalCode: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
+                <AddressField
+                  value={{
+                    country: formData.b2b_country || "",
+                    province: formData.b2b_province || "",
+                    city: formData.b2b_city || "",
+                    district: formData.b2b_district || "",
+                    subDistrict: formData.b2b_subDistrict || "",
+                    postalCode: formData.b2b_postalCode || "",
+                  }}
+                  onChange={(updated) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      b2b_country: updated.country ?? prev.b2b_country,
+                      b2b_province: updated.province ?? prev.b2b_province,
+                      b2b_city: updated.city ?? prev.b2b_city,
+                      b2b_district: updated.district ?? prev.b2b_district,
+                      b2b_subDistrict:
+                        updated.subDistrict ?? prev.b2b_subDistrict,
+                      b2b_postalCode: updated.postalCode ?? prev.b2b_postalCode,
+                    }))
+                  }
+                />
 
                 <div className="space-y-2 mt-4">
                   <Label>Alamat Lengkap</Label>
@@ -1152,221 +696,29 @@ export default function ClientAddForm() {
                 <h3 className="text-lg font-semibold border-b pb-2 mt-6">
                   Alamat
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* COUNTRY B2C */}
-                  <div className="space-y-2 flex flex-col">
-                    <Label>Negara</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className={cn(
-                            "w-full justify-between pl-3 font-normal",
-                            !formData.b2c_country && "text-muted-foreground",
-                          )}>
-                          {formData.b2c_country ? (
-                            <span className="flex items-center gap-2 truncate">
-                              <span>
-                                {
-                                  countries.find(
-                                    (c) => c.name === formData.b2c_country,
-                                  )?.flag
-                                }
-                              </span>
-                              {formData.b2c_country}
-                            </span>
-                          ) : (
-                            "Pilih Negara"
-                          )}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-75 p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Cari negara..." />
-                          <CommandList>
-                            <CommandEmpty>Negara tidak ditemukan.</CommandEmpty>
-                            <CommandGroup>
-                              {countries.map((c) => (
-                                <CommandItem
-                                  key={c.code}
-                                  value={c.name}
-                                  onSelect={() => {
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      b2c_country: c.name,
-                                      b2c_province: "",
-                                      b2c_city: "",
-                                      b2c_district: "",
-                                      b2c_subDistrict: "",
-                                      b2c_postalCode: "",
-                                    }));
-                                  }}>
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      formData.b2c_country === c.name
-                                        ? "opacity-100"
-                                        : "opacity-0",
-                                    )}
-                                  />
-                                  <span>
-                                    {c.flag} {c.name}
-                                  </span>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
 
-                  {/* PROVINCE B2C */}
-                  {formData.b2c_country === "Indonesia" ? (
-                    <RegionCombobox
-                      label="Provinsi"
-                      placeholder="Pilih Provinsi"
-                      list={provinces}
-                      value={formData.b2c_province || ""}
-                      disabled={!formData.b2c_country}
-                      onChange={(val) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          b2c_province: val,
-                          b2c_city: "",
-                          b2c_district: "",
-                          b2c_subDistrict: "",
-                        }))
-                      }
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      <Label>Provinsi</Label>
-                      <Input
-                        placeholder="Masukkan Provinsi"
-                        value={formData.b2c_province}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            b2c_province: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  )}
-
-                  {/* CITY B2C */}
-                  {formData.b2c_country === "Indonesia" ? (
-                    <RegionCombobox
-                      label="Kota / Kabupaten"
-                      placeholder="Pilih Kota / Kabupaten"
-                      list={citiesB2C}
-                      value={formData.b2c_city || ""}
-                      disabled={!formData.b2c_province}
-                      onChange={(val) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          b2c_city: val,
-                          b2c_district: "",
-                          b2c_subDistrict: "",
-                        }))
-                      }
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      <Label>Kota / Kabupaten</Label>
-                      <Input
-                        placeholder="Masukkan Kota"
-                        value={formData.b2c_city}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            b2c_city: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  )}
-
-                  {/* DISTRICT B2C */}
-                  {formData.b2c_country === "Indonesia" ? (
-                    <RegionCombobox
-                      label="Kecamatan"
-                      placeholder="Pilih Kecamatan"
-                      list={districtsB2C}
-                      value={formData.b2c_district || ""}
-                      disabled={!formData.b2c_city}
-                      onChange={(val) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          b2c_district: val,
-                          b2c_subDistrict: "",
-                        }))
-                      }
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      <Label>Kecamatan</Label>
-                      <Input
-                        placeholder="Masukkan Kecamatan"
-                        value={formData.b2c_district}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            b2c_district: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  )}
-
-                  {/* SUBDISTRICT B2C */}
-                  {formData.b2c_country === "Indonesia" ? (
-                    <RegionCombobox
-                      label="Kelurahan"
-                      placeholder="Pilih Kelurahan"
-                      list={subDistrictsB2C}
-                      value={formData.b2c_subDistrict || ""}
-                      disabled={!formData.b2c_district}
-                      onChange={(val) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          b2c_subDistrict: val,
-                        }))
-                      }
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      <Label>Kelurahan</Label>
-                      <Input
-                        placeholder="Masukkan Kelurahan"
-                        value={formData.b2c_subDistrict}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            b2c_subDistrict: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label>Kode Pos</Label>
-                    <Input
-                      placeholder="Kode Pos"
-                      value={formData.b2c_postalCode}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          b2c_postalCode: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
+                <AddressField
+                  value={{
+                    country: formData.b2c_country || "",
+                    province: formData.b2c_province || "",
+                    city: formData.b2c_city || "",
+                    district: formData.b2c_district || "",
+                    subDistrict: formData.b2c_subDistrict || "",
+                    postalCode: formData.b2c_postalCode || "",
+                  }}
+                  onChange={(updated) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      b2c_country: updated.country ?? prev.b2c_country,
+                      b2c_province: updated.province ?? prev.b2c_province,
+                      b2c_city: updated.city ?? prev.b2c_city,
+                      b2c_district: updated.district ?? prev.b2c_district,
+                      b2c_subDistrict:
+                        updated.subDistrict ?? prev.b2c_subDistrict,
+                      b2c_postalCode: updated.postalCode ?? prev.b2c_postalCode,
+                    }))
+                  }
+                />
 
                 <div className="space-y-2 mt-4">
                   <Label>Alamat Lengkap</Label>

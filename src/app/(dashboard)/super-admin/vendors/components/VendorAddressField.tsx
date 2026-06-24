@@ -22,13 +22,99 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useApi } from "@/hooks/useApi";
 import { countries } from "@/lib/countries";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
-const WILAYAH_API = "https://wilayah.id/api";
+const WILAYAH_BASE_PATH = "/wilayah";
+
+interface SelectPopoverProps {
+  form: any;
+  label: string;
+  name: string;
+  value?: string;
+  list: any[];
+  placeholder: string;
+  disabled?: boolean;
+  loading?: boolean;
+  onSelect?: (value: string) => void;
+}
+
+const SelectPopover = ({
+  form,
+  label,
+  name,
+  list,
+  placeholder,
+  disabled,
+  loading,
+  onSelect,
+}: SelectPopoverProps) => (
+  <FormField
+    control={form.control}
+    name={name}
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>{label}</FormLabel>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <FormControl>
+              <Button
+                variant="outline"
+                disabled={disabled || loading}
+                className="w-full justify-between rounded-xl h-11">
+                {loading ? "Loading..." : field.value || placeholder}
+                <ChevronsUpDown className="h-4 w-4 opacity-50" />
+              </Button>
+            </FormControl>
+          </PopoverTrigger>
+          <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
+            <Command>
+              <CommandInput placeholder={`Search ${label.toLowerCase()}...`} />
+
+              <CommandList>
+                {loading ? (
+                  <div className="py-6 text-center text-sm text-muted-foreground">
+                    Loading data...
+                  </div>
+                ) : (
+                  <CommandEmpty>No data found</CommandEmpty>
+                )}
+
+                <CommandGroup>
+                  {list?.map((item: any) => (
+                    <CommandItem
+                      key={item.code || item.name}
+                      value={item.name}
+                      onSelect={() => {
+                        field.onChange(item.name);
+                        if (onSelect) onSelect(item.name);
+                      }}>
+                      {item.flag && (
+                        <span className="mr-2 text-xl">{item.flag}</span>
+                      )}
+                      {item.name}
+                      {field.value === item.name && (
+                        <Check className="ml-auto h-4 w-4" />
+                      )}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+);
 
 export default function VendorAddressField({ form }: any) {
+  const { fetchApi } = useApi();
   const [provinces, setProvinces] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
@@ -40,205 +126,77 @@ export default function VendorAddressField({ form }: any) {
   const city = form.watch("city");
   const district = form.watch("district");
 
-  // Fetch provinces (once)
+  // Fetch provinces
   useEffect(() => {
     const fetchProvinces = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`${WILAYAH_API}/provinces.json`);
-        const json = await res.json();
-
-        if (Array.isArray(json.data)) {
-          const formatted = json.data.map((item: any) => ({
-            code: item.code,
-            name: item.name,
-          }));
-          setProvinces(formatted);
-        }
+        const res = await fetchApi(`${WILAYAH_BASE_PATH}/provinces`);
+        const data = await res.json();
+        setProvinces(data.data);
       } catch (err) {
         console.error("Error fetching provinces:", err);
       } finally {
         setLoading(false);
       }
     };
-
     fetchProvinces();
-  }, []);
+  }, [fetchApi]);
 
-  // Fetch cities when province selected
+  // Fetch cities
   useEffect(() => {
-    if (!province || country !== "Indonesia") {
-      setCities([]);
-      return;
-    }
+    if (!province || country !== "Indonesia") return;
+    const prov = provinces.find((p) => p.name === province);
+    if (!prov) return;
 
     const fetchCities = async () => {
-      try {
-        setLoading(true);
-        const prov = provinces.find((p) => p.name === province);
-        if (!prov) return;
-
-        const res = await fetch(`${WILAYAH_API}/regencies/${prov.code}.json`);
-        const json = await res.json();
-
-        if (Array.isArray(json.data)) {
-          const formatted = json.data.map((item: any) => ({
-            code: item.code,
-            name: item.name,
-          }));
-          setCities(formatted);
-        }
-      } catch (err) {
-        console.error("Error fetching cities:", err);
-      } finally {
-        setLoading(false);
-      }
+      setLoading(true);
+      const res = await fetchApi(`${WILAYAH_BASE_PATH}/regencies/${prov.code}`);
+      const data = await res.json();
+      setCities(data.data);
+      setLoading(false);
     };
-
     fetchCities();
-  }, [province, country, provinces]);
+  }, [province, country, provinces, fetchApi]);
 
-  // Fetch districts when city selected
+  // Fetch districts
   useEffect(() => {
-    if (!city || country !== "Indonesia") {
-      setDistricts([]);
-      return;
-    }
+    if (!city || country !== "Indonesia") return;
+    const c = cities.find((p) => p.name === city);
+    if (!c) return;
 
     const fetchDistricts = async () => {
-      try {
-        setLoading(true);
-        const c = cities.find((p) => p.name === city);
-        if (!c) return;
-
-        const res = await fetch(`${WILAYAH_API}/districts/${c.code}.json`);
-        const json = await res.json();
-
-        if (Array.isArray(json.data)) {
-          const formatted = json.data.map((item: any) => ({
-            code: item.code,
-            name: item.name,
-          }));
-          setDistricts(formatted);
-        }
-      } catch (err) {
-        console.error("Error fetching districts:", err);
-      } finally {
-        setLoading(false);
-      }
+      setLoading(true);
+      const res = await fetchApi(`${WILAYAH_BASE_PATH}/districts/${c.code}`);
+      const data = await res.json();
+      setDistricts(data.data);
+      setLoading(false);
     };
-
     fetchDistricts();
-  }, [city, country, cities]);
+  }, [city, country, cities, fetchApi]);
 
-  // Fetch sub-district
+  // Fetch villages
   useEffect(() => {
-    if (!district || country !== "Indonesia") {
-      setSubDistricts([]);
-      return;
-    }
+    if (!district || country !== "Indonesia") return;
+    const dist = districts.find((p) => p.name === district);
+    if (!dist) return;
 
     const fetchSubDistricts = async () => {
-      try {
-        setLoading(true);
-        const dist = districts.find((p) => p.name === district);
-        if (!dist) return;
-
-        const res = await fetch(`${WILAYAH_API}/villages/${dist.code}.json`);
-        const json = await res.json();
-
-        if (Array.isArray(json.data)) {
-          const formatted = json.data.map((item: any) => ({
-            code: item.code,
-            name: item.name,
-          }));
-          setSubDistricts(formatted);
-        }
-      } catch (err) {
-        console.error("Error fetching villages:", err);
-      } finally {
-        setLoading(false);
-      }
+      setLoading(true);
+      const res = await fetchApi(`${WILAYAH_BASE_PATH}/villages/${dist.code}`);
+      const data = await res.json();
+      setSubDistricts(data.data);
+      setLoading(false);
     };
-
     fetchSubDistricts();
-  }, [district, country, districts]);
-
-  // REUSABLE select popover item
-  const SelectPopover = ({
-    label,
-    name,
-    value,
-    list,
-    placeholder,
-    disabled,
-    onSelect,
-  }: any) => (
-    <FormField
-      control={form.control}
-      name={name}
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>{label}</FormLabel>
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <FormControl>
-                <Button
-                  variant="outline"
-                  disabled={disabled || loading}
-                  className="w-full justify-between rounded-xl h-11">
-                  {loading ? "Loading..." : field.value || placeholder}
-                  <ChevronsUpDown className="h-4 w-4 opacity-50" />
-                </Button>
-              </FormControl>
-            </PopoverTrigger>
-
-            <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
-              <Command>
-                <CommandInput
-                  placeholder={`Search ${label.toLowerCase()}...`}
-                />
-
-                <CommandList>
-                  <CommandEmpty>
-                    {loading ? "Loading data..." : "No data found"}
-                  </CommandEmpty>
-
-                  <CommandGroup>
-                    {list?.map((item: any) => (
-                      <CommandItem
-                        key={item.code || item.name}
-                        value={item.name}
-                        onSelect={() => {
-                          field.onChange(item.name);
-                          if (onSelect) onSelect(item.name);
-                        }}>
-                        {item.flag && (
-                          <span className="mr-2 text-xl">{item.flag}</span>
-                        )}
-                        {item.name}
-                        {field.value === item.name && (
-                          <Check className="ml-auto h-4 w-4" />
-                        )}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  );
+  }, [district, country, districts, fetchApi]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* COUNTRY */}
       <SelectPopover
+        form={form}
+        loading={loading}
         label="Country"
         name="country"
         list={countries}
@@ -255,6 +213,8 @@ export default function VendorAddressField({ form }: any) {
       {/* PROVINCE */}
       {country === "Indonesia" ? (
         <SelectPopover
+          form={form}
+          loading={loading}
           label="Province"
           name="province"
           value={province}
@@ -285,6 +245,8 @@ export default function VendorAddressField({ form }: any) {
       {/* CITY */}
       {country === "Indonesia" ? (
         <SelectPopover
+          form={form}
+          loading={loading}
           label="City / Regency"
           name="city"
           value={city}
@@ -314,6 +276,8 @@ export default function VendorAddressField({ form }: any) {
       {/* DISTRICT */}
       {country === "Indonesia" ? (
         <SelectPopover
+          form={form}
+          loading={loading}
           label="District"
           name="district"
           value={district}
@@ -342,6 +306,8 @@ export default function VendorAddressField({ form }: any) {
       {/* SUBDISTRICT */}
       {country === "Indonesia" ? (
         <SelectPopover
+          form={form}
+          loading={loading}
           label="Sub-District"
           name="subDistrict"
           value={form.watch("subDistrict")}
