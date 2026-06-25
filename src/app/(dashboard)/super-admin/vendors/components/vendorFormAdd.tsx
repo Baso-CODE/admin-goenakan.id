@@ -326,11 +326,11 @@ export default function AddVendorForm({
                   <FormItem className="w-full">
                     <FormLabel>Platform *</FormLabel>
 
-                    {/* ✨ MODAL PLATFORM */}
+                    {/* MODAL PLATFORM */}
                     <Dialog
                       open={isPlatformModalOpen}
                       onOpenChange={setIsPlatformModalOpen}>
-                      <DialogContent className="sm:max-w-md">
+                      <DialogContent className="sm:max-w-2xl">
                         <DialogHeader>
                           <DialogTitle>Tambah Platform Baru</DialogTitle>
                         </DialogHeader>

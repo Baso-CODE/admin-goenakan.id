@@ -1,8 +1,9 @@
 "use client";
 
 import { apiUrl } from "@/helper/apiurl";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useCallback } from "react";
+import { toast } from "sonner";
 
 export function useApi() {
   const { data: session, status } = useSession();
@@ -24,6 +25,14 @@ export function useApi() {
         ...options,
         headers,
       });
+
+      if (res.status === 401) {
+        toast.error("Sesi Anda telah berakhir, silakan login kembali.");
+
+        await signOut({ callbackUrl: "/login" });
+
+        throw new Error("Unauthorized: Token expired or missing");
+      }
 
       return res;
     },

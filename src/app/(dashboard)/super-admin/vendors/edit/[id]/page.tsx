@@ -14,7 +14,6 @@ export default function EditVendorPage() {
 
   const [vendorData, setVendorData] = useState<VendorFormValues | undefined>();
 
-  // State untuk menyimpan Nama Item (untuk Badge di Form)
   const [existingItems, setExistingItems] = useState<
     { id: string; name: string }[]
   >([]);
@@ -24,11 +23,10 @@ export default function EditVendorPage() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (status !== "authenticated") return;
+
       setIsLoading(true);
       try {
-        const tokenRes = await fetch("/api/auth/token");
-        const { token } = await tokenRes.json();
-
         const res = await fetchApi(`/vendors/${id}`);
 
         if (!res.ok) {
@@ -37,7 +35,6 @@ export default function EditVendorPage() {
         }
         const data = await res.json();
 
-        // 1. SIAPKAN EXISTING ITEMS (PENTING AGAR BADGE MUNCUL)
         const itemsList =
           data.items?.map((item: any) => ({
             id: item.id,
@@ -45,17 +42,13 @@ export default function EditVendorPage() {
           })) || [];
         setExistingItems(itemsList);
 
-        // 2. Deteksi Category & Type dari item pertama (untuk auto-fill dropdown)
         const firstItem = data.items?.[0];
         const existingCategoryId = firstItem?.category?.id || "";
         const existingType = firstItem?.category?.type || "";
 
-        // 3. Mapping Data ke Form
         setVendorData({
           companyName: data.companyName ?? "",
           picName: data.picName ?? "",
-
-          // Address Fields (Sekarang sudah lengkap dari backend)
           country: data.country ?? "",
           province: data.province ?? "",
           city: data.city ?? "",
@@ -67,14 +60,11 @@ export default function EditVendorPage() {
           isActive: data.isActive ?? true,
           trackingUrl: data.trackingUrl ?? "",
 
-          // Relations
           platformId: data.contacts?.[0]?.platform?.id || "",
           contactId: data.contacts?.[0]?.contactId || "",
 
-          // Item IDs (Hanya butuh array of strings untuk form value)
           itemIds: data.items?.map((v: any) => v.id) || [],
 
-          // Type & Category
           type: existingType,
           categoryId: existingCategoryId,
         });
@@ -86,12 +76,18 @@ export default function EditVendorPage() {
       }
     };
 
-    if (id) fetchData();
-  }, [id]);
+    if (id && status === "authenticated") {
+      fetchData();
+    }
+  }, [id, status, fetchApi]);
 
   const handleUpdateVendor = async (data: VendorFormValues) => {
     setIsSubmitting(true);
     try {
+      if (status !== "authenticated") {
+        throw new Error("Sesi tidak valid, silakan coba lagi.");
+      }
+
       const payload = {
         ...data,
         contacts: [{ platformId: data.platformId, contactId: data.contactId }],
