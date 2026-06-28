@@ -27,8 +27,6 @@ type AttributeFromServer = {
 type SelectedAttributeRow = {
   attributeId: string;
   valueIds: string[];
-  priceModifiers?: Record<string, number>;
-  isVariantGenerator?: boolean;
 };
 
 // --- KOMPONEN UTAMA ---
@@ -203,28 +201,6 @@ export function AttributeSelector({
                           )}
                         </SelectContent>
                       </Select>
-                      {row.attributeId && (
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Checkbox
-                            id={`generate-variants-${idx}`}
-                            checked={row.isVariantGenerator !== false}
-                            onCheckedChange={(checked) => {
-                              setLocal((prev) =>
-                                prev.map((r, i) =>
-                                  i === idx ? { ...r, isVariantGenerator: !!checked } : r
-                                )
-                              );
-                            }}
-                            className="h-4 w-4 shrink-0"
-                          />
-                          <label
-                            htmlFor={`generate-variants-${idx}`}
-                            className="text-xs font-semibold text-gray-500 cursor-pointer select-none"
-                          >
-                            Gunakan untuk menghasilkan variasi kombinasi (Stok & SKU)
-                          </label>
-                        </div>
-                      )}
                     </div>
                   </div>
 

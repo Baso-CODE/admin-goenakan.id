@@ -16,7 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { ListPlus, Loader2, Tag, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ListPlus, Loader2, Tag, Trash2 } from "lucide-react";
 
 // ===================== Schema ===================== //
 
@@ -24,6 +24,7 @@ const valueSchema = z.object({
   id: z.string().optional(),
   value: z.string().min(1, "Value is required"),
   deleted: z.boolean().optional(),
+  position: z.number().optional(),
 });
 
 export const attributeSchema = z.object({
@@ -60,14 +61,30 @@ export default function AttributeForm({
 
   const { control } = form;
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, move } = useFieldArray({
     name: "values",
     control,
   });
 
   const handleSubmit = (values: AttributeFormValues) => {
-    onSubmit(values);
+    let activeIdx = 0;
+    const valuesWithPositions = {
+      ...values,
+      values: values.values.map((v) => {
+        if (v.deleted) {
+          return v;
+        }
+        const updated = { ...v, position: activeIdx };
+        activeIdx++;
+        return updated;
+      }),
+    };
+    onSubmit(valuesWithPositions);
   };
+
+  const visibleFields = fields
+    .map((field, index) => ({ field, index, item: form.watch(`values.${index}`) }))
+    .filter((x) => !x.item?.deleted);
 
   return (
     <Card className="w-full relative">
@@ -109,11 +126,7 @@ export default function AttributeForm({
             <div className="space-y-4">
               <FormLabel>Attribute Values</FormLabel>
 
-              {fields.map((field, index) => {
-                const item = form.watch(`values.${index}`);
-
-                if (item?.deleted) return null;
-
+              {visibleFields.map(({ field, index }, i) => {
                 return (
                   <div key={field.id} className="flex items-center gap-3">
                     <FormField
@@ -128,6 +141,27 @@ export default function AttributeForm({
                         </FormItem>
                       )}
                     />
+
+                    <div className="flex gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 p-0"
+                        disabled={i === 0 || isLoading || isSubmitting}
+                        onClick={() => move(index, visibleFields[i - 1].index)}>
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 p-0"
+                        disabled={i === visibleFields.length - 1 || isLoading || isSubmitting}
+                        onClick={() => move(index, visibleFields[i + 1].index)}>
+                        <ArrowDown className="h-4 w-4" />
+                      </Button>
+                    </div>
 
                     <Button
                       type="button"

@@ -253,7 +253,8 @@ export default function FormUpdateVariants({
           height: v.height ? Number(v.height) : undefined,
           length: v.length ? Number(v.length) : undefined,
           attributeValueIds:
-            v.attributeValues?.map((av: any) => av.attributeValueId) ?? [],
+            v.attributeValueIds ||
+            (v.attributeValues?.map((av: any) => av.attributeValueId) ?? []),
 
           // ✨ TAMBAHAN BARU: Prefill Price Tiers
           priceTiers:

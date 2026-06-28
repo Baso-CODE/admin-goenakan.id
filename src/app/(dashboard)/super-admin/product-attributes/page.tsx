@@ -17,7 +17,7 @@ import {
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
-import { FileDown, Loader2, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, FileDown, Loader2, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -104,6 +104,36 @@ export default function ProductAttributesPage() {
       toast.error("Failed to load product attributes");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMoveAttribute = async (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= attributes.length) return;
+
+    const updatedAttributes = [...attributes];
+    const temp = updatedAttributes[index];
+    updatedAttributes[index] = updatedAttributes[targetIndex];
+    updatedAttributes[targetIndex] = temp;
+    
+    setAttributes(updatedAttributes);
+
+    try {
+      await Promise.all([
+        fetchApi(`/product-attributes/${updatedAttributes[index].id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ position: index }),
+        }),
+        fetchApi(`/product-attributes/${updatedAttributes[targetIndex].id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ position: targetIndex }),
+        }),
+      ]);
+      toast.success("Attribute order updated!");
+    } catch (err) {
+      console.error("❌ Failed to move attribute:", err);
+      toast.error("Failed to persist attribute order.");
+      fetchAttributes();
     }
   };
 
@@ -307,6 +337,7 @@ export default function ProductAttributesPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-24">Order</TableHead>
                 <TableHead className="w-50">Attribute Name</TableHead>
                 <TableHead>Values</TableHead>
                 <TableHead>Created</TableHead>
@@ -319,6 +350,9 @@ export default function ProductAttributesPage() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
+                    <TableCell>
+                      <Skeleton className="h-8 w-16" />
+                    </TableCell>
                     <TableCell>
                       <Skeleton className="h-4 w-35" />
                     </TableCell>
@@ -339,14 +373,38 @@ export default function ProductAttributesPage() {
               ) : error ? (
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="text-center text-red-500 py-6">
                     Error loading attributes.
                   </TableCell>
                 </TableRow>
               ) : attributes.length > 0 ? (
-                attributes.map((attr) => (
+                attributes.map((attr, index) => (
                   <TableRow key={attr.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 cursor-pointer"
+                          disabled={index === 0 || loading}
+                          onClick={() => handleMoveAttribute(index, "up")}
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 cursor-pointer"
+                          disabled={index === attributes.length - 1 || loading}
+                          onClick={() => handleMoveAttribute(index, "down")}
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                     <TableCell className="font-medium">{attr.name}</TableCell>
 
                     {/* VALUES */}
@@ -375,7 +433,7 @@ export default function ProductAttributesPage() {
                     <TableCell className="space-x-2">
                       <Link
                         href={`/super-admin/product-attributes/edit/${attr.id}`}>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" className="cursor-pointer">
                           Edit
                         </Button>
                       </Link>
@@ -383,6 +441,7 @@ export default function ProductAttributesPage() {
                       <Button
                         variant="destructive"
                         size="sm"
+                        className="cursor-pointer"
                         onClick={() => setDeleteId(attr.id)}>
                         Delete
                       </Button>
@@ -392,7 +451,7 @@ export default function ProductAttributesPage() {
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="text-center py-6 text-muted-foreground">
                     No attributes found.
                   </TableCell>

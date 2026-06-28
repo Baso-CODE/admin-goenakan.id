@@ -18,7 +18,7 @@ export default function AddAttributePage() {
     try {
       const payload = {
         name: data.name,
-        values: data.values.map((v) => ({ value: v.value })),
+        values: data.values.map((v) => ({ value: v.value, position: v.position })),
       };
 
       const res = await fetchApi("/product-attributes", {

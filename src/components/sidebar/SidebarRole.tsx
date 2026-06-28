@@ -192,6 +192,14 @@ export default function SidebarRole({ ...props }) {
           },
         ],
       },
+      {
+        title: "Product Management V2",
+        url: "#",
+        icon: Package,
+        items: [
+          { title: "Products V2", url: "/super-admin/products-v2", icon: Package },
+        ],
+      },
     ],
 
     // 3. USER MANAGEMENT SECTION

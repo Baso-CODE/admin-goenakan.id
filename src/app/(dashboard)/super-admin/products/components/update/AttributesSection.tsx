@@ -41,27 +41,10 @@ export default function FormUpdateAttributes({
       grouped[attrId].push(valId);
     });
 
-    const variantGeneratingAttrIds = new Set<string>();
-    initialData.productVariants?.forEach((variant: any) => {
-      variant.attributeValues?.forEach((av: any) => {
-        const attrId = av.attributeValue?.attributeId || av.attributeValue?.attribute?.id;
-        if (attrId) {
-          variantGeneratingAttrIds.add(attrId);
-        }
-      });
-    });
-
-    const mapped = Object.entries(grouped).map(([attributeId, valueIds]) => {
-      const isVariantGenerator = initialData.productVariants?.length > 0
-        ? variantGeneratingAttrIds.has(attributeId)
-        : true;
-
-      return {
-        attributeId,
-        valueIds,
-        isVariantGenerator,
-      };
-    });
+    const mapped = Object.entries(grouped).map(([attributeId, valueIds]) => ({
+      attributeId,
+      valueIds,
+    }));
 
     setAttributeSelections(mapped);
   }, [initialData]);

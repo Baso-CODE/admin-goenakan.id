@@ -38,7 +38,7 @@ export default function EditAttributePage() {
 
         setAttributeData({
           name: data.name,
-          values: data.values.map((v: any) => ({ id: v.id, value: v.value })),
+          values: data.values.map((v: any) => ({ id: v.id, value: v.value, position: v.position })),
         });
       } catch (err: any) {
         console.error("❌ Failed to load attribute data:", err);

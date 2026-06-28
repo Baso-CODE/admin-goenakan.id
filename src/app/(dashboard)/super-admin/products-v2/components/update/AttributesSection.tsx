@@ -60,7 +60,7 @@ export default function FormUpdateAttributes({
       });
 
       const isVariantGenerator = initialData.productVariants?.length > 0
-        ? variantGeneratingAttrIds.has(attributeId)
+        ? (variantGeneratingAttrIds.size > 0 ? variantGeneratingAttrIds.has(attributeId) : true)
         : true;
 
       return {
@@ -82,6 +82,14 @@ export default function FormUpdateAttributes({
       );
 
       const allModifiers: Record<string, number> = {};
+      const orderedAttributeIds = attributeSelections
+        .map((attr) => attr.attributeId)
+        .filter((id) => id !== "");
+
+      const orderedAttributeValueIds = attributesFullList.flatMap((attr) =>
+        attr.values?.map((v: any) => v.id) || []
+      );
+
       attributeSelections.forEach((attr) => {
         if (attr.priceModifiers) {
           Object.entries(attr.priceModifiers).forEach(([valId, mod]) => {
@@ -94,6 +102,8 @@ export default function FormUpdateAttributes({
       const payload = {
         attributeValueIds: allAttributeValueIds,
         priceModifiers: allModifiers,
+        orderedAttributeIds,
+        orderedAttributeValueIds,
       };
 
       await onSubmit(payload);
@@ -116,6 +126,7 @@ export default function FormUpdateAttributes({
       <h3 className="text-lg font-semibold">Product Attributes</h3>
 
       <AttributeSelector
+        productId={initialData?.id}
         value={attributeSelections}
         onChange={(attrs, full) => {
           setAttributeSelections(attrs);

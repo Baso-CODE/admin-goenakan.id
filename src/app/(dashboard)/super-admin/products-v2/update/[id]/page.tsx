@@ -604,6 +604,7 @@ export default function EditProductPage() {
     };
 
     for (const newComb of newCombinations) {
+      const valueIdsInCombo = Object.values(newComb.attributeMap) as string[];
       const newCombAttributeIds = Object.values(newComb.attributeMap)
         .sort()
         .join("|");
@@ -613,19 +614,26 @@ export default function EditProductPage() {
 
         // Cek apakah signature atributnya cocok
         const existingSignature = getVariantSignature(v);
-        return existingSignature === newCombAttributeIds;
+        if (existingSignature && existingSignature !== "") {
+          return existingSignature === newCombAttributeIds;
+        }
+
+        // Fallback: Cocokkan berdasarkan nama (case-insensitive, normalize separators)
+        const normalizeName = (name: string) =>
+          name?.toLowerCase().replace(/[\s•·\-\/]/g, "") || "";
+        return normalizeName(v.variantName) === normalizeName(newComb.variantName);
       });
 
       if (existingMatch) {
         newVariantsState.push({
           ...existingMatch,
           _isDeleted: false,
+          attributeValueIds: valueIdsInCombo,
         });
         usedExistingVariantIds.add(existingMatch.id);
       } else {
         // B. Variant BARU DIBUAT
         let modifierSum = 0;
-        const valueIdsInCombo = Object.values(newComb.attributeMap) as string[];
         currentSelections.forEach((selection: any) => {
           if (selection.isVariantGenerator !== false) {
             selection.valueIds.forEach((valId: string) => {
