@@ -5,6 +5,7 @@ import {
   FileDown,
   Loader2,
   MoreHorizontal,
+  Pencil,
   Search,
   Trash2,
   UserCircle,
@@ -23,6 +24,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -42,9 +44,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
+import { format } from "date-fns";
 
 type ClientType = "B2B" | "B2C";
 
@@ -98,7 +102,7 @@ export default function ClientManagementTable() {
   });
 
   const [loading, setLoading] = useState<boolean>(true);
-  const [exporting, setExporting] = useState<boolean>(false); // State untuk proses export
+  const [exporting, setExporting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // State Filter
@@ -314,34 +318,32 @@ export default function ClientManagementTable() {
           </h3>
 
           {/* Filter Tanggal Mulai */}
-          <div className="flex flex-col">
-            <label className="text-xs font-medium text-muted-foreground mb-1">
-              Start Date (Created)
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Start Date
             </label>
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setMeta((prev) => ({ ...prev, page: 1 })); // Reset page
+            <DatePickerHelper
+              placeholder="Pilih Tanggal Mulai"
+              date={startDate ? new Date(startDate) : undefined}
+              setDate={(date) => {
+                setStartDate(date ? format(date, "yyyy-MM-dd") : "");
+                setMeta((prev) => ({ ...prev, page: 1 }));
               }}
-              className="w-37.5"
             />
           </div>
 
           {/* Filter Tanggal Akhir */}
-          <div className="flex flex-col">
-            <label className="text-xs font-medium text-muted-foreground mb-1">
-              End Date (Created)
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              End Date
             </label>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setMeta((prev) => ({ ...prev, page: 1 })); // Reset page
+            <DatePickerHelper
+              placeholder="Pilih Tanggal Akhir"
+              date={endDate ? new Date(endDate) : undefined}
+              setDate={(date) => {
+                setEndDate(date ? format(date, "yyyy-MM-dd") : "");
+                setMeta((prev) => ({ ...prev, page: 1 }));
               }}
-              className="w-37.5"
             />
           </div>
 
@@ -491,6 +493,8 @@ export default function ClientManagementTable() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
+
+                          {/* ACTION: VIEW */}
                           <DropdownMenuItem asChild>
                             <Link
                               href={`/super-admin/clients/detail/${client.id}`}
@@ -499,6 +503,19 @@ export default function ClientManagementTable() {
                             </Link>
                           </DropdownMenuItem>
 
+                          {/* ✨ ACTION: EDIT */}
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/super-admin/clients/edit/${client.id}`}
+                              className="cursor-pointer">
+                              <Pencil className="mr-2 h-4 w-4 text-orange-600" />{" "}
+                              Edit
+                            </Link>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuSeparator />
+
+                          {/* ACTION: DELETE */}
                           <DropdownMenuItem
                             className="text-red-600 focus:text-red-600 cursor-pointer"
                             onClick={() => setDeleteId(client.id)}>

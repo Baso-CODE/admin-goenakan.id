@@ -1,5 +1,7 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClipboardList, FlaskConical } from "lucide-react";
 
@@ -9,6 +11,9 @@ import TableOrder from "./components/tableOrder";
 import TableOrderSample from "./components/tableOrderSample";
 
 export default function OrderPage() {
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams.get("tab") || "all";
+
   return (
     <div className="w-full min-w-0 max-w-[98vw] overflow-hidden mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
@@ -20,16 +25,9 @@ export default function OrderPage() {
             Kelola semua pesanan produksi dan sample dalam satu tempat.
           </p>
         </div>
-        {/* TOMBOL CREATE ORDER */}
-        {/* <Link href="/super-admin/orders/add">
-          <Button className="w-full sm:w-auto shadow-sm transition-all hover:shadow-md">
-            <Plus className="mr-2 h-4 w-4" />
-            Create New Order
-          </Button>
-        </Link> */}
       </div>
-      {/* TABS CONTAINER */}
-      <Tabs defaultValue="all" className="w-full min-w-0">
+
+      <Tabs defaultValue={defaultTab} className="w-full min-w-0">
         <div className="flex items-center justify-between mb-4">
           <TabsList className="grid w-full max-w-100 grid-cols-2">
             <TabsTrigger value="all" className="flex items-center gap-2">
@@ -42,7 +40,7 @@ export default function OrderPage() {
             </TabsTrigger>
           </TabsList>
         </div>
-        {/* CONTENT TAB 1: ALL ORDERS */}
+
         <TabsContent
           value="all"
           className="mt-0 focus-visible:outline-none w-full min-w-0 max-w-full overflow-hidden">
@@ -52,7 +50,6 @@ export default function OrderPage() {
           </div>
         </TabsContent>
 
-        {/* CONTENT TAB 2: SAMPLE ORDERS */}
         <TabsContent
           value="sample"
           className="mt-0 focus-visible:outline-none w-full min-w-0 max-w-full overflow-hidden">

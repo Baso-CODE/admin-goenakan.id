@@ -48,7 +48,7 @@ import {
   ShoppingBag,
   Trash2,
 } from "lucide-react";
-import { useSearchParams } from "next/navigation"; // ✨ Import useSearchParams
+import { useRouter, useSearchParams } from "next/navigation"; // ✨ Import useSearchParams
 import { useEffect, useState } from "react";
 import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -80,7 +80,7 @@ import { SampleFollowUpSection, SampleStepItem } from "./sampleFollowUpSection";
 
 export default function AddOrderForm() {
   const { fetchApi, status } = useApi();
-
+  const router = useRouter();
   const searchParams = useSearchParams();
   const typeParam = searchParams.get("type");
   const defaultCategory = typeParam === "SAMPLE" ? "SAMPLE" : "SALES";
@@ -124,7 +124,6 @@ export default function AddOrderForm() {
   // Master Data States
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  console.log("products", products);
 
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
     [],
@@ -254,6 +253,11 @@ export default function AddOrderForm() {
       toast.success("Order created successfully");
       form.reset();
       setSampleSteps([]);
+      if (data.salesCategory === "SAMPLE") {
+        router.push("/orders?tab=sample");
+      } else {
+        router.push("/orders?tab=all");
+      }
     } catch {
       toast.error("Failed to create order");
     } finally {

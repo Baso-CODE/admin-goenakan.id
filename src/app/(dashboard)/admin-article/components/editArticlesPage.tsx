@@ -19,8 +19,6 @@ export default function EditArticle() {
     null,
   );
 
-  console.log("ini adalah data initial data", initialData);
-
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

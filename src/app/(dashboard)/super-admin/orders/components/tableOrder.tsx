@@ -124,7 +124,6 @@ export default function TableOrder() {
 
   // === STATE ===
   const [orders, setOrders] = useState<Order[]>([]);
-  console.log("ini adalah data", orders);
 
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);

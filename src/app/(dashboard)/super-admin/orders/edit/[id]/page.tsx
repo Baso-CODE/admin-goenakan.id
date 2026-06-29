@@ -280,7 +280,11 @@ export default function EditOrderForm() {
       };
       await updateOrder(fetchApi, orderId, finalPayload);
       toast.success("Order berhasil diupdate!");
-      router.push("/super-admin/orders");
+      if (data.salesCategory === "SAMPLE") {
+        router.push("/super-admin/orders?tab=sample");
+      } else {
+        router.push("/super-admin/orders?tab=all");
+      }
     } catch {
       toast.error("Gagal mengupdate order");
     } finally {
@@ -860,6 +864,24 @@ export default function EditOrderForm() {
                             )}
                           />
 
+                          {/* PERBAIKAN 1: Menambahkan info SKU & UOM di bawah dropdown produk */}
+                          {selectedProduct && (
+                            <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                              <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                                SKU:{" "}
+                                <span className="font-medium text-gray-800">
+                                  {(selectedProduct as any).sku || "-"}
+                                </span>
+                              </span>
+                              <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                                UOM:{" "}
+                                <span className="font-medium text-gray-800">
+                                  {(selectedProduct as any).uom || "-"}
+                                </span>
+                              </span>
+                            </div>
+                          )}
+
                           {isCustomProduct && (
                             <FormField
                               control={control}
@@ -944,8 +966,9 @@ export default function EditOrderForm() {
                                       }}
                                       className="text-center h-10"
                                     />
-                                    <span className="absolute right-3 top-2.5 text-xs text-gray-400 pointer-events-none">
-                                      pcs
+                                    {/* PERBAIKAN 2: Mengubah hardcode 'pcs' menjadi UOM dinamis */}
+                                    <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium pointer-events-none">
+                                      {selectedProduct?.uom || ""}
                                     </span>
                                   </div>
                                 </FormControl>

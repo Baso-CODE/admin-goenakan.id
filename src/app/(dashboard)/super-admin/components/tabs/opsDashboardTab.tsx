@@ -19,7 +19,6 @@ export default function OpsDashboardTab() {
   const [customEndDate, setCustomEndDate] = useState("");
 
   const [opsData, setOpsData] = useState<any>(null);
-  console.log("ini adalah data opsdata", opsData);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);

@@ -53,8 +53,7 @@ type OrderSample = {
 
   // Follow Up
   lastFollowUpDate: string | null;
-  lastFollowUpRemark: string;
-
+  lastFollowUpNotes: string;
   // Audit
   createdBy: string;
   createdTime: string;
@@ -438,8 +437,8 @@ export default function TableOrderSample() {
                       </TableCell>
                       <TableCell
                         className="text-sm text-orange-600 bg-orange-50/30 max-w-50 truncate"
-                        title={order.lastFollowUpRemark}>
-                        {order.lastFollowUpRemark}
+                        title={order.lastFollowUpNotes}>
+                        {order.lastFollowUpNotes}
                       </TableCell>
 
                       <TableCell

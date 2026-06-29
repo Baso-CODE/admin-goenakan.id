@@ -90,7 +90,6 @@ export default function TableFinance() {
 
   // === STATE ===
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
-  console.log("ini adlaah transaction", transactions);
 
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);

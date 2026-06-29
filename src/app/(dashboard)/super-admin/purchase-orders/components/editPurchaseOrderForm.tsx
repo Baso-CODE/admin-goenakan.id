@@ -90,8 +90,6 @@ type OrderRef = { id: string; orderNumber: string };
 type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
 
 export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
-  console.log("ini adlaah poId", poId);
-
   const { fetchApi, status } = useApi();
   const router = useRouter();
   const [loading, setLoading] = useState(true);

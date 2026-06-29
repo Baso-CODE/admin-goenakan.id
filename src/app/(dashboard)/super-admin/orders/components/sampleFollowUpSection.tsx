@@ -23,7 +23,6 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-// 🔥 UPDATE INTERFACE
 export type SampleStepItem = {
   name: string;
   date: Date | null;
@@ -40,7 +39,6 @@ type SampleStep =
 type SampleStepData = {
   date: Date | null;
   enabled: boolean;
-  // 🔥 TAMBAHAN FIELD
   method: string;
   notes: string;
   nextAction: string;
@@ -125,7 +123,7 @@ export function SampleFollowUpSection({
         } else {
           init[i] = {
             date: null,
-            enabled: true,
+            enabled: false,
             method: "",
             notes: "",
             nextAction: "",
@@ -140,7 +138,7 @@ export function SampleFollowUpSection({
       ) {
         init[initialData.length] = {
           date: null,
-          enabled: true,
+          enabled: false,
           method: "",
           notes: "",
           nextAction: "",
@@ -160,7 +158,7 @@ export function SampleFollowUpSection({
       newSteps.map((step, i) => ({
         name: getStepLabel(step),
         date: newData[i]?.date ?? null,
-        enabled: newData[i]?.enabled ?? true,
+        enabled: newData[i]?.enabled ?? false,
         method: newData[i]?.method || undefined,
         notes: newData[i]?.notes || undefined,
         nextAction: newData[i]?.nextAction || undefined,
@@ -210,7 +208,6 @@ export function SampleFollowUpSection({
       if (i < convertIdx) {
         newData[i] = stepData[i];
       } else if (i === convertIdx) {
-        // 🔥 DEFAULT UNTUK STEP BARU
         newData[i] = {
           date: null,
           enabled: true,
@@ -245,7 +242,7 @@ export function SampleFollowUpSection({
             const data = stepData[idx];
             const color = getStepColor(step);
             const isExpanded = expandedStep === idx;
-            const isEnabled = data?.enabled ?? true;
+            const isEnabled = data?.enabled ?? false;
 
             return (
               <div key={idx} className="relative z-10">
