@@ -17,6 +17,7 @@ import {
   useFormContext,
 } from "react-hook-form";
 import { z } from "zod";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -236,6 +237,36 @@ export default function FormUpdateVariants({
     imageIndex: number;
   } | null>(null);
 
+  const [globalStock, setGlobalStock] = useState<string>("");
+
+  const handleDeleteAll = () => {
+    if (!confirm("Apakah Anda yakin ingin menghapus semua varian?")) return;
+    const currentVariants = form.getValues("variants") || [];
+    const updated = currentVariants.map((v: any) => {
+      if (v.id) {
+        return { ...v, _isDeleted: true };
+      }
+      return null;
+    }).filter(Boolean);
+    form.setValue("variants", updated as any);
+    toast.success("Semua varian ditandai untuk dihapus. Klik 'Save' di bagian bawah untuk menyimpan perubahan.");
+  };
+
+  const handleApplyGlobalStock = () => {
+    const stockNum = parseInt(globalStock);
+    if (isNaN(stockNum) || stockNum < 0) {
+      toast.error("Masukkan jumlah stok yang valid");
+      return;
+    }
+    const currentVariants = form.getValues("variants") || [];
+    const updated = currentVariants.map((v: any) => ({
+      ...v,
+      stock: stockNum,
+    }));
+    form.setValue("variants", updated);
+    toast.success(`Berhasil menerapkan stok ${stockNum} ke semua varian.`);
+  };
+
   // PREFILL DATA
   useEffect(() => {
     if (initialData?.productVariants) {
@@ -366,6 +397,33 @@ export default function FormUpdateVariants({
               Add Custom Variant
             </Button>
           </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-4 p-4 border rounded-xl bg-stone-50">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-stone-700">Global Stock Adjuster:</span>
+              <Input
+                type="number"
+                min="0"
+                placeholder="Stock qty"
+                value={globalStock}
+                onChange={(e) => setGlobalStock(e.target.value)}
+                className="w-28 bg-white"
+              />
+              <Button type="button" variant="outline" onClick={handleApplyGlobalStock}>
+                Apply to All
+              </Button>
+            </div>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteAll}
+              className="space-x-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Delete All Variants</span>
+            </Button>
+          </div>
+
           <hr />
 
           <div className="space-y-8">

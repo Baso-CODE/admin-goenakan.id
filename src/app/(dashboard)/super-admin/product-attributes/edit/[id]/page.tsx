@@ -20,6 +20,49 @@ export default function EditAttributePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const mapValuesFromApi = (vals: any[]): any[] => {
+    return vals.map((v: any) => {
+      const mapped: any = {
+        id: v.id,
+        value: v.value,
+        position: v.position,
+        hasSubAttributes: !!(v.subAttributes && v.subAttributes.length > 0),
+      };
+      if (v.subAttributes && v.subAttributes.length > 0) {
+        mapped.subAttributes = v.subAttributes.map((sub: any) => ({
+          id: sub.id,
+          name: sub.name,
+          type: sub.type || "TEXT",
+          parentValueId: sub.parentValueId,
+          values: mapValuesFromApi(sub.values),
+        }));
+      }
+      return mapped;
+    });
+  };
+
+  const formatValuesRecursive = (values: any[]): any[] => {
+    return values.map((v) => {
+      const formatted: any = {
+        value: v.value,
+        position: v.position,
+      };
+      if (v.id) formatted.id = v.id;
+      if (v.deleted) formatted.deleted = v.deleted;
+      if (v.subAttributes && v.subAttributes.length > 0) {
+        formatted.subAttributes = v.subAttributes.map((sub: any) => ({
+          id: sub.id,
+          name: sub.name,
+          type: sub.type,
+          parentValueId: sub.parentValueId,
+          deleted: sub.deleted,
+          values: formatValuesRecursive(sub.values),
+        }));
+      }
+      return formatted;
+    });
+  };
+
   // === Fetch attribute data ===
   useEffect(() => {
     const fetchData = async () => {
@@ -38,7 +81,9 @@ export default function EditAttributePage() {
 
         setAttributeData({
           name: data.name,
-          values: data.values.map((v: any) => ({ id: v.id, value: v.value, position: v.position })),
+          type: data.type || "TEXT",
+          parentValueId: data.parentValueId || null,
+          values: mapValuesFromApi(data.values),
         });
       } catch (err: any) {
         console.error("❌ Failed to load attribute data:", err);
@@ -57,9 +102,16 @@ export default function EditAttributePage() {
 
     setIsSubmitting(true);
     try {
+      const payload = {
+        name: data.name,
+        type: data.type,
+        parentValueId: data.parentValueId,
+        values: formatValuesRecursive(data.values),
+      };
+
       const res = await fetchApi(`/product-attributes/${id}`, {
         method: "PATCH",
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -90,6 +142,7 @@ export default function EditAttributePage() {
         onSubmit={handleUpdateAttribute}
         isLoading={isLoading}
         isSubmitting={isSubmitting}
+        attributeId={id as string}
       />
     </div>
   );

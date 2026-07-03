@@ -21,15 +21,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApi } from "@/hooks/useApi";
-import { ArrowDown, ArrowUp, GripVertical, ListChecks, Loader2, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical, ListChecks, Loader2, Plus, Trash2, Pencil } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
+import { useForm, useFieldArray } from "react-hook-form";
+import { parseColorValue } from "@/utils/colorConverter";
+import { ColorValueInput } from "@/components/ui/color-value-input";
+
+
 
 // --- TIPE DATA ---
 
 type AttributeFromServer = {
   id: string;
   name: string;
+  type?: string;
+  parentValueId?: string | null;
+  parentValue?: {
+    id: string;
+    value: string;
+    attributeId: string;
+  } | null;
   values: { id: string; value: string; attributeId?: string }[];
 };
 
@@ -57,11 +69,21 @@ export function AttributeSelector({
   const [loading, setLoading] = useState(false);
   const [local, setLocal] = useState<SelectedAttributeRow[]>(value ?? []);
 
-  // Inline creation states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newValues, setNewValues] = useState<string[]>([""]);
+  const [editingAttributeId, setEditingAttributeId] = useState<string | null>(null);
   const [submittingCreate, setSubmittingCreate] = useState(false);
+
+  // React Hook Form for inline local attribute creation dialog
+  const localForm = useForm<any>({
+    defaultValues: {
+      name: "",
+      type: "TEXT",
+      values: [{ value: "", hasSubAttributes: false }],
+    },
+  });
+
+  const { control } = localForm;
+  const currentLocalType = localForm.watch("type");
 
   // Cloning states
   const [isCloneOpen, setIsCloneOpen] = useState(false);
@@ -82,7 +104,39 @@ export function AttributeSelector({
 
   // Sync: Beri tahu parent (FormUpdateAttributes) setiap kali 'local' atau 'available' berubah
   useEffect(() => {
-    onChange(local, available);
+    const cleanLocal = local.map((row) => {
+      const attr = available.find((a) => a.id === row.attributeId);
+      if (attr?.type === "MOCKUP_SIDE" && row.isVariantGenerator !== false) {
+        return { ...row, isVariantGenerator: false };
+      }
+      return row;
+    });
+
+    const hasDiff = cleanLocal.some((row, idx) => {
+      const orig = local[idx];
+      return orig && orig.isVariantGenerator !== row.isVariantGenerator;
+    });
+
+    if (hasDiff) {
+      setLocal(cleanLocal);
+    } else {
+      onChange(local, available);
+    }
+  }, [local, available]);
+
+  // Clean up sub-attributes if their parent value is unselected
+  useEffect(() => {
+    const allSelectedValueIds = local.flatMap((row) => row.valueIds);
+    const validRows = local.filter((row) => {
+      if (!row.attributeId) return true;
+      const attr = available.find((a) => a.id === row.attributeId);
+      if (!attr || !attr.parentValueId) return true;
+      return allSelectedValueIds.includes(attr.parentValueId);
+    });
+
+    if (validRows.length !== local.length) {
+      setLocal(validRows);
+    }
   }, [local, available]);
 
   // Load attributes from server
@@ -251,51 +305,152 @@ export function AttributeSelector({
       })
     );
 
-  // Filter available attributes that are already selected in other rows
+  // Filter available attributes that are already selected in other rows and whose parent is selected
   const getUnselectedAttributes = (currentId: string) => {
     const selectedIds = local
       .filter((row) => row.attributeId !== currentId)
       .map((row) => row.attributeId);
-    return available.filter((attr) => !selectedIds.includes(attr.id));
+
+    const allSelectedValueIds = local.flatMap(row => row.valueIds);
+
+    return available.filter((attr) => {
+      if (selectedIds.includes(attr.id)) return false;
+      if (!attr.parentValueId) return true;
+      return allSelectedValueIds.includes(attr.parentValueId);
+    });
   };
 
-  const handleCreateAttribute = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim()) {
+  const formatValuesRecursive = (values: any[]): any[] => {
+    return values.map((v) => {
+      const formatted: any = {
+        value: v.value,
+        position: v.position || 0,
+      };
+      if (v.id) formatted.id = v.id;
+      if (v.deleted) formatted.deleted = v.deleted;
+      if (v.subAttributes && v.subAttributes.length > 0) {
+        formatted.subAttributes = v.subAttributes
+          .filter((sub: any) => !sub.deleted)
+          .map((sub: any) => ({
+            id: sub.id,
+            name: sub.name,
+            type: sub.type,
+            parentValueId: sub.parentValueId,
+            values: formatValuesRecursive(sub.values),
+          }));
+      }
+      return formatted;
+    });
+  };
+
+  const mapValuesFromApi = (vals: any[]): any[] => {
+    return vals.map((v: any) => {
+      const mapped: any = {
+        id: v.id,
+        value: v.value,
+        position: v.position,
+        hasSubAttributes: !!(v.subAttributes && v.subAttributes.length > 0),
+      };
+      if (v.subAttributes && v.subAttributes.length > 0) {
+        mapped.subAttributes = v.subAttributes.map((sub: any) => ({
+          id: sub.id,
+          name: sub.name,
+          type: sub.type || "TEXT",
+          parentValueId: sub.parentValueId,
+          values: mapValuesFromApi(sub.values),
+        }));
+      }
+      return mapped;
+    });
+  };
+
+  const handleOpenEdit = (attr: AttributeFromServer) => {
+    setEditingAttributeId(attr.id);
+    localForm.reset({
+      name: attr.name,
+      type: attr.type || "TEXT",
+      values: mapValuesFromApi(attr.values),
+    });
+    setIsCreateOpen(true);
+  };
+
+  const handleDeleteFromDb = async (attrId: string, selectionIdx: number) => {
+    if (!confirm("Are you sure you want to permanently delete this attribute from the database?")) {
+      return;
+    }
+
+    try {
+      const res = await fetchApi(`/product-attributes/${attrId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to delete attribute.");
+      }
+
+      toast.success("Attribute deleted successfully.");
+      // Remove from active selections
+      setLocal((prev) => prev.filter((_, i) => i !== selectionIdx));
+      await fetchAttributes();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Failed to delete attribute.");
+    }
+  };
+
+  const onSubmitCreate = async (data: any) => {
+    if (!data.name.trim()) {
       toast.error("Attribute name is required.");
       return;
     }
-    const filteredValues = newValues.filter((v) => v.trim() !== "");
-    if (filteredValues.length === 0) {
-      toast.error("At least one value is required.");
+    const formattedValues = formatValuesRecursive(data.values);
+    const activeValues = formattedValues.filter((v) => !v.deleted);
+    if (activeValues.length === 0) {
+      toast.error("At least one active value is required.");
       return;
     }
 
     setSubmittingCreate(true);
     try {
-      const res = await fetchApi("/product-attributes", {
-        method: "POST",
+      const url = editingAttributeId 
+        ? `/product-attributes/${editingAttributeId}`
+        : "/product-attributes";
+      const method = editingAttributeId ? "PATCH" : "POST";
+      
+      const payload: any = {
+        name: data.name.trim(),
+        type: data.type,
+        values: formattedValues,
+      };
+      
+      if (!editingAttributeId) {
+        payload.productId = productId || undefined;
+      }
+
+      const res = await fetchApi(url, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newName.trim(),
-          values: filteredValues.map((v) => ({ value: v.trim() })),
-          productId: productId || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to create attribute.");
+        throw new Error(errData.message || `Failed to ${editingAttributeId ? "update" : "create"} attribute.`);
       }
 
-      toast.success("Attribute created successfully.");
+      toast.success(`Attribute ${editingAttributeId ? "updated" : "created"} successfully.`);
       await fetchAttributes();
       setIsCreateOpen(false);
-      setNewName("");
-      setNewValues([""]);
+      setEditingAttributeId(null);
+      localForm.reset({
+        name: "",
+        type: "TEXT",
+        values: [{ value: "", hasSubAttributes: false }],
+      });
     } catch (error: any) {
       console.error(error);
-      toast.error(error.message || "Failed to create attribute.");
+      toast.error(error.message || `Failed to ${editingAttributeId ? "update" : "create"} attribute.`);
     } finally {
       setSubmittingCreate(false);
     }
@@ -359,74 +514,73 @@ export function AttributeSelector({
         </h4>
         <div className="flex flex-wrap items-center gap-2">
           {/* Create Local Attribute Dialog */}
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <Dialog open={isCreateOpen} onOpenChange={(open) => {
+            setIsCreateOpen(open);
+            if (!open) {
+              setEditingAttributeId(null);
+              localForm.reset({
+                name: "",
+                type: "TEXT",
+                values: [{ value: "", hasSubAttributes: false }],
+              });
+            }
+          }}>
             <DialogTrigger asChild>
               <Button type="button" variant="outline" size="sm" className="space-x-1 border-indigo-200 text-indigo-700 hover:bg-indigo-50">
                 <Plus className="h-4 w-4" />
                 <span>Create Local Attribute</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md w-full bg-white text-slate-900 border">
-              <form onSubmit={handleCreateAttribute} className="space-y-4">
-                <DialogHeader>
-                  <DialogTitle className="text-slate-900">Create Local Attribute</DialogTitle>
+            <DialogContent className="max-w-md w-full bg-white text-slate-900 border max-h-[85vh] flex flex-col">
+              <form onSubmit={localForm.handleSubmit(onSubmitCreate)} className="space-y-4 flex-1 flex flex-col min-h-0">
+                <DialogHeader className="shrink-0">
+                  <DialogTitle className="text-slate-900">{editingAttributeId ? "Edit Attribute" : "Create Local Attribute"}</DialogTitle>
                   <DialogDescription className="text-slate-500">
-                    Create an attribute that belongs specifically to this product. This prevents interference with other products.
+                    {editingAttributeId ? "Modify this attribute's details and values. Changes will apply immediately." : "Create an attribute that belongs specifically to this product. This prevents interference with other products."}
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-3">
+                
+                <div className="space-y-4 flex-1 overflow-y-auto pr-1 py-1 min-h-0">
                   <div>
                     <Label htmlFor="attr-name" className="text-slate-700 text-sm font-semibold">Attribute Name (e.g. Size, Print Area)</Label>
                     <Input
                       id="attr-name"
                       placeholder="e.g. Size, Color, Print Position"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
+                      {...localForm.register("name")}
                       className="mt-1 border-slate-300 text-slate-800 bg-white"
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-700 text-sm font-semibold">Values</Label>
-                    {newValues.map((val, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <Input
-                          placeholder={`Value #${idx + 1}`}
-                          value={val}
-                          onChange={(e) => {
-                            const updated = [...newValues];
-                            updated[idx] = e.target.value;
-                            setNewValues(updated);
-                          }}
-                          className="border-slate-300 text-slate-800 bg-white"
-                          required
-                        />
-                        {newValues.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setNewValues(newValues.filter((_, i) => i !== idx));
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setNewValues([...newValues, ""])}
-                      className="w-full mt-1 border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                  <div>
+                    <Label htmlFor="attr-type" className="text-slate-700 text-sm font-semibold">Attribute Type</Label>
+                    <Select
+                      value={currentLocalType}
+                      onValueChange={(val) => localForm.setValue("type", val)}
                     >
-                      <Plus className="h-3 w-3 mr-1" /> Add Value
-                    </Button>
+                      <SelectTrigger id="attr-type" className="w-full mt-1 border-slate-300 bg-white text-slate-850">
+                        <SelectValue placeholder="Choose type..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border text-slate-850">
+                        <SelectItem value="TEXT" className="hover:bg-slate-50">Text (Default)</SelectItem>
+                        <SelectItem value="COLOR" className="hover:bg-slate-50">Color Swatch</SelectItem>
+                        <SelectItem value="SIZE" className="hover:bg-slate-50">Size / Capacity</SelectItem>
+                        <SelectItem value="MOCKUP_SIDE" className="hover:bg-slate-50">Mockup Side / Print Position</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <Label className="text-slate-700 text-sm font-semibold">Attribute Values</Label>
+                    
+                    <LocalFieldArrayEditor
+                      control={control}
+                      localForm={localForm}
+                      currentLocalType={currentLocalType}
+                    />
                   </div>
                 </div>
-                <DialogFooter className="gap-2">
+
+                <DialogFooter className="gap-2 shrink-0 pt-2 border-t mt-auto">
                   <Button
                     type="button"
                     variant="outline"
@@ -437,7 +591,7 @@ export function AttributeSelector({
                     Cancel
                   </Button>
                   <Button type="submit" disabled={submittingCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                    {submittingCreate ? "Creating..." : "Create"}
+                    {submittingCreate ? (editingAttributeId ? "Updating..." : "Creating...") : (editingAttributeId ? "Update" : "Create")}
                   </Button>
                 </DialogFooter>
               </form>
@@ -577,36 +731,88 @@ export function AttributeSelector({
                     </div>
 
                     <div className="flex-1">
-                      <Label className="text-sm font-semibold">
+                      <Label className="text-sm font-semibold flex items-center gap-2">
                         Attribute #{idx + 1}
+                        {attr && (
+                          <>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${
+                              attr.type === "COLOR"
+                                ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                : attr.type === "SIZE"
+                                ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                : attr.type === "MOCKUP_SIDE"
+                                ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                : "bg-stone-50 text-stone-700 border border-stone-200"
+                            }`}>
+                              {attr.type === "COLOR" ? "Color Swatch" : attr.type === "SIZE" ? "Size / Capacity" : attr.type === "MOCKUP_SIDE" ? "Mockup Side / Print Position" : "Text"}
+                            </span>
+                            {attr.parentValue && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-indigo-50 text-indigo-750 border border-indigo-200 uppercase tracking-wider">
+                                Sub of: {attr.parentValue.value.includes("|") ? attr.parentValue.value.split("|")[0] : attr.parentValue.value}
+                              </span>
+                            )}
+                          </>
+                        )}
                       </Label>
-                      <Select
-                        value={row.attributeId}
-                        onValueChange={(val) => setAttributeId(idx, val)}
-                        disabled={loading}>
-                        <SelectTrigger className="mt-1 w-full font-medium">
-                          <SelectValue placeholder="Pilih jenis attribute (e.g., Warna, Ukuran)..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {/* Tampilkan attribute yang sudah dipilih + yang belum dipilih lainnya */}
-                          {unselectedAttributes.map((a) => (
-                            <SelectItem key={a.id} value={a.id}>
-                              {a.name} ({a.values.length} values)
-                            </SelectItem>
-                          ))}
-                          {attr && (
-                            <SelectItem key={attr.id} value={attr.id}>
-                              {attr.name} (Currently Selected)
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-2 items-center mt-1">
+                        <Select
+                          value={row.attributeId}
+                          onValueChange={(val) => setAttributeId(idx, val)}
+                          disabled={loading}>
+                          <SelectTrigger className="w-full font-medium">
+                            <SelectValue placeholder="Pilih jenis attribute (e.g., Warna, Ukuran)..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {/* Tampilkan attribute yang sudah dipilih + yang belum dipilih lainnya */}
+                            {unselectedAttributes.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name} ({a.type === "COLOR" ? "Color" : a.type === "SIZE" ? "Size" : a.type === "MOCKUP_SIDE" ? "Mockup Side" : "Text"} - {a.values.length} values)
+                              </SelectItem>
+                            ))}
+                            {attr && (
+                              <SelectItem key={attr.id} value={attr.id}>
+                                {attr.name} ({attr.type === "COLOR" ? "Color" : attr.type === "SIZE" ? "Size" : attr.type === "MOCKUP_SIDE" ? "Mockup Side" : "Text"} - Currently Selected)
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+
+                        {attr && (
+                          <div className="flex gap-1 shrink-0">
+                            {/* Edit Button */}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9 border-stone-200 text-stone-600 hover:bg-stone-50"
+                              onClick={() => handleOpenEdit(attr)}
+                              title="Edit Attribute Definition"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            
+                            {/* Delete From DB Button */}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9 border-red-200 text-red-600 hover:bg-red-50"
+                              onClick={() => handleDeleteFromDb(attr.id, idx)}
+                              title="Delete Attribute completely from database"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                       {row.attributeId && (
                         <div className="flex items-center space-x-2 mt-2">
                           <Checkbox
                             id={`generate-variants-${idx}`}
-                            checked={row.isVariantGenerator !== false}
+                            checked={attr?.type === "MOCKUP_SIDE" ? false : row.isVariantGenerator !== false}
+                            disabled={attr?.type === "MOCKUP_SIDE"}
                             onCheckedChange={(checked) => {
+                              if (attr?.type === "MOCKUP_SIDE") return;
                               setLocal((prev) =>
                                 prev.map((r, i) =>
                                   i === idx ? { ...r, isVariantGenerator: !!checked } : r
@@ -616,10 +822,14 @@ export function AttributeSelector({
                             className="h-4 w-4 shrink-0"
                           />
                           <label
-                            htmlFor={`generate-variants-${idx}`}
-                            className="text-xs font-semibold text-gray-500 cursor-pointer select-none"
+                            htmlFor={attr?.type === "MOCKUP_SIDE" ? undefined : `generate-variants-${idx}`}
+                            className={`text-xs font-semibold select-none ${
+                              attr?.type === "MOCKUP_SIDE"
+                                ? "text-gray-300 cursor-not-allowed italic"
+                                : "text-gray-500 cursor-pointer"
+                            }`}
                           >
-                            Gunakan untuk menghasilkan variasi kombinasi (Stok & SKU)
+                            Gunakan untuk menghasilkan variasi kombinasi (Stok & SKU) {attr?.type === "MOCKUP_SIDE" && "(Dinonaktifkan untuk Posisi Cetak)"}
                           </label>
                         </div>
                       )}
@@ -676,7 +886,29 @@ export function AttributeSelector({
                                 onDragStart={(e) => e.stopPropagation()}
                                 className="h-4 w-4 shrink-0 cursor-pointer"
                               />
-                              <span className="truncate flex-1 font-medium">{val.value}</span>
+                              <span className="truncate flex-1 font-medium flex items-center gap-1.5 text-xs text-slate-700">
+                                {attr.type === "COLOR" ? (
+                                  (() => {
+                                    const parsed = parseColorValue(val.value);
+                                    return (
+                                      <>
+                                        <span
+                                          className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
+                                          style={{ backgroundColor: parsed.hex }}
+                                        />
+                                        <span className="truncate">
+                                          {parsed.name || parsed.hex}
+                                        </span>
+                                        <span className="text-[9px] text-slate-400 font-mono shrink-0">
+                                          CMYK({parsed.cmyk.c},{parsed.cmyk.m},{parsed.cmyk.y},{parsed.cmyk.k})
+                                        </span>
+                                      </>
+                                    );
+                                  })()
+                                ) : (
+                                  val.value
+                                )}
+                              </span>
 
                               {/* Reordering Controls for Options */}
                               <div className="flex gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -746,6 +978,280 @@ export function AttributeSelector({
           <span>Add Another Attribute Row</span>
         </Button>
       </div> */}
+    </div>
+  );
+}
+
+// ===================== Local Attribute Creator Field Array & Sub-Values Helpers ===================== //
+
+function LocalFieldArrayEditor({
+  control,
+  localForm,
+  currentLocalType,
+}: {
+  control: any;
+  localForm: any;
+  currentLocalType: string;
+}) {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "values",
+  });
+
+  const visibleFields = fields
+    .map((field, index) => ({ field, index, item: localForm.watch(`values.${index}`) }))
+    .filter((x) => !x.item?.deleted);
+
+  return (
+    <div className="space-y-4">
+      {visibleFields.map(({ field, index }) => {
+        const valuePath = `values.${index}`;
+        const valValue = localForm.watch(`${valuePath}.value`) || "";
+
+        return (
+          <div key={field.id} className="border border-stone-200 p-3 rounded-md bg-stone-50/20 space-y-3 shadow-xs">
+            <div className="flex items-center gap-2">
+              {currentLocalType === "COLOR" ? (
+                <ColorValueInput
+                  value={valValue}
+                  onChange={(newVal) => localForm.setValue(`${valuePath}.value`, newVal)}
+                />
+              ) : (
+                <Input
+                  placeholder={`Value #${index + 1}`}
+                  {...localForm.register(`${valuePath}.value`)}
+                  className="flex-1 border-slate-300 text-slate-800 bg-white"
+                  required
+                />
+              )}
+
+              {visibleFields.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 text-red-500 hover:text-red-700"
+                  onClick={() => {
+                    const id = localForm.getValues(`${valuePath}.id`);
+                    if (id) {
+                      localForm.setValue(`${valuePath}.deleted`, true);
+                    } else {
+                      remove(index);
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-2 pt-1 pl-1 select-none">
+              <Checkbox
+                id={`has-sub-${field.id}`}
+                checked={localForm.watch(`${valuePath}.hasSubAttributes`) || false}
+                onCheckedChange={(checked) => {
+                  localForm.setValue(`${valuePath}.hasSubAttributes`, !!checked);
+                  if (!checked) {
+                    localForm.setValue(`${valuePath}.subAttributes`, []);
+                  }
+                }}
+              />
+              <label
+                htmlFor={`has-sub-${field.id}`}
+                className="text-xs font-semibold text-stone-500 cursor-pointer select-none"
+              >
+                Enable sub-attributes for this value
+              </label>
+            </div>
+
+            {(localForm.watch(`${valuePath}.hasSubAttributes`) || false) && (
+              <LocalSubValuesGroupEditor
+                parentPath={valuePath}
+                control={control}
+                form={localForm}
+                level={1}
+              />
+            )}
+          </div>
+        );
+      })}
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => append({ value: "", hasSubAttributes: false })}
+        className="w-full mt-1 border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+      >
+        <Plus className="h-3 w-3 mr-1" /> Add Value
+      </Button>
+    </div>
+  );
+}
+
+function LocalSubValuesGroupEditor({
+  parentPath,
+  control,
+  form,
+  level = 1,
+}: {
+  parentPath: string;
+  control: any;
+  form: any;
+  level: number;
+}) {
+  const parentName = form.watch("name") || "Sub-attribute";
+  const parentType = form.watch("type") || "TEXT";
+
+  const subAttributes = form.watch(`${parentPath}.subAttributes`) || [];
+
+  useEffect(() => {
+    if (!subAttributes || subAttributes.length === 0) {
+      form.setValue(`${parentPath}.subAttributes`, [
+        {
+          name: parentName,
+          type: parentType,
+          values: [{ value: "" }],
+        },
+      ]);
+    } else {
+      if (subAttributes[0]?.name !== parentName) {
+        form.setValue(`${parentPath}.subAttributes.0.name`, parentName);
+      }
+      if (subAttributes[0]?.type !== parentType) {
+        form.setValue(`${parentPath}.subAttributes.0.type`, parentType);
+      }
+    }
+  }, [parentName, parentType, parentPath, form, subAttributes]);
+
+  if (level > 3) return null;
+
+  const subAttrPath = `${parentPath}.subAttributes.0`;
+
+  return (
+    <div className="mt-3 pl-4 border-l-2 border-indigo-200 space-y-3 bg-stone-50/40 p-3 rounded-sm">
+      <div className="text-[10px] font-bold text-indigo-650 flex items-center gap-1 uppercase tracking-wider">
+        <span>Level {level} Sub-Values</span>
+      </div>
+
+      <LocalSubValuesEditor
+        subAttrPath={subAttrPath}
+        control={control}
+        form={form}
+        type={parentType}
+        level={level}
+      />
+    </div>
+  );
+}
+
+function LocalSubValuesEditor({
+  subAttrPath,
+  control,
+  form,
+  type,
+  level,
+}: {
+  subAttrPath: string;
+  control: any;
+  form: any;
+  type: string;
+  level: number;
+}) {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: `${subAttrPath}.values`,
+  });
+
+  const visibleFields = fields
+    .map((field, index) => ({ field, index, item: form.watch(`${subAttrPath}.values.${index}`) }))
+    .filter((x) => !x.item?.deleted);
+
+  return (
+    <div className="space-y-2 mt-2">
+      <Label className="text-xs font-semibold text-stone-500">Values</Label>
+      
+      {visibleFields.map(({ field, index }) => {
+        const valuePath = `${subAttrPath}.values.${index}`;
+        const valValue = form.watch(`${valuePath}.value`) || "";
+
+        return (
+          <div key={field.id} className="space-y-2 border-b pb-3 last:border-b-0 last:pb-0">
+            <div className="flex items-center gap-2">
+              {type === "COLOR" ? (
+                <ColorValueInput
+                  value={valValue}
+                  onChange={(newVal) => form.setValue(`${valuePath}.value`, newVal)}
+                />
+              ) : (
+                <Input
+                  placeholder={`Value #${index + 1}`}
+                  {...form.register(`${valuePath}.value`)}
+                  className="flex-1 h-9 border-slate-300 bg-white"
+                  required
+                />
+              )}
+
+              {visibleFields.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 text-red-500 hover:text-red-700"
+                  onClick={() => {
+                    const id = form.getValues(`${valuePath}.id`);
+                    if (id) {
+                      form.setValue(`${valuePath}.deleted`, true);
+                    } else {
+                      remove(index);
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-2 pt-1 pl-1 select-none">
+              <Checkbox
+                id={`has-sub-${field.id}`}
+                checked={form.watch(`${valuePath}.hasSubAttributes`) || false}
+                onCheckedChange={(checked) => {
+                  form.setValue(`${valuePath}.hasSubAttributes`, !!checked);
+                  if (!checked) {
+                    form.setValue(`${valuePath}.subAttributes`, []);
+                  }
+                }}
+              />
+              <label
+                htmlFor={`has-sub-${field.id}`}
+                className="text-[11px] font-semibold text-stone-500 cursor-pointer select-none"
+              >
+                Enable sub-attributes
+              </label>
+            </div>
+
+            {(form.watch(`${valuePath}.hasSubAttributes`) || false) && (
+              <LocalSubValuesGroupEditor
+                parentPath={valuePath}
+                control={control}
+                form={form}
+                level={level + 1}
+              />
+            )}
+          </div>
+        );
+      })}
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="text-[11px] h-6 text-stone-500 hover:text-stone-700"
+        onClick={() => append({ value: "" })}
+      >
+        <Plus className="h-3 w-3 mr-1" /> Add Value Choice
+      </Button>
     </div>
   );
 }

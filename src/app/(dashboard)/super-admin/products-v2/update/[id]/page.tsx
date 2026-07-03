@@ -748,8 +748,6 @@ export default function EditProductPage() {
             onDeleteVideo={handleDeleteVideo}
             onUpdateMediaMetadata={handleUpdateMediaMetadata}
             onUpdateVideoMetadata={handleUpdateVideoMetadata}
-            onUpdateMediaMockups={handleUpdateMediaMockups}
-            onUpdateMockupSettings={handleUpdateMockupSettings}
           />
         </TabsContent>
 
@@ -770,6 +768,9 @@ export default function EditProductPage() {
               setCurrentSelections(selections);
               setCurrentFullList(fullList);
             }}
+            onUpdateMediaMockups={handleUpdateMediaMockups}
+            onUpdateMockupSettings={handleUpdateMockupSettings}
+            onUpdateMediaMetadata={handleUpdateMediaMetadata}
           />
           <FormUpdateVariants
             initialData={productData}

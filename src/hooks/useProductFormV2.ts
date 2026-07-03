@@ -10,6 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { parseColorValue } from "@/utils/colorConverter";
 
 export function useProductFormV2(
   onSubmitProps: (data: ProductFormValues, files: any) => Promise<void>,
@@ -313,8 +314,29 @@ export function useProductFormV2(
     if (groups.some((g) => g.length === 0))
       return toast.error("Semua attribute untuk variasi kombinasi wajib memiliki nilai.");
 
-    const combos = cartesianProduct(groups);
+    let combos = cartesianProduct(groups);
     if (combos.length === 0) return setCombinations([]);
+
+    // Filter combos based on hierarchical parentValue constraints
+    combos = combos.filter((combo) => {
+      for (const valueId of combo) {
+        let foundAttr: any = null;
+        for (const attr of attributesList) {
+          const val = attr.values.find((v: any) => v.id === valueId);
+          if (val) {
+            foundAttr = attr;
+            break;
+          }
+        }
+
+        if (foundAttr && foundAttr.parentValueId) {
+          if (!combo.includes(foundAttr.parentValueId)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    });
 
     const comboObjects = combos.map((combo) => {
       const names: string[] = [];
@@ -323,7 +345,16 @@ export function useProductFormV2(
         if (selection && selection.isVariantGenerator !== false) {
           combo.forEach((valueId) => {
             const found = attr.values.find((v: any) => v.id === valueId);
-            if (found) names.push(`${attr.name} - ${found.value}`);
+            if (found) {
+              let valStr = found.value;
+              if (attr.type === "COLOR") {
+                const parsed = parseColorValue(found.value);
+                valStr = parsed.name || parsed.hex;
+              } else if (found.value.includes("|")) {
+                valStr = found.value.split("|")[0];
+              }
+              names.push(`${attr.name} - ${valStr}`);
+            }
           });
         }
       });

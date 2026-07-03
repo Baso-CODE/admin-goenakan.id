@@ -507,18 +507,22 @@ model ProductSEO {
 }
 
 model Attribute {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  position  Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String          @id @default(uuid())
+  name          String
+  slug          String          @unique
+  position      Int             @default(0)
+  type          String          @default("TEXT")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
-  productId String?
-  product   Product?   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId     String?
+  product       Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  values   AttributeValue[]
-  products ProductAttributeValue[]
+  parentValueId String?
+  parentValue   AttributeValue? @relation("ValueToSubAttributes", fields: [parentValueId], references: [id], onDelete: Cascade)
+
+  values        AttributeValue[] @relation("AttributeToValues")
+  products      ProductAttributeValue[]
 
   @@map("attributes")
 }
@@ -528,8 +532,9 @@ model AttributeValue {
   value       String
   position    Int       @default(0)
   attributeId String
-  attribute   Attribute @relation(fields: [attributeId], references: [id])
+  attribute   Attribute @relation("AttributeToValues", fields: [attributeId], references: [id], onDelete: Cascade)
 
+  subAttributes                 Attribute[]                     @relation("ValueToSubAttributes")
   products                      ProductAttributeValue[]
   productVariantAttributeValues ProductVariantAttributeValue[]
 

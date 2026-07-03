@@ -54,6 +54,7 @@ const FormCoreSchema = z.object({
     z.number().nonnegative("Harga harus angka valid"),
   ),
   isCustom: z.boolean().optional(),
+  isMadeByOrder: z.boolean().optional(),
   materialTypeId: z.string().min(1, "Material wajib dipilih").optional(),
   stock: z.preprocess(
     (v) => Number(v),
@@ -113,6 +114,7 @@ export default function FormProductCore({
       basePrice: 0,
       stock: 0,
       isCustom: false,
+      isMadeByOrder: false,
       materialTypeId: "",
       categoryId: "",
       itemCategoryId: "",
@@ -196,6 +198,7 @@ export default function FormProductCore({
               basePrice: initialData.basePrice || 0,
               stock: initialData.stock || 0,
               isCustom: initialData.isCustom || false,
+              isMadeByOrder: initialData.isMadeByOrder || false,
               materialTypeId: initialData.materialTypeId || "",
               categoryId: initialData.categoryId || "",
               itemCategoryId: initialData.itemCategoryId || "",
@@ -567,6 +570,28 @@ export default function FormProductCore({
                       </span>
                     </div>
                   </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="isMadeByOrder"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sistem Order saat Stok Habis</FormLabel>
+                  <FormControl>
+                    <div className="flex items-center gap-3 h-10 border rounded-md px-4 bg-white">
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                      <span className="text-sm text-stone-600">
+                        Made by Order / Pre-Order (Bisa dipesan walaupun stok habis)
+                      </span>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />

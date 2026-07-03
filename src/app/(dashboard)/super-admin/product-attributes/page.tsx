@@ -34,6 +34,17 @@ type Attribute = {
   name: string;
   createdAt: string;
   values: AttributeValue[];
+  productId?: string | null;
+  product?: { name: string } | null;
+  parentValueId?: string | null;
+  parentValue?: {
+    id: string;
+    value: string;
+    attribute: {
+      id: string;
+      name: string;
+    };
+  } | null;
 };
 
 type Meta = {
@@ -339,6 +350,7 @@ export default function ProductAttributesPage() {
               <TableRow>
                 <TableHead className="w-24">Order</TableHead>
                 <TableHead className="w-50">Attribute Name</TableHead>
+                <TableHead>Scope</TableHead>
                 <TableHead>Values</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Actions</TableHead>
@@ -357,6 +369,9 @@ export default function ProductAttributesPage() {
                       <Skeleton className="h-4 w-35" />
                     </TableCell>
                     <TableCell>
+                      <Skeleton className="h-4.5 w-24" />
+                    </TableCell>
+                    <TableCell>
                       <Skeleton className="h-4 w-50" />
                     </TableCell>
                     <TableCell>
@@ -373,7 +388,7 @@ export default function ProductAttributesPage() {
               ) : error ? (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={6}
                     className="text-center text-red-500 py-6">
                     Error loading attributes.
                   </TableCell>
@@ -405,17 +420,42 @@ export default function ProductAttributesPage() {
                         </Button>
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium">{attr.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div>
+                        {attr.name}
+                        {attr.parentValue && (
+                          <div className="text-xs text-muted-foreground mt-0.5 font-normal">
+                            Sub-attribute of: <span className="font-semibold text-stone-600">{attr.parentValue.attribute.name}</span> → <span className="font-semibold text-stone-600">{attr.parentValue.value.includes("|") ? attr.parentValue.value.split("|")[0] : attr.parentValue.value}</span>
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    {/* SCOPE */}
+                    <TableCell>
+                      {attr.productId && attr.product ? (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          Local: {attr.product.name}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-stone-50 text-stone-700 border-stone-200">
+                          Global
+                        </Badge>
+                      )}
+                    </TableCell>
 
                     {/* VALUES */}
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {attr.values.length > 0 ? (
-                          attr.values.map((value) => (
-                            <Badge key={value.id} variant="secondary">
-                              {value.value}
-                            </Badge>
-                          ))
+                          attr.values.map((value) => {
+                            const valStr = value.value.includes("|") ? value.value.split("|")[0] : value.value;
+                            return (
+                              <Badge key={value.id} variant="secondary">
+                                {valStr}
+                              </Badge>
+                            );
+                          })
                         ) : (
                           <span className="text-muted-foreground text-sm">
                             No values
