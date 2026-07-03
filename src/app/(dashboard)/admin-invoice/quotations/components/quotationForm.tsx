@@ -66,6 +66,7 @@ export type ClientData = {
   id: string;
   name: string;
   type: "B2B" | "B2C" | string;
+  status?: "POTENTIAL" | "OFFICIAL" | string;
   custCode: string;
   phone: string;
   address: string;
