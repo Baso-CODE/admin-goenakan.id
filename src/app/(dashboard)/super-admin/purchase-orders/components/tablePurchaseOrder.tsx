@@ -8,6 +8,7 @@ import {
   FileDown,
   Loader2,
   Pencil,
+  Plus,
   Search,
   ShoppingBag,
 } from "lucide-react";
@@ -245,7 +246,14 @@ export default function TablePurchaseOrder() {
           </div>
         </CardHeader>
       </Card>
-
+      <div className="flex justify-end w-full">
+        <Link href="/super-admin/purchase-orders/add">
+          <Button>
+            <Plus className="mr-px h-4 w-4" />
+            Create Purchase Order
+          </Button>
+        </Link>
+      </div>
       {/* Filter & Export Bar */}
       <Card className="p-4 shadow-sm">
         <div className="flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between">
