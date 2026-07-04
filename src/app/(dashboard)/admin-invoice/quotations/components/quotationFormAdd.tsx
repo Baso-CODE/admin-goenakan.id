@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import ClientAddForm from "@/app/(dashboard)/super-admin/clients/components/addClientForm";
+import { ClientAddModal } from "@/app/(dashboard)/super-admin/clients/components/clientAddmodal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -556,16 +557,14 @@ export default function QuotationAddForm({
   const { fetchApi, status } = useApi();
   const [clients, setClients] = useState<ClientData[]>([]);
   const [products, setProducts] = useState<ProductData[]>([]);
-  const [currencies, setCurrencies] = useState<Currency[]>([]); // ✨ State Mata Uang
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
 
   const [noteCategories, setNoteCategories] = useState<NoteCategory[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClientData | null>(null);
   const [loadingMaster, setLoadingMaster] = useState(true);
-  const [salesList, setSalesList] = useState<SalesData[]>([]);
   const [itemImages, setItemImages] = useState<Record<number, File | null>>({});
-
-  // Modal State untuk Client
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [isClientAddModalOpen, setIsClientAddModalOpen] = useState(false);
 
   const form = useForm<AddQuotationFormValues>({
     resolver: zodResolver(quotationSchema) as Resolver<AddQuotationFormValues>,
@@ -616,19 +615,17 @@ export default function QuotationAddForm({
         fetchApi("/products/order"),
         fetchApi("/quotation-notes-categories"),
         fetchApi("/sales?isActive=true"),
-        fetchApi("/currencies"), // ✨ Ambil data currencies
+        fetchApi("/currencies"),
       ]);
 
       const clientData = resC.ok ? await resC.json() : [];
       const productData = resP.ok ? await resP.json() : [];
       const noteData = resN.ok ? await resN.json() : [];
-      const salesData = resS.ok ? await resS.json() : [];
       const currData = resCurr.ok ? await resCurr.json() : [];
 
       setClients(clientData.data || clientData || []);
       setProducts(productData.data || productData || []);
       setNoteCategories(noteData.data || noteData || []);
-      setSalesList(salesData.data || salesData || []);
       setCurrencies(currData.data || currData || []);
     } catch (e) {
       console.error("❌ Error loading master data:", e);
@@ -672,469 +669,501 @@ export default function QuotationAddForm({
     onSubmit(formData);
   };
 
+  const handleClientAdded = async (newClient: ClientData) => {
+    try {
+      const res = await fetchApi("/clients/order");
+      if (res.ok) {
+        const clientData = await res.json();
+        setClients(clientData.data || clientData || []);
+
+        const addedClient = clientData.data?.find(
+          (c: ClientData) => c.id === newClient.id,
+        );
+        if (addedClient) {
+          setSelectedClient(addedClient);
+          form.setValue("clientId", addedClient.id);
+          form.setValue("picId", "");
+        }
+      }
+    } catch (error) {
+      console.error("Error refetching clients:", error);
+      toast.error("Gagal me-refresh data client");
+    }
+  };
+
   return (
-    <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(handleFinalSubmit)}
-        className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* QUOTATION INFO */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <CalendarIcon className="w-4 h-4" /> Detail Penawaran
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih Status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {QUOTATION_STATUSES.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Tanggal Transaksi</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="justify-start font-normal">
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>Pilih Tanggal</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="validUntil"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Berlaku Hingga</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "justify-start font-normal",
-                            !field.value && "text-muted-foreground",
-                          )}>
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>Pilih Tanggal (Opsional)</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) => date < new Date()}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    {field.value && (
-                      <button
-                        type="button"
-                        onClick={() => field.onChange(undefined)}
-                        className="text-[11px] text-red-400 hover:text-red-600 text-left">
-                        Hapus tanggal
-                      </button>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* ✨ TAMBAHAN: Currency Code */}
-              <FormField
-                control={form.control}
-                name="currencyCode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-1.5">
-                      <Banknote className="w-4 h-4 text-slate-500" /> Mata Uang
-                    </FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value ?? ""}
-                      disabled={loadingMaster}>
-                      <FormControl>
-                        <SelectTrigger className="bg-white">
-                          <SelectValue
-                            placeholder={
-                              loadingMaster
-                                ? "Memuat Mata Uang..."
-                                : "Pilih Mata Uang"
-                            }
+    <>
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit(handleFinalSubmit)}
+          className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* QUOTATION INFO */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4" /> Detail Penawaran
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Pilih Status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {QUOTATION_STATUSES.map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {s}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="date"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Tanggal Transaksi</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="justify-start font-normal">
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pilih Tanggal</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
                           />
-                        </SelectTrigger>
+                        </PopoverContent>
+                      </Popover>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="validUntil"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Berlaku Hingga</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "justify-start font-normal",
+                              !field.value && "text-muted-foreground",
+                            )}>
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pilih Tanggal (Opsional)</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) => date < new Date()}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      {field.value && (
+                        <button
+                          type="button"
+                          onClick={() => field.onChange(undefined)}
+                          className="text-[11px] text-red-400 hover:text-red-600 text-left">
+                          Hapus tanggal
+                        </button>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* ✨ TAMBAHAN: Currency Code */}
+                <FormField
+                  control={form.control}
+                  name="currencyCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1.5">
+                        <Banknote className="w-4 h-4 text-slate-500" /> Mata
+                        Uang
+                      </FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value ?? ""}
+                        disabled={loadingMaster}>
+                        <FormControl>
+                          <SelectTrigger className="bg-white">
+                            <SelectValue
+                              placeholder={
+                                loadingMaster
+                                  ? "Memuat Mata Uang..."
+                                  : "Pilih Mata Uang"
+                              }
+                            />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {currencies.map((curr) => (
+                            <SelectItem key={curr.code} value={curr.code}>
+                              {curr.code} - {curr.name} ({curr.symbol})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* ✨ TAMBAHAN: Payment Terms */}
+                <FormField
+                  control={form.control}
+                  name="paymentTerms"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Syarat Pembayaran (Payment Terms)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Contoh: DP 50%, Pelunasan sebelum pengiriman..."
+                          className="text-xs min-h-15"
+                          {...field}
+                        />
                       </FormControl>
-                      <SelectContent>
-                        {currencies.map((curr) => (
-                          <SelectItem key={curr.code} value={curr.code}>
-                            {curr.code} - {curr.name} ({curr.symbol})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {/* ✨ TAMBAHAN: Payment Terms */}
-              <FormField
-                control={form.control}
-                name="paymentTerms"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Syarat Pembayaran (Payment Terms)</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Contoh: DP 50%, Pelunasan sebelum pengiriman..."
-                        className="text-xs min-h-15"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
 
-          {/* CLIENT INFO */}
-          <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <User className="w-5 h-5 text-muted-foreground" />
-                Informasi Client
-              </CardTitle>
-              {/* ✨ Tombol Add Client yang memicu Modal */}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                onClick={() => setIsClientModalOpen(true)}>
-                <Plus className="w-4 h-4 mr-1" /> Tambah Client Baru
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="col-span-2 space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="clientId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Pilih Client dari Database *</FormLabel>
-                        <Select
-                          onValueChange={(val) => {
-                            field.onChange(val);
-                            const client = clients.find((c) => c.id === val);
-                            if (client) {
-                              setSelectedClient(client);
-                              form.setValue("picId", "");
-                            }
-                          }}
-                          value={field.value ?? ""}
-                          disabled={loadingMaster}>
-                          <FormControl>
-                            <SelectTrigger className="bg-white h-11 border-blue-200">
-                              <SelectValue
-                                placeholder={
-                                  loadingMaster
-                                    ? "Memuat data client..."
-                                    : "Ketik & Cari Client di Database..."
-                                }
-                              />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {clients.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
-                                {c.name} ({c.type}){" "}
-                                {c.status ? `- ${c.status}` : ""}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+            {/* CLIENT INFO */}
+            <Card className="lg:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <User className="w-5 h-5 text-muted-foreground" />
+                  Informasi Client
+                </CardTitle>
 
-                  {selectedClient && (
-                    <div className="rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 animate-in fade-in slide-in-from-top-1 overflow-hidden">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              Detail Client
-                            </p>
-                            <h3 className="text-lg font-bold text-blue-600">
-                              {selectedClient.name}
-                            </h3>
-                            <div className="flex gap-2 mt-1">
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px]">
-                                {selectedClient.custCode}
-                              </Badge>
-                              <Badge
-                                className={cn(
-                                  "text-[10px]",
-                                  selectedClient.type === "B2B"
-                                    ? "bg-purple-100 text-purple-700 hover:bg-purple-100"
-                                    : "bg-green-100 text-green-700 hover:bg-green-100",
-                                )}>
-                                {selectedClient.type}
-                              </Badge>
-                              {selectedClient.status === "POTENTIAL" && (
-                                <Badge className="text-[10px] bg-amber-100 text-amber-700 hover:bg-amber-100">
-                                  POTENTIAL
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                  onClick={() => setIsClientAddModalOpen(true)}>
+                  <Plus className="w-4 h-4 mr-1" /> Tambah Client Baru
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="col-span-2 space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="clientId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Pilih Client dari Database *</FormLabel>
+                          <Select
+                            onValueChange={(val) => {
+                              field.onChange(val);
+                              const client = clients.find((c) => c.id === val);
+                              if (client) {
+                                setSelectedClient(client);
+                                form.setValue("picId", "");
+                              }
+                            }}
+                            value={field.value ?? ""}
+                            disabled={loadingMaster}>
+                            <FormControl>
+                              <SelectTrigger className="bg-white h-11 border-blue-200">
+                                <SelectValue
+                                  placeholder={
+                                    loadingMaster
+                                      ? "Memuat data client..."
+                                      : "Ketik & Cari Client di Database..."
+                                  }
+                                />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {clients.map((c) => (
+                                <SelectItem key={c.id} value={c.id}>
+                                  {c.name} ({c.type}){" "}
+                                  {c.status ? `- ${c.status}` : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {selectedClient && (
+                      <div className="rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 animate-in fade-in slide-in-from-top-1 overflow-hidden">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                          <div className="space-y-3">
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                Detail Client
+                              </p>
+                              <h3 className="text-lg font-bold text-blue-600">
+                                {selectedClient.name}
+                              </h3>
+                              <div className="flex gap-2 mt-1">
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px]">
+                                  {selectedClient.custCode}
                                 </Badge>
-                              )}
+                                <Badge
+                                  className={cn(
+                                    "text-[10px]",
+                                    selectedClient.type === "B2B"
+                                      ? "bg-purple-100 text-purple-700 hover:bg-purple-100"
+                                      : "bg-green-100 text-green-700 hover:bg-green-100",
+                                  )}>
+                                  {selectedClient.type}
+                                </Badge>
+                                {selectedClient.status === "POTENTIAL" && (
+                                  <Badge className="text-[10px] bg-amber-100 text-amber-700 hover:bg-amber-100">
+                                    POTENTIAL
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2 text-sm text-slate-600">
+                              <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-slate-400" />
+                              <span>{selectedClient.address}</span>
                             </div>
                           </div>
-                          <div className="flex items-start gap-2 text-sm text-slate-600">
-                            <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-slate-400" />
-                            <span>{selectedClient.address}</span>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                              <Phone className="w-4 h-4 shrink-0 text-slate-400" />
+                              <span>{selectedClient.phone || "-"}</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-sm text-slate-600">
-                            <Phone className="w-4 h-4 shrink-0 text-slate-400" />
-                            <span>{selectedClient.phone || "-"}</span>
-                          </div>
-                        </div>
-                      </div>
 
-                      {selectedClient.type === "B2B" &&
-                        selectedClient.pics &&
-                        selectedClient.pics.length > 0 && (
-                          <div className="border-t border-slate-200 bg-white px-4 py-3">
-                            <FormField
-                              control={form.control}
-                              name="picId"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                                    <UserCheck className="w-3.5 h-3.5" />
-                                    Person in Charge (PIC)
-                                  </FormLabel>
-                                  <Select
-                                    onValueChange={field.onChange}
-                                    value={field.value ?? ""}>
-                                    <FormControl>
-                                      <SelectTrigger className="bg-white mt-1.5">
-                                        <SelectValue placeholder="Pilih PIC Client..." />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {selectedClient.pics.map((pic) => (
-                                        <SelectItem key={pic.id} value={pic.id}>
-                                          <div className="flex items-center gap-2">
-                                            <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600 shrink-0">
-                                              {pic.name.charAt(0)}
-                                            </div>
-                                            <div className="flex flex-col">
-                                              <span className="text-sm font-medium">
-                                                {pic.name}
-                                              </span>
-                                              {(pic.position ||
-                                                pic.phone ||
-                                                pic.email) && (
-                                                <span className="text-[10px] text-muted-foreground">
-                                                  {pic.position
-                                                    ? pic.position
-                                                    : pic.phone || pic.email}
+                        {selectedClient.type === "B2B" &&
+                          selectedClient.pics &&
+                          selectedClient.pics.length > 0 && (
+                            <div className="border-t border-slate-200 bg-white px-4 py-3">
+                              <FormField
+                                control={form.control}
+                                name="picId"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                      <UserCheck className="w-3.5 h-3.5" />
+                                      Person in Charge (PIC)
+                                    </FormLabel>
+                                    <Select
+                                      onValueChange={field.onChange}
+                                      value={field.value ?? ""}>
+                                      <FormControl>
+                                        <SelectTrigger className="bg-white mt-1.5">
+                                          <SelectValue placeholder="Pilih PIC Client..." />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {selectedClient.pics.map((pic) => (
+                                          <SelectItem
+                                            key={pic.id}
+                                            value={pic.id}>
+                                            <div className="flex items-center gap-2">
+                                              <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600 shrink-0">
+                                                {pic.name.charAt(0)}
+                                              </div>
+                                              <div className="flex flex-col">
+                                                <span className="text-sm font-medium">
+                                                  {pic.name}
                                                 </span>
-                                              )}
+                                                {(pic.position ||
+                                                  pic.phone ||
+                                                  pic.email) && (
+                                                  <span className="text-[10px] text-muted-foreground">
+                                                    {pic.position
+                                                      ? pic.position
+                                                      : pic.phone || pic.email}
+                                                  </span>
+                                                )}
+                                              </div>
                                             </div>
-                                          </div>
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            {form.watch("picId") &&
-                              (() => {
-                                const pic = selectedClient.pics.find(
-                                  (p) => p.id === form.watch("picId"),
-                                );
-                                if (!pic) return null;
-                                return (
-                                  <div className="mt-2 flex items-center gap-3 p-2 rounded-md bg-blue-50 border border-blue-100">
-                                    <div className="w-8 h-8 rounded-full bg-blue-200 flex items-center justify-center text-sm font-bold text-blue-700 shrink-0">
-                                      {pic.name.charAt(0)}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-semibold text-slate-800 truncate">
-                                        {pic.name}
-                                      </p>
-                                      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                                        {pic.position && (
-                                          <span className="text-[11px] text-slate-500">
-                                            {pic.position}
-                                          </span>
-                                        )}
-                                        {pic.phone && (
-                                          <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                                            <Phone className="w-3 h-3" />
-                                            {pic.phone}
-                                          </span>
-                                        )}
-                                        {pic.email && (
-                                          <span className="text-[11px] text-slate-500 truncate">
-                                            {pic.email}
-                                          </span>
-                                        )}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              {form.watch("picId") &&
+                                (() => {
+                                  const pic = selectedClient.pics.find(
+                                    (p) => p.id === form.watch("picId"),
+                                  );
+                                  if (!pic) return null;
+                                  return (
+                                    <div className="mt-2 flex items-center gap-3 p-2 rounded-md bg-blue-50 border border-blue-100">
+                                      <div className="w-8 h-8 rounded-full bg-blue-200 flex items-center justify-center text-sm font-bold text-blue-700 shrink-0">
+                                        {pic.name.charAt(0)}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-slate-800 truncate">
+                                          {pic.name}
+                                        </p>
+                                        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                                          {pic.position && (
+                                            <span className="text-[11px] text-slate-500">
+                                              {pic.position}
+                                            </span>
+                                          )}
+                                          {pic.phone && (
+                                            <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                                              <Phone className="w-3 h-3" />
+                                              {pic.phone}
+                                            </span>
+                                          )}
+                                          {pic.email && (
+                                            <span className="text-[11px] text-slate-500 truncate">
+                                              {pic.email}
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                );
-                              })()}
-                          </div>
-                        )}
-                    </div>
-                  )}
+                                  );
+                                })()}
+                            </div>
+                          )}
+                      </div>
+                    )}
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ITEMS */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between border-b py-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Box className="w-4 h-4" /> Produk & Jasa
+              </CardTitle>
+              <div className="hidden md:flex items-center gap-4 text-[11px] text-muted-foreground mr-auto ml-4">
+                <span className="flex items-center gap-1">
+                  <span className="font-semibold text-slate-600">
+                    ✨ Min/Max Qty
+                  </span>
+                  = Rentang Jumlah
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="font-semibold text-slate-600">✨ Label</span>{" "}
+                  = Satuan (Pcs/Unit)
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="font-semibold text-slate-600">Rp</span> =
+                  Harga Satuan
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="font-semibold text-slate-600">Disc</span> =
+                  Total Diskon Item
+                </span>
               </div>
+
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  append({
+                    isManualProduct: true,
+                    productName: "",
+                    discount: 0,
+                    remarks: "",
+                    tiers: [
+                      {
+                        minQuantity: 1,
+                        maxQuantity: undefined,
+                        quantityLabel: "Pcs",
+                        unitPrice: 0,
+                      },
+                    ],
+                  })
+                }>
+                <Plus className="w-4 h-4 mr-1" /> Tambah Baris
+              </Button>
+            </CardHeader>
+
+            <CardContent className="pt-4 space-y-3">
+              {fields.map((field, index) => (
+                <ItemRow
+                  key={field.id}
+                  index={index}
+                  products={products}
+                  form={form}
+                  onRemove={() => remove(index)}
+                  canRemove={fields.length > 1}
+                  onImageChange={handleImageChange}
+                  imageFile={itemImages[index] ?? null}
+                />
+              ))}
             </CardContent>
           </Card>
-        </div>
 
-        {/* ITEMS */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between border-b py-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Box className="w-4 h-4" /> Produk & Jasa
-            </CardTitle>
-            <div className="hidden md:flex items-center gap-4 text-[11px] text-muted-foreground mr-auto ml-4">
-              <span className="flex items-center gap-1">
-                <span className="font-semibold text-slate-600">
-                  ✨ Min/Max Qty
-                </span>
-                = Rentang Jumlah
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="font-semibold text-slate-600">✨ Label</span> =
-                Satuan (Pcs/Unit)
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="font-semibold text-slate-600">Rp</span> = Harga
-                Satuan
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="font-semibold text-slate-600">Disc</span> =
-                Total Diskon Item
-              </span>
+          {/* FOOTER: NOTES & SUMMARY */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              <QuotationNotesSection noteCategories={noteCategories} />
             </div>
-
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                append({
-                  isManualProduct: true,
-                  productName: "",
-                  discount: 0,
-                  remarks: "",
-                  tiers: [
-                    {
-                      minQuantity: 1,
-                      maxQuantity: undefined,
-                      quantityLabel: "Pcs",
-                      unitPrice: 0,
-                    },
-                  ],
-                })
-              }>
-              <Plus className="w-4 h-4 mr-1" /> Tambah Baris
-            </Button>
-          </CardHeader>
-
-          <CardContent className="pt-4 space-y-3">
-            {fields.map((field, index) => (
-              <ItemRow
-                key={field.id}
-                index={index}
-                products={products}
-                form={form}
-                onRemove={() => remove(index)}
-                canRemove={fields.length > 1}
-                onImageChange={handleImageChange}
-                imageFile={itemImages[index] ?? null}
-              />
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* FOOTER: NOTES & SUMMARY */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-6">
-            <QuotationNotesSection noteCategories={noteCategories} />
+            <OrderSummary form={form} isLoading={isLoading} />
           </div>
-          <OrderSummary form={form} isLoading={isLoading} />
-        </div>
-      </form>
+        </form>
 
-      {/* MODAL TAMBAH KLIEN */}
-      <Dialog open={isClientModalOpen} onOpenChange={setIsClientModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Tambah Klien Baru</DialogTitle>
-          </DialogHeader>
-          <div className="p-4">
-            <ClientAddForm />
-          </div>
-        </DialogContent>
-      </Dialog>
-    </Form>
+        {/* MODAL TAMBAH KLIEN */}
+        <Dialog open={isClientModalOpen} onOpenChange={setIsClientModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Tambah Klien Baru</DialogTitle>
+            </DialogHeader>
+            <div className="p-4">
+              <ClientAddForm />
+            </div>
+          </DialogContent>
+        </Dialog>
+      </Form>
+      <ClientAddModal
+        isOpen={isClientAddModalOpen}
+        onClose={() => setIsClientAddModalOpen(false)}
+        onClientAdded={handleClientAdded}
+      />
+    </>
   );
 }

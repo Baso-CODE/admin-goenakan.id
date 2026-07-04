@@ -47,15 +47,18 @@ import {
 import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
+import { cn } from "@/lib/utils";
 import { formatDate } from "@/utils/formatDate";
 import { format } from "date-fns";
 
 type ClientType = "B2B" | "B2C";
 
+// ✨ UPDATE: Tambahkan 'status' pada interface
 interface ClientBase {
   id: string;
   custCode: string;
   type: ClientType;
+  status: "POTENTIAL" | "OFFICIAL" | string;
   createdAt: string;
   phone?: string;
   email?: string;
@@ -82,9 +85,10 @@ interface PaginationMeta {
   hasPrevious: boolean;
 }
 
-// Interface untuk Query Export
+// ✨ UPDATE: Tambahkan 'status' ke Query Export
 interface ClientExportQuery {
   type?: ClientType | "ALL";
+  status?: string;
   startDate?: string;
   endDate?: string;
 }
@@ -109,6 +113,7 @@ export default function ClientManagementTable() {
   const [search, setSearch] = useState<string>("");
   const debouncedSearch = useDebounce(search, 500);
   const [clientTypeFilter, setClientTypeFilter] = useState<string>("ALL");
+  const [clientStatusFilter, setClientStatusFilter] = useState<string>("ALL"); // ✨ UPDATE: State Status
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
@@ -117,9 +122,12 @@ export default function ClientManagementTable() {
 
   const handleFilterChange = (filterUpdate: Partial<ClientExportQuery>) => {
     setMeta((prev) => ({ ...prev, page: 1 }));
-    // Update filter type
     if (filterUpdate.type !== undefined) {
       setClientTypeFilter(filterUpdate.type);
+    }
+    // ✨ UPDATE: Update filter status
+    if (filterUpdate.status !== undefined) {
+      setClientStatusFilter(filterUpdate.status);
     }
   };
 
@@ -132,6 +140,7 @@ export default function ClientManagementTable() {
         page: meta.page.toString(),
         take: meta.perPage.toString(),
         type: clientTypeFilter,
+        status: clientStatusFilter, // ✨ UPDATE: Kirim status ke backend
         ...(startDate && { startDate }),
         ...(endDate && { endDate }),
       });
@@ -157,10 +166,13 @@ export default function ClientManagementTable() {
     meta.page,
     meta.perPage,
     clientTypeFilter,
+    clientStatusFilter, // ✨ UPDATE: Tambahkan ke dependencies
     debouncedSearch,
     startDate,
     endDate,
+    fetchApi,
   ]);
+
   useEffect(() => {
     fetchClients();
   }, [fetchClients]);
@@ -169,15 +181,11 @@ export default function ClientManagementTable() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      // 1. Ambil Token Autentikasi
-
-      // 2. Kumpulkan Filter (menggunakan semua filter yang ada)
       const exportFilters: ClientExportQuery & { search?: string } = {
         type: clientTypeFilter as ClientType | "ALL",
-        // Tambahkan filter tanggal yang sedang aktif
+        status: clientStatusFilter, // ✨ UPDATE: Kirim parameter saat export
         ...(startDate && { startDate }),
         ...(endDate && { endDate }),
-        // Tambahkan search/debounce search yang sedang aktif
         ...(search.trim() && { search: search.trim() }),
       };
 
@@ -185,7 +193,6 @@ export default function ClientManagementTable() {
         exportFilters as Record<string, string>,
       ).toString();
 
-      // URL untuk export
       const response = await fetchApi(`/clients/export/excel?${queryString}`, {
         method: "GET",
       });
@@ -196,25 +203,22 @@ export default function ClientManagementTable() {
         throw new Error("Export failed. Server responded with an error.");
       }
 
-      // 3. Proses File Binary (Blob)
       const blob = await response.blob();
       const contentDisposition = response.headers.get("Content-Disposition");
 
-      // Ambil nama file dari header
       const filenameMatch = contentDisposition?.match(/filename="(.+?)"/i);
       const filename = filenameMatch
         ? filenameMatch[1]
         : `clients_export_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
-      // Membuat URL objek untuk file yang akan diunduh
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename; // Nama file download
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url); // Bersihkan URL
+      window.URL.revokeObjectURL(url);
 
       toast.success("Data Klien berhasil di-export ke Excel!");
     } catch (error) {
@@ -251,7 +255,6 @@ export default function ClientManagementTable() {
       }
 
       toast.success("Client berhasil dihapus");
-
       fetchClients();
     } catch (error: any) {
       toast.error(error.message || "Terjadi kesalahan saat menghapus data");
@@ -273,13 +276,27 @@ export default function ClientManagementTable() {
           </CardTitle>
 
           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+            {/* ✨ UPDATE: FILTER STATUS BARU */}
+            <Select
+              value={clientStatusFilter}
+              onValueChange={(val) => handleFilterChange({ status: val })}>
+              <SelectTrigger className="w-full md:w-36">
+                <SelectValue placeholder="Client Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Status</SelectItem>
+                <SelectItem value="OFFICIAL">Official</SelectItem>
+                <SelectItem value="POTENTIAL">Potential</SelectItem>
+              </SelectContent>
+            </Select>
+
             {/* === FILTER TYPE === */}
             <Select
               value={clientTypeFilter}
               onValueChange={(val) =>
                 handleFilterChange({ type: val as ClientType | "ALL" })
               }>
-              <SelectTrigger className="w-full md:w-37.5">
+              <SelectTrigger className="w-full md:w-36">
                 <SelectValue placeholder="Client Type" />
               </SelectTrigger>
               <SelectContent>
@@ -290,11 +307,11 @@ export default function ClientManagementTable() {
             </Select>
 
             {/* === SEARCH INPUT === */}
-            <div className="relative w-full md:w-80">
+            <div className="relative w-full md:w-72">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search Kode, Nama, Perusahaan, atau Email..."
+                placeholder="Cari Klien..."
                 value={search}
                 onChange={(e) => {
                   setMeta((prev) => ({ ...prev, page: 1 }));
@@ -317,7 +334,6 @@ export default function ClientManagementTable() {
             Export Filter (opsional):
           </h3>
 
-          {/* Filter Tanggal Mulai */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Start Date
@@ -332,7 +348,6 @@ export default function ClientManagementTable() {
             />
           </div>
 
-          {/* Filter Tanggal Akhir */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               End Date
@@ -347,14 +362,12 @@ export default function ClientManagementTable() {
             />
           </div>
 
-          {/* Tombol Add Client */}
           <Link href="/super-admin/clients/add" className="ml-auto">
             <Button size="sm" className="gap-2">
               <UserPlus className="h-4 w-4" /> Add New Client
             </Button>
           </Link>
 
-          {/* Tombol Export */}
           <Button
             size="sm"
             className="gap-2 bg-green-600 hover:bg-green-700"
@@ -369,7 +382,6 @@ export default function ClientManagementTable() {
           </Button>
         </div>
       </Card>
-      {/* --- END: FILTER DAN EXPORT BARU --- */}
 
       {/* === TABLE === */}
       <Card className="w-full overflow-hidden shadow-lg">
@@ -377,20 +389,22 @@ export default function ClientManagementTable() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="min-w-37.5 font-semibold">
+                <TableHead className="min-w-32 font-semibold">
                   Kode Klien
                 </TableHead>
-                <TableHead className="min-w-50 font-semibold">
+                <TableHead className="min-w-48 font-semibold">
                   Nama / Perusahaan
                 </TableHead>
                 <TableHead className="font-semibold">Tipe</TableHead>
-                <TableHead className="min-w-37.5 font-semibold">
+                {/* ✨ UPDATE: Kolom Baru Status */}
+                <TableHead className="font-semibold">Status</TableHead>
+                <TableHead className="min-w-36 font-semibold">
                   Kontak Utama
                 </TableHead>
-                <TableHead className="min-w-37.5 font-semibold">
+                <TableHead className="min-w-32 font-semibold">
                   Telepon
                 </TableHead>
-                <TableHead className="min-w-37.5 font-semibold">
+                <TableHead className="min-w-32 font-semibold">
                   Created
                 </TableHead>
                 <TableHead className="text-right font-semibold">
@@ -401,52 +415,48 @@ export default function ClientManagementTable() {
 
             <TableBody>
               {loading ? (
-                /* Penanganan Loading menggunakan Skeleton */
                 Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={index}>
-                    {/* Kolom 1: Customer Code (font-mono text-xs) */}
                     <TableCell className="h-12">
                       <Skeleton className="h-4 w-20" />
                     </TableCell>
-                    {/* Kolom 2: Client Name (font-medium) */}
-                    <TableCell className="h-12">
-                      <Skeleton className="h-4 w-50" />
-                    </TableCell>
-                    {/* Kolom 3: Type (Badge) */}
-                    <TableCell className="h-12">
-                      <Skeleton className="h-4 w-12.5" />
-                    </TableCell>
-                    {/* Kolom 4: PIC/Email (text-sm text-muted-foreground) */}
                     <TableCell className="h-12">
                       <Skeleton className="h-4 w-40" />
                     </TableCell>
-                    {/* Kolom 5: Phone (text-sm) */}
                     <TableCell className="h-12">
-                      <Skeleton className="h-4 w-25" />
+                      <Skeleton className="h-4 w-12" />
                     </TableCell>
-                    {/* Kolom 6: Created (font-mono text-xs) */}
                     <TableCell className="h-12">
-                      <Skeleton className="h-4 w-25" />
+                      <Skeleton className="h-4 w-16" />
+                    </TableCell>{" "}
+                    {/* Skeleton Status */}
+                    <TableCell className="h-12">
+                      <Skeleton className="h-4 w-32" />
                     </TableCell>
-                    {/* Kolom 7: Actions (text-right) */}
+                    <TableCell className="h-12">
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell className="h-12">
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
                     <TableCell className="h-12 text-right">
                       <div className="flex justify-end">
-                        <Skeleton className="h-8 w-15" />
+                        <Skeleton className="h-8 w-8" />
                       </div>
                     </TableCell>
                   </TableRow>
                 ))
               ) : error ? (
-                /* Penanganan Error */
                 <TableRow>
                   <TableCell
-                    colSpan={7} // Jumlah kolom: 7
+                    colSpan={8}
                     className="text-center text-red-500 py-6">
+                    {" "}
+                    {/* ✨ UPDATE: colSpan 8 */}
                     {error}
                   </TableCell>
                 </TableRow>
               ) : clients.length > 0 ? (
-                /* Menampilkan Data Client */
                 clients.map((client) => (
                   <TableRow key={client.id}>
                     <TableCell className="font-mono text-xs">
@@ -466,6 +476,21 @@ export default function ClientManagementTable() {
                         {client.type}
                       </Badge>
                     </TableCell>
+
+                    {/* ✨ UPDATE: Cell Baru Status */}
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "uppercase text-[10px]",
+                          client.status === "POTENTIAL"
+                            ? "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900 dark:text-amber-300"
+                            : "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900 dark:text-emerald-300",
+                        )}>
+                        {client.status || "OFFICIAL"}
+                      </Badge>
+                    </TableCell>
+
                     <TableCell className="text-sm text-muted-foreground">
                       {getClientPicOrEmail(client) || "-"}
                     </TableCell>
@@ -475,13 +500,6 @@ export default function ClientManagementTable() {
                     <TableCell className="font-mono text-xs">
                       {formatDate(client.createdAt, { style: "relative" })}
                     </TableCell>
-                    {/* <TableCell className="text-right">
-                      <Link href={`/super-admin/clients/detail/${client.id}`}>
-                        <Button variant="secondary" size="sm">
-                          View
-                        </Button>
-                      </Link>
-                    </TableCell> */}
 
                     <TableCell className="text-right">
                       <DropdownMenu>
@@ -494,7 +512,6 @@ export default function ClientManagementTable() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
 
-                          {/* ACTION: VIEW */}
                           <DropdownMenuItem asChild>
                             <Link
                               href={`/super-admin/clients/detail/${client.id}`}
@@ -503,7 +520,6 @@ export default function ClientManagementTable() {
                             </Link>
                           </DropdownMenuItem>
 
-                          {/* ✨ ACTION: EDIT */}
                           <DropdownMenuItem asChild>
                             <Link
                               href={`/super-admin/clients/edit/${client.id}`}
@@ -515,7 +531,6 @@ export default function ClientManagementTable() {
 
                           <DropdownMenuSeparator />
 
-                          {/* ACTION: DELETE */}
                           <DropdownMenuItem
                             className="text-red-600 focus:text-red-600 cursor-pointer"
                             onClick={() => setDeleteId(client.id)}>
@@ -527,10 +542,9 @@ export default function ClientManagementTable() {
                   </TableRow>
                 ))
               ) : (
-                /* Data Kosong */
                 <TableRow>
                   <TableCell
-                    colSpan={7} // Jumlah kolom: 7
+                    colSpan={8} // ✨ UPDATE: colSpan 8
                     className="text-center py-6 text-muted-foreground">
                     No clients found.
                   </TableCell>

@@ -1,5 +1,6 @@
 "use client";
 
+import { ClientData } from "@/app/(dashboard)/admin-invoice/quotations/components/quotationForm";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -130,7 +131,13 @@ const initialFormData: ClientFormData = {
   b2c_purchaseChannelIdB2C: "",
 };
 
-export default function ClientAddForm() {
+export default function ClientAddForm({
+  onSuccess,
+  isModal = false,
+}: {
+  onSuccess?: (newClient: ClientData) => void;
+  isModal?: boolean;
+} = {}) {
   const { fetchApi, status } = useApi();
   const [formData, setFormData] = useState(initialFormData);
   const [clientType, setClientType] = useState<ClientType>("");
@@ -310,9 +317,14 @@ export default function ClientAddForm() {
         return;
       }
 
+      const newClient = await res.json();
       toast.success("Client berhasil ditambahkan!");
-      router.push("/super-admin/clients");
-      router.refresh();
+      if (isModal && onSuccess) {
+        onSuccess(newClient);
+      } else {
+        router.push("/super-admin/clients");
+        router.refresh();
+      }
     } catch (err) {
       toast.error("Terjadi kesalahan koneksi ke server.");
       console.error(err);
