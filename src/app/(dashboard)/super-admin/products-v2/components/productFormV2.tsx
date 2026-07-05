@@ -1,0 +1,823 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { useProductFormV2 } from "@/hooks/useProductFormV2";
+import { cn } from "@/lib/utils";
+import { Check, ChevronsUpDown, Loader2, RefreshCw, X } from "lucide-react";
+import { AddItemCategoryModal } from "../../item-categories-product/components/addItemCategoryModal";
+import { AddItemNameModal } from "../../item-names-product/components/addItemNameModal";
+import CreateCategoryModal from "../../product-categories/components/createCategoryModal";
+import MaterialTypeForm from "../../product-materials/components/materialTypeForm";
+import { AttributeSelector } from "./AttributeSelector";
+import { PriceTiers } from "./PriceTiers";
+import { ProductFormValues } from "./product.schema";
+import { UploadImages } from "./upload-images";
+import { UploadVideos } from "./upload-videos";
+import { VariantList } from "./VariantList";
+import { ProductMockupModal } from "./ProductMockupModal";
+import { MockupAreaSelector } from "./MockupAreaSelector";
+
+export default function ProductFormV2({
+  onSubmit,
+  isLoading = false,
+  isSubmitting = false,
+}: {
+  onSubmit: (data: ProductFormValues, files: any) => Promise<void>;
+  isLoading?: boolean;
+  isSubmitting?: boolean;
+}) {
+  // Panggil Custom Hook
+  const { form, submit, state, setters, handlers } = useProductFormV2(onSubmit);
+
+  const [previewUrl, setPreviewUrl] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (state.productImagesFiles && state.productImagesFiles.length > 0) {
+      const url = URL.createObjectURL(state.productImagesFiles[0]);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreviewUrl(undefined);
+    }
+  }, [state.productImagesFiles]);
+
+  return (
+    <Card className="w-full pt-2">
+      <CardContent className="pt-6">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(submit)} className="space-y-6">
+            <Tabs defaultValue="identity" className="w-full space-y-6">
+              <TabsList className="grid w-full grid-cols-4 p-1 bg-stone-100 dark:bg-stone-800 rounded-lg">
+                <TabsTrigger value="identity" className="font-semibold text-xs sm:text-sm">1. Informasi Utama</TabsTrigger>
+                <TabsTrigger value="media" className="font-semibold text-xs sm:text-sm">2. Media & Visual</TabsTrigger>
+                <TabsTrigger value="pricing" className="font-semibold text-xs sm:text-sm">3. Harga & Inventory</TabsTrigger>
+                <TabsTrigger value="customization" disabled={!state.isCustomProduct} className="font-semibold text-xs sm:text-sm">4. Kustomisasi</TabsTrigger>
+              </TabsList>
+
+              {/* Tab 1: Informasi Utama */}
+              <TabsContent value="identity" forceMount className="space-y-6 animate-fade-in focus-visible:outline-none data-[state=inactive]:hidden">
+                <div className="rounded-xl border border-stone-200 dark:border-stone-800 p-6 bg-white dark:bg-stone-900 shadow-sm space-y-6">
+                  <h3 className="text-lg font-semibold tracking-tight border-b pb-2 mb-4 flex items-center gap-2 text-stone-800 dark:text-stone-200">
+                    📝 Informasi Utama
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1 lg:col-span-2">
+                          <FormLabel>Nama Produk</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="isCustom"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1">
+                          <FormLabel>Tipe Produk</FormLabel>
+                          <FormControl>
+                            <div className="flex items-center gap-3 h-10 border rounded-md px-3 bg-white dark:bg-stone-950">
+                              <span
+                                className={`text-sm ${!field.value ? "font-bold text-primary" : "text-gray-400"}`}>
+                                Standard
+                              </span>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                              <span
+                                className={`text-sm ${field.value ? "font-bold text-primary" : "text-gray-400"}`}>
+                                Custom
+                              </span>
+                            </div>
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="materialTypeId"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1">
+                          <FormLabel>Material</FormLabel>
+                          <Select
+                            onValueChange={(val) => {
+                              if (val === "ADD_NEW_MATERIAL")
+                                return setters.setIsMaterialModalOpen(true);
+                              field.onChange(val);
+                            }}
+                            value={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Pilih jenis material..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {state.materialTypes.map((mat) => (
+                                <SelectItem key={mat.id} value={mat.id}>
+                                  {mat.name}
+                                </SelectItem>
+                              ))}
+                              <div className="h-px bg-stone-200 my-1 mx-1" />
+                              <SelectItem
+                                value="ADD_NEW_MATERIAL"
+                                className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                + Tambah Material Baru
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="categoryId"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1">
+                          <FormLabel>Kategori Produk</FormLabel>
+                          <Select
+                            onValueChange={(val) => {
+                              if (val === "ADD_NEW_CATEGORY")
+                                return setters.setIsCategoryModalOpen(true);
+                              field.onChange(val);
+                              form.setValue("itemCategoryId", "");
+                              form.setValue("itemNameId", "");
+                            }}
+                            value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Pilih kategori..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {state.categories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  {cat.name} {cat.code && `(${cat.code})`}
+                                </SelectItem>
+                              ))}
+                              <div className="h-px bg-stone-200 my-1 mx-1" />
+                              <SelectItem
+                                value="ADD_NEW_CATEGORY"
+                                className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                + Kategori Baru
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="itemCategoryId"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1">
+                          <FormLabel>Item Category</FormLabel>
+                          <Select
+                            onValueChange={(val) => {
+                              if (val === "ADD_NEW_ITEM_CATEGORY")
+                                return setters.setIsItemCategoryModalOpen(true);
+                              field.onChange(val);
+                              form.setValue("itemNameId", "");
+                            }}
+                            value={field.value}
+                            disabled={!state.selectedCategoryId}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Pilih item category..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {state.itemCategories.map((ic) => (
+                                <SelectItem key={ic.id} value={ic.id}>
+                                  {ic.name}
+                                </SelectItem>
+                              ))}
+                              <div className="h-px bg-stone-200 my-1 mx-1" />
+                              <SelectItem
+                                value="ADD_NEW_ITEM_CATEGORY"
+                                className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                + Tambah Item Category Baru
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="itemNameId"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1">
+                          <FormLabel>Item Name</FormLabel>
+                          <Select
+                            value={field.value || ""}
+                            onValueChange={(val) => {
+                              if (val === "ADD_NEW_ITEM_NAME")
+                                return setters.setIsItemNameModalOpen(true);
+                              field.onChange(val);
+                            }}
+                            disabled={!state.selectedItemCategoryId}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Pilih item name..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {state.itemNames.map((inm) => (
+                                <SelectItem key={inm.id} value={inm.id}>
+                                  {inm.name}
+                                </SelectItem>
+                              ))}
+                              <div className="h-px bg-stone-200 my-1 mx-1" />
+                              <SelectItem
+                                value="ADD_NEW_ITEM_NAME"
+                                className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                + Tambah Item Name Baru
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="sku"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1">
+                          <FormLabel>SKU</FormLabel>
+                          <div className="flex gap-2">
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Contoh: ELE-LAP-MAC-ALU-MA0001"
+                              />
+                            </FormControl>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={handlers.handleGenerateSku}
+                              disabled={state.isGeneratingSku}>
+                              <RefreshCw
+                                className={`h-4 w-4 ${state.isGeneratingSku ? "animate-spin" : ""}`}
+                              />
+                            </Button>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* TAGS */}
+                  <FormField
+                    control={form.control}
+                    name="tagIds"
+                    render={({ field }) => {
+                      const selectedTags = field.value || [];
+                      return (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Product Tags</FormLabel>
+                          <Popover
+                            open={state.tagSearchOpen}
+                            onOpenChange={setters.setTagSearchOpen}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className={cn(
+                                    "w-full justify-between h-auto min-h-10 text-left bg-white dark:bg-stone-950",
+                                    selectedTags.length === 0 &&
+                                      "text-muted-foreground",
+                                  )}>
+                                  <div className="flex flex-wrap gap-1 items-center">
+                                    {selectedTags.length > 0
+                                      ? selectedTags.map((tagId) => {
+                                          const tagInfo = state.tags.find(
+                                            (t) => t.id === tagId,
+                                          );
+                                          if (!tagInfo) return null;
+                                          return (
+                                            <Badge
+                                              key={tagId}
+                                              variant="secondary"
+                                              className="mr-1 mb-1"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                field.onChange(
+                                                  selectedTags.filter(
+                                                    (id) => id !== tagId,
+                                                  ),
+                                                );
+                                              }}>
+                                              {tagInfo.name}{" "}
+                                              <X className="h-3 w-3 ml-1 text-slate-500 hover:text-red-500" />
+                                            </Badge>
+                                          );
+                                        })
+                                      : "Pilih tag produk..."}
+                                  </div>
+                                  <ChevronsUpDown className="h-4 w-4 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              align="start"
+                              className="w-[--radix-popover-trigger-width] p-0">
+                              <Command>
+                                <CommandInput
+                                  placeholder="Cari tag..."
+                                  value={state.tagSearchQuery}
+                                  onValueChange={setters.setTagSearchQuery}
+                                />
+                                <CommandList>
+                                  <CommandEmpty>Tag tidak ditemukan.</CommandEmpty>
+                                  <CommandGroup>
+                                    {state.tags.map((tag) => (
+                                      <CommandItem
+                                        key={tag.id}
+                                        onSelect={() => {
+                                          field.onChange(
+                                            selectedTags.includes(tag.id)
+                                              ? selectedTags.filter(
+                                                  (id) => id !== tag.id,
+                                                )
+                                              : [...selectedTags, tag.id],
+                                          );
+                                          setters.setTagSearchQuery("");
+                                        }}>
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            selectedTags.includes(tag.id)
+                                              ? "opacity-100"
+                                              : "opacity-0",
+                                          )}
+                                        />
+                                        {tag.name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                  <div className="h-px bg-stone-200 my-1 mx-1" />
+                                  <CommandItem
+                                    onSelect={() => {
+                                      setters.setIsTagModalOpen(true);
+                                      setters.setTagSearchOpen(false);
+                                    }}
+                                    className="text-blue-600 font-bold justify-center text-xs">
+                                    + Tambah Tag Baru Sekaligus
+                                  </CommandItem>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </FormItem>
+                      );
+                    }}
+                  />
+
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 border-t pt-4">
+                    <FormField
+                      control={form.control}
+                      name="weight"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Berat (gram)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value) || 0)
+                              }
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="length"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Panjang (cm)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value) || 0)
+                              }
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="width"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lebar (cm)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value) || 0)
+                              }
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="height"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tinggi (cm)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value) || 0)
+                              }
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Deskripsi</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </TabsContent>
+
+              {/* Tab 2: Media & Visual */}
+              <TabsContent value="media" forceMount className="space-y-6 animate-fade-in focus-visible:outline-none data-[state=inactive]:hidden">
+                <div className="rounded-xl border border-stone-200 dark:border-stone-800 p-6 bg-white dark:bg-stone-900 shadow-sm space-y-6">
+                  <h3 className="text-lg font-semibold tracking-tight border-b pb-2 mb-4 flex items-center gap-2 text-stone-800 dark:text-stone-200">
+                    📸 Media & Visual
+                  </h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="border border-stone-100 dark:border-stone-800/80 p-4 rounded-lg shadow-sm">
+                      <UploadImages
+                        form={form}
+                        metadataName="imagesMetadata"
+                        name="imageFiles"
+                        label="Gambar Utama"
+                        max={10}
+                        onFilesChange={setters.setProductImagesFiles}
+                      />
+                      {previewUrl && (
+                        <div className="mt-3 pt-3 border-t space-y-4">
+                          <div className="flex justify-end">
+                            <ProductMockupModal
+                              productName={form.watch("name") || "Produk Baru"}
+                              productSku={form.watch("sku") || "SKU-TEMP"}
+                              imageUrl={previewUrl}
+                              triggerLabel="Live Mockup Preview"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between bg-stone-50 dark:bg-stone-950 p-3 rounded-lg border">
+                            <div>
+                              <h4 className="text-sm font-semibold">Tentukan Area Logo</h4>
+                              <p className="text-xs text-stone-500 dark:text-stone-400 font-normal">Batasi area penempatan logo pembeli pada mockup produk ini</p>
+                            </div>
+                            <Switch
+                              checked={form.watch("mockupAreaX") !== null}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  form.setValue("mockupAreaX", 25);
+                                  form.setValue("mockupAreaY", 25);
+                                  form.setValue("mockupAreaWidth", 50);
+                                  form.setValue("mockupAreaHeight", 50);
+                                } else {
+                                  form.setValue("mockupAreaX", null);
+                                  form.setValue("mockupAreaY", null);
+                                  form.setValue("mockupAreaWidth", null);
+                                  form.setValue("mockupAreaHeight", null);
+                                }
+                              }}
+                            />
+                          </div>
+
+                          {form.watch("mockupAreaX") !== null && (
+                            <div className="flex justify-center p-4 border rounded-lg bg-white dark:bg-stone-900 shadow-sm">
+                              <MockupAreaSelector
+                                imageUrl={previewUrl}
+                                areas={
+                                  form.watch("mockupAreaX") !== null
+                                    ? [
+                                        {
+                                          id: "legacy",
+                                          x: form.watch("mockupAreaX") ?? 25,
+                                          y: form.watch("mockupAreaY") ?? 25,
+                                          width: form.watch("mockupAreaWidth") ?? 50,
+                                          height: form.watch("mockupAreaHeight") ?? 50,
+                                          label: "Logo Area",
+                                        },
+                                      ]
+                                    : []
+                                }
+                                onChange={(newAreas) => {
+                                  if (newAreas && newAreas.length > 0) {
+                                    const area = newAreas[0];
+                                    form.setValue("mockupAreaX", area.x);
+                                    form.setValue("mockupAreaY", area.y);
+                                    form.setValue("mockupAreaWidth", area.width);
+                                    form.setValue("mockupAreaHeight", area.height);
+                                  } else {
+                                    form.setValue("mockupAreaX", null);
+                                    form.setValue("mockupAreaY", null);
+                                    form.setValue("mockupAreaWidth", null);
+                                    form.setValue("mockupAreaHeight", null);
+                                  }
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="border border-stone-100 dark:border-stone-800/80 p-4 rounded-lg shadow-sm">
+                      <UploadVideos
+                        form={form}
+                        metadataName="videosMetadata"
+                        label="Video Promosi"
+                        max={3}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Tab 3: Harga & Inventory */}
+              <TabsContent value="pricing" forceMount className="space-y-6 animate-fade-in focus-visible:outline-none data-[state=inactive]:hidden">
+                <div className="rounded-xl border border-stone-200 dark:border-stone-800 p-6 bg-white dark:bg-stone-900 shadow-sm space-y-6">
+                  <h3 className="text-lg font-semibold tracking-tight border-b pb-2 mb-4 flex items-center gap-2 text-stone-800 dark:text-stone-200">
+                    💰 Harga & Inventory
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start border rounded-xl p-6 bg-stone-50/50 dark:bg-stone-950/30">
+                    <FormField
+                      control={form.control}
+                      name="basePrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Base Price</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                              min={0}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="stock"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Stok{" "}
+                            {state.isCustomProduct && (
+                              <span className="text-[10px] text-amber-600 italic">
+                                (Diatur per Varian)
+                              </span>
+                            )}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                              disabled={state.isCustomProduct}
+                              min={0}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="mt-6 border-t pt-6">
+                    <PriceTiers />
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Tab 4: Kustomisasi */}
+              <TabsContent value="customization" forceMount className="space-y-6 animate-fade-in focus-visible:outline-none data-[state=inactive]:hidden">
+                {state.isCustomProduct && (
+                  <div className="rounded-xl border border-stone-200 dark:border-stone-800 p-6 bg-white dark:bg-stone-900 shadow-sm space-y-6 animate-in fade-in zoom-in duration-300">
+                    <h3 className="text-lg font-semibold tracking-tight border-b pb-2 mb-4 flex items-center gap-2 text-stone-800 dark:text-stone-200">
+                      ⚙️ Kustomisasi & Varian
+                    </h3>
+                    
+                    <div className="border rounded-xl p-6 bg-stone-50/50 dark:bg-stone-950/30">
+                      <h4 className="font-semibold mb-3 text-base text-stone-700 dark:text-stone-300">
+                        Konfigurasi Varian
+                      </h4>
+                      <AttributeSelector
+                        value={state.attributeSelections}
+                        onChange={handlers.handleAddAttributeToForm}
+                      />
+                      <div className="border-t mt-3 pt-3 flex justify-end">
+                        <Button
+                          variant="secondary"
+                          type="button"
+                          onClick={handlers.handleGenerateVariants}>
+                          Generate Variants
+                        </Button>
+                      </div>
+                    </div>
+                    {state.combinations.length > 0 && (
+                      <div className="border rounded-xl p-6 bg-white dark:bg-stone-900 shadow-sm">
+                        <VariantList
+                          combinations={state.combinations}
+                          variantMetas={state.variantMetas}
+                          onUpdateVariantMeta={handlers.handleUpdateVariantMeta}
+                          onChangeMeta={setters.setVariantFilesMap}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+
+            <div className="flex justify-end pt-4 border-t">
+              <Button type="submit" disabled={isSubmitting || isLoading}>
+                {isSubmitting && (
+                  <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                )}{" "}
+                Create Product
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+
+      {/* MODALS */}
+      <CreateCategoryModal
+        isOpen={state.isCategoryModalOpen}
+        onClose={() => setters.setIsCategoryModalOpen(false)}
+        onSuccess={(newCat) => {
+          setters.setCategories((p) => [...p, newCat]);
+          form.setValue("categoryId", newCat.id);
+          form.setValue("itemCategoryId", "");
+          form.setValue("itemNameId", "");
+        }}
+      />
+      <AddItemCategoryModal
+        isOpen={state.isItemCategoryModalOpen}
+        onClose={() => setters.setIsItemCategoryModalOpen(false)}
+        parentCategoryId={state.selectedCategoryId}
+        onSuccess={(newCat) => {
+          setters.setItemCategories((p) => [...p, newCat]);
+          form.setValue("itemCategoryId", newCat.id);
+          form.setValue("itemNameId", "");
+        }}
+      />
+      <AddItemNameModal
+        isOpen={state.isItemNameModalOpen}
+        onClose={() => setters.setIsItemNameModalOpen(false)}
+        parentCategoryId={state.selectedCategoryId}
+        parentItemCategoryId={state.selectedItemCategoryId}
+        productCategories={state.categories}
+        itemCategories={state.itemCategories}
+        onSuccess={(newName) => {
+          setters.setItemNames((p) => [...p, newName]);
+          form.setValue("itemNameId", newName.id);
+        }}
+      />
+
+      <Dialog
+        open={state.isTagModalOpen}
+        onOpenChange={setters.setIsTagModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tambah Tags Baru</DialogTitle>
+            <DialogDescription>Pisahkan dengan koma ( , )</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={state.bulkTagInput}
+              onChange={(e) => setters.setBulkTagInput(e.target.value)}
+              disabled={state.isSubmittingTags}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setters.setIsTagModalOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              onClick={handlers.handleBulkCreateTags}
+              disabled={state.isSubmittingTags}>
+              {state.isSubmittingTags ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={state.isMaterialModalOpen}
+        onOpenChange={setters.setIsMaterialModalOpen}>
+        <DialogContent className="sm:max-w-140 bg-[oklch(0.98_0.02_90)]">
+          <DialogHeader>
+            <DialogTitle>Tambah Material Baru</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">
+            <MaterialTypeForm
+              onSubmit={handlers.handleAddMaterialSubmit}
+              isSubmitting={state.isSubmittingMaterial}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}

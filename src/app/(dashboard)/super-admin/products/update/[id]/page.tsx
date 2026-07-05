@@ -28,25 +28,25 @@ export default function EditProductPage() {
   const [currentSelections, setCurrentSelections] = useState<any[]>([]);
   const [currentFullList, setCurrentFullList] = useState<any[]>([]);
 
+  const fetchProductData = async () => {
+    if (!id || status === "loading") return;
+
+    try {
+      const res = await fetchApi(`/products/${id}`);
+
+      if (!res.ok) throw new Error("Failed to fetch product data");
+
+      const data = await res.json();
+
+      setProductData(data);
+    } catch (err) {
+      console.error("Error fetching product data:", err);
+      toast.error("Failed to load product data");
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      if (!id || status === "loading") return;
-
-      try {
-        const res = await fetchApi(`/products/${id}`);
-
-        if (!res.ok) throw new Error("Failed to fetch product data");
-
-        const data = await res.json();
-
-        setProductData(data);
-      } catch (err) {
-        console.error("Error fetching product data:", err);
-        toast.error("Failed to load product data");
-      }
-    };
-
-    fetchData();
+    fetchProductData();
   }, [id, status, fetchApi]);
   const handleUpdateProduct = async (
     coreValues: ProductCoreFormValues,
@@ -85,6 +85,7 @@ export default function EditProductPage() {
       if (!res.ok) throw new Error("Failed to update attributes");
 
       toast.success("Attributes updated");
+      await fetchProductData();
     } catch (err) {
       console.error(err);
       toast.error("Failed to update attributes");
@@ -178,7 +179,7 @@ export default function EditProductPage() {
 
       setProductData((prev: any) => ({
         ...prev,
-        variants: updated.variants,
+        productVariants: updated.variants,
       }));
     } catch (err) {
       toast.error(
@@ -506,11 +507,16 @@ export default function EditProductPage() {
     const usedExistingVariantIds = new Set();
 
     const getVariantSignature = (variant: any) => {
-      const attributeIds = variant.attributeValues
-        .map((av: any) => av.attributeValueId)
-        .sort()
-        .join("|");
-      return attributeIds;
+      if (variant.attributeValues) {
+        return variant.attributeValues
+          .map((av: any) => av.attributeValueId)
+          .sort()
+          .join("|");
+      }
+      if (variant.attributeValueIds) {
+        return [...variant.attributeValueIds].sort().join("|");
+      }
+      return "";
     };
 
     for (const newComb of newCombinations) {
@@ -534,15 +540,30 @@ export default function EditProductPage() {
         usedExistingVariantIds.add(existingMatch.id);
       } else {
         // B. Variant BARU DIBUAT
+        let modifierSum = 0;
+        const valueIdsInCombo = Object.values(newComb.attributeMap) as string[];
+        currentSelections.forEach((selection: any) => {
+          selection.valueIds.forEach((valId: string) => {
+            if (valueIdsInCombo.includes(valId)) {
+              const modVal = selection.priceModifiers?.[valId];
+              if (modVal !== undefined) {
+                modifierSum += Number(modVal) || 0;
+              }
+            }
+          });
+        });
+
+        const basePrice = Number(productData?.basePrice) || 0;
+
         newVariantsState.push({
           id: undefined,
           variantName: newComb.variantName,
           sku: "",
-          price: 0,
+          price: basePrice + modifierSum,
           images: [],
           _isDeleted: false,
 
-          attributeValueIds: Object.values(newComb.attributeMap),
+          attributeValueIds: valueIdsInCombo,
         });
       }
     }

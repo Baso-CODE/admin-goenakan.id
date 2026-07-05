@@ -12,13 +12,38 @@ export default function AddAttributePage() {
 
   const router = useRouter();
 
+  const formatValuesRecursive = (values: any[]): any[] => {
+    return values.map((v) => {
+      const formatted: any = {
+        value: v.value,
+        position: v.position,
+      };
+      if (v.id) formatted.id = v.id;
+      if (v.deleted) formatted.deleted = v.deleted;
+      if (v.subAttributes && v.subAttributes.length > 0) {
+        formatted.subAttributes = v.subAttributes
+          .filter((sub: any) => !sub.deleted)
+          .map((sub: any) => ({
+            id: sub.id,
+            name: sub.name,
+            type: sub.type,
+            parentValueId: sub.parentValueId,
+            values: formatValuesRecursive(sub.values),
+          }));
+      }
+      return formatted;
+    });
+  };
+
   const handleAddAttribute = async (data: AttributeFormValues) => {
     if (status !== "authenticated") return;
 
     try {
       const payload = {
         name: data.name,
-        values: data.values.map((v) => ({ value: v.value })),
+        type: data.type,
+        parentValueId: data.parentValueId,
+        values: formatValuesRecursive(data.values),
       };
 
       const res = await fetchApi("/product-attributes", {

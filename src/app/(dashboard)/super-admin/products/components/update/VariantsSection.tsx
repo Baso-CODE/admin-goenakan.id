@@ -374,15 +374,7 @@ export default function FormUpdateVariants({
                 form.watch(`variants.${index}.images`) || [];
 
               if (deleted) {
-                return (
-                  <div
-                    key={field.id}
-                    className="border border-red-300 p-3 rounded-lg bg-red-50 text-sm text-red-600 italic">
-                    🗑️ Variant **
-                    {form.getValues(`variants.${index}.variantName`)}** marked
-                    for deletion.
-                  </div>
-                );
+                return null;
               }
 
               return (
