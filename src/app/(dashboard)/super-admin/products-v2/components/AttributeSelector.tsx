@@ -45,11 +45,15 @@ type AttributeFromServer = {
   values: { id: string; value: string; attributeId?: string }[];
 };
 
-type SelectedAttributeRow = {
+export type SelectedAttributeRow = {
   attributeId: string;
   valueIds: string[];
   priceModifiers?: Record<string, number>;
   isVariantGenerator?: boolean;
+  weights?: Record<string, number>;
+  widths?: Record<string, number>;
+  heights?: Record<string, number>;
+  lengths?: Record<string, number>;
 };
 
 // --- KOMPONEN UTAMA ---
@@ -194,7 +198,7 @@ export function AttributeSelector({
       toast.warning("Please select an attribute for the previous row first.");
       return;
     }
-    setLocal((prev) => [...prev, { attributeId: "", valueIds: [], priceModifiers: {} }]);
+    setLocal((prev) => [...prev, { attributeId: "", valueIds: [], priceModifiers: {}, weights: {}, widths: {}, heights: {}, lengths: {} }]);
   };
 
   const updatePriceModifier = (index: number, valueId: string, modifier: number) => {
@@ -206,6 +210,66 @@ export function AttributeSelector({
           priceModifiers: {
             ...row.priceModifiers,
             [valueId]: modifier,
+          },
+        };
+      })
+    );
+  };
+
+  const updateWeight = (index: number, valueId: string, val: number) => {
+    setLocal((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        return {
+          ...row,
+          weights: {
+            ...row.weights,
+            [valueId]: val,
+          },
+        };
+      })
+    );
+  };
+
+  const updateWidth = (index: number, valueId: string, val: number) => {
+    setLocal((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        return {
+          ...row,
+          widths: {
+            ...row.widths,
+            [valueId]: val,
+          },
+        };
+      })
+    );
+  };
+
+  const updateHeight = (index: number, valueId: string, val: number) => {
+    setLocal((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        return {
+          ...row,
+          heights: {
+            ...row.heights,
+            [valueId]: val,
+          },
+        };
+      })
+    );
+  };
+
+  const updateLength = (index: number, valueId: string, val: number) => {
+    setLocal((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        return {
+          ...row,
+          lengths: {
+            ...row.lengths,
+            [valueId]: val,
           },
         };
       })
@@ -866,7 +930,7 @@ export function AttributeSelector({
                               onDragOver={handleDragOver}
                               onDragEnter={() => handleDragEnter(attr.id, valIdx)}
                               onDragEnd={handleDragEnd}
-                              className={`flex items-center gap-2 text-sm cursor-move border p-2 rounded-md transition-all duration-150 select-none ${
+                              className={`flex flex-col items-stretch gap-2 text-sm cursor-move border p-2 rounded-md transition-all duration-150 select-none ${
                                 isDragging
                                   ? "opacity-45 border-dashed border-indigo-400 bg-indigo-50/50 scale-95"
                                   : "hover:bg-gray-100"
@@ -879,72 +943,122 @@ export function AttributeSelector({
                                   ? "#4f46e5"
                                   : "#e5e7eb",
                               }}>
-                              <Checkbox
-                                id={`attr-val-${val.id}`}
-                                checked={row.valueIds.includes(val.id)}
-                                onCheckedChange={() => toggleValue(idx, val.id)}
-                                onDragStart={(e) => e.stopPropagation()}
-                                className="h-4 w-4 shrink-0 cursor-pointer"
-                              />
-                              <span className="truncate flex-1 font-medium flex items-center gap-1.5 text-xs text-slate-700">
-                                {attr.type === "COLOR" ? (
-                                  (() => {
-                                    const parsed = parseColorValue(val.value);
-                                    return (
-                                      <>
-                                        <span
-                                          className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
-                                          style={{ backgroundColor: parsed.hex }}
-                                        />
-                                        <span className="truncate">
-                                          {parsed.name || parsed.hex}
-                                        </span>
-                                        <span className="text-[9px] text-slate-400 font-mono shrink-0">
-                                          CMYK({parsed.cmyk.c},{parsed.cmyk.m},{parsed.cmyk.y},{parsed.cmyk.k})
-                                        </span>
-                                      </>
-                                    );
-                                  })()
-                                ) : (
-                                  val.value
-                                )}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`attr-val-${val.id}`}
+                                  checked={row.valueIds.includes(val.id)}
+                                  onCheckedChange={() => toggleValue(idx, val.id)}
+                                  onDragStart={(e) => e.stopPropagation()}
+                                  className="h-4 w-4 shrink-0 cursor-pointer"
+                                />
+                                <span className="truncate flex-1 font-medium flex items-center gap-1.5 text-xs text-slate-700">
+                                  {attr.type === "COLOR" ? (
+                                    (() => {
+                                      const parsed = parseColorValue(val.value);
+                                      return (
+                                        <>
+                                          <span
+                                            className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
+                                            style={{ backgroundColor: parsed.hex }}
+                                          />
+                                          <span className="truncate">
+                                            {parsed.name || parsed.hex}
+                                          </span>
+                                          <span className="text-[9px] text-slate-400 font-mono shrink-0">
+                                            CMYK({parsed.cmyk.c},{parsed.cmyk.m},{parsed.cmyk.y},{parsed.cmyk.k})
+                                          </span>
+                                        </>
+                                      );
+                                    })()
+                                  ) : (
+                                    val.value
+                                  )}
+                                </span>
 
-                              {/* Reordering Controls for Options */}
-                              <div className="flex gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-5 w-5 p-0 hover:bg-slate-200 rounded-sm cursor-pointer"
-                                  disabled={valIdx === 0 || loading}
-                                  onClick={() => handleMoveValue(attr.id, valIdx, "up")}>
-                                  <ArrowUp className="h-3 w-3 text-slate-500" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-5 w-5 p-0 hover:bg-slate-200 rounded-sm cursor-pointer"
-                                  disabled={valIdx === attr.values.length - 1 || loading}
-                                  onClick={() => handleMoveValue(attr.id, valIdx, "down")}>
-                                  <ArrowDown className="h-3 w-3 text-slate-500" />
-                                </Button>
+                                {/* Reordering Controls for Options */}
+                                <div className="flex gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 p-0 hover:bg-slate-200 rounded-sm cursor-pointer"
+                                    disabled={valIdx === 0 || loading}
+                                    onClick={() => handleMoveValue(attr.id, valIdx, "up")}>
+                                    <ArrowUp className="h-3 w-3 text-slate-500" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 p-0 hover:bg-slate-200 rounded-sm cursor-pointer"
+                                    disabled={valIdx === attr.values.length - 1 || loading}
+                                    onClick={() => handleMoveValue(attr.id, valIdx, "down")}>
+                                    <ArrowDown className="h-3 w-3 text-slate-500" />
+                                  </Button>
+                                </div>
                               </div>
 
-                            {row.valueIds.includes(val.id) && (
-                              <input
-                                type="number"
-                                placeholder="+ Harga"
-                                value={row.priceModifiers?.[val.id] !== undefined ? row.priceModifiers[val.id] : ""}
-                                onChange={(e) => {
-                                  updatePriceModifier(idx, val.id, parseFloat(e.target.value) || 0);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-20 text-xs border rounded p-1 text-slate-700 bg-white"
-                              />
-                            )}
-                          </label>
+                              {row.valueIds.includes(val.id) && (
+                                <div className="flex flex-col gap-1.5 pt-1.5 border-t mt-1" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[9px] text-gray-500 font-semibold w-12 shrink-0">Price Adj:</span>
+                                    <input
+                                      type="number"
+                                      placeholder="+ Harga"
+                                      value={row.priceModifiers?.[val.id] !== undefined ? row.priceModifiers[val.id] : ""}
+                                      onChange={(e) => {
+                                        updatePriceModifier(idx, val.id, parseFloat(e.target.value) || 0);
+                                      }}
+                                      className="w-full text-xs border rounded p-1 text-slate-700 bg-white"
+                                    />
+                                  </div>
+                                  {attr.type === "SIZE" && (
+                                    <div className="space-y-1 mt-1 border-t pt-1">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[9px] text-gray-500 font-semibold w-12 shrink-0">Berat (g):</span>
+                                        <input
+                                          type="number"
+                                          placeholder="Gr"
+                                          value={row.weights?.[val.id] !== undefined ? row.weights[val.id] : ""}
+                                          onChange={(e) => updateWeight(idx, val.id, parseFloat(e.target.value) || 0)}
+                                          className="w-full text-xs border rounded p-1 text-slate-700 bg-white"
+                                        />
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[9px] text-gray-500 font-semibold w-12 shrink-0">P (cm):</span>
+                                        <input
+                                          type="number"
+                                          placeholder="Cm"
+                                          value={row.lengths?.[val.id] !== undefined ? row.lengths[val.id] : ""}
+                                          onChange={(e) => updateLength(idx, val.id, parseFloat(e.target.value) || 0)}
+                                          className="w-full text-xs border rounded p-1 text-slate-700 bg-white"
+                                        />
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[9px] text-gray-500 font-semibold w-12 shrink-0">L (cm):</span>
+                                        <input
+                                          type="number"
+                                          placeholder="Cm"
+                                          value={row.widths?.[val.id] !== undefined ? row.widths[val.id] : ""}
+                                          onChange={(e) => updateWidth(idx, val.id, parseFloat(e.target.value) || 0)}
+                                          className="w-full text-xs border rounded p-1 text-slate-700 bg-white"
+                                        />
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[9px] text-gray-500 font-semibold w-12 shrink-0">T (cm):</span>
+                                        <input
+                                          type="number"
+                                          placeholder="Cm"
+                                          value={row.heights?.[val.id] !== undefined ? row.heights[val.id] : ""}
+                                          onChange={(e) => updateHeight(idx, val.id, parseFloat(e.target.value) || 0)}
+                                          className="w-full text-xs border rounded p-1 text-slate-700 bg-white"
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </label>
                           );
                         })}
                       </div>

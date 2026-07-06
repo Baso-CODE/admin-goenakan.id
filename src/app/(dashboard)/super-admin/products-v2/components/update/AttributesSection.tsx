@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { AttributeSelector } from "../AttributeSelector";
+import { AttributeSelector, SelectedAttributeRow } from "../AttributeSelector";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -31,7 +31,7 @@ export default function FormUpdateAttributes({
   isSubmitting: boolean;
   onSubmit: (payload: any) => Promise<void>;
   onAttributesChange: (
-    selections: { attributeId: string; valueIds: string[]; priceModifiers?: Record<string, number> }[],
+    selections: SelectedAttributeRow[],
     fullList: any[]
   ) => void;
   onUpdateMediaMockups?: (mediaId: string, mockups: any[]) => Promise<void>;
@@ -43,7 +43,7 @@ export default function FormUpdateAttributes({
   onUpdateMediaMetadata?: (mediaId: string, updates: any) => Promise<void>;
 }) {
   const [attributeSelections, setAttributeSelections] = useState<
-    { attributeId: string; valueIds: string[]; priceModifiers?: Record<string, number> }[]
+    SelectedAttributeRow[]
   >([]);
 
   const [attributesFullList, setAttributesFullList] = useState<any[]>([]);
@@ -87,16 +87,24 @@ export default function FormUpdateAttributes({
 
     const grouped: Record<string, string[]> = {};
     const modifiers: Record<string, number> = {};
+    const weights: Record<string, number> = {};
+    const widths: Record<string, number> = {};
+    const heights: Record<string, number> = {};
+    const lengths: Record<string, number> = {};
 
     initialData.attributeValues.forEach((item: any) => {
-      const attrId = item.attributeValue?.attribute?.id;
-      const valId = item.attributeValue?.id;
+      const attrId = item.attributeValue?.attribute?.id || item.attributeId;
+      const valId = item.attributeValue?.id || item.attributeValueId;
 
       if (!attrId || !valId) return; // skip data rusak
 
       if (!grouped[attrId]) grouped[attrId] = [];
       grouped[attrId].push(valId);
       modifiers[valId] = item.priceModifier || 0;
+      weights[valId] = item.weight || 0;
+      widths[valId] = item.width || 0;
+      heights[valId] = item.height || 0;
+      lengths[valId] = item.length || 0;
     });
 
     const variantGeneratingAttrIds = new Set<string>();
@@ -111,8 +119,17 @@ export default function FormUpdateAttributes({
 
     const mapped = Object.entries(grouped).map(([attributeId, valueIds]) => {
       const rowModifiers: Record<string, number> = {};
+      const rowWeights: Record<string, number> = {};
+      const rowWidths: Record<string, number> = {};
+      const rowHeights: Record<string, number> = {};
+      const rowLengths: Record<string, number> = {};
+
       valueIds.forEach((id) => {
         rowModifiers[id] = modifiers[id] || 0;
+        rowWeights[id] = weights[id] || 0;
+        rowWidths[id] = widths[id] || 0;
+        rowHeights[id] = heights[id] || 0;
+        rowLengths[id] = lengths[id] || 0;
       });
 
       const isVariantGenerator = initialData.productVariants?.length > 0
@@ -123,6 +140,10 @@ export default function FormUpdateAttributes({
         attributeId,
         valueIds,
         priceModifiers: rowModifiers,
+        weights: rowWeights,
+        widths: rowWidths,
+        heights: rowHeights,
+        lengths: rowLengths,
         isVariantGenerator,
       };
     });
@@ -137,6 +158,11 @@ export default function FormUpdateAttributes({
       );
 
       const allModifiers: Record<string, number> = {};
+      const allWeights: Record<string, number> = {};
+      const allWidths: Record<string, number> = {};
+      const allHeights: Record<string, number> = {};
+      const allLengths: Record<string, number> = {};
+
       const orderedAttributeIds = attributeSelections
         .map((attr) => attr.attributeId)
         .filter((id) => id !== "");
@@ -151,11 +177,35 @@ export default function FormUpdateAttributes({
             allModifiers[valId] = Number(mod);
           });
         }
+        if (attr.weights) {
+          Object.entries(attr.weights).forEach(([valId, w]) => {
+            allWeights[valId] = Number(w);
+          });
+        }
+        if (attr.widths) {
+          Object.entries(attr.widths).forEach(([valId, w]) => {
+            allWidths[valId] = Number(w);
+          });
+        }
+        if (attr.heights) {
+          Object.entries(attr.heights).forEach(([valId, h]) => {
+            allHeights[valId] = Number(h);
+          });
+        }
+        if (attr.lengths) {
+          Object.entries(attr.lengths).forEach(([valId, l]) => {
+            allLengths[valId] = Number(l);
+          });
+        }
       });
 
       const payload = {
         attributeValueIds: allAttributeValueIds,
         priceModifiers: allModifiers,
+        weights: allWeights,
+        widths: allWidths,
+        heights: allHeights,
+        lengths: allLengths,
         orderedAttributeIds,
         orderedAttributeValueIds,
       };
