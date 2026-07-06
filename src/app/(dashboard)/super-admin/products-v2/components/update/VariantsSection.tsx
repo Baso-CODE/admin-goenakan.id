@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Edit,
   Image as ImageIcon,
-  Layers,
   Plus,
   PlusCircle,
   Trash2,
@@ -44,14 +43,6 @@ const ImageSchema = z.object({
   fileIndex: z.number().nullable().optional(),
 });
 
-// ✨ TAMBAHAN BARU: Skema untuk Price Tier
-const PriceTierSchema = z.object({
-  id: z.string().optional(),
-  minQuantity: z.coerce.number().min(1, "Minimal qty 1"),
-  maxQuantity: z.coerce.number().min(1).nullable().optional(),
-  price: z.coerce.number().min(0, "Harga tidak valid"),
-});
-
 const VariantSchema = z.object({
   variants: z.array(
     z.object({
@@ -72,141 +63,11 @@ const VariantSchema = z.object({
       _isDeleted: z.boolean().optional(),
       attributeValueIds: z.array(z.string()).optional(),
       images: z.array(ImageSchema).optional(),
-      // ✨ TAMBAHAN BARU: Field Price Tiers untuk Variant
-      priceTiers: z.array(PriceTierSchema).optional(),
     }),
   ),
 });
 
 export type VariantFormValues = z.infer<typeof VariantSchema>;
-
-// ==========================================
-// SUB-COMPONENT: NESTED PRICE TIERS
-// ==========================================
-function NestedVariantPriceTiers({ nestIndex }: { nestIndex: number }) {
-  const { control } = useFormContext();
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: `variants.${nestIndex}.priceTiers`,
-  });
-
-  return (
-    <div className="pt-4 border-t border-gray-200 space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-indigo-500" />
-          <FormLabel className="text-sm font-bold text-gray-700 m-0">
-            Harga Grosir (Wholesale)
-          </FormLabel>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() =>
-            append({ minQuantity: 1, maxQuantity: null, price: 0 })
-          }>
-          <PlusCircle className="w-3 h-3 mr-1.5" /> Tambah Tier Varian
-        </Button>
-      </div>
-
-      {fields.length === 0 ? (
-        <div className="p-3 text-center text-xs text-gray-400 border border-dashed rounded-md bg-gray-50">
-          Belum ada harga grosir khusus varian ini.
-        </div>
-      ) : (
-        <div className="border rounded-md divide-y overflow-hidden shadow-sm">
-          <div className="bg-muted/50 grid grid-cols-12 gap-2 p-2 px-3 text-[10px] font-bold text-gray-500 uppercase">
-            <div className="col-span-3">Min Qty</div>
-            <div className="col-span-3">Max Qty (Kosong = ∞)</div>
-            <div className="col-span-5">Harga Satuan (Rp)</div>
-            <div className="col-span-1 text-center">Aksi</div>
-          </div>
-          {fields.map((item, k) => (
-            <div
-              key={item.id}
-              className="grid grid-cols-12 gap-2 p-2 px-3 items-center bg-white">
-              <div className="col-span-3">
-                <FormField
-                  control={control}
-                  name={`variants.${nestIndex}.priceTiers.${k}.minQuantity`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={1}
-                          className="h-8 text-sm"
-                          {...field}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="col-span-3">
-                <FormField
-                  control={control}
-                  name={`variants.${nestIndex}.priceTiers.${k}.maxQuantity`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={1}
-                          placeholder="∞"
-                          className="h-8 text-sm"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={(e) =>
-                            field.onChange(
-                              e.target.value === ""
-                                ? null
-                                : parseInt(e.target.value),
-                            )
-                          }
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="col-span-5">
-                <FormField
-                  control={control}
-                  name={`variants.${nestIndex}.priceTiers.${k}.price`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={0}
-                          placeholder="0"
-                          className="h-8 text-sm font-mono"
-                          {...field}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="col-span-1 flex justify-center">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => remove(k)}
-                  className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50">
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ==========================================
 // MAIN COMPONENT: FormUpdateVariants
@@ -332,7 +193,6 @@ export default function FormUpdateVariants({
       length: undefined,
       _isDeleted: false,
       images: [],
-      priceTiers: [], // Inisialisasi kosong
     });
   };
 
@@ -379,8 +239,7 @@ export default function FormUpdateVariants({
             📦 Product Variants Configuration
           </h3>
           <p className="text-sm text-gray-500">
-            Define basic properties, wholesale pricing, and media for each
-            product combination.
+            Define basic properties and media for each product combination.
           </p>
           <hr />
 
@@ -537,9 +396,6 @@ export default function FormUpdateVariants({
                       )}
                     />
                   </div>
-
-                  {/* ✨ RENDER SUB-COMPONENT PRICE TIERS DI SINI */}
-                  <NestedVariantPriceTiers nestIndex={index} />
 
                   {/* DIMENSI & BERAT */}
                   <div className="pt-4 border-t border-gray-200">
