@@ -151,8 +151,6 @@ export default function EditProductPage() {
           // ---------------------------------
           attributeValueIds: v.attributeValueIds || [],
 
-          priceTiers: v.priceTiers || [],
-
           images: variantImages,
         });
       });
