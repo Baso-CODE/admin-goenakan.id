@@ -17,6 +17,12 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Form,
   FormControl,
   FormField,
@@ -46,7 +52,18 @@ import {
   ClipboardList,
   Loader2,
   PackageSearch,
+  Plus,
 } from "lucide-react";
+import { toast } from "sonner";
+import ContactPlatformForm, {
+  ContactPlatformFormValues,
+} from "../../contact-platforms/components/FormContactPlatform";
+import VendorCategoryForm, {
+  VendorCategoryFormValues,
+} from "../../vendor-categories/components/formCategoryVendor";
+import VendorItemForm, {
+  VendorItemFormValues,
+} from "../../vendor-items/components/formItemVendor";
 import { useVendorFormFilter } from "../hooks/useVendorFormFilter";
 import VendorAddressField from "./VendorAddressField";
 
@@ -97,7 +114,9 @@ export default function AddVendorForm({
   const [vendorItems, setVendorItems] = useState<
     { id: string; name: string; categoryId: string }[]
   >([]);
-
+  const [isPlatformModalOpen, setIsPlatformModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   // UI State
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [isComboboxOpen, setIsComboboxOpen] = useState(false);
@@ -165,8 +184,86 @@ export default function AddVendorForm({
     };
 
     fetchDependencies();
-  }, [status, fetchApi]); // Tambahkan dependensi lengkap
+  }, [status, fetchApi]);
 
+  const handleAddPlatformFast = async (data: ContactPlatformFormValues) => {
+    if (status !== "authenticated") return;
+    try {
+      const res = await fetchApi("/contact-platforms", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || "Gagal membuat platform");
+      }
+
+      const responseData = await res.json();
+      const newPlatform = responseData.data || responseData;
+      setContactPlatforms((prev) => [...prev, newPlatform]);
+      form.setValue("platformId", newPlatform.id);
+      setIsPlatformModalOpen(false);
+      toast.success("Platform berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan.");
+    }
+  };
+
+  const handleAddCategoryFast = async (data: VendorCategoryFormValues) => {
+    if (status !== "authenticated") return;
+    try {
+      const res = await fetchApi("/vendor-categories", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal membuat kategori vendor");
+      }
+
+      const responseData = await res.json();
+      const newCategory = responseData.data || responseData;
+
+      setVendorCategories((prev) => [...prev, newCategory]);
+      form.setValue("type", newCategory.type);
+      form.setValue("categoryId", newCategory.id);
+      setIsCategoryModalOpen(false);
+      toast.success("Kategori Vendor berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan.");
+    }
+  };
+
+  const handleAddItemFast = async (data: VendorItemFormValues) => {
+    if (status !== "authenticated") return;
+    try {
+      const res = await fetchApi("/vendor-items", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal membuat vendor item");
+      }
+
+      const responseData = await res.json();
+      const newItem = responseData.data || responseData;
+
+      // Tambah data master item baru
+      setVendorItems((prev) => [...prev, newItem]);
+
+      const currentItems = form.getValues("itemIds") || [];
+      form.setValue("itemIds", [...currentItems, newItem.id]);
+
+      setIsItemModalOpen(false);
+      toast.success("Vendor Item berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan.");
+    }
+  };
   const handleSubmit = (values: AddVendorFormValues) => {
     const payload = {
       ...values,
@@ -228,13 +325,32 @@ export default function AddVendorForm({
                 render={({ field }) => (
                   <FormItem className="w-full">
                     <FormLabel>Platform *</FormLabel>
+
+                    {/* MODAL PLATFORM */}
+                    <Dialog
+                      open={isPlatformModalOpen}
+                      onOpenChange={setIsPlatformModalOpen}>
+                      <DialogContent className="sm:max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Tambah Platform Baru</DialogTitle>
+                        </DialogHeader>
+                        <ContactPlatformForm onSubmit={handleAddPlatformFast} />
+                      </DialogContent>
+                    </Dialog>
+
                     <Select
-                      onValueChange={field.onChange}
                       value={field.value}
-                      disabled={isLoading || isSubmitting}>
+                      disabled={isLoading || isSubmitting}
+                      onValueChange={(val) => {
+                        if (val === "add_new_platform") {
+                          setIsPlatformModalOpen(true);
+                        } else {
+                          field.onChange(val);
+                        }
+                      }}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select" />
+                          <SelectValue placeholder="Select Platform" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -243,6 +359,15 @@ export default function AddVendorForm({
                             {p.name}
                           </SelectItem>
                         ))}
+                        <div className="h-px bg-stone-200 my-1 mx-2" />
+                        <SelectItem
+                          value="add_new_platform"
+                          className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer">
+                          <div className="flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Buat Platform Baru...
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -311,11 +436,6 @@ export default function AddVendorForm({
                     <Select
                       onValueChange={(val) => {
                         field.onChange(val);
-                        // Hapus reset categoryId jika Anda ingin category tetap terpilih (opsional)
-                        // form.setValue("categoryId", "");
-
-                        // Hapus reset itemIds agar item tidak hilang saat Type berubah
-                        // form.setValue("itemIds", []);
                       }}
                       value={field.value}
                       disabled={isLoading || isSubmitting}>
@@ -343,17 +463,27 @@ export default function AddVendorForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
+                    <Dialog
+                      open={isCategoryModalOpen}
+                      onOpenChange={setIsCategoryModalOpen}>
+                      <DialogContent className="sm:max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Tambah Kategori Vendor Baru</DialogTitle>
+                        </DialogHeader>
+                        <VendorCategoryForm onSubmit={handleAddCategoryFast} />
+                      </DialogContent>
+                    </Dialog>
+
                     <Select
-                      // === PERBAIKAN DISINI ===
-                      onValueChange={field.onChange} // Cukup gunakan field.onChange saja
-                      // ATAU jika ingin eksplisit:
-                      /* onValueChange={(val) => {
-                         field.onChange(val);
-                         // Jangan panggil form.setValue("itemIds", [])
-                      }} 
-                      */
                       value={field.value}
-                      disabled={!form.watch("type") || loadingCategories}>
+                      disabled={!form.watch("type") || loadingCategories}
+                      onValueChange={(val) => {
+                        if (val === "add_new_category") {
+                          setIsCategoryModalOpen(true);
+                        } else {
+                          field.onChange(val);
+                        }
+                      }}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select Category" />
@@ -365,6 +495,20 @@ export default function AddVendorForm({
                             {c.name}
                           </SelectItem>
                         ))}
+
+                        {form.watch("type") && (
+                          <>
+                            <div className="h-px bg-stone-200 my-1 mx-2" />
+                            <SelectItem
+                              value="add_new_category"
+                              className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer">
+                              <div className="flex items-center gap-2 text-sm">
+                                <Plus className="w-4 h-4" />
+                                Buat Kategori Baru...
+                              </div>
+                            </SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -372,7 +516,7 @@ export default function AddVendorForm({
                 )}
               />
 
-              {/* === VENDOR ITEMS (Simpler for Add Mode) === */}
+              {/* === VENDOR ITEMS === */}
               <FormField
                 control={form.control}
                 name="itemIds"
@@ -382,6 +526,25 @@ export default function AddVendorForm({
                       <PackageSearch className="h-4 w-4 text-muted-foreground" />
                       Vendor Items
                     </FormLabel>
+
+                    <Dialog
+                      open={isItemModalOpen}
+                      onOpenChange={setIsItemModalOpen}>
+                      <DialogContent className="sm:max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Tambah Vendor Item Baru</DialogTitle>
+                        </DialogHeader>
+                        <VendorItemForm
+                          onSubmit={handleAddItemFast}
+                          initialData={{
+                            name: "",
+                            description: "",
+                            categoryId: form.watch("categoryId") || "",
+                            isActive: true,
+                          }}
+                        />
+                      </DialogContent>
+                    </Dialog>
                     <Popover
                       open={isComboboxOpen}
                       onOpenChange={setIsComboboxOpen}>
@@ -391,7 +554,6 @@ export default function AddVendorForm({
                             variant="outline"
                             role="combobox"
                             className="w-full justify-between"
-                            // Disable jika Category belum dipilih (Optional, UX preference)
                             disabled={
                               !form.watch("categoryId") ||
                               isLoading ||
@@ -410,7 +572,6 @@ export default function AddVendorForm({
                           <CommandList>
                             <CommandEmpty>Item tidak ditemukan.</CommandEmpty>
                             <CommandGroup>
-                              {/* Gunakan filteredItems langsung */}
                               {filteredItems.map((item) => {
                                 const isSelected = (field.value ?? []).includes(
                                   item.id,
@@ -439,6 +600,15 @@ export default function AddVendorForm({
                                 );
                               })}
                             </CommandGroup>
+                            <div className="h-1px bg-stone-200 my-1 mx-2" />
+                            <CommandItem
+                              onSelect={() => {
+                                setIsItemModalOpen(true);
+                                setIsComboboxOpen(false);
+                              }}
+                              className="text-blue-600 font-medium text-sm justify-center cursor-pointer py-2">
+                              <Plus className="mr-2 h-4 w-4" /> Buat Item Baru
+                            </CommandItem>
                           </CommandList>
                         </Command>
                       </PopoverContent>
@@ -447,7 +617,6 @@ export default function AddVendorForm({
                     {/* BADGE LIST */}
                     <div className="flex flex-wrap gap-2 mt-2">
                       {(field.value ?? []).map((selectedId) => {
-                        // Cari Nama Item dari Master Data (vendorItems)
                         const item = vendorItems.find(
                           (i) => i.id === selectedId,
                         );

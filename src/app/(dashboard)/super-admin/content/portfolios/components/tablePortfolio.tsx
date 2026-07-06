@@ -68,7 +68,6 @@ export default function PortfolioTable() {
   const { fetchApi, status } = useApi();
 
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
-  console.log("ini adalah portfolio", portfolios);
 
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);

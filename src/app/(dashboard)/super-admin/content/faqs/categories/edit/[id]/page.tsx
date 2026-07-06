@@ -10,14 +10,12 @@ import FaqCategoryForm, {
 
 export default function EditFaqCategory() {
   const { fetchApi, status } = useApi();
-
   const { id } = useParams();
   const router = useRouter();
 
   const [categoryData, setCategoryData] = useState<
     FaqCategoryFormValues | undefined
   >(undefined);
-
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -40,9 +38,12 @@ export default function EditFaqCategory() {
 
         const data = await res.json();
 
+        // Mapping dari response database ke format FormValues bilingual
         setCategoryData({
-          name: data.name,
-          description: data.description || "",
+          nameId: data.nameId,
+          nameEn: data.nameEn,
+          descriptionId: data.descriptionId || "",
+          descriptionEn: data.descriptionEn || "",
           displayOrder: data.displayOrder,
           isActive: data.isActive,
         });
@@ -57,6 +58,7 @@ export default function EditFaqCategory() {
 
     fetchData();
   }, [id, status, fetchApi, router]);
+
   // ============================
   // UPDATE DATA
   // ============================
@@ -77,7 +79,6 @@ export default function EditFaqCategory() {
       }
 
       toast.success("Category updated successfully!");
-
       router.push("/super-admin/faqs/categories");
       router.refresh();
     } catch (err) {
@@ -89,8 +90,9 @@ export default function EditFaqCategory() {
       setIsSubmitting(false);
     }
   };
+
   return (
-    <div className="space-y-4  mx-auto">
+    <div className="space-y-4 mx-auto">
       <h2 className="text-xl font-semibold tracking-tight uppercase">
         Edit FAQ Category
       </h2>

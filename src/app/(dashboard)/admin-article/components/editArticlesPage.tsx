@@ -28,35 +28,30 @@ export default function EditArticle() {
     try {
       setIsLoading(true);
       const res = await fetchApi(`/articles/${id}`);
-
       if (!res.ok) throw new Error("Gagal mengambil data artikel");
 
       const responseData = await res.json();
       const article = responseData.data || responseData;
 
-      const existingProductIds = article.relatedProducts
-        ? article.relatedProducts.map((rp: any) => rp.productId)
-        : [];
-
-      const existingTagIds = article.articleTags
-        ? article.articleTags.map((at: any) => at.tagId)
-        : [];
-
       setInitialData({
-        title: article.title,
+        title: article.title_id,
+        title_en: article.title_en || "",
+        content: article.content_id,
+        content_en: article.content_en || "",
+        focusKeywords_id: article.focusKeywords_id || "",
+        focusKeywords_en: article.focusKeywords_en || "",
+        autoTranslate: false,
+        isTranslated: article.isTranslated,
         authorName: article.authorName || "",
         categoryId: article.categoryId,
-        content: article.content,
-        source: article.source || "",
         published: article.published,
+        source: article.source || "",
         coverImage: article.coverImage,
         coverImageMobile: article.coverImageMobile || undefined,
         coverImageAlt: article.coverImageAlt || "",
-        productIds: existingProductIds,
-        tagIds: existingTagIds,
-        focusKeywords: article.focusKeywords || "",
-
-        // ✨ Data SEO diambil dari relasi backend
+        productIds:
+          article.relatedProducts?.map((rp: any) => rp.productId) || [],
+        tagIds: article.articleTags?.map((at: any) => at.tagId) || [],
         seo: {
           metaTitle: article.seo?.metaTitle || "",
           metaDescription: article.seo?.metaDescription || "",
@@ -71,7 +66,7 @@ export default function EditArticle() {
       });
     } catch (error) {
       console.error(error);
-      toast.error("Artikel tidak ditemukan atau terjadi kesalahan.");
+      toast.error("Artikel tidak ditemukan.");
       router.push("/admin-article/article");
     } finally {
       setIsLoading(false);
@@ -88,83 +83,51 @@ export default function EditArticle() {
     coverFile: File | null,
     coverMobileFile: File | null,
   ) => {
-    if (status !== "authenticated") {
-      toast.error("Sesi berakhir, silakan login kembali.");
-      return;
-    }
+    if (status !== "authenticated") return;
 
     setIsSubmitting(true);
     try {
-      // ==========================================
-      // PROSES 1: UPDATE ARTIKEL UTAMA (FormData)
-      // ==========================================
       const formData = new FormData();
       formData.append("title", values.title);
-      formData.append("authorName", values.authorName);
+      formData.append("title_en", values.title_en || "");
       formData.append("content", values.content);
+      formData.append("content_en", values.content_en || "");
+      formData.append("focusKeywords_id", values.focusKeywords_id || "");
+      formData.append("focusKeywords_en", values.focusKeywords_en || "");
+      formData.append("autoTranslate", String(values.autoTranslate || false));
+
+      formData.append("authorName", values.authorName);
       formData.append("categoryId", values.categoryId);
       formData.append("published", String(values.published));
       formData.append("coverImageAlt", values.coverImageAlt || "");
-      formData.append("focusKeywords", values.focusKeywords || "");
 
-      if (values.source) {
-        formData.append("source", values.source);
-      }
-
+      if (values.source) formData.append("source", values.source);
       formData.append("productIds", values.productIds?.join(",") || "");
       formData.append("tagIds", values.tagIds?.join(",") || "");
 
-      if (coverFile) {
-        formData.append("coverFile", coverFile);
-      }
+      if (coverFile) formData.append("coverFile", coverFile);
+      if (coverMobileFile) formData.append("coverMobileFile", coverMobileFile);
 
-      if (coverMobileFile) {
-        formData.append("coverMobileFile", coverMobileFile);
-      }
-
-      // Tembak API Artikel Utama
       const resArticle = await fetchApi(`/articles/${id}`, {
         method: "PATCH",
         body: formData,
       });
 
-      if (!resArticle.ok) {
-        const errorData = await resArticle.json().catch(() => ({}));
-        throw new Error(errorData.message || "Gagal mengupdate artikel utama");
-      }
+      if (!resArticle.ok) throw new Error("Gagal mengupdate artikel");
 
-      // ==========================================
-      // PROSES 2: UPSERT DATA SEO (JSON)
-      // ==========================================
       if (values.seo) {
-        // Tembak API SEO
-        const resSeo = await fetchApi(`/article-seo/${id}`, {
-          method: "POST", // Menggunakan POST karena controller kita Upsert
-          headers: {
-            "Content-Type": "application/json",
-          },
+        await fetchApi(`/article-seo/${id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(values.seo),
         });
-
-        if (!resSeo.ok) {
-          const errorData = await resSeo.json().catch(() => ({}));
-          // Jika artikel berhasil tapi SEO gagal, kita throw error agar ditangkap catch
-          throw new Error(
-            errorData.message ||
-              "Artikel berhasil diupdate, tetapi gagal menyimpan pengaturan SEO",
-          );
-        }
       }
 
-      // ==========================================
-      // PROSES SELESAI
-      // ==========================================
-      toast.success("Artikel dan Pengaturan SEO berhasil diperbarui!");
+      toast.success("Artikel berhasil diperbarui!");
       router.push("/admin-article/article");
       router.refresh();
     } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Terjadi kesalahan pada server");
+      toast.error(err.message || "Terjadi kesalahan");
     } finally {
       setIsSubmitting(false);
     }

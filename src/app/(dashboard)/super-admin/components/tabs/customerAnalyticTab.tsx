@@ -10,17 +10,13 @@ import CustomerRegionTable from "../customer-analytic/customerRegionTable";
 import CustomerRetentionGraphs from "../customer-analytic/customerRetentionGraphs";
 
 export default function CustomerAnalyticTab() {
-  // State untuk Range Date & Comparison
   const [dateRange, setDateRange] = useState("30days");
   const [comparison, setComparison] = useState("none");
 
-  // State untuk menyimpan input custom date
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
 
-  // State untuk menyimpan data dari API dan status loading/error
   const [customerData, setCustomerData] = useState<any>(null);
-  console.log("customer data", customerData);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 

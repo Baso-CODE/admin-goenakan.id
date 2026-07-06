@@ -21,12 +21,6 @@ import { toast } from "sonner";
 // === Tipe Data ===
 type ClientType = "B2B" | "B2C";
 
-interface PurchaseChannel {
-  id: string;
-  name: string;
-  slug: string;
-}
-
 interface Department {
   id: string;
   name: string;
@@ -45,7 +39,6 @@ interface ClientB2C {
   subDistrict: string;
   postalCode: string;
   fullAddress: string;
-  purchaseChannel: PurchaseChannel; // UPDATE
 }
 
 interface ClientB2B {
@@ -63,7 +56,7 @@ interface ClientB2B {
   subDistrict: string;
   postalCode: string;
   fullAddress: string; // UPDATE
-  purchaseChannel: PurchaseChannel; // UPDATE
+
   pics: {
     id: string;
     name: string;
@@ -124,17 +117,6 @@ const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
           <span className="text-muted-foreground font-medium">Departemen</span>
           <span className="col-span-2 font-semibold text-gray-900">
             {data.department?.name}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-3">
-          <span className="text-muted-foreground font-medium">
-            Purchase Channel
-          </span>
-          <span className="col-span-2">
-            <Badge variant="secondary" className="px-3 py-1 rounded-lg">
-              {data.purchaseChannel?.name}
-            </Badge>
           </span>
         </div>
       </CardContent>
@@ -296,17 +278,6 @@ const B2CDetails: React.FC<{ data: ClientB2C }> = ({ data }) => (
           <span className="text-muted-foreground font-medium">Telepon</span>
           <span className="col-span-2 font-semibold">{data.phone}</span>
         </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <span className="text-muted-foreground font-medium">
-            Purchase Channel
-          </span>
-          <span className="col-span-2">
-            <Badge variant="outline" className="font-semibold">
-              {data.purchaseChannel.name}
-            </Badge>
-          </span>
-        </div>
       </CardContent>
     </Card>
 
@@ -386,7 +357,6 @@ export default function ClientDetail() {
   const [loading, setLoading] = useState(true);
 
   // === FETCH DATA ===
-  // ✨ 2. Gunakan useCallback agar fungsi stabil
   const fetchClient = useCallback(async () => {
     if (status === "loading" || status === "unauthenticated" || !clientId)
       return;

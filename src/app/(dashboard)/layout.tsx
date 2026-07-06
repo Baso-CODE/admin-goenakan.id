@@ -22,18 +22,16 @@ export default async function DashboardGuardLayout({
   }
 
   // === PENGECEKAN DINAMIS ===
-  // 1. Dapatkan role dari session (dari backend/database)
+
   const userRole = session.user.role as string;
 
   // 2. Dapatkan URL (pathname) saat ini
-  const headersList = await headers(); // <-- Tambahkan 'await' di sini
+  const headersList = await headers();
   const currentPath = headersList.get("x-invoke-path") || "/dashboard";
 
-  // 3. Cek akses menggunakan fungsi yang kita buat
   const hasAccess = checkAccess(userRole, currentPath);
 
   if (!hasAccess) {
-    // Jika tidak punya akses, lempar ke halaman unauthorized atau dashboard utama
     return redirect("/dashboard?error=unauthorized");
   }
 

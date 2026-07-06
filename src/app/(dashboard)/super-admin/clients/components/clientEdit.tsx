@@ -89,7 +89,6 @@ interface ClientFormData {
   b2b_subDistrict: string;
   b2b_postalCode: string;
   b2b_fullAddress: string;
-  b2b_purchaseChannelId: string;
   // MULTIPLE PIC
   b2b_pics: PICFormData[]; // NEW (multiple PICs)
 }
@@ -124,7 +123,6 @@ const initialFormData: ClientFormData = {
   b2b_subDistrict: "",
   b2b_postalCode: "",
   b2b_fullAddress: "",
-  b2b_purchaseChannelId: "",
 
   // MULTIPLE PIC
   b2b_pics: [{ prefix: "", name: "", email: "", phone: "" }],
@@ -333,7 +331,6 @@ export default function ClientEditForm() {
             b2b_subDistrict: data.b2b.subDistrict || "",
             b2b_postalCode: data.b2b.postalCode || "",
             b2b_fullAddress: data.b2b.fullAddress || "",
-            b2b_purchaseChannelId: data.b2b.purchaseChannel?.id || "",
 
             // MULTIPLE PICS
             b2b_pics:
@@ -460,7 +457,6 @@ export default function ClientEditForm() {
           postalCode: formData.b2b_postalCode,
 
           fullAddress: formData.b2b_fullAddress,
-          purchaseChannelId: formData.b2b_purchaseChannelId,
 
           // STANDARDIZED PIC ARRAY
           pics: formData.b2b_pics.map((pic) => ({
@@ -534,28 +530,6 @@ export default function ClientEditForm() {
               {departments.map((dep) => (
                 <SelectItem key={dep.id} value={dep.id}>
                   {dep.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Saluran Pembelian *</Label>
-          <Select
-            value={formData.b2b_purchaseChannelId}
-            onValueChange={(value) =>
-              setFormData((prev) => ({
-                ...prev,
-                b2b_purchaseChannelId: value,
-              }))
-            }>
-            <SelectTrigger>
-              <SelectValue placeholder="Pilih Saluran Pembelian" />
-            </SelectTrigger>
-            <SelectContent>
-              {purchaseChannels.map((pc) => (
-                <SelectItem key={pc.id} value={pc.id}>
-                  {pc.name}
                 </SelectItem>
               ))}
             </SelectContent>

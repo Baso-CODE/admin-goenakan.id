@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress"; // 🔥 IMPORT PROGRESS SHADCN
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -25,7 +25,7 @@ import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
-import { Eye, FileText, Filter, Plus, Search } from "lucide-react";
+import { Eye, FileText, Plus, Search, User, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -37,29 +37,44 @@ type Quotation = {
   date: string;
   validUntil: string | null;
   status: string;
+  subTotal: string | number;
   totalAmount: string | number;
-  client?: any;
-  manualClientName?: string | null;
-  manualClientCompany?: string | null;
+  currencyCode: string;
+  paymentTerms: string | null;
+  remarks: string | null;
+  createdAt: string;
+  updatedAt: string;
+  approvedAt: string | null;
+  client?: {
+    type: "B2B" | "B2C";
+    b2b?: { companyName: string };
+    b2c?: { name: string; prefix: string | null };
+  };
+  pic?: { name: string; position: string | null } | null;
+  user?: { name: string } | null; // Created By
+  updatedBy?: { name: string } | null; // Updated By
+  approvedBy?: { name: string } | null; // Approved By
   followUps: { name: string; date: string }[];
-  _count: { followUps: number };
 };
 
 type Meta = {
-  hasNext: boolean;
-  hasPrevious: boolean;
   page: number;
   take: number;
   total: number;
   totalPage: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
 };
 
 // === UTILS ===
-const formatCurrency = (amount: string | number) => {
+const formatCurrencyWithCode = (
+  amount: string | number,
+  code: string = "IDR",
+) => {
   const numericAmount = Number(amount) || 0;
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
-    currency: "IDR",
+    currency: code,
     minimumFractionDigits: 0,
   }).format(numericAmount);
 };
@@ -74,84 +89,51 @@ const getStatusBadgeVariant = (status: string) => {
       return "outline";
     case "DRAFT":
       return "secondary";
-    case "REJECTED":
-    case "CANCELLED":
-    case "EXPIRED":
-      return "destructive";
     default:
-      return "outline";
+      return "destructive";
   }
 };
 
 const getStatusClassName = (status: string) => {
   if (status === "FOLLOW_UP")
-    return "text-orange-600 border-orange-200 bg-orange-50";
+    return "text-amber-600 border-amber-200 bg-amber-50";
   if (status === "SENT") return "text-blue-600 border-blue-200 bg-blue-50";
+  if (status === "ACCEPTED")
+    return "text-emerald-600 border-emerald-200 bg-emerald-50";
   return "";
 };
 
-const getClientName = (quo: Quotation) => {
-  if (quo.manualClientName) return quo.manualClientName;
-  if (quo.client?.b2b) return quo.client.b2b.companyName;
-  if (quo.client?.b2c) {
+const getCustomerName = (quo: Quotation) => {
+  if (quo.client?.type === "B2B" && quo.client.b2b)
+    return quo.client.b2b.companyName;
+  if (quo.client?.type === "B2C" && quo.client.b2c) {
     const prefix = quo.client.b2c.prefix ? `${quo.client.b2c.prefix}. ` : "";
     return `${prefix}${quo.client.b2c.name}`;
   }
-  return "Unknown Client";
+  return "Klien Tidak Diketahui";
 };
 
-// 🔥 FUNGSI BARU UNTUK RENDER UI PROGRESS FOLLOW UP SEPERTI GAMBAR 🔥
 const renderFollowUpProgress = (
   followUps: { name: string; date: string }[],
   status: string,
 ) => {
-  // Jika masih draft, belum bisa di-follow up
-  if (status === "DRAFT") {
+  if (status === "DRAFT")
     return (
       <span className="text-[10px] text-muted-foreground italic">
         Belum dikirim
       </span>
     );
-  }
-
-  const maxFU = 3; // Target standar 3 kali follow up
+  const maxFU = 3;
   const completedCount = Math.min(followUps.length, maxFU);
   const progressPercentage = (completedCount / maxFU) * 100;
 
   return (
-    <div className="flex flex-col gap-2 min-w-42 text-left">
-      {/* Progress Bar Shadcn */}
+    <div className="flex flex-col gap-1 min-w-36 text-left">
       <Progress
         value={progressPercentage}
-        className="h-2 w-full bg-slate-100 [&>div]:bg-blue-600"
+        className="h-1.5 w-full bg-slate-100 [&>div]:bg-blue-600"
       />
-
-      {/* List Follow Up */}
-      <div className="flex flex-col gap-1 text-[10px] text-muted-foreground mt-1">
-        {[0, 1, 2].map((index) => {
-          const fu = followUps[index];
-          const isCompleted = !!fu;
-
-          return (
-            <div key={index} className="flex items-center gap-1.5">
-              <div
-                className={`h-1.5 w-1.5 rounded-full ${isCompleted ? "bg-green-500" : "bg-slate-300"}`}
-              />
-              <span className={isCompleted ? "text-green-600 font-medium" : ""}>
-                FU{index + 1}:
-                {isCompleted
-                  ? format(new Date(fu.date), "dd MMM yyyy", {
-                      locale: idLocale,
-                    })
-                  : "Not scheduled"}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Summary Text */}
-      <div className="text-[10px] text-slate-500 font-medium mt-0.5">
+      <div className="text-[9px] text-slate-500 font-medium">
         {completedCount}/{maxFU} follow-ups completed
       </div>
     </div>
@@ -163,33 +145,21 @@ export default function QuotationsTable() {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
-
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
-  // === FETCH DATA ===
   const fetchQuotations = useCallback(async () => {
-    // 🛑 Jangan jalan jika sesi belum siap
     if (status === "loading" || status === "unauthenticated") return;
-
     setLoading(true);
     try {
-      // Build Query Params
-      const params = new URLSearchParams({
-        page: page.toString(),
-        take: "10",
-      });
-
+      const params = new URLSearchParams({ page: page.toString(), take: "10" });
       if (debouncedSearch) params.append("search", debouncedSearch);
       if (statusFilter !== "ALL") params.append("status", statusFilter);
 
-      // ✨ 3. Gunakan fetchApi (Otomatis handle Token & Base URL)
       const res = await fetchApi(`/quotations?${params}`);
-
-      if (!res.ok) throw new Error("Failed to fetch quotations");
-
+      if (!res.ok) throw new Error("Gagal mengambil data");
       const result = await res.json();
       setQuotations(result.data || []);
       setMeta(result.meta);
@@ -207,9 +177,8 @@ export default function QuotationsTable() {
 
   return (
     <div className="space-y-6 w-full mx-auto pb-10">
-      {/* Header (Tetap Sama) */}
+      {/* Header */}
       <Card className="border-l-4 border-l-orange-500 shadow-sm">
-        {/* ... (Kode Header Anda sebelumnya) ... */}
         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
@@ -218,15 +187,15 @@ export default function QuotationsTable() {
             <div>
               <CardTitle className="text-2xl font-bold">Quotations</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Kelola penawaran harga, follow-up, dan persetujuan client.
+                Kelola penawaran harga terintegrasi, log persetujuan, dan syarat
+                pembayaran klien.
               </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2 items-center">
             <Link href="/admin-invoice/quotations/add">
               <Button className="h-9 gap-2 bg-orange-600 hover:bg-orange-700">
-                <Plus className="h-4 w-4" />
-                Buat Penawaran
+                <Plus className="h-4 w-4" /> Buat Penawaran
               </Button>
             </Link>
             <div className="relative w-full md:w-60">
@@ -245,13 +214,9 @@ export default function QuotationsTable() {
         </CardHeader>
       </Card>
 
-      {/* Filter (Tetap Sama) */}
+      {/* Filter */}
       <Card className="p-4 shadow-sm bg-gray-50/50 border-gray-100">
         <div className="flex flex-wrap gap-4 items-center">
-          <div className="hidden md:flex items-center gap-2 mr-1 h-9 bg-white px-3 border rounded-md shadow-sm text-muted-foreground">
-            <Filter className="h-4 w-4" />
-            <span className="text-xs font-medium">Filter</span>
-          </div>
           <div className="flex flex-col gap-1.5 w-full sm:w-48">
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider ml-1">
               Status Penawaran
@@ -271,8 +236,6 @@ export default function QuotationsTable() {
                 <SelectItem value="SENT">Sent (Terkirim)</SelectItem>
                 <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
                 <SelectItem value="ACCEPTED">Accepted (Deal)</SelectItem>
-                <SelectItem value="REJECTED">Rejected</SelectItem>
-                <SelectItem value="EXPIRED">Expired</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -280,80 +243,115 @@ export default function QuotationsTable() {
       </Card>
 
       {/* Table Data */}
-      <Card className="shadow-sm border-t-0">
+      <Card className="shadow-sm">
         <CardContent className="p-0">
           <div className="rounded-md border overflow-x-auto">
-            <Table className="min-w-200">
+            <Table className="min-w-600">
+              {/* Lebar disesuaikan agar kolom audit muat */}
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="w-28">Tanggal</TableHead>
-                  <TableHead className="w-36">Quotation No</TableHead>
-                  <TableHead className="min-w-40">Client</TableHead>
-
-                  {/* 🔥 HEADER PROGRESS 🔥 */}
-                  <TableHead className="w-48">Follow-Up Progress</TableHead>
-
-                  <TableHead className="text-right w-32">Total Nilai</TableHead>
-                  <TableHead className="text-center w-28">Status</TableHead>
-                  <TableHead className="text-center w-16">Action</TableHead>
+                  <TableHead className="w-44">Quotation No</TableHead>
+                  <TableHead className="w-64">Customer Name</TableHead>
+                  <TableHead className="w-52">PIC Customer (B2B)</TableHead>
+                  <TableHead className="w-32">Valid Until</TableHead>
+                  <TableHead className="w-24 text-center">Currency</TableHead>
+                  <TableHead className="w-64">Payment Terms</TableHead>
+                  <TableHead className="w-64">Remarks</TableHead>
+                  <TableHead className="w-44">Follow-Up Progress</TableHead>
+                  <TableHead className="w-36 text-right">Total Nilai</TableHead>
+                  <TableHead className="w-28 text-center">Status</TableHead>
+                  <TableHead className="w-48">Created By / Time</TableHead>
+                  <TableHead className="w-48">Updated By / Time</TableHead>
+                  <TableHead className="w-48">Approved By / Date</TableHead>
+                  <TableHead className="w-16 text-center sticky right-0 bg-white shadow-md">
+                    Action
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell>
-                        <Skeleton className="h-4 w-20" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-28" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-32" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-16 w-40" />
-                      </TableCell>
-                      {/* Skeleton Progress */}
-                      <TableCell>
-                        <Skeleton className="h-4 w-24 ml-auto" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-20 mx-auto" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-8 w-8 mx-auto" />
-                      </TableCell>
+                      {Array.from({ length: 15 }).map((_, colIdx) => (
+                        <TableCell key={colIdx}>
+                          <Skeleton className="h-4 w-full" />
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))
                 ) : quotations.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={15}
                       className="h-40 text-center text-muted-foreground">
-                      Tidak ada data.
+                      Tidak ada data penawaran.
                     </TableCell>
                   </TableRow>
                 ) : (
                   quotations.map((quo) => (
                     <TableRow key={quo.id} className="hover:bg-muted/5">
-                      <TableCell className="text-sm">
-                        <span className="font-medium text-gray-700">
-                          {format(new Date(quo.date), "dd MMM yyyy", {
-                            locale: idLocale,
-                          })}
-                        </span>
+                      <TableCell className="text-xs font-medium text-gray-700">
+                        {format(new Date(quo.date), "dd MMM yyyy", {
+                          locale: idLocale,
+                        })}
                       </TableCell>
 
-                      <TableCell className="font-mono text-xs font-medium text-blue-600">
+                      <TableCell className="font-mono text-xs font-semibold text-blue-600">
                         {quo.quotationNumber}
                       </TableCell>
 
-                      <TableCell className="text-xs font-semibold text-gray-800">
-                        {getClientName(quo)}
+                      <TableCell className="text-xs font-bold text-gray-900">
+                        {getCustomerName(quo)}
                       </TableCell>
 
-                      {/* 🔥 CELL PROGRESS FOLLOW UP 🔥 */}
+                      <TableCell className="text-xs text-gray-700">
+                        {quo.client?.type === "B2B" && quo.pic ? (
+                          <div>
+                            <p className="font-medium text-slate-900">
+                              {quo.pic.name}
+                            </p>
+                            {quo.pic.position && (
+                              <p className="text-[10px] text-slate-400">
+                                {quo.pic.position}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic">-</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="text-xs text-gray-600">
+                        {quo.validUntil ? (
+                          format(new Date(quo.validUntil), "dd MMM yyyy", {
+                            locale: idLocale,
+                          })
+                        ) : (
+                          <span className="text-slate-400 italic">-</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="text-center text-xs font-bold">
+                        <Badge variant="outline">{quo.currencyCode}</Badge>
+                      </TableCell>
+
+                      <TableCell
+                        className="text-xs text-slate-600 max-w-50 truncate"
+                        title={quo.paymentTerms || ""}>
+                        {quo.paymentTerms || (
+                          <span className="text-slate-400 italic">-</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell
+                        className="text-xs text-slate-600 max-w-50 truncate"
+                        title={quo.remarks || ""}>
+                        {quo.remarks || (
+                          <span className="text-slate-400 italic">-</span>
+                        )}
+                      </TableCell>
+
                       <TableCell>
                         {renderFollowUpProgress(
                           quo.followUps || [],
@@ -361,8 +359,11 @@ export default function QuotationsTable() {
                         )}
                       </TableCell>
 
-                      <TableCell className="text-right text-xs font-semibold text-gray-900">
-                        {formatCurrency(quo.totalAmount)}
+                      <TableCell className="text-right text-xs font-bold text-slate-900">
+                        {formatCurrencyWithCode(
+                          quo.totalAmount,
+                          quo.currencyCode,
+                        )}
                       </TableCell>
 
                       <TableCell className="text-center">
@@ -373,7 +374,66 @@ export default function QuotationsTable() {
                         </Badge>
                       </TableCell>
 
-                      <TableCell className="text-center">
+                      {/* --- Audit: Created --- */}
+                      <TableCell className="text-xs">
+                        <div className="flex flex-col">
+                          <span className="font-medium flex items-center gap-1">
+                            <User className="w-3 h-3 text-slate-400" />
+                            {quo.user?.name || "System"}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {format(
+                              new Date(quo.createdAt),
+                              "dd/MM/yyyy HH:mm",
+                            )}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      {/* --- Audit: Updated --- */}
+                      <TableCell className="text-xs">
+                        <div className="flex flex-col">
+                          <span className="font-medium flex items-center gap-1">
+                            <User className="w-3 h-3 text-slate-400" />
+                            {quo.updatedBy?.name || (
+                              <span className="text-slate-400 italic">-</span>
+                            )}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {format(
+                              new Date(quo.updatedAt),
+                              "dd/MM/yyyy HH:mm",
+                            )}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      {/* --- Audit: Approved --- */}
+                      <TableCell className="text-xs bg-slate-50/40">
+                        {quo.approvedBy ? (
+                          <div className="flex flex-col">
+                            <span className="font-bold text-emerald-700 flex items-center gap-1">
+                              <UserCheck className="w-3 h-3 text-emerald-500" />
+                              {quo.approvedBy.name}
+                            </span>
+                            <span className="text-[10px] text-emerald-600">
+                              {quo.approvedAt
+                                ? format(
+                                    new Date(quo.approvedAt),
+                                    "dd/MM/yyyy HH:mm",
+                                  )
+                                : ""}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic">
+                            Pending Approval
+                          </span>
+                        )}
+                      </TableCell>
+
+                      {/* --- Sticky Action --- */}
+                      <TableCell className="text-center sticky right-0 bg-white border-l shadow-md">
                         <Link
                           href={`/admin-invoice/quotations/detail/${quo.id}`}>
                           <Button

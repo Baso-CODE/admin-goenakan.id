@@ -19,10 +19,8 @@ export default function SalesOverviewTab() {
 
   const [dashboardData, setDashboardData] = useState<any>(null);
 
-  console.log("ini adalah data", dashboardData);
-
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null); // ✨ Tambahan state untuk error
+  const [error, setError] = useState<string | null>(null);
 
   // ✨ Mengambil fetchApi dari custom hook milikmu
   const { fetchApi } = useApi();

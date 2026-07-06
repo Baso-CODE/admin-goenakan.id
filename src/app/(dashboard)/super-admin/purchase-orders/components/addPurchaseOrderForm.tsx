@@ -77,12 +77,12 @@ const purchaseOrderSchema = z.object({
       z.object({
         itemName: z.string().min(1, "Item name is required"),
         productId: z.string().optional(),
-        orderId: z.string().optional(), // Reference SO/SN
+        orderId: z.string().optional(),
         quantityOrder: z.number().min(1),
         quantityStock: z.number().min(0),
         quantityPurchase: z.number().min(0),
         uom: z.string().min(1, "UOM is required"),
-        unitPrice: z.number().min(0),
+        unitPrice: z.number().positive("Harga harus positif"),
         remarks: z.string().optional(),
       }),
     )
@@ -731,15 +731,19 @@ export default function AddPurchaseOrderForm() {
                                       {currentCurrencySymbol}
                                     </span>
                                     <Input
-                                      type="number"
+                                      type="text"
+                                      inputMode="decimal"
                                       min={0}
                                       {...field}
-                                      onChange={(e) =>
-                                        field.onChange(
-                                          e.target.valueAsNumber || 0,
-                                        )
-                                      }
+                                      value={field.value || ""}
+                                      onChange={(e) => {
+                                        const val = e.target.value
+                                          .replace(",", ".")
+                                          .replace(/[^\d.]/g, "");
+                                        field.onChange(parseFloat(val) || 0);
+                                      }}
                                       className="pl-9 h-10 text-right font-mono"
+                                      placeholder="0.00"
                                     />
                                   </div>
                                 </FormControl>
@@ -747,6 +751,7 @@ export default function AddPurchaseOrderForm() {
                               </FormItem>
                             )}
                           />
+
                           <FormField
                             control={control}
                             name={`items.${index}.uom`}

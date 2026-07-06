@@ -24,23 +24,24 @@ import {
   Check,
   ClipboardList,
   FileText,
+  Languages,
   ListOrdered,
   Loader2,
   Tag,
 } from "lucide-react";
 
-// === SCHEMA ===
+// === SCHEMA (BILINGUAL) ===
 const faqCategorySchema = z.object({
-  name: z.string().min(2, {
-    message: "Category name must be at least 2 characters.",
-  }),
-  description: z.string().optional(),
-  // z.coerce.number() akan mengubah string "123" menjadi number 123 secara otomatis
-  displayOrder: z.coerce
-    .number()
-    .min(0, "Order must be 0 or greater")
-    .default(0),
-  isActive: z.boolean().optional(),
+  nameId: z
+    .string()
+    .min(2, { message: "Name (ID) must be at least 2 characters." }),
+  nameEn: z
+    .string()
+    .min(2, { message: "Name (EN) must be at least 2 characters." }),
+  descriptionId: z.string().optional(),
+  descriptionEn: z.string().optional(),
+  displayOrder: z.number().min(0, "Order must be 0 or greater").default(0),
+  isActive: z.boolean().default(true),
 });
 
 export type FaqCategoryFormValues = z.infer<typeof faqCategorySchema>;
@@ -56,12 +57,13 @@ export default function FaqCategoryForm({
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
-  // Gunakan inferred types otomatis dari zodResolver
   const form = useForm({
     resolver: zodResolver(faqCategorySchema),
     defaultValues: initialData ?? {
-      name: "",
-      description: "",
+      nameId: "",
+      nameEn: "",
+      descriptionId: "",
+      descriptionEn: "",
       displayOrder: 0,
       isActive: true,
     },
@@ -70,18 +72,9 @@ export default function FaqCategoryForm({
 
   useEffect(() => {
     if (initialData) {
-      form.reset({
-        name: initialData.name,
-        description: initialData.description || "",
-        displayOrder: initialData.displayOrder,
-        isActive: initialData.isActive,
-      });
+      form.reset(initialData);
     }
   }, [initialData, form]);
-
-  const handleSubmit = (values: z.infer<typeof faqCategorySchema>) => {
-    onSubmit(values as FaqCategoryFormValues);
-  };
 
   return (
     <Card className="w-full relative">
@@ -94,123 +87,145 @@ export default function FaqCategoryForm({
       <CardContent className="pt-6">
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(handleSubmit)}
+            onSubmit={form.handleSubmit(onSubmit)}
             className="space-y-6 w-full">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* === Name === */}
-              <div className="col-span-2">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        <Tag className="h-4 w-4 text-muted-foreground" />
-                        Category Name *
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Ex: Payment Methods"
-                          {...field}
-                          value={field.value ?? ""}
-                          disabled={isLoading || isSubmitting}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              {/* === NAME (ID & EN) === */}
+              <FormField
+                control={form.control}
+                name="nameId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-muted-foreground" /> Category
+                      Name (ID) *
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Contoh: Metode Pembayaran"
+                        {...field}
+                        disabled={isLoading || isSubmitting}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="nameEn"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Languages className="h-4 w-4 text-muted-foreground" />{" "}
+                      Category Name (EN) *
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: Payment Methods"
+                        {...field}
+                        disabled={isLoading || isSubmitting}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-              {/* === Description === */}
+              {/* === DESCRIPTION (ID & EN) === */}
               <div className="col-span-2">
                 <FormField
                   control={form.control}
-                  name="description"
+                  name="descriptionId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        Description (Optional)
+                        <FileText className="h-4 w-4 text-muted-foreground" />{" "}
+                        Description (ID)
                       </FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Short description for this category..."
-                          className="resize-none"
+                          placeholder="Deskripsi untuk kategori (ID)..."
                           {...field}
-                          value={field.value ?? ""}
                           disabled={isLoading || isSubmitting}
                         />
                       </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-
-              {/* === Display Order (FIXED HERE) === */}
-              <div className="col-span-2 md:col-span-1 items-center">
+              <div className="col-span-2">
                 <FormField
                   control={form.control}
-                  name="displayOrder"
+                  name="descriptionEn"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-2">
-                        <ListOrdered className="h-4 w-4 text-muted-foreground" />
-                        Display Order
+                        <FileText className="h-4 w-4 text-muted-foreground" />{" "}
+                        Description (EN)
                       </FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          min={0}
-                          placeholder="0"
+                        <Textarea
+                          placeholder="Description for category (EN)..."
+                          {...field}
                           disabled={isLoading || isSubmitting}
-                          value={String(field.value ?? "")}
-                          onChange={(e) =>
-                            field.onChange(Number(e.target.value))
-                          }
                         />
                       </FormControl>
-                      <FormDescription className="text-xs">
-                        Lower numbers appear first.
-                      </FormDescription>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
 
-              {/* === isActive === */}
-              <div className="col-span-2 md:col-span-1 flex items-center">
-                <FormField
-                  control={form.control}
-                  name="isActive"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center gap-3 p-3 border rounded-lg w-full h-10.5">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          disabled={isLoading || isSubmitting}
-                        />
-                      </FormControl>
-                      <FormLabel className="flex items-center gap-2 cursor-pointer m-0">
-                        <Check className="h-4 w-4 text-muted-foreground" />
-                        Active Status
-                      </FormLabel>
-                    </FormItem>
-                  )}
-                />
-              </div>
+              {/* === DISPLAY ORDER & ACTIVE STATUS === */}
+              <FormField
+                control={form.control}
+                name="displayOrder"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <ListOrdered className="h-4 w-4 text-muted-foreground" />{" "}
+                      Display Order
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="0"
+                        disabled={isLoading || isSubmitting}
+                        value={field.value ?? 0}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        name={field.name}
+                        ref={field.ref}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Lower numbers appear first.
+                    </FormDescription>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center gap-3 p-3 border rounded-lg h-12 mt-auto">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={isLoading || isSubmitting}
+                      />
+                    </FormControl>
+                    <FormLabel className="cursor-pointer m-0 flex items-center gap-2">
+                      <Check className="h-4 w-4" /> Active Status
+                    </FormLabel>
+                  </FormItem>
+                )}
+              />
             </div>
 
-            {/* === SUBMIT BUTTON === */}
             <div className="flex justify-end pt-4">
-              <Button
-                type="submit"
-                className="w-full md:w-auto cursor-pointer"
-                variant="default"
-                disabled={isLoading || isSubmitting}>
+              <Button type="submit" disabled={isLoading || isSubmitting}>
                 {isSubmitting ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (

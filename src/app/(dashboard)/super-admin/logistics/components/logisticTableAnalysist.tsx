@@ -90,12 +90,9 @@ export default function LogisticTableAnalysist() {
       if (endDate) params.append("endDate", format(endDate, "yyyy-MM-dd"));
 
       const res = await fetchApi(`/logistics/analytics/summary?${params}`);
-
       if (!res.ok) throw new Error("Gagal mengambil data logistik");
 
       const result = await res.json();
-      console.log("ini adalah result", result);
-
       setData(result.data || []);
       setMeta(result.meta);
     } catch (error) {
