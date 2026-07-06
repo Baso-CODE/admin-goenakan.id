@@ -397,52 +397,7 @@ export default function FormUpdateVariants({
                     />
                   </div>
 
-                  {/* DIMENSI & BERAT */}
-                  <div className="pt-4 border-t border-gray-200">
-                    <FormLabel className="mb-3 block text-gray-700">
-                      Dimensi & Berat (Opsional)
-                    </FormLabel>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {[
-                        { name: "weight", label: "Berat (Gr)" },
-                        { name: "length", label: "Length (Cm)" },
-                        { name: "width", label: "Width (Cm)" },
-                        { name: "height", label: "Height (Cm)" },
-                      ].map((dim) => (
-                        <FormField
-                          key={dim.name}
-                          control={form.control}
-                          name={`variants.${index}.${dim.name}` as any}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-sm font-medium text-gray-800">
-                                {dim.label}
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="any"
-                                  placeholder="0"
-                                  {...field}
-                                  value={(field.value as number) ?? ""}
-                                  onChange={(e) => {
-                                    const val = e.target.value.replace(
-                                      ",",
-                                      ".",
-                                    );
-                                    field.onChange(
-                                      val === "" ? null : parseFloat(val),
-                                    );
-                                  }}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      ))}
-                    </div>
-                  </div>
+
 
                   <FormField
                     control={form.control}
