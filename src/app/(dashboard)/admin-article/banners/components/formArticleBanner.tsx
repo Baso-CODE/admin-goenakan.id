@@ -8,6 +8,14 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Form,
   FormControl,
   FormField,
@@ -17,16 +25,17 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/useApi";
+import { cn } from "@/lib/utils";
 import {
   Activity,
+  Check,
+  ChevronsUpDown,
   FileText,
   Image as ImageIcon,
   LinkIcon,
@@ -60,6 +69,8 @@ export default function FormArticleBanner({
 }) {
   const { fetchApi, status } = useApi();
   const [articles, setArticles] = useState<any[]>([]);
+  console.log("ini adalah articles", articles);
+
   const [loadingArticles, setLoadingArticles] = useState(true);
 
   const form = useForm<ArticleBannerFormValues>({
@@ -85,7 +96,7 @@ export default function FormArticleBanner({
 
       try {
         setLoadingArticles(true);
-        const res = await fetchApi("/articles?take=50");
+        const res = await fetchApi("/articles/simple-list");
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
@@ -102,7 +113,7 @@ export default function FormArticleBanner({
     };
 
     fetchArticles();
-  }, [status, fetchApi]); // Tambahkan dependensi lengkap
+  }, [status, fetchApi]);
 
   const handleSubmit = (values: ArticleBannerFormValues) => {
     onSubmit(values);
@@ -137,22 +148,50 @@ export default function FormArticleBanner({
                           Memuat daftar artikel...
                         </div>
                       ) : (
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value ? String(field.value) : undefined}>
-                          <FormControl>
-                            <SelectTrigger className="w-full bg-white">
-                              <SelectValue placeholder="Pilih artikel untuk dijadikan banner" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {articles.map((art) => (
-                              <SelectItem key={art.id} value={String(art.id)}>
-                                {art.title}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className="w-full justify-between">
+                                {field.value
+                                  ? articles.find((a) => a.id === field.value)
+                                      ?.title_id
+                                  : "Pilih artikel..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0">
+                            <Command>
+                              <CommandInput placeholder="Cari artikel..." />
+                              <CommandList>
+                                <CommandEmpty>
+                                  Artikel tidak ditemukan
+                                </CommandEmpty>
+                                <CommandGroup>
+                                  {articles.map((art) => (
+                                    <CommandItem
+                                      key={art.id}
+                                      value={art.id}
+                                      onSelect={() => field.onChange(art.id)}>
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          field.value === art.id
+                                            ? "opacity-100"
+                                            : "opacity-0",
+                                        )}
+                                      />
+                                      {art.title_id}{" "}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       )}
                       <FormMessage />
                     </FormItem>
