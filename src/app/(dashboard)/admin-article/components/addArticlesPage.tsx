@@ -54,12 +54,10 @@ export default function AddArticle() {
         formData.append("seo", JSON.stringify(values.seo));
       }
 
-      // Mengirimkan file gambar desktop
       if (coverFile) {
         formData.append("coverFile", coverFile);
       }
 
-      // Mengirimkan file gambar mobile (opsional)
       if (coverMobileFile) {
         formData.append("coverMobileFile", coverMobileFile);
       }
