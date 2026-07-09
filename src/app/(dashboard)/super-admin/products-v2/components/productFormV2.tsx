@@ -103,501 +103,500 @@ export default function ProductFormV2({
                   <h3 className="text-lg font-semibold tracking-tight border-b pb-2 mb-4 flex items-center gap-2 text-stone-800 dark:text-stone-200">
                     📝 Informasi Utama
                   </h3>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem className="col-span-1 lg:col-span-2">
-                          <FormLabel>Nama Produk</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
 
-                    <FormField
-                      control={form.control}
-                      name="isCustom"
-                      render={({ field }) => (
-                        <FormItem className="col-span-1">
-                          <FormLabel>Tipe Produk</FormLabel>
-                          <FormControl>
-                            <div className="flex items-center gap-3 h-10 border rounded-md px-3 bg-white dark:bg-stone-950">
-                              <span
-                                className={`text-sm ${!field.value ? "font-bold text-primary" : "text-gray-400"}`}>
-                                Standard
-                              </span>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                              <span
-                                className={`text-sm ${field.value ? "font-bold text-primary" : "text-gray-400"}`}>
-                                Custom
-                              </span>
+                  <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-md text-sm flex items-start gap-2">
+                    <span className="font-semibold text-blue-900 dark:text-blue-200 shrink-0">Catatan:</span>
+                    <span>Semua pengaturan di dalam tab ini akan memengaruhi konfigurasi produk utama/dasar (base product configuration).</span>
+                  </div>
+
+                  {/* SECTION 1: IDENTITAS PRODUK */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
+                      Identitas Produk
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Nama Produk</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Contoh: Meja Kayu Jati" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="sku"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-1">
+                            <FormLabel>SKU</FormLabel>
+                            <div className="flex gap-2">
+                              <FormControl>
+                                <Input placeholder="Auto / Manual" {...field} />
+                              </FormControl>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={handlers.handleGenerateSku}
+                                disabled={state.isGeneratingSku}
+                                className="shrink-0">
+                                <RefreshCw
+                                  className={`h-4 w-4 ${state.isGeneratingSku ? "animate-spin" : ""}`}
+                                />
+                              </Button>
                             </div>
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
 
-                    <FormField
-                      control={form.control}
-                      name="isMadeByOrder"
-                      render={({ field }) => (
-                        <FormItem className="col-span-1">
-                          <FormLabel>Sistem Order saat Stok Habis</FormLabel>
-                          <FormControl>
-                            <div className="flex items-center gap-3 h-10 border rounded-md px-3 bg-white dark:bg-stone-950">
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                              <span className="text-xs text-stone-600 truncate" title="Made by Order / Pre-Order (Bisa dipesan walaupun stok habis)">
-                                Made by Order / PO
-                              </span>
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="materialTypeId"
-                      render={({ field }) => (
-                        <FormItem className="col-span-1">
-                          <FormLabel>Material</FormLabel>
-                          <Select
-                            onValueChange={(val) => {
-                              if (val === "ADD_NEW_MATERIAL")
-                                return setters.setIsMaterialModalOpen(true);
-                              field.onChange(val);
-                            }}
-                            value={field.value || ""}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Pilih jenis material..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {state.materialTypes.map((mat) => (
-                                <SelectItem key={mat.id} value={mat.id}>
-                                  {mat.name}
+                  {/* SECTION 2: HIRARKI KATEGORI & MATERIAL */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
+                      Hirarki & Material
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="categoryId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Kategori Utama</FormLabel>
+                            <Select
+                              onValueChange={(val) => {
+                                if (val === "ADD_NEW_CATEGORY")
+                                  return setters.setIsCategoryModalOpen(true);
+                                field.onChange(val);
+                                form.setValue("itemCategoryId", "");
+                                form.setValue("itemNameId", "");
+                              }}
+                              value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Pilih Kategori" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {state.categories.map((cat) => (
+                                  <SelectItem key={cat.id} value={cat.id}>
+                                    {cat.name} {cat.code && `(${cat.code})`}
+                                  </SelectItem>
+                                ))}
+                                <div className="h-px bg-stone-200 my-1 mx-1" />
+                                <SelectItem
+                                  value="ADD_NEW_CATEGORY"
+                                  className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                  + Kategori Baru
                                 </SelectItem>
-                              ))}
-                              <div className="h-px bg-stone-200 my-1 mx-1" />
-                              <SelectItem
-                                value="ADD_NEW_MATERIAL"
-                                className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                                + Tambah Material Baru
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="categoryId"
-                      render={({ field }) => (
-                        <FormItem className="col-span-1">
-                          <FormLabel>Kategori Produk</FormLabel>
-                          <Select
-                            onValueChange={(val) => {
-                              if (val === "ADD_NEW_CATEGORY")
-                                return setters.setIsCategoryModalOpen(true);
-                              field.onChange(val);
-                              form.setValue("itemCategoryId", "");
-                              form.setValue("itemNameId", "");
-                            }}
-                            value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Pilih kategori..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {state.categories.map((cat) => (
-                                <SelectItem key={cat.id} value={cat.id}>
-                                  {cat.name} {cat.code && `(${cat.code})`}
+                      <FormField
+                        control={form.control}
+                        name="itemCategoryId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Item Category</FormLabel>
+                            <Select
+                              onValueChange={(val) => {
+                                if (val === "ADD_NEW_ITEM_CATEGORY")
+                                  return setters.setIsItemCategoryModalOpen(true);
+                                field.onChange(val);
+                                form.setValue("itemNameId", "");
+                              }}
+                              value={field.value}
+                              disabled={!state.selectedCategoryId}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Pilih Sub Kategori" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {state.itemCategories.map((ic) => (
+                                  <SelectItem key={ic.id} value={ic.id}>
+                                    {ic.name}
+                                  </SelectItem>
+                                ))}
+                                <div className="h-px bg-stone-200 my-1 mx-1" />
+                                <SelectItem
+                                  value="ADD_NEW_ITEM_CATEGORY"
+                                  className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                  + Tambah Item Category Baru
                                 </SelectItem>
-                              ))}
-                              <div className="h-px bg-stone-200 my-1 mx-1" />
-                              <SelectItem
-                                value="ADD_NEW_CATEGORY"
-                                className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                                + Kategori Baru
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="itemCategoryId"
-                      render={({ field }) => (
-                        <FormItem className="col-span-1">
-                          <FormLabel>Item Category</FormLabel>
-                          <Select
-                            onValueChange={(val) => {
-                              if (val === "ADD_NEW_ITEM_CATEGORY")
-                                return setters.setIsItemCategoryModalOpen(true);
-                              field.onChange(val);
-                              form.setValue("itemNameId", "");
-                            }}
-                            value={field.value}
-                            disabled={!state.selectedCategoryId}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Pilih item category..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {state.itemCategories.map((ic) => (
-                                <SelectItem key={ic.id} value={ic.id}>
-                                  {ic.name}
+                      <FormField
+                        control={form.control}
+                        name="itemNameId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Item Name</FormLabel>
+                            <Select
+                              value={field.value || ""}
+                              onValueChange={(val) => {
+                                if (val === "ADD_NEW_ITEM_NAME")
+                                  return setters.setIsItemNameModalOpen(true);
+                                field.onChange(val);
+                              }}
+                              disabled={!state.selectedItemCategoryId}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Pilih Nama Item" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {state.itemNames.map((inm) => (
+                                  <SelectItem key={inm.id} value={inm.id}>
+                                    {inm.name}
+                                  </SelectItem>
+                                ))}
+                                <div className="h-px bg-stone-200 my-1 mx-1" />
+                                <SelectItem
+                                  value="ADD_NEW_ITEM_NAME"
+                                  className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                  + Tambah Item Name Baru
                                 </SelectItem>
-                              ))}
-                              <div className="h-px bg-stone-200 my-1 mx-1" />
-                              <SelectItem
-                                value="ADD_NEW_ITEM_CATEGORY"
-                                className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                                + Tambah Item Category Baru
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="itemNameId"
-                      render={({ field }) => (
-                        <FormItem className="col-span-1">
-                          <FormLabel>Item Name</FormLabel>
-                          <Select
-                            value={field.value || ""}
-                            onValueChange={(val) => {
-                              if (val === "ADD_NEW_ITEM_NAME")
-                                return setters.setIsItemNameModalOpen(true);
-                              field.onChange(val);
-                            }}
-                            disabled={!state.selectedItemCategoryId}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Pilih item name..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {state.itemNames.map((inm) => (
-                                <SelectItem key={inm.id} value={inm.id}>
-                                  {inm.name}
+                      <FormField
+                        control={form.control}
+                        name="materialTypeId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Material</FormLabel>
+                            <Select
+                              onValueChange={(val) => {
+                                if (val === "ADD_NEW_MATERIAL")
+                                  return setters.setIsMaterialModalOpen(true);
+                                field.onChange(val);
+                              }}
+                              value={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Pilih Material" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {state.materialTypes.map((mat) => (
+                                  <SelectItem key={mat.id} value={mat.id}>
+                                    {mat.name}
+                                  </SelectItem>
+                                ))}
+                                <div className="h-px bg-stone-200 my-1 mx-1" />
+                                <SelectItem
+                                  value="ADD_NEW_MATERIAL"
+                                  className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                  + Tambah Material Baru
                                 </SelectItem>
-                              ))}
-                              <div className="h-px bg-stone-200 my-1 mx-1" />
-                              <SelectItem
-                                value="ADD_NEW_ITEM_NAME"
-                                className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                                + Tambah Item Name Baru
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
 
-                    <FormField
-                      control={form.control}
-                      name="sku"
-                      render={({ field }) => (
-                        <FormItem className="col-span-1">
-                          <FormLabel>SKU</FormLabel>
-                          <div className="flex gap-2">
+                  {/* SECTION 3: HARGA, STOK & TAGS */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
+                      Harga, Stok & Label
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="basePrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Harga Dasar (Rp)</FormLabel>
                             <FormControl>
                               <Input
+                                type="number"
+                                placeholder="0"
                                 {...field}
-                                placeholder="Contoh: ELE-LAP-MAC-ALU-MA0001"
+                                onChange={(e) =>
+                                  field.onChange(parseFloat(e.target.value) || 0)
+                                }
+                                min={0}
                               />
                             </FormControl>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={handlers.handleGenerateSku}
-                              disabled={state.isGeneratingSku}>
-                              <RefreshCw
-                                className={`h-4 w-4 ${state.isGeneratingSku ? "animate-spin" : ""}`}
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="stock"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              Stok Global
+                              {state.isCustomProduct && (
+                                <span className="text-[10px] text-amber-600 font-normal italic">
+                                  (Diatur per Varian)
+                                </span>
+                              )}
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder={
+                                  state.isCustomProduct ? "0" : "Masukkan jumlah stok"
+                                }
+                                {...field}
+                                onChange={(e) =>
+                                  field.onChange(parseFloat(e.target.value) || 0)
+                                }
+                                disabled={state.isCustomProduct}
+                                min={0}
                               />
-                            </Button>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="basePrice"
-                      render={({ field }) => (
-                        <FormItem className="col-span-1">
-                          <FormLabel>Harga Dasar (Rp)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              placeholder="0"
-                              {...field}
-                              onChange={(e) =>
-                                field.onChange(parseFloat(e.target.value) || 0)
-                              }
-                              min={0}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="stock"
-                      render={({ field }) => (
-                        <FormItem className="col-span-1">
-                          <FormLabel>
-                            Stok{" "}
-                            {state.isCustomProduct && (
-                              <span className="text-[10px] text-amber-600 italic">
-                                (Diatur per Varian)
-                              </span>
-                            )}
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              placeholder={
-                                state.isCustomProduct ? "0" : "Masukkan jumlah stok"
-                              }
-                              {...field}
-                              onChange={(e) =>
-                                field.onChange(parseFloat(e.target.value) || 0)
-                              }
-                              disabled={state.isCustomProduct}
-                              min={0}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  {/* TAGS */}
-                  <FormField
-                    control={form.control}
-                    name="tagIds"
-                    render={({ field }) => {
-                      const selectedTags = field.value || [];
-                      return (
-                        <FormItem className="flex flex-col">
-                          <FormLabel>Product Tags</FormLabel>
-                          <Popover
-                            open={state.tagSearchOpen}
-                            onOpenChange={setters.setTagSearchOpen}>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  className={cn(
-                                    "w-full justify-between h-auto min-h-10 text-left bg-white dark:bg-stone-950",
-                                    selectedTags.length === 0 &&
-                                      "text-muted-foreground",
-                                  )}>
-                                  <div className="flex flex-wrap gap-1 items-center">
-                                    {selectedTags.length > 0
-                                      ? selectedTags.map((tagId) => {
-                                          const tagInfo = state.tags.find(
-                                            (t) => t.id === tagId,
-                                          );
-                                          if (!tagInfo) return null;
-                                          return (
-                                            <Badge
-                                              key={tagId}
-                                              variant="secondary"
-                                              className="mr-1 mb-1"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                field.onChange(
-                                                  selectedTags.filter(
-                                                    (id) => id !== tagId,
-                                                  ),
-                                                );
-                                              }}>
-                                              {tagInfo.name}{" "}
-                                              <X className="h-3 w-3 ml-1 text-slate-500 hover:text-red-500" />
-                                            </Badge>
-                                          );
-                                        })
-                                      : "Pilih tag produk..."}
-                                  </div>
-                                  <ChevronsUpDown className="h-4 w-4 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              align="start"
-                              className="w-[--radix-popover-trigger-width] p-0">
-                              <Command>
-                                <CommandInput
-                                  placeholder="Cari tag..."
-                                  value={state.tagSearchQuery}
-                                  onValueChange={setters.setTagSearchQuery}
+                      <FormField
+                        control={form.control}
+                        name="isCustom"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tipe Produk</FormLabel>
+                            <FormControl>
+                              <div className="flex items-center gap-3 h-10 border rounded-md px-4 bg-white dark:bg-stone-950">
+                                <span
+                                  className={`text-sm cursor-pointer ${!field.value ? "font-bold text-primary" : "text-gray-400"}`}
+                                  onClick={() => field.onChange(false)}>
+                                  Standard
+                                </span>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={(checked) => {
+                                    field.onChange(checked);
+                                    if (checked) form.setValue("stock", 0);
+                                  }}
                                 />
-                                <CommandList>
-                                  <CommandEmpty>Tag tidak ditemukan.</CommandEmpty>
-                                  <CommandGroup>
-                                    {state.tags.map((tag) => (
-                                      <CommandItem
-                                        key={tag.id}
-                                        onSelect={() => {
-                                          field.onChange(
-                                            selectedTags.includes(tag.id)
-                                              ? selectedTags.filter(
-                                                  (id) => id !== tag.id,
-                                                )
-                                              : [...selectedTags, tag.id],
-                                          );
-                                          setters.setTagSearchQuery("");
-                                        }}>
-                                        <Check
-                                          className={cn(
-                                            "mr-2 h-4 w-4",
-                                            selectedTags.includes(tag.id)
-                                              ? "opacity-100"
-                                              : "opacity-0",
-                                          )}
-                                        />
-                                        {tag.name}
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                  <div className="h-px bg-stone-200 my-1 mx-1" />
-                                  <CommandItem
-                                    onSelect={() => {
-                                      setters.setIsTagModalOpen(true);
-                                      setters.setTagSearchOpen(false);
-                                    }}
-                                    className="text-blue-600 font-bold justify-center text-xs">
-                                    + Tambah Tag Baru Sekaligus
-                                  </CommandItem>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                        </FormItem>
-                      );
-                    }}
-                  />
+                                <span
+                                  className={`text-sm cursor-pointer ${field.value ? "font-bold text-primary" : "text-gray-400"}`}
+                                  onClick={() => field.onChange(true)}>
+                                  Custom
+                                </span>
+                              </div>
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
 
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 border-t pt-4">
-                    <FormField
-                      control={form.control}
-                      name="weight"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Berat (gram)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              {...field}
-                              onChange={(e) =>
-                                field.onChange(parseFloat(e.target.value) || 0)
-                              }
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="length"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Panjang (cm)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              {...field}
-                              onChange={(e) =>
-                                field.onChange(parseFloat(e.target.value) || 0)
-                              }
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="width"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Lebar (cm)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              {...field}
-                              onChange={(e) =>
-                                field.onChange(parseFloat(e.target.value) || 0)
-                              }
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="height"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tinggi (cm)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              {...field}
-                              onChange={(e) =>
-                                field.onChange(parseFloat(e.target.value) || 0)
-                              }
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="isMadeByOrder"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Sistem Order saat Stok Habis</FormLabel>
+                            <FormControl>
+                              <div className="flex items-center gap-3 h-10 border rounded-md px-4 bg-white dark:bg-stone-950">
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                                <span className="text-xs text-stone-600 truncate" title="Made by Order / Pre-Order (Bisa dipesan walaupun stok habis)">
+                                  Made by Order / PO
+                                </span>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* TAGS */}
+                      <FormField
+                        control={form.control}
+                        name="tagIds"
+                        render={({ field }) => {
+                          const selectedTags = field.value || [];
+                          return (
+                            <FormItem className="md:col-span-4">
+                              <FormLabel>Product Tags</FormLabel>
+                              <Popover
+                                open={state.tagSearchOpen}
+                                onOpenChange={setters.setTagSearchOpen}>
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      className={cn(
+                                        "w-full justify-between h-auto min-h-10 text-left bg-white dark:bg-stone-950",
+                                        selectedTags.length === 0 &&
+                                          "text-muted-foreground",
+                                      )}>
+                                      <div className="flex flex-wrap gap-1.5 items-center py-1">
+                                        {selectedTags.length > 0
+                                          ? selectedTags.map((tagId) => {
+                                              const tagInfo = state.tags.find(
+                                                (t) => t.id === tagId,
+                                              );
+                                              if (!tagInfo) return null;
+                                              return (
+                                                <Badge
+                                                  key={tagId}
+                                                  variant="secondary"
+                                                  className="flex items-center gap-1 px-2 py-1">
+                                                  {tagInfo.name}
+                                                  <X
+                                                    className="h-3 w-3 cursor-pointer hover:text-red-500"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      field.onChange(
+                                                        selectedTags.filter(
+                                                          (id) => id !== tagId,
+                                                        ),
+                                                      );
+                                                    }}
+                                                  />
+                                                </Badge>
+                                              );
+                                            })
+                                          : "Pilih tag produk..."}
+                                      </div>
+                                      <ChevronsUpDown className="h-4 w-4 opacity-50" />
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  align="start"
+                                  className="w-[--radix-popover-trigger-width] p-0">
+                                  <Command>
+                                    <CommandInput
+                                      placeholder="Cari tag..."
+                                      value={state.tagSearchQuery}
+                                      onValueChange={setters.setTagSearchQuery}
+                                    />
+                                    <CommandList>
+                                      <CommandEmpty>Tag tidak ditemukan.</CommandEmpty>
+                                      <CommandGroup>
+                                        {state.tags.map((tag) => (
+                                          <CommandItem
+                                            key={tag.id}
+                                            onSelect={() => {
+                                              field.onChange(
+                                                selectedTags.includes(tag.id)
+                                                  ? selectedTags.filter(
+                                                      (id) => id !== tag.id,
+                                                    )
+                                                  : [...selectedTags, tag.id],
+                                              );
+                                              setters.setTagSearchQuery("");
+                                            }}>
+                                            <Check
+                                              className={cn(
+                                                "mr-2 h-4 w-4",
+                                                selectedTags.includes(tag.id)
+                                                  ? "opacity-100"
+                                                  : "opacity-0",
+                                              )}
+                                            />
+                                            {tag.name}
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                      <div className="h-px bg-stone-200 my-1 mx-1" />
+                                      <CommandItem
+                                        onSelect={() => {
+                                          setters.setIsTagModalOpen(true);
+                                          setters.setTagSearchOpen(false);
+                                        }}
+                                        className="text-blue-600 font-bold justify-center text-xs">
+                                        + Tambah Tag Baru Sekaligus
+                                      </CommandItem>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    </div>
                   </div>
-                  
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Deskripsi</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+
+                  {/* SECTION 4: DIMENSI & DESKRIPSI */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
+                      Dimensi & Deskripsi
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                      {["weight", "length", "width", "height"].map((dim) => (
+                        <FormField
+                          key={dim}
+                          control={form.control}
+                          name={dim as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="capitalize">
+                                {dim === "weight" ? "Berat (gr)" : dim + " (cm)"}
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  min={0}
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(parseFloat(e.target.value) || 0)
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+
+                      <FormField
+                        control={form.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem className="col-span-2 md:col-span-4">
+                            <FormLabel>Deskripsi Produk</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                rows={4}
+                                placeholder="Jelaskan detail produk..."
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
                 </div>
               </TabsContent>
 
