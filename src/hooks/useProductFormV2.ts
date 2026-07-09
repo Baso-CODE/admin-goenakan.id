@@ -82,6 +82,7 @@ export function useProductFormV2(
       mockupAreaY: null,
       mockupAreaWidth: null,
       mockupAreaHeight: null,
+      mockupSides: [],
     },
   });
 
@@ -461,6 +462,7 @@ export function useProductFormV2(
       selectedCategoryId,
       selectedItemCategoryId,
       productImagesFiles,
+      attributesList,
     },
     setters: {
       setIsCategoryModalOpen,
