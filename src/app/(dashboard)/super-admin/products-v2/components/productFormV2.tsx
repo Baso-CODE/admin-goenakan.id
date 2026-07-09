@@ -59,6 +59,7 @@ import { UploadVideos } from "./upload-videos";
 import { VariantList } from "./VariantList";
 import { ProductMockupModal } from "./ProductMockupModal";
 import { MockupAreaSelector } from "./MockupAreaSelector";
+import { toast } from "sonner";
 
 export default function ProductFormV2({
   onSubmit,
@@ -73,6 +74,14 @@ export default function ProductFormV2({
   const { form, submit, state, setters, handlers } = useProductFormV2(onSubmit);
 
   const [previewUrl, setPreviewUrl] = useState<string | undefined>();
+  const [tempAttributeSelections, setTempAttributeSelections] = useState<any[]>([]);
+  const [tempFullAttrs, setTempFullAttrs] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (state.attributeSelections) {
+      setTempAttributeSelections(state.attributeSelections);
+    }
+  }, [state.attributeSelections]);
 
   useEffect(() => {
     if (state.productImagesFiles && state.productImagesFiles.length > 0) {
@@ -656,9 +665,24 @@ export default function ProductFormV2({
                       </CardHeader>
                       <CardContent className="pt-6 space-y-4">
                         <AttributeSelector
-                          value={state.attributeSelections}
-                          onChange={handlers.handleAddAttributeToForm}
+                          value={tempAttributeSelections}
+                          onChange={(attrs, full) => {
+                            setTempAttributeSelections(attrs);
+                            setTempFullAttrs(full);
+                          }}
                         />
+                        <div className="flex justify-end pt-2">
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              handlers.handleAddAttributeToForm(tempAttributeSelections, tempFullAttrs);
+                              toast.success("Attributes saved successfully.");
+                            }}
+                            className="bg-stone-900 hover:bg-stone-800 text-white font-semibold"
+                          >
+                            Save Attributes
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
 
