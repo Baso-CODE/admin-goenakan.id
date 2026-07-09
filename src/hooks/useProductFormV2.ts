@@ -70,6 +70,7 @@ export function useProductFormV2(
       height: 0,
       length: 0,
       isCustom: false,
+      isMadeByOrder: false,
       materialTypeId: "",
       stock: 0,
       attributes: [],

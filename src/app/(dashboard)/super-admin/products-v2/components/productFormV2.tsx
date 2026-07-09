@@ -147,6 +147,28 @@ export default function ProductFormV2({
 
                     <FormField
                       control={form.control}
+                      name="isMadeByOrder"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1">
+                          <FormLabel>Sistem Order saat Stok Habis</FormLabel>
+                          <FormControl>
+                            <div className="flex items-center gap-3 h-10 border rounded-md px-3 bg-white dark:bg-stone-950">
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                              <span className="text-xs text-stone-600 truncate" title="Made by Order / Pre-Order (Bisa dipesan walaupun stok habis)">
+                                Made by Order / PO
+                              </span>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
                       name="materialTypeId"
                       render={({ field }) => (
                         <FormItem className="col-span-1">
