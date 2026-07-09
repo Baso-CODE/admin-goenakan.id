@@ -657,34 +657,28 @@ export default function ProductFormV2({
                   <div className="space-y-6 animate-in fade-in zoom-in duration-300">
                     
                     {/* Card 1: Product Attributes */}
-                    <Card className="border-stone-200 dark:border-stone-800 shadow-sm">
-                      <CardHeader className="bg-stone-50/50 dark:bg-stone-900/50 border-b pb-4">
-                        <CardTitle className="text-sm font-bold uppercase tracking-wider text-stone-800 dark:text-stone-100 flex items-center gap-2">
-                          Product Attributes
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-6 space-y-4">
-                        <AttributeSelector
-                          value={tempAttributeSelections}
-                          onChange={(attrs, full) => {
-                            setTempAttributeSelections(attrs);
-                            setTempFullAttrs(full);
-                          }}
-                        />
-                        <div className="flex justify-end pt-2">
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              handlers.handleAddAttributeToForm(tempAttributeSelections, tempFullAttrs);
-                              toast.success("Attributes saved successfully.");
-                            }}
-                            className="bg-stone-900 hover:bg-stone-800 text-white font-semibold"
-                          >
-                            Save Attributes
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <div className="border rounded p-4 space-y-4 bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800">
+                      <h3 className="text-lg font-semibold">Product Attributes</h3>
+                      
+                      <AttributeSelector
+                        value={tempAttributeSelections}
+                        onChange={(attrs, full) => {
+                          setTempAttributeSelections(attrs);
+                          setTempFullAttrs(full);
+                        }}
+                      />
+
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          handlers.handleAddAttributeToForm(tempAttributeSelections, tempFullAttrs);
+                          toast.success("Attributes saved successfully.");
+                        }}
+                        className="bg-stone-900 hover:bg-stone-800 text-white font-semibold"
+                      >
+                        Save Attributes
+                      </Button>
+                    </div>
 
                     {/* Card 2: Area Custom & Hubungan Gambar Atribut */}
                     <Card className="border-stone-200 dark:border-stone-800 shadow-sm">
