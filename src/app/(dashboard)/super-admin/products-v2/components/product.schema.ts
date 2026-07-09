@@ -11,11 +11,12 @@ export type Category = {
 export const priceTierSchema = z.object({
   minQuantity: z.number().min(1, "Min qty wajib diisi"),
   maxQuantity: z.number().min(1).nullable().optional(),
+  discount: z.coerce.number().min(0).optional(),
   price: z
     .string()
     .or(z.number())
     .transform((val) => String(val))
-    .refine((val) => val.length > 0, "Harga wajib diisi"),
+    .optional(),
 });
 
 export const attributeSelectionSchema = z.object({

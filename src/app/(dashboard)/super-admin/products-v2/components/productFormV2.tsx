@@ -93,8 +93,8 @@ export default function ProductFormV2({
               <TabsList className="grid w-full grid-cols-4 p-1 bg-stone-100 dark:bg-stone-800 rounded-lg">
                 <TabsTrigger value="identity" className="font-semibold text-xs sm:text-sm">1. Informasi Utama</TabsTrigger>
                 <TabsTrigger value="media" className="font-semibold text-xs sm:text-sm">2. Media & Visual</TabsTrigger>
-                <TabsTrigger value="pricing" className="font-semibold text-xs sm:text-sm">3. Harga & Inventory</TabsTrigger>
-                <TabsTrigger value="customization" disabled={!state.isCustomProduct} className="font-semibold text-xs sm:text-sm">4. Kustomisasi</TabsTrigger>
+                <TabsTrigger value="pricing" className="font-semibold text-xs sm:text-sm">3. Harga & Tiers</TabsTrigger>
+                <TabsTrigger value="customization" disabled={!state.isCustomProduct} className="font-semibold text-xs sm:text-sm">4. Kustomisasi & Varian</TabsTrigger>
               </TabsList>
 
               {/* Tab 1: Informasi Utama */}
@@ -322,6 +322,59 @@ export default function ProductFormV2({
                               />
                             </Button>
                           </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="basePrice"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1">
+                          <FormLabel>Harga Dasar (Rp)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="0"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value) || 0)
+                              }
+                              min={0}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="stock"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1">
+                          <FormLabel>
+                            Stok{" "}
+                            {state.isCustomProduct && (
+                              <span className="text-[10px] text-amber-600 italic">
+                                (Diatur per Varian)
+                              </span>
+                            )}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder={
+                                state.isCustomProduct ? "0" : "Masukkan jumlah stok"
+                              }
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value) || 0)
+                              }
+                              disabled={state.isCustomProduct}
+                              min={0}
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -626,62 +679,14 @@ export default function ProductFormV2({
                 </div>
               </TabsContent>
 
-              {/* Tab 3: Harga & Inventory */}
+              {/* Tab 3: Harga & Tiers */}
               <TabsContent value="pricing" forceMount className="space-y-6 animate-fade-in focus-visible:outline-none data-[state=inactive]:hidden">
                 <div className="rounded-xl border border-stone-200 dark:border-stone-800 p-6 bg-white dark:bg-stone-900 shadow-sm space-y-6">
                   <h3 className="text-lg font-semibold tracking-tight border-b pb-2 mb-4 flex items-center gap-2 text-stone-800 dark:text-stone-200">
-                    💰 Harga & Inventory
+                    💰 Harga Bertingkat (Wholesale)
                   </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start border rounded-xl p-6 bg-stone-50/50 dark:bg-stone-950/30">
-                    <FormField
-                      control={form.control}
-                      name="basePrice"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Base Price</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                              min={0}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
 
-                    <FormField
-                      control={form.control}
-                      name="stock"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>
-                            Stok{" "}
-                            {state.isCustomProduct && (
-                              <span className="text-[10px] text-amber-600 italic">
-                                (Diatur per Varian)
-                              </span>
-                            )}
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                              disabled={state.isCustomProduct}
-                              min={0}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="mt-6 border-t pt-6">
+                  <div>
                     <PriceTiers />
                   </div>
                 </div>

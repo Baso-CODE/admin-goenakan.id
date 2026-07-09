@@ -397,9 +397,20 @@ export function useProductFormV2(
 
   const submit = async (values: ProductFormValues) => {
     try {
+      const basePriceVal = Number(values.basePrice) || 0;
+      const mappedPriceTiers = (values.priceTiers || []).map((tier: any) => {
+        const discountVal = Number(tier.discount || 0);
+        const calculatedPrice = Math.max(0, basePriceVal - discountVal);
+        return {
+          minQuantity: Number(tier.minQuantity || 1),
+          maxQuantity: tier.maxQuantity ? Number(tier.maxQuantity) : null,
+          price: String(calculatedPrice),
+        };
+      });
+
       const payload = {
         ...values,
-        basePrice: Number(values.basePrice),
+        basePrice: basePriceVal,
         stock: isCustomProduct ? 0 : Number(values.stock || 0),
         weight: Number(values.weight || 0),
         width: Number(values.width || 0),
@@ -407,6 +418,7 @@ export function useProductFormV2(
         length: Number(values.length || 0),
         attributes: isCustomProduct ? attributeSelections : undefined,
         variantImagesMetadata: isCustomProduct ? variantMetas : [],
+        priceTiers: mappedPriceTiers,
       };
 
       const filesToSubmit = {
