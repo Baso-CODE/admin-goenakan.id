@@ -147,8 +147,8 @@ export default function ProductFormV2({
   const getProductAttributeValues = () => {
     const list: { id: string; value: string; attributeName: string; attributeType: string }[] = [];
     
-    state.attributesList.forEach((attr) => {
-      const selection = state.attributeSelections.find((sel) => sel.attributeId === attr.id);
+    tempFullAttrs.forEach((attr) => {
+      const selection = tempAttributeSelections.find((sel) => sel.attributeId === attr.id);
       if (!selection) return;
       attr.values?.forEach((val: any) => {
         if (selection.valueIds.includes(val.id)) {
@@ -170,6 +170,12 @@ export default function ProductFormV2({
       setTempAttributeSelections(state.attributeSelections);
     }
   }, [state.attributeSelections]);
+
+  useEffect(() => {
+    if (state.attributesList) {
+      setTempFullAttrs(state.attributesList);
+    }
+  }, [state.attributesList]);
 
   useEffect(() => {
     if (state.productImagesFiles && state.productImagesFiles.length > 0) {
