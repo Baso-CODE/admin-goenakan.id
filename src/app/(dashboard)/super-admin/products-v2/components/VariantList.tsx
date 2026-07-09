@@ -256,13 +256,6 @@ export function VariantList({
 
   return (
     <div className="space-y-6">
-      <h3 className="text-xl font-bold tracking-tight text-gray-800">
-        Generated Variants ({combinations.length})
-      </h3>
-      <p className="text-sm text-gray-500">
-        Set price, wholesale tiers, and upload images for each variant.
-      </p>
-      <hr />
 
       {combinations.map((comb, idx) => {
         const meta = variantMetas.find((m) => m.variantIndex === idx);
