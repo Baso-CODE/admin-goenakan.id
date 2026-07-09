@@ -434,6 +434,58 @@ export function useProductFormV2(
     }
   };
 
+  const handleClearAllVariants = () => {
+    setCombinations([]);
+    setVariantMetas([]);
+    setVariantFilesMap([]);
+    form.setValue("variantImagesMetadata", []);
+  };
+
+  const handleRemoveVariant = (idx: number) => {
+    setCombinations((prev) => prev.filter((_, i) => i !== idx));
+    setVariantMetas((prev) => {
+      const filtered = prev.filter((_, i) => i !== idx);
+      const reindexed = filtered.map((meta, i) => ({
+        ...meta,
+        variantIndex: i,
+      }));
+      form.setValue("variantImagesMetadata", reindexed);
+      return reindexed;
+    });
+    setVariantFilesMap((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddCustomVariant = () => {
+    const nextIdx = combinations.length;
+    const newCombo = {
+      label: `Custom Variant ${nextIdx + 1}`,
+      valueIds: [],
+    };
+    const newMeta = {
+      variantIndex: nextIdx,
+      price: Number(form.getValues("basePrice")) || 0,
+      stock: 0,
+      isFeatured: false,
+      altText: "",
+      description: "",
+      priceTiers: [],
+    };
+
+    setCombinations((prev) => [...prev, newCombo]);
+    setVariantMetas((prev) => {
+      const updated = [...prev, newMeta];
+      form.setValue("variantImagesMetadata", updated);
+      return updated;
+    });
+    setVariantFilesMap((prev) => [...prev, []]);
+  };
+
+  const handleUpdateVariantLabel = (idx: number, newLabel: string) => {
+    setCombinations((prev) =>
+      prev.map((c, i) => (i === idx ? { ...c, label: newLabel } : c))
+    );
+  };
+
   // Return everything needed by the UI
   return {
     form,
@@ -507,6 +559,10 @@ export function useProductFormV2(
         form.setValue("attributes", attrs);
         setAttributesList(fullAttrs);
       },
+      handleClearAllVariants,
+      handleRemoveVariant,
+      handleAddCustomVariant,
+      handleUpdateVariantLabel,
     },
   };
 }
