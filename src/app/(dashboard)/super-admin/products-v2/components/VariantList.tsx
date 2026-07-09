@@ -51,6 +51,8 @@ interface VariantListProps {
   }[];
   onUpdateVariantMeta: (index: number, field: string, value: any) => void;
   onChangeMeta: (filesMap: File[][]) => void;
+  onRemoveVariant?: (idx: number) => void;
+  onUpdateVariantLabel?: (idx: number, label: string) => void;
 }
 
 // --- MODAL IMAGE ---
@@ -148,6 +150,8 @@ export function VariantList({
   variantMetas,
   onUpdateVariantMeta,
   onChangeMeta,
+  onRemoveVariant,
+  onUpdateVariantLabel,
 }: VariantListProps) {
   const [variantStates, setVariantStates] = useState<VariantState[]>(() =>
     combinations.map((_, idx) => ({ variantIndex: idx, images: [] })),
@@ -272,12 +276,46 @@ export function VariantList({
                   {comb.label.split("|").join(" • ")}
                 </span>
               </h4>
+              {onRemoveVariant && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm("Apakah Anda yakin ingin menghapus varian ini?")) {
+                      onRemoveVariant(idx);
+                    }
+                  }}
+                  className="space-x-1"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Remove</span>
+                </Button>
+              )}
             </div>
 
             <div className="flex flex-col gap-6 items-start">
               <div className="w-full bg-white p-4 rounded-lg border shadow-sm space-y-5">
                 {/* BARIS HARGA & STOK */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-gray-500 uppercase">
+                      Variant Name
+                    </Label>
+                    <Input
+                      type="text"
+                      value={comb.label}
+                      onChange={(e) =>
+                        onUpdateVariantLabel?.(idx, e.target.value)
+                      }
+                      className="font-medium text-slate-800"
+                      placeholder="e.g. Black • XL"
+                    />
+                    <p className="text-[10px] text-muted-foreground italic">
+                      Nama tampilan untuk varian kombinasi ini.
+                    </p>
+                  </div>
+
                   <div className="space-y-2">
                     <Label className="text-xs font-bold text-gray-500 uppercase">
                       Variant Price (Rp)

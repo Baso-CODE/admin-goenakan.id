@@ -46,7 +46,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useProductFormV2 } from "@/hooks/useProductFormV2";
 import { cn } from "@/lib/utils";
-import { Check, ChevronsUpDown, Loader2, RefreshCw, X, Layers, PlusCircle } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, RefreshCw, X, Layers, PlusCircle, Trash2 } from "lucide-react";
 import { AddItemCategoryModal } from "../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../item-names-product/components/addItemNameModal";
 import CreateCategoryModal from "../../product-categories/components/createCategoryModal";
@@ -76,6 +76,7 @@ export default function ProductFormV2({
   const [previewUrl, setPreviewUrl] = useState<string | undefined>();
   const [tempAttributeSelections, setTempAttributeSelections] = useState<any[]>([]);
   const [tempFullAttrs, setTempFullAttrs] = useState<any[]>([]);
+  const [globalStock, setGlobalStock] = useState<string>("");
 
   const [mockupSides, setMockupSides] = useState<any[]>([]);
   const [selectedMockupImage, setSelectedMockupImage] = useState<any | null>(null);
@@ -1000,23 +1001,86 @@ export default function ProductFormV2({
                             Atur harga, stok, dan gambar khusus untuk masing-masing kombinasi varian.
                           </p>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handlers.handleGenerateVariants}
-                          className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold"
-                        >
-                          Generate Variants
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handlers.handleGenerateVariants}
+                            className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold"
+                          >
+                            Generate Variants
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handlers.handleAddCustomVariant}
+                            className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold"
+                          >
+                            Add Custom Variant
+                          </Button>
+                        </div>
                       </CardHeader>
                       <CardContent className="pt-6 space-y-6">
+                        {state.combinations.length > 0 && (
+                          <div className="flex flex-wrap items-center justify-between gap-4 p-4 border rounded-xl bg-stone-50/50">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-semibold text-stone-700">Global Stock Adjuster:</span>
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="Stock qty"
+                                value={globalStock}
+                                onChange={(e) => setGlobalStock(e.target.value)}
+                                className="w-28 bg-white h-8 text-xs"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const stockNum = parseInt(globalStock);
+                                  if (isNaN(stockNum) || stockNum < 0) {
+                                    toast.error("Masukkan jumlah stok yang valid");
+                                    return;
+                                  }
+                                  state.combinations.forEach((_, idx) => {
+                                    handlers.handleUpdateVariantMeta(idx, "stock", stockNum);
+                                  });
+                                  toast.success(`Berhasil menerapkan stok ${stockNum} ke semua varian.`);
+                                }}
+                                className="h-8 text-xs font-semibold"
+                              >
+                                Apply to All
+                              </Button>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm("Apakah Anda yakin ingin menghapus semua varian?")) {
+                                  handlers.handleClearAllVariants();
+                                  toast.success("Semua varian berhasil dihapus.");
+                                }
+                              }}
+                              className="space-x-1.5 h-8 text-xs font-semibold"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span>Delete All Variants</span>
+                            </Button>
+                          </div>
+                        )}
+
                         {state.combinations.length > 0 ? (
                           <VariantList
                             combinations={state.combinations}
                             variantMetas={state.variantMetas}
                             onUpdateVariantMeta={handlers.handleUpdateVariantMeta}
                             onChangeMeta={setters.setVariantFilesMap}
+                            onRemoveVariant={handlers.handleRemoveVariant}
+                            onUpdateVariantLabel={handlers.handleUpdateVariantLabel}
                           />
                         ) : (
                           <div className="text-center py-8 border border-dashed rounded-lg border-stone-300 dark:border-stone-750">
