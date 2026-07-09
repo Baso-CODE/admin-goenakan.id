@@ -315,6 +315,13 @@ export default function FormProductCore({
       <form
         onSubmit={form.handleSubmit(onSubmit)}
         className="space-y-8 border p-6 rounded-md bg-white shadow-sm">
+        
+        {/* Keterangan Konfigurasi Dasar */}
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-md text-sm flex items-start gap-2">
+          <span className="font-semibold text-blue-905 shrink-0">Catatan:</span>
+          <span>Semua pengaturan di dalam tab ini akan memengaruhi konfigurasi produk utama/dasar (base product configuration).</span>
+        </div>
+
         {/* SECTION 1: IDENTITAS PRODUK */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
@@ -490,7 +497,7 @@ export default function FormProductCore({
           <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
             Harga, Stok & Label
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <FormField
               control={form.control}
               name="basePrice"
@@ -586,8 +593,8 @@ export default function FormProductCore({
                         checked={field.value}
                         onCheckedChange={field.onChange}
                       />
-                      <span className="text-sm text-stone-600">
-                        Made by Order / Pre-Order (Bisa dipesan walaupun stok habis)
+                      <span className="text-xs text-stone-600 truncate" title="Made by Order / Pre-Order (Bisa dipesan walaupun stok habis)">
+                        Made by Order / PO
                       </span>
                     </div>
                   </FormControl>
@@ -602,7 +609,7 @@ export default function FormProductCore({
               render={({ field }) => {
                 const selectedTags = field.value || [];
                 return (
-                  <FormItem className="md:col-span-3">
+                  <FormItem className="md:col-span-4">
                     <FormLabel>Product Tags</FormLabel>
                     <Popover
                       open={tagSearchOpen}

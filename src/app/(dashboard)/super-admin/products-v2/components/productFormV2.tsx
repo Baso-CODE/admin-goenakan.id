@@ -57,6 +57,9 @@ import { ProductFormValues } from "./product.schema";
 import { UploadImages } from "./upload-images";
 import { UploadVideos } from "./upload-videos";
 import { VariantList } from "./VariantList";
+import FormUpdateAttributes from "./update/AttributesSection";
+import FormUpdateVariants from "./update/VariantsSection";
+import { toast } from "sonner";
 import { ProductMockupModal } from "./ProductMockupModal";
 import { MockupAreaSelector } from "./MockupAreaSelector";
 
@@ -83,6 +86,294 @@ export default function ProductFormV2({
       setPreviewUrl(undefined);
     }
   }, [state.productImagesFiles]);
+
+  const [productData, setProductData] = useState<any>({
+    isCustom: false,
+    images: [],
+    productVariants: [],
+    attributeValues: [],
+  });
+
+  const [currentSelections, setCurrentSelections] = useState<any[]>([]);
+  const [currentFullList, setCurrentFullList] = useState<any[]>([]);
+
+  // Sync isCustom and basePrice to productData
+  const isCustomProduct = state.isCustomProduct;
+  const basePrice = form.watch("basePrice") || 0;
+
+  useEffect(() => {
+    setProductData((prev: any) => ({
+      ...prev,
+      isCustom: isCustomProduct,
+      basePrice: basePrice,
+    }));
+  }, [isCustomProduct, basePrice]);
+
+  // Sync uploaded images to productData
+  useEffect(() => {
+    if (state.productImagesFiles) {
+      setProductData((prev: any) => ({
+        ...prev,
+        images: state.productImagesFiles.map((file, idx) => {
+          // If file is already mocked, preserve url to avoid revoking
+          const existing = prev.images?.find((img: any) => img.id === file.name);
+          return {
+            id: file.name,
+            url: existing?.url || URL.createObjectURL(file),
+            altText: file.name,
+            isFeatured: idx === 0,
+            mockupAreas: existing?.mockupAreas || [],
+          };
+        }),
+      }));
+    }
+  }, [state.productImagesFiles]);
+
+  useEffect(() => {
+    form.setValue("productData", productData);
+  }, [productData, form]);
+
+  const handleUpdateAttributesLocal = async (payload: any) => {
+    // Save to form attributes schema
+    const mappedAttrs = currentSelections.map((sel) => ({
+      attributeId: sel.attributeId,
+      valueIds: sel.valueIds,
+      priceModifiers: sel.priceModifiers || {},
+    }));
+    form.setValue("attributes", mappedAttrs);
+
+    // Update productData.attributeValues
+    const mappedVals = currentSelections.flatMap((sel: any) =>
+      sel.valueIds.map((valId: string) => ({
+        attributeId: sel.attributeId,
+        attributeValueId: valId,
+        priceModifier: sel.priceModifiers?.[valId] || 0,
+        weight: sel.weights?.[valId] || 0,
+        width: sel.widths?.[valId] || 0,
+        height: sel.heights?.[valId] || 0,
+        length: sel.lengths?.[valId] || 0,
+      }))
+    );
+
+    setProductData((prev: any) => ({
+      ...prev,
+      attributeValues: mappedVals,
+    }));
+
+    toast.success("Attributes saved locally");
+  };
+
+  const handleUpdateMediaMockupsLocal = async (mediaId: string, mockups: any[]) => {
+    setProductData((prev: any) => ({
+      ...prev,
+      images: prev.images.map((img: any) =>
+        img.id === mediaId ? { ...img, mockupAreas: mockups } : img
+      ),
+    }));
+    toast.success("Mockup areas saved locally");
+  };
+
+  const handleUpdateMockupSettingsLocal = async (settings: any) => {
+    setProductData((prev: any) => ({
+      ...prev,
+      ...settings,
+    }));
+    toast.success("Mockup settings saved locally");
+  };
+
+  const handleUpdateMediaMetadataLocal = async (mediaId: string, updates: any) => {
+    setProductData((prev: any) => ({
+      ...prev,
+      images: prev.images.map((img: any) =>
+        img.id === mediaId ? { ...img, ...updates } : img
+      ),
+    }));
+    toast.success("Media metadata saved locally");
+  };
+
+  const handleUpdateVariantsLocal = async (values: any) => {
+    const newVariantMetas = values.variants.map((v: any, idx: number) => ({
+      variantIndex: idx,
+      price: Number(v.price),
+      stock: Number(v.stock),
+      description: v.description || "",
+      weight: v.weight ? Number(v.weight) : undefined,
+      width: v.width ? Number(v.width) : undefined,
+      height: v.height ? Number(v.height) : undefined,
+      length: v.length ? Number(v.length) : undefined,
+      priceTiers: (v.priceTiers || []).map((t: any) => ({
+        minQuantity: Number(t.minQuantity),
+        maxQuantity: t.maxQuantity ? Number(t.maxQuantity) : null,
+        price: String(t.price),
+      })),
+    }));
+
+    setters.setVariantMetas(newVariantMetas);
+    form.setValue("variantImagesMetadata", newVariantMetas);
+
+    const filesMap = values.variants.map((v: any) =>
+      (v.images || []).map((img: any) => img.file).filter(Boolean)
+    );
+    setters.setVariantFilesMap(filesMap);
+
+    setProductData((prev: any) => ({
+      ...prev,
+      productVariants: values.variants.map((v: any, idx: number) => ({
+        ...v,
+        variantName: v.variantName,
+        attributeValueIds: v.attributeValueIds,
+        images: (v.images || []).map((img: any) => ({
+          id: img.id || `temp-${idx}-${Date.now()}-${Math.random()}`,
+          url: img.url || (img.file ? URL.createObjectURL(img.file) : ""),
+          altText: img.altText || "",
+          isFeatured: img.isFeatured || false,
+          file: img.file,
+        })),
+      })),
+    }));
+
+    toast.success("Variants configuration saved locally");
+  };
+
+  const handleGenerateVariantsLocal = () => {
+    const variantGeneratingSelections = currentSelections.filter(
+      (sel) => sel.isVariantGenerator !== false
+    );
+    if (variantGeneratingSelections.length === 0) {
+      toast.error("Tambahkan minimal 1 attribute dengan isVariantGenerator = true.");
+      return;
+    }
+
+    const activeAttributes = currentFullList
+      .filter((attr) => variantGeneratingSelections.some((sel) => sel.attributeId === attr.id))
+      .map((attr) => ({
+        ...attr,
+        values: attr.values.filter((val: any) =>
+          variantGeneratingSelections
+            .find((sel) => sel.attributeId === attr.id)
+            ?.valueIds.includes(val.id)
+        ),
+      }))
+      .filter((attr) => attr.values.length > 0);
+
+    if (activeAttributes.length === 0) return;
+
+    const combine = (arr: any[]): any[] => {
+      if (arr.length === 0) return [];
+      if (arr.length === 1) return arr[0].values.map((v: any) => [v]);
+
+      const [first, ...rest] = arr;
+      const subCombinations = combine(rest);
+
+      const combinations: any[] = [];
+      for (const val of first.values) {
+        for (const sub of subCombinations) {
+          combinations.push([val, ...(Array.isArray(sub) ? sub : [sub])]);
+        }
+      }
+      return combinations;
+    };
+
+    const rawCombinations = combine(activeAttributes);
+    const newCombinations = rawCombinations.map((combination: any[]) => {
+      const attributeMap: Record<string, string> = {};
+      const nameParts: string[] = [];
+
+      combination.forEach((val) => {
+        attributeMap[val.attributeId] = val.id;
+        nameParts.push(val.value);
+      });
+
+      return {
+        attributeMap,
+        variantName: nameParts.join(" • "),
+      };
+    });
+
+    const existingVariants = productData.productVariants || [];
+    const newVariantsState: any[] = [];
+    const usedExistingVariantIds = new Set();
+
+    const getVariantSignature = (variant: any) => {
+      if (variant.attributeValues) {
+        return variant.attributeValues
+          .map((av: any) => av.attributeValueId)
+          .sort()
+          .join("|");
+      }
+      if (variant.attributeValueIds) {
+        return [...variant.attributeValueIds].sort().join("|");
+      }
+      return "";
+    };
+
+    for (const newComb of newCombinations) {
+      const valueIdsInCombo = Object.values(newComb.attributeMap) as string[];
+      const newCombAttributeIds = Object.values(newComb.attributeMap)
+        .sort()
+        .join("|");
+
+      const existingMatch = existingVariants.find((v: any) => {
+        if (v._isDeleted) return false;
+        const existingSignature = getVariantSignature(v);
+        if (existingSignature && existingSignature !== "") {
+          return existingSignature === newCombAttributeIds;
+        }
+        const normalizeName = (name: string) =>
+          name?.toLowerCase().replace(/[\s•·\-\/]/g, "") || "";
+        return normalizeName(v.variantName) === normalizeName(newComb.variantName);
+      });
+
+      if (existingMatch) {
+        newVariantsState.push({
+          ...existingMatch,
+          _isDeleted: false,
+          attributeValueIds: valueIdsInCombo,
+        });
+        if (existingMatch.id) usedExistingVariantIds.add(existingMatch.id);
+      } else {
+        let modifierSum = 0;
+        currentSelections.forEach((selection: any) => {
+          if (selection.isVariantGenerator !== false) {
+            selection.valueIds.forEach((valId: string) => {
+              if (valueIdsInCombo.includes(valId)) {
+                const modVal = selection.priceModifiers?.[valId];
+                if (modVal !== undefined) {
+                  modifierSum += Number(modVal) || 0;
+                }
+              }
+            });
+          }
+        });
+
+        newVariantsState.push({
+          id: undefined,
+          variantName: newComb.variantName,
+          sku: "",
+          price: Number(productData.basePrice || 0) + modifierSum,
+          images: [],
+          _isDeleted: false,
+          attributeValueIds: valueIdsInCombo,
+        });
+      }
+    }
+
+    const variantsToKeep = existingVariants
+      .filter((v: any) => v.id && !usedExistingVariantIds.has(v.id))
+      .map((v: any) => ({
+        ...v,
+        _isDeleted: true,
+      }));
+
+    const finalVariantsState = [...variantsToKeep, ...newVariantsState];
+
+    setProductData((prev: any) => ({
+      ...prev,
+      productVariants: finalVariantsState,
+    }));
+
+    toast.info(`Generated ${newCombinations.length} variants.`);
+  };
 
   return (
     <Card className="w-full pt-2">
@@ -646,130 +937,25 @@ export default function ProductFormV2({
               <TabsContent value="customization" forceMount className="space-y-6 animate-fade-in focus-visible:outline-none data-[state=inactive]:hidden">
                 {state.isCustomProduct && (
                   <div className="space-y-6 animate-in fade-in zoom-in duration-300">
-                    <div className="rounded-xl border border-stone-200 dark:border-stone-800 p-6 bg-white dark:bg-stone-900 shadow-sm space-y-6">
-                      <h3 className="text-lg font-semibold tracking-tight border-b pb-2 mb-4 flex items-center gap-2 text-stone-800 dark:text-stone-200">
-                        ⚙️ Kustomisasi & Varian
-                      </h3>
-                      
-                      <div className="border rounded-xl p-6 bg-stone-50/50 dark:bg-stone-950/30">
-                        <h4 className="font-semibold mb-3 text-base text-stone-700 dark:text-stone-300">
-                          Konfigurasi Varian
-                        </h4>
-                        <AttributeSelector
-                          value={state.attributeSelections}
-                          onChange={handlers.handleAddAttributeToForm}
-                        />
-                        <div className="border-t mt-3 pt-3 flex justify-end">
-                          <Button
-                            variant="secondary"
-                            type="button"
-                            onClick={handlers.handleGenerateVariants}>
-                            Generate Variants
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Card className="border-stone-200 dark:border-stone-800 shadow-sm">
-                      <CardHeader className="bg-stone-50/50 dark:bg-stone-900/50 border-b pb-4">
-                        <CardTitle className="text-sm font-bold uppercase tracking-wider text-stone-800 dark:text-stone-100 flex items-center gap-2">
-                          <Layers className="h-4.5 w-4.5 text-indigo-500" /> Area Custom & Hubungan Gambar Atribut
-                        </CardTitle>
-                        <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">
-                          Atur area mockup pada gambar dan hubungkan gambar ke nilai atribut spesifik.
-                        </p>
-                      </CardHeader>
-                      <CardContent className="space-y-6 pt-6">
-                        {previewUrl ? (
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between bg-stone-50 dark:bg-stone-950 p-3 rounded-lg border">
-                              <div>
-                                <h4 className="text-sm font-semibold">Tentukan Area Logo</h4>
-                                <p className="text-xs text-stone-500 dark:text-stone-400 font-normal">Batasi area penempatan logo pembeli pada mockup produk ini</p>
-                              </div>
-                              <Switch
-                                checked={form.watch("mockupAreaX") !== null}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    form.setValue("mockupAreaX", 25);
-                                    form.setValue("mockupAreaY", 25);
-                                    form.setValue("mockupAreaWidth", 50);
-                                    form.setValue("mockupAreaHeight", 50);
-                                  } else {
-                                    form.setValue("mockupAreaX", null);
-                                    form.setValue("mockupAreaY", null);
-                                    form.setValue("mockupAreaWidth", null);
-                                    form.setValue("mockupAreaHeight", null);
-                                  }
-                                }}
-                              />
-                            </div>
-
-                            {form.watch("mockupAreaX") !== null && (
-                              <div className="flex flex-col gap-4">
-                                <div className="flex justify-center p-4 border rounded-lg bg-white dark:bg-stone-900 shadow-sm">
-                                  <MockupAreaSelector
-                                    imageUrl={previewUrl}
-                                    areas={
-                                      form.watch("mockupAreaX") !== null
-                                        ? [
-                                            {
-                                              id: "legacy",
-                                              x: form.watch("mockupAreaX") ?? 25,
-                                              y: form.watch("mockupAreaY") ?? 25,
-                                              width: form.watch("mockupAreaWidth") ?? 50,
-                                              height: form.watch("mockupAreaHeight") ?? 50,
-                                              label: "Logo Area",
-                                            },
-                                          ]
-                                        : []
-                                    }
-                                    onChange={(newAreas) => {
-                                      if (newAreas && newAreas.length > 0) {
-                                        const area = newAreas[0];
-                                        form.setValue("mockupAreaX", area.x);
-                                        form.setValue("mockupAreaY", area.y);
-                                        form.setValue("mockupAreaWidth", area.width);
-                                        form.setValue("mockupAreaHeight", area.height);
-                                      } else {
-                                        form.setValue("mockupAreaX", null);
-                                        form.setValue("mockupAreaY", null);
-                                        form.setValue("mockupAreaWidth", null);
-                                        form.setValue("mockupAreaHeight", null);
-                                      }
-                                    }}
-                                  />
-                                </div>
-
-                                <div className="flex justify-end">
-                                  <ProductMockupModal
-                                    productName={form.watch("name") || "Produk Baru"}
-                                    productSku={form.watch("sku") || "SKU-TEMP"}
-                                    imageUrl={previewUrl}
-                                    triggerLabel="Live Mockup Preview"
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-center py-8 border border-dashed rounded-lg border-stone-300 dark:border-stone-750">
-                            <p className="text-sm text-stone-500 italic">Silakan unggah Gambar Utama terlebih dahulu di tab Media & Visual.</p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    {state.combinations.length > 0 && (
-                      <div className="border rounded-xl p-6 bg-white dark:bg-stone-900 shadow-sm">
-                        <VariantList
-                          combinations={state.combinations}
-                          variantMetas={state.variantMetas}
-                          onUpdateVariantMeta={handlers.handleUpdateVariantMeta}
-                          onChangeMeta={setters.setVariantFilesMap}
-                        />
-                      </div>
-                    )}
+                    <FormUpdateAttributes
+                      initialData={productData}
+                      isSubmitting={isSubmitting}
+                      onSubmit={handleUpdateAttributesLocal}
+                      onAttributesChange={(selections, fullList) => {
+                        setCurrentSelections(selections);
+                        setCurrentFullList(fullList);
+                        setters.setAttributeSelections(selections);
+                      }}
+                      onUpdateMediaMockups={handleUpdateMediaMockupsLocal}
+                      onUpdateMockupSettings={handleUpdateMockupSettingsLocal}
+                      onUpdateMediaMetadata={handleUpdateMediaMetadataLocal}
+                    />
+                    <FormUpdateVariants
+                      initialData={productData}
+                      isSubmitting={isSubmitting}
+                      onSubmit={handleUpdateVariantsLocal}
+                      onGenerateClick={handleGenerateVariantsLocal}
+                    />
                   </div>
                 )}
               </TabsContent>
