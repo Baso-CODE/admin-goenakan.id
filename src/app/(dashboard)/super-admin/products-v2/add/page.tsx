@@ -62,67 +62,6 @@ export default function AddProductPage() {
         throw new Error(result.message || "Failed to create product");
       }
 
-      // Sync and update mockup settings & sides after product creation
-      if (data.productData) {
-        try {
-          const imageIdMap: Record<string, string> = {};
-          if (files.images && result.images) {
-            files.images.forEach((file, idx) => {
-              const remoteImg = result.images[idx];
-              if (remoteImg) {
-                imageIdMap[file.name] = remoteImg.id;
-              }
-            });
-          }
-
-          // 1. Update Mockup Settings (isMultiFace, mockupFrontImageId, mockupBackImageId)
-          if (data.productData.mockupFrontImageId || data.productData.mockupBackImageId) {
-            const settingsPayload = {
-              isMultiFace: data.productData.isMultiFace || false,
-              mockupFrontImageId: data.productData.mockupFrontImageId ? imageIdMap[data.productData.mockupFrontImageId] : null,
-              mockupBackImageId: data.productData.mockupBackImageId ? imageIdMap[data.productData.mockupBackImageId] : null,
-            };
-            await fetchApi(`/products/${result.id}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(settingsPayload),
-            });
-          }
-
-          // 2. Update Image Mockup Areas and Metadata
-          if (data.productData.images) {
-            for (const localImg of data.productData.images) {
-              const remoteId = imageIdMap[localImg.id];
-              if (!remoteId) continue;
-
-              // Update mockup areas
-              if (localImg.mockupAreas && localImg.mockupAreas.length > 0) {
-                await fetchApi(`/products/image/${remoteId}/mockups`, {
-                  method: "PUT",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ mockupAreas: localImg.mockupAreas }),
-                });
-              }
-
-              // Update metadata (mockupSideName, attributeValueId, printPositionValueId)
-              if (localImg.mockupSideName || localImg.attributeValueId || localImg.printPositionValueId) {
-                await fetchApi(`/products/image/${remoteId}/seo`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    mockupSideName: localImg.mockupSideName || null,
-                    attributeValueId: localImg.attributeValueId || null,
-                    printPositionValueId: localImg.printPositionValueId || null,
-                  }),
-                });
-              }
-            }
-          }
-        } catch (syncErr) {
-          console.error("Failed to sync mockup settings post-creation:", syncErr);
-        }
-      }
-
       toast.success("Product created successfully!");
       router.push("/super-admin/products-v2");
       router.refresh();

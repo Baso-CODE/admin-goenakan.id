@@ -52,6 +52,7 @@ export function useProductFormV2(
   const [variantMetas, setVariantMetas] = useState<any[]>([]);
   const [variantFilesMap, setVariantFilesMap] = useState<File[][]>([]);
   const [productImagesFiles, setProductImagesFiles] = useState<File[]>([]);
+  const [mockupSides, setMockupSides] = useState<any[]>([]);
 
   // === FORM INITIALIZATION ===
   const form = useForm<ProductFormValues>({
@@ -382,6 +383,9 @@ export function useProductFormV2(
 
       return {
         variantIndex: idx,
+        variantName: comb.label,
+        sku: `${form.getValues("sku") || "SKU"}-VAR-${idx + 1}`,
+        attributeValueIds: comb.valueIds,
         price: currentBasePrice + modifierSum,
         stock: 0,
         isFeatured: false,
@@ -409,6 +413,44 @@ export function useProductFormV2(
         };
       });
 
+      const mappedImagesMetadata = (values.imagesMetadata || []).map((meta, idx) => {
+        const side = mockupSides.find((s) => s.imageId === `index-${idx}`);
+        if (side) {
+          return {
+            ...meta,
+            mockupSideName: side.name || null,
+            attributeValueId: side.attributeValueId || null,
+            printPositionValueId: side.printPositionValueId || null,
+            mockupAreas: (side.mockupAreas || []).map((area: any) => ({
+              x: Number(area.x),
+              y: Number(area.y),
+              width: Number(area.width),
+              height: Number(area.height),
+              label: area.label,
+            })),
+          };
+        }
+        return meta;
+      });
+
+      const mappedVariants = variantMetas.map((meta) => ({
+        variantName: meta.variantName || `Varian #${meta.variantIndex + 1}`,
+        sku: meta.sku || `${values.sku}-VAR-${meta.variantIndex + 1}`,
+        price: Number(meta.price) || 0,
+        stock: Number(meta.stock) || 0,
+        description: meta.description || "",
+        weight: meta.weight ? Number(meta.weight) : undefined,
+        width: meta.width ? Number(meta.width) : undefined,
+        height: meta.height ? Number(meta.height) : undefined,
+        length: meta.length ? Number(meta.length) : undefined,
+        attributeValueIds: meta.attributeValueIds || [],
+        priceTiers: (meta.priceTiers || []).map((pt: any) => ({
+          minQuantity: Number(pt.minQuantity),
+          maxQuantity: pt.maxQuantity ? Number(pt.maxQuantity) : null,
+          price: String(pt.price),
+        })),
+      }));
+
       const payload = {
         ...values,
         basePrice: basePriceVal,
@@ -418,8 +460,9 @@ export function useProductFormV2(
         height: Number(values.height || 0),
         length: Number(values.length || 0),
         attributes: isCustomProduct ? attributeSelections : undefined,
-        variantImagesMetadata: isCustomProduct ? variantMetas : [],
+        variants: isCustomProduct ? mappedVariants : [],
         priceTiers: mappedPriceTiers,
+        imagesMetadata: mappedImagesMetadata,
       };
 
       const filesToSubmit = {
@@ -461,6 +504,8 @@ export function useProductFormV2(
       selectedCategoryId,
       selectedItemCategoryId,
       productImagesFiles,
+      attributesList,
+      mockupSides,
     },
     setters: {
       setIsCategoryModalOpen,
@@ -479,6 +524,8 @@ export function useProductFormV2(
       setAttributesList,
       setVariantMetas,
       setVariantFilesMap,
+      setMockupSides,
+      setCombinations,
     },
     handlers: {
       handleBulkCreateTags,

@@ -28,6 +28,9 @@ export const attributeSelectionSchema = z.object({
 export const variantMetaSchema = z.object({
   variantIndex: z.number(),
   isFeatured: z.boolean().optional(),
+  variantName: z.string().optional(),
+  sku: z.string().optional(),
+  attributeValueIds: z.array(z.string()).optional(),
   price: z.number().min(0, "Price must be >= 0"),
   stock: z.number().min(0, "Stock minimal 0").default(0),
   altText: z.string().optional(),
@@ -72,6 +75,20 @@ export const productSchema = z.object({
       z.object({
         isFeatured: z.boolean().optional(),
         altText: z.string().optional(),
+        mockupSideName: z.string().optional().nullable(),
+        attributeValueId: z.string().optional().nullable(),
+        printPositionValueId: z.string().optional().nullable(),
+        mockupAreas: z
+          .array(
+            z.object({
+              x: z.number(),
+              y: z.number(),
+              width: z.number(),
+              height: z.number(),
+              label: z.string(),
+            }),
+          )
+          .optional(),
       }),
     )
     .optional(),
@@ -81,7 +98,6 @@ export const productSchema = z.object({
   mockupAreaY: z.number().optional().nullable(),
   mockupAreaWidth: z.number().optional().nullable(),
   mockupAreaHeight: z.number().optional().nullable(),
-  productData: z.any().optional(),
 });
 
 export type ProductFormValues = z.infer<typeof productSchema> & {
