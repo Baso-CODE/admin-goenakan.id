@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Command,
   CommandEmpty,
@@ -46,7 +46,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useProductFormV2 } from "@/hooks/useProductFormV2";
 import { cn } from "@/lib/utils";
-import { Check, ChevronsUpDown, Loader2, RefreshCw, X } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, RefreshCw, X, Layers } from "lucide-react";
 import { AddItemCategoryModal } from "../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../item-names-product/components/addItemNameModal";
 import CreateCategoryModal from "../../product-categories/components/createCategoryModal";
@@ -616,77 +616,6 @@ export default function ProductFormV2({
                         max={10}
                         onFilesChange={setters.setProductImagesFiles}
                       />
-                      {previewUrl && (
-                        <div className="mt-3 pt-3 border-t space-y-4">
-                          <div className="flex justify-end">
-                            <ProductMockupModal
-                              productName={form.watch("name") || "Produk Baru"}
-                              productSku={form.watch("sku") || "SKU-TEMP"}
-                              imageUrl={previewUrl}
-                              triggerLabel="Live Mockup Preview"
-                            />
-                          </div>
-
-                          <div className="flex items-center justify-between bg-stone-50 dark:bg-stone-950 p-3 rounded-lg border">
-                            <div>
-                              <h4 className="text-sm font-semibold">Tentukan Area Logo</h4>
-                              <p className="text-xs text-stone-500 dark:text-stone-400 font-normal">Batasi area penempatan logo pembeli pada mockup produk ini</p>
-                            </div>
-                            <Switch
-                              checked={form.watch("mockupAreaX") !== null}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  form.setValue("mockupAreaX", 25);
-                                  form.setValue("mockupAreaY", 25);
-                                  form.setValue("mockupAreaWidth", 50);
-                                  form.setValue("mockupAreaHeight", 50);
-                                } else {
-                                  form.setValue("mockupAreaX", null);
-                                  form.setValue("mockupAreaY", null);
-                                  form.setValue("mockupAreaWidth", null);
-                                  form.setValue("mockupAreaHeight", null);
-                                }
-                              }}
-                            />
-                          </div>
-
-                          {form.watch("mockupAreaX") !== null && (
-                            <div className="flex justify-center p-4 border rounded-lg bg-white dark:bg-stone-900 shadow-sm">
-                              <MockupAreaSelector
-                                imageUrl={previewUrl}
-                                areas={
-                                  form.watch("mockupAreaX") !== null
-                                    ? [
-                                        {
-                                          id: "legacy",
-                                          x: form.watch("mockupAreaX") ?? 25,
-                                          y: form.watch("mockupAreaY") ?? 25,
-                                          width: form.watch("mockupAreaWidth") ?? 50,
-                                          height: form.watch("mockupAreaHeight") ?? 50,
-                                          label: "Logo Area",
-                                        },
-                                      ]
-                                    : []
-                                }
-                                onChange={(newAreas) => {
-                                  if (newAreas && newAreas.length > 0) {
-                                    const area = newAreas[0];
-                                    form.setValue("mockupAreaX", area.x);
-                                    form.setValue("mockupAreaY", area.y);
-                                    form.setValue("mockupAreaWidth", area.width);
-                                    form.setValue("mockupAreaHeight", area.height);
-                                  } else {
-                                    form.setValue("mockupAreaX", null);
-                                    form.setValue("mockupAreaY", null);
-                                    form.setValue("mockupAreaWidth", null);
-                                    form.setValue("mockupAreaHeight", null);
-                                  }
-                                }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                     <div className="border border-stone-100 dark:border-stone-800/80 p-4 rounded-lg shadow-sm">
                       <UploadVideos
@@ -713,31 +642,124 @@ export default function ProductFormV2({
                 </div>
               </TabsContent>
 
-              {/* Tab 4: Kustomisasi */}
+              {/* Tab 4: Kustomisasi & Varian */}
               <TabsContent value="customization" forceMount className="space-y-6 animate-fade-in focus-visible:outline-none data-[state=inactive]:hidden">
                 {state.isCustomProduct && (
-                  <div className="rounded-xl border border-stone-200 dark:border-stone-800 p-6 bg-white dark:bg-stone-900 shadow-sm space-y-6 animate-in fade-in zoom-in duration-300">
-                    <h3 className="text-lg font-semibold tracking-tight border-b pb-2 mb-4 flex items-center gap-2 text-stone-800 dark:text-stone-200">
-                      ⚙️ Kustomisasi & Varian
-                    </h3>
-                    
-                    <div className="border rounded-xl p-6 bg-stone-50/50 dark:bg-stone-950/30">
-                      <h4 className="font-semibold mb-3 text-base text-stone-700 dark:text-stone-300">
-                        Konfigurasi Varian
-                      </h4>
-                      <AttributeSelector
-                        value={state.attributeSelections}
-                        onChange={handlers.handleAddAttributeToForm}
-                      />
-                      <div className="border-t mt-3 pt-3 flex justify-end">
-                        <Button
-                          variant="secondary"
-                          type="button"
-                          onClick={handlers.handleGenerateVariants}>
-                          Generate Variants
-                        </Button>
+                  <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+                    <div className="rounded-xl border border-stone-200 dark:border-stone-800 p-6 bg-white dark:bg-stone-900 shadow-sm space-y-6">
+                      <h3 className="text-lg font-semibold tracking-tight border-b pb-2 mb-4 flex items-center gap-2 text-stone-800 dark:text-stone-200">
+                        ⚙️ Kustomisasi & Varian
+                      </h3>
+                      
+                      <div className="border rounded-xl p-6 bg-stone-50/50 dark:bg-stone-950/30">
+                        <h4 className="font-semibold mb-3 text-base text-stone-700 dark:text-stone-300">
+                          Konfigurasi Varian
+                        </h4>
+                        <AttributeSelector
+                          value={state.attributeSelections}
+                          onChange={handlers.handleAddAttributeToForm}
+                        />
+                        <div className="border-t mt-3 pt-3 flex justify-end">
+                          <Button
+                            variant="secondary"
+                            type="button"
+                            onClick={handlers.handleGenerateVariants}>
+                            Generate Variants
+                          </Button>
+                        </div>
                       </div>
                     </div>
+
+                    <Card className="border-stone-200 dark:border-stone-800 shadow-sm">
+                      <CardHeader className="bg-stone-50/50 dark:bg-stone-900/50 border-b pb-4">
+                        <CardTitle className="text-sm font-bold uppercase tracking-wider text-stone-800 dark:text-stone-100 flex items-center gap-2">
+                          <Layers className="h-4.5 w-4.5 text-indigo-500" /> Area Custom & Hubungan Gambar Atribut
+                        </CardTitle>
+                        <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">
+                          Atur area mockup pada gambar dan hubungkan gambar ke nilai atribut spesifik.
+                        </p>
+                      </CardHeader>
+                      <CardContent className="space-y-6 pt-6">
+                        {previewUrl ? (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between bg-stone-50 dark:bg-stone-950 p-3 rounded-lg border">
+                              <div>
+                                <h4 className="text-sm font-semibold">Tentukan Area Logo</h4>
+                                <p className="text-xs text-stone-500 dark:text-stone-400 font-normal">Batasi area penempatan logo pembeli pada mockup produk ini</p>
+                              </div>
+                              <Switch
+                                checked={form.watch("mockupAreaX") !== null}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    form.setValue("mockupAreaX", 25);
+                                    form.setValue("mockupAreaY", 25);
+                                    form.setValue("mockupAreaWidth", 50);
+                                    form.setValue("mockupAreaHeight", 50);
+                                  } else {
+                                    form.setValue("mockupAreaX", null);
+                                    form.setValue("mockupAreaY", null);
+                                    form.setValue("mockupAreaWidth", null);
+                                    form.setValue("mockupAreaHeight", null);
+                                  }
+                                }}
+                              />
+                            </div>
+
+                            {form.watch("mockupAreaX") !== null && (
+                              <div className="flex flex-col gap-4">
+                                <div className="flex justify-center p-4 border rounded-lg bg-white dark:bg-stone-900 shadow-sm">
+                                  <MockupAreaSelector
+                                    imageUrl={previewUrl}
+                                    areas={
+                                      form.watch("mockupAreaX") !== null
+                                        ? [
+                                            {
+                                              id: "legacy",
+                                              x: form.watch("mockupAreaX") ?? 25,
+                                              y: form.watch("mockupAreaY") ?? 25,
+                                              width: form.watch("mockupAreaWidth") ?? 50,
+                                              height: form.watch("mockupAreaHeight") ?? 50,
+                                              label: "Logo Area",
+                                            },
+                                          ]
+                                        : []
+                                    }
+                                    onChange={(newAreas) => {
+                                      if (newAreas && newAreas.length > 0) {
+                                        const area = newAreas[0];
+                                        form.setValue("mockupAreaX", area.x);
+                                        form.setValue("mockupAreaY", area.y);
+                                        form.setValue("mockupAreaWidth", area.width);
+                                        form.setValue("mockupAreaHeight", area.height);
+                                      } else {
+                                        form.setValue("mockupAreaX", null);
+                                        form.setValue("mockupAreaY", null);
+                                        form.setValue("mockupAreaWidth", null);
+                                        form.setValue("mockupAreaHeight", null);
+                                      }
+                                    }}
+                                  />
+                                </div>
+
+                                <div className="flex justify-end">
+                                  <ProductMockupModal
+                                    productName={form.watch("name") || "Produk Baru"}
+                                    productSku={form.watch("sku") || "SKU-TEMP"}
+                                    imageUrl={previewUrl}
+                                    triggerLabel="Live Mockup Preview"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 border border-dashed rounded-lg border-stone-300 dark:border-stone-750">
+                            <p className="text-sm text-stone-500 italic">Silakan unggah Gambar Utama terlebih dahulu di tab Media & Visual.</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
                     {state.combinations.length > 0 && (
                       <div className="border rounded-xl p-6 bg-white dark:bg-stone-900 shadow-sm">
                         <VariantList
