@@ -46,7 +46,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useProductFormV2 } from "@/hooks/useProductFormV2";
 import { cn } from "@/lib/utils";
-import { Check, ChevronsUpDown, Loader2, RefreshCw, X, Layers, PlusCircle, Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, RefreshCw, X, Layers, PlusCircle, Trash2, Plus } from "lucide-react";
 import { AddItemCategoryModal } from "../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../item-names-product/components/addItemNameModal";
 import CreateCategoryModal from "../../product-categories/components/createCategoryModal";
@@ -990,89 +990,79 @@ export default function ProductFormV2({
                       </CardContent>
                     </Card>
 
-                    {/* Card 3: Generated Variants */}
-                    <Card className="border-stone-200 dark:border-stone-800 shadow-sm">
-                      <CardHeader className="bg-stone-50/50 dark:bg-stone-900/50 border-b pb-4 flex flex-row items-center justify-between">
-                        <div>
-                          <CardTitle className="text-sm font-bold uppercase tracking-wider text-stone-800 dark:text-stone-100 flex items-center gap-2">
-                            <PlusCircle className="h-4.5 w-4.5 text-indigo-500" /> Generated Variants
-                          </CardTitle>
-                          <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">
-                            Atur harga, stok, dan gambar khusus untuk masing-masing kombinasi varian.
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handlers.handleGenerateVariants}
-                            className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold"
-                          >
-                            Generate Variants
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handlers.handleAddCustomVariant}
-                            className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold"
-                          >
-                            Add Custom Variant
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="pt-6 space-y-6">
-                        {state.combinations.length > 0 && (
-                          <div className="flex flex-wrap items-center justify-between gap-4 p-4 border rounded-xl bg-stone-50/50">
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs font-semibold text-stone-700">Global Stock Adjuster:</span>
-                              <Input
-                                type="number"
-                                min="0"
-                                placeholder="Stock qty"
-                                value={globalStock}
-                                onChange={(e) => setGlobalStock(e.target.value)}
-                                className="w-28 bg-white h-8 text-xs"
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  const stockNum = parseInt(globalStock);
-                                  if (isNaN(stockNum) || stockNum < 0) {
-                                    toast.error("Masukkan jumlah stok yang valid");
-                                    return;
-                                  }
-                                  state.combinations.forEach((_, idx) => {
-                                    handlers.handleUpdateVariantMeta(idx, "stock", stockNum);
-                                  });
-                                  toast.success(`Berhasil menerapkan stok ${stockNum} ke semua varian.`);
-                                }}
-                                className="h-8 text-xs font-semibold"
-                              >
-                                Apply to All
-                              </Button>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => {
-                                if (confirm("Apakah Anda yakin ingin menghapus semua varian?")) {
-                                  handlers.handleClearAllVariants();
-                                  toast.success("Semua varian berhasil dihapus.");
-                                }
-                              }}
-                              className="space-x-1.5 h-8 text-xs font-semibold"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              <span>Delete All Variants</span>
-                            </Button>
-                          </div>
-                        )}
+                    {/* Section 3: Product Variants Configuration */}
+                    <div className="space-y-6 border p-6 rounded-xl bg-white shadow-sm border-stone-200 dark:border-stone-800">
+                      <h3 className="text-xl font-bold tracking-tight text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                        📦 Product Variants Configuration
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        Define basic properties and media for each product combination.
+                      </p>
+                      <hr />
 
+                      <div className="flex justify-between items-center">
+                        <Button
+                          variant="secondary"
+                          type="button"
+                          onClick={handlers.handleGenerateVariants}
+                          className="space-x-2"
+                        >
+                          <Plus className="h-4 w-4" />
+                          <span>Generate Variants from Attributes</span>
+                        </Button>
+                        <Button variant="outline" type="button" onClick={handlers.handleAddCustomVariant}>
+                          Add Custom Variant
+                        </Button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-4 p-4 border rounded-xl bg-stone-50">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-semibold text-stone-700">Global Stock Adjuster:</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="Stock qty"
+                            value={globalStock}
+                            onChange={(e) => setGlobalStock(e.target.value)}
+                            className="w-28 bg-white"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              const stockNum = parseInt(globalStock);
+                              if (isNaN(stockNum) || stockNum < 0) {
+                                toast.error("Masukkan jumlah stok yang valid");
+                                return;
+                              }
+                              state.combinations.forEach((_, idx) => {
+                                handlers.handleUpdateVariantMeta(idx, "stock", stockNum);
+                              });
+                              toast.success(`Berhasil menerapkan stok ${stockNum} ke semua varian.`);
+                            }}
+                          >
+                            Apply to All
+                          </Button>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={() => {
+                            if (confirm("Apakah Anda yakin ingin menghapus semua varian?")) {
+                              handlers.handleClearAllVariants();
+                              toast.success("Semua varian berhasil dihapus.");
+                            }
+                          }}
+                          className="space-x-2"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span>Delete All Variants</span>
+                        </Button>
+                      </div>
+
+                      <hr />
+
+                      <div className="space-y-8">
                         {state.combinations.length > 0 ? (
                           <VariantList
                             combinations={state.combinations}
@@ -1087,8 +1077,8 @@ export default function ProductFormV2({
                             <p className="text-sm text-stone-500 italic">Belum ada varian yang dibuat. Klik tombol Generate Variants di atas untuk membuat kombinasi.</p>
                           </div>
                         )}
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </div>
 
                   </div>
                 )}
