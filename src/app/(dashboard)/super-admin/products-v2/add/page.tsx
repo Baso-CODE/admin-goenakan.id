@@ -48,7 +48,8 @@ export default function AddProductPage() {
         });
       }
 
-      const productDataJson = JSON.stringify(data);
+      const { mockupSides, ...cleanData } = data as any;
+      const productDataJson = JSON.stringify(cleanData);
       formData.append("data", productDataJson);
 
       const res = await fetchApi("/products", {
@@ -60,6 +61,35 @@ export default function AddProductPage() {
 
       if (!res.ok) {
         throw new Error(result.message || "Failed to create product");
+      }
+
+      // If there are mockup sides defined locally, update them sequentially
+      if (mockupSides && mockupSides.length > 0 && result.images && result.images.length > 0) {
+        for (const side of mockupSides) {
+          if (!side.imageId) continue;
+
+          const fileIndex = parseInt(side.imageId.replace("index-", ""));
+          const createdImage = result.images[fileIndex];
+          if (!createdImage) continue;
+
+          // 1. Update image mockup metadata
+          await fetchApi(`/products/image/${createdImage.id}/seo`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              mockupSideName: side.name,
+              attributeValueId: side.attributeValueId,
+              printPositionValueId: side.printPositionValueId,
+            }),
+          });
+
+          // 2. Update mockup areas
+          if (side.mockupAreas && side.mockupAreas.length > 0) {
+            await fetchApi(`/products/image/${createdImage.id}/mockups`, {
+              method: "PUT",
+              body: JSON.stringify({ mockupAreas: side.mockupAreas }),
+            });
+          }
+        }
       }
 
       toast.success("Product created successfully!");

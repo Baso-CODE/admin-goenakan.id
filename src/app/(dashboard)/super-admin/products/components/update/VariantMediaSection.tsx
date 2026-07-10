@@ -216,7 +216,10 @@ export default function FormUpdateProductMedia({
         <CardContent className="space-y-6">
           {/* --- Gambar Produk --- */}
           <div>
-            <h3 className="text-lg font-medium mb-2">Gambar Produk</h3>
+            <h3 className="text-lg font-medium mb-1">Gambar Produk</h3>
+            <p className="text-xs text-stone-500 mb-3">
+              Setiap gambar yang berhasil diunggah akan otomatis dikonversi ke format <strong>.webp</strong> untuk mengoptimalkan performa pemuatan halaman.
+            </p>
             <ExistingMediaDisplay
               media={initialData?.images || []}
               type="image"

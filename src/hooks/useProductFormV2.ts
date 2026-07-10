@@ -70,6 +70,7 @@ export function useProductFormV2(
       height: 0,
       length: 0,
       isCustom: false,
+      isMadeByOrder: false,
       materialTypeId: "",
       stock: 0,
       attributes: [],
@@ -81,6 +82,7 @@ export function useProductFormV2(
       mockupAreaY: null,
       mockupAreaWidth: null,
       mockupAreaHeight: null,
+      mockupSides: [],
     },
   });
 
@@ -397,9 +399,20 @@ export function useProductFormV2(
 
   const submit = async (values: ProductFormValues) => {
     try {
+      const basePriceVal = Number(values.basePrice) || 0;
+      const mappedPriceTiers = (values.priceTiers || []).map((tier: any) => {
+        const discountVal = Number(tier.discount || 0);
+        const calculatedPrice = Math.max(0, basePriceVal - discountVal);
+        return {
+          minQuantity: Number(tier.minQuantity || 1),
+          maxQuantity: tier.maxQuantity ? Number(tier.maxQuantity) : null,
+          price: String(calculatedPrice),
+        };
+      });
+
       const payload = {
         ...values,
-        basePrice: Number(values.basePrice),
+        basePrice: basePriceVal,
         stock: isCustomProduct ? 0 : Number(values.stock || 0),
         weight: Number(values.weight || 0),
         width: Number(values.width || 0),
@@ -407,6 +420,7 @@ export function useProductFormV2(
         length: Number(values.length || 0),
         attributes: isCustomProduct ? attributeSelections : undefined,
         variantImagesMetadata: isCustomProduct ? variantMetas : [],
+        priceTiers: mappedPriceTiers,
       };
 
       const filesToSubmit = {
@@ -418,6 +432,58 @@ export function useProductFormV2(
     } catch (err) {
       toast.error("Failed to submit product form");
     }
+  };
+
+  const handleClearAllVariants = () => {
+    setCombinations([]);
+    setVariantMetas([]);
+    setVariantFilesMap([]);
+    form.setValue("variantImagesMetadata", []);
+  };
+
+  const handleRemoveVariant = (idx: number) => {
+    setCombinations((prev) => prev.filter((_, i) => i !== idx));
+    setVariantMetas((prev) => {
+      const filtered = prev.filter((_, i) => i !== idx);
+      const reindexed = filtered.map((meta, i) => ({
+        ...meta,
+        variantIndex: i,
+      }));
+      form.setValue("variantImagesMetadata", reindexed);
+      return reindexed;
+    });
+    setVariantFilesMap((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddCustomVariant = () => {
+    const nextIdx = combinations.length;
+    const newCombo = {
+      label: `Custom Variant ${nextIdx + 1}`,
+      valueIds: [],
+    };
+    const newMeta = {
+      variantIndex: nextIdx,
+      price: Number(form.getValues("basePrice")) || 0,
+      stock: 0,
+      isFeatured: false,
+      altText: "",
+      description: "",
+      priceTiers: [],
+    };
+
+    setCombinations((prev) => [...prev, newCombo]);
+    setVariantMetas((prev) => {
+      const updated = [...prev, newMeta];
+      form.setValue("variantImagesMetadata", updated);
+      return updated;
+    });
+    setVariantFilesMap((prev) => [...prev, []]);
+  };
+
+  const handleUpdateVariantLabel = (idx: number, newLabel: string) => {
+    setCombinations((prev) =>
+      prev.map((c, i) => (i === idx ? { ...c, label: newLabel } : c))
+    );
   };
 
   // Return everything needed by the UI
@@ -448,6 +514,7 @@ export function useProductFormV2(
       selectedCategoryId,
       selectedItemCategoryId,
       productImagesFiles,
+      attributesList,
     },
     setters: {
       setIsCategoryModalOpen,
@@ -492,6 +559,10 @@ export function useProductFormV2(
         form.setValue("attributes", attrs);
         setAttributesList(fullAttrs);
       },
+      handleClearAllVariants,
+      handleRemoveVariant,
+      handleAddCustomVariant,
+      handleUpdateVariantLabel,
     },
   };
 }

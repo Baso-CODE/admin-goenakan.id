@@ -42,7 +42,7 @@ type AttributeFromServer = {
     value: string;
     attributeId: string;
   } | null;
-  values: { id: string; value: string; attributeId?: string }[];
+  values: { id: string; value: string; position?: number; attributeId?: string }[];
 };
 
 export type SelectedAttributeRow = {
@@ -526,21 +526,37 @@ export function AttributeSelector({
       toast.error("Please select an attribute to clone.");
       return;
     }
-    if (!productId) {
-      toast.error("Product ID is required for cloning.");
-      return;
-    }
 
     setSubmittingClone(true);
     try {
-      const res = await fetchApi("/product-attributes/clone", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sourceAttributeId: selectedCloneId,
-          targetProductId: productId,
-        }),
-      });
+      let res;
+      if (productId) {
+        res = await fetchApi("/product-attributes/clone", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sourceAttributeId: selectedCloneId,
+            targetProductId: productId,
+          }),
+        });
+      } else {
+        const sourceAttr = allAttributes.find((attr) => attr.id === selectedCloneId);
+        if (!sourceAttr) {
+          throw new Error("Source attribute not found.");
+        }
+        res = await fetchApi("/product-attributes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: sourceAttr.name,
+            type: sourceAttr.type || "TEXT",
+            values: sourceAttr.values.map((v) => ({
+              value: v.value,
+              position: v.position,
+            })),
+          }),
+        });
+      }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -663,67 +679,70 @@ export function AttributeSelector({
           </Dialog>
 
           {/* Clone Attribute Dialog */}
-          {productId && (
-            <Dialog open={isCloneOpen} onOpenChange={setIsCloneOpen}>
-              <DialogTrigger asChild>
-                <Button type="button" variant="outline" size="sm" className="space-x-1 border-indigo-200 text-indigo-700 hover:bg-indigo-50">
-                  <Plus className="h-4 w-4" />
-                  <span>Clone Attribute</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md w-full bg-white text-slate-900 border">
-                <form onSubmit={handleCloneAttribute} className="space-y-4">
-                  <DialogHeader>
-                    <DialogTitle className="text-slate-900">Clone Attribute</DialogTitle>
-                    <DialogDescription className="text-slate-500">
-                      Clone an existing attribute from another product or a global attribute. This creates a local copy for this product.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-3">
-                    <Label htmlFor="clone-select" className="text-slate-700 text-sm font-semibold">Select Attribute to Clone</Label>
-                    <Select
-                      value={selectedCloneId}
-                      onValueChange={setSelectedCloneId}
-                    >
-                      <SelectTrigger id="clone-select" className="w-full mt-1 border-slate-300 bg-white text-slate-800">
-                        <SelectValue placeholder="Choose attribute..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border">
-                        {cloneableAttributes.map((attr) => (
-                          <SelectItem key={attr.id} value={attr.id} className="hover:bg-slate-50">
-                            {attr.name} ({attr.values.map(v => v.value).join(", ")})
-                          </SelectItem>
-                        ))}
-                        {cloneableAttributes.length === 0 && (
-                          <p className="p-2 text-xs text-slate-500 text-center">
-                            No attributes available to clone.
-                          </p>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <DialogFooter className="gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsCloneOpen(false)}
-                      disabled={submittingClone}
-                      className="border-slate-300 text-slate-700 hover:bg-slate-50"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={submittingClone || !selectedCloneId}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                    >
-                      {submittingClone ? "Cloning..." : "Clone"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-          )}
+          <Dialog open={isCloneOpen} onOpenChange={(open) => {
+            setIsCloneOpen(open);
+            if (open) {
+              fetchAllAttributesForClone();
+            }
+          }}>
+            <DialogTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="space-x-1 border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                <Plus className="h-4 w-4" />
+                <span>Clone Attribute</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md w-full bg-white text-slate-900 border">
+              <form onSubmit={handleCloneAttribute} className="space-y-4">
+                <DialogHeader>
+                  <DialogTitle className="text-slate-900">Clone Attribute</DialogTitle>
+                  <DialogDescription className="text-slate-500">
+                    Clone an existing attribute from another product or a global attribute. This creates a local copy for this product.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <Label htmlFor="clone-select" className="text-slate-700 text-sm font-semibold">Select Attribute to Clone</Label>
+                  <Select
+                    value={selectedCloneId}
+                    onValueChange={setSelectedCloneId}
+                  >
+                    <SelectTrigger id="clone-select" className="w-full mt-1 border-slate-300 bg-white text-slate-800">
+                      <SelectValue placeholder="Choose attribute..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border">
+                      {cloneableAttributes.map((attr) => (
+                        <SelectItem key={attr.id} value={attr.id} className="hover:bg-slate-50">
+                          {attr.name} ({attr.values.map(v => v.value).join(", ")})
+                        </SelectItem>
+                      ))}
+                      {cloneableAttributes.length === 0 && (
+                        <p className="p-2 text-xs text-slate-500 text-center">
+                          No attributes available to clone.
+                        </p>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <DialogFooter className="gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsCloneOpen(false)}
+                    disabled={submittingClone}
+                    className="border-slate-300 text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={submittingClone || !selectedCloneId}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    {submittingClone ? "Cloning..." : "Clone"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
 
           {/* Add Attribute Row Button */}
           <Button type="button" onClick={add} variant="default" size="sm" className="space-x-1 bg-slate-900 hover:bg-slate-800 text-white">
