@@ -188,12 +188,34 @@ export default function ProductFormV2({
     }
   }, [state.productImagesFiles]);
 
+  const onInvalid = (errors: any) => {
+    const fieldLabels: Record<string, string> = {
+      name: "Nama Produk",
+      categoryId: "Kategori Produk",
+      itemCategoryId: "Item Category",
+      itemNameId: "Item Name",
+      materialTypeId: "Material Type",
+      basePrice: "Harga Dasar",
+      description: "Deskripsi",
+      sku: "SKU",
+      weight: "Berat",
+      length: "Panjang",
+      width: "Lebar",
+      height: "Tinggi",
+    };
+
+    const missingFields = Object.keys(errors)
+      .map((key) => fieldLabels[key] || key);
+
+    toast.error(`Mohon lengkapi field berikut: ${missingFields.join(", ")}`);
+  };
+
   return (
     <>
       <Card className="w-full pt-2">
       <CardContent className="pt-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(submit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(submit, onInvalid)} className="space-y-6">
             <Tabs defaultValue="identity" className="w-full space-y-6">
               <TabsList className="grid w-full grid-cols-4 p-1 bg-stone-100 dark:bg-stone-800 rounded-lg">
                 <TabsTrigger value="identity" className="font-semibold text-xs sm:text-sm">1. Informasi Utama</TabsTrigger>
@@ -358,9 +380,23 @@ export default function ProductFormV2({
                               onValueChange={(val) => {
                                 if (val === "ADD_NEW_ITEM_NAME")
                                   return setters.setIsItemNameModalOpen(true);
+
+                                const oldVal = form.getValues("itemNameId");
+                                const oldItem = state.itemNames.find((inm) => inm.id === oldVal);
+                                const newItem = state.itemNames.find((inm) => inm.id === val);
+
+                                let currentName = form.getValues("name") || "";
+                                if (newItem) {
+                                  if (oldItem && currentName.startsWith(oldItem.name)) {
+                                    currentName = currentName.replace(oldItem.name, newItem.name);
+                                  } else if (!currentName.startsWith(newItem.name)) {
+                                    currentName = currentName ? `${newItem.name} ${currentName}` : newItem.name;
+                                  }
+                                  form.setValue("name", currentName);
+                                }
+
                                 field.onChange(val);
-                              }}
-                              disabled={!state.selectedItemCategoryId}>
+                              }}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Pilih Nama Item" />
@@ -1127,6 +1163,18 @@ export default function ProductFormV2({
         itemCategories={state.itemCategories}
         onSuccess={(newName) => {
           setters.setItemNames((p) => [...p, newName]);
+
+          const oldVal = form.getValues("itemNameId");
+          const oldItem = state.itemNames.find((inm) => inm.id === oldVal);
+
+          let currentName = form.getValues("name") || "";
+          if (oldItem && currentName.startsWith(oldItem.name)) {
+            currentName = currentName.replace(oldItem.name, newName.name);
+          } else if (!currentName.startsWith(newName.name)) {
+            currentName = currentName ? `${newName.name} ${currentName}` : newName.name;
+          }
+          form.setValue("name", currentName);
+
           form.setValue("itemNameId", newName.id);
         }}
       />

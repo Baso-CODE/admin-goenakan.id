@@ -65,6 +65,7 @@ export function AddItemNameModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!name || !itemCategoryId) {
       toast.error("Nama dan Item Category (Parent) wajib diisi!");
       return;

@@ -130,10 +130,9 @@ export function useProductFormV2(
 
   useEffect(() => {
     const fetchItemNames = async () => {
-      if (!selectedItemCategoryId) return setItemNames([]);
       try {
         const res = await fetchApi(
-          `/item-names?itemCategoryId=${selectedItemCategoryId}&take=100`,
+          "/item-names?take=500",
         );
         const result = await res.json();
         setItemNames(result.data || []);
@@ -142,7 +141,7 @@ export function useProductFormV2(
       }
     };
     fetchItemNames();
-  }, [selectedItemCategoryId, fetchApi]);
+  }, [fetchApi]);
 
   useEffect(() => {
     if (!isCustomProduct) {

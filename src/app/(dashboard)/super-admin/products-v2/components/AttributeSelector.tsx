@@ -522,6 +522,7 @@ export function AttributeSelector({
 
   const handleCloneAttribute = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!selectedCloneId) {
       toast.error("Please select an attribute to clone.");
       return;
@@ -612,7 +613,14 @@ export function AttributeSelector({
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md w-full bg-white text-slate-900 border max-h-[85vh] flex flex-col">
-              <form onSubmit={localForm.handleSubmit(onSubmitCreate)} className="space-y-4 flex-1 flex flex-col min-h-0">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  localForm.handleSubmit(onSubmitCreate)(e);
+                }}
+                className="space-y-4 flex-1 flex flex-col min-h-0"
+              >
                 <DialogHeader className="shrink-0">
                   <DialogTitle className="text-slate-900">{editingAttributeId ? "Edit Attribute" : "Create Local Attribute"}</DialogTitle>
                   <DialogDescription className="text-slate-500">
@@ -709,11 +717,16 @@ export function AttributeSelector({
                       <SelectValue placeholder="Choose attribute..." />
                     </SelectTrigger>
                     <SelectContent className="bg-white border">
-                      {cloneableAttributes.map((attr) => (
-                        <SelectItem key={attr.id} value={attr.id} className="hover:bg-slate-50">
-                          {attr.name} ({attr.values.map(v => v.value).join(", ")})
-                        </SelectItem>
-                      ))}
+                      {cloneableAttributes.map((attr) => {
+                        const fullText = `${attr.name} (${attr.values.map((v) => v.value).join(", ")})`;
+                        return (
+                          <SelectItem key={attr.id} value={attr.id} className="hover:bg-slate-50 max-w-full">
+                            <span className="block truncate max-w-[240px] sm:max-w-[340px]" title={fullText}>
+                              {fullText}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
                       {cloneableAttributes.length === 0 && (
                         <p className="p-2 text-xs text-slate-500 text-center">
                           No attributes available to clone.
