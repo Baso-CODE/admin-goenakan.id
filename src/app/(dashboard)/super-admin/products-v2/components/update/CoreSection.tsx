@@ -43,6 +43,11 @@ import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { CheckCheck, ChevronsUpDown, RefreshCw, X } from "lucide-react";
+import CreateCategoryModal from "../../../product-categories/components/createCategoryModal";
+import { AddItemCategoryModal } from "../../../item-categories-product/components/addItemCategoryModal";
+import { AddItemNameModal } from "../../../item-names-product/components/addItemNameModal";
+import MaterialTypeForm from "../../../product-materials/components/materialTypeForm";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 
 const FormCoreSchema = z.object({
@@ -105,6 +110,13 @@ export default function FormProductCore({
   const [loadingData, setLoadingData] = useState(true);
   const [isGeneratingSku, setIsGeneratingSku] = useState(false);
 
+  // States for inline creation modals
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isItemCategoryModalOpen, setIsItemCategoryModalOpen] = useState(false);
+  const [isItemNameModalOpen, setIsItemNameModalOpen] = useState(false);
+  const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
+  const [isSubmittingMaterial, setIsSubmittingMaterial] = useState(false);
+
   const form = useForm<ProductCoreFormValues>({
     resolver: zodResolver(FormCoreSchema) as any,
     defaultValues: {
@@ -132,6 +144,8 @@ export default function FormProductCore({
   });
 
   const isCustomProduct = form.watch("isCustom");
+  const selectedCategoryId = form.watch("categoryId");
+  const selectedItemCategoryId = form.watch("itemCategoryId");
 
   // ✨ 1. INITIALIZATION API FETCH (Tanpa Race Condition)
   useEffect(() => {
@@ -171,12 +185,13 @@ export default function FormProductCore({
             fetchedItemCats = dataIC.data || [];
           }
 
-          if (initialData.itemCategoryId) {
-            const resIN = await fetchApi(
-              `/item-names?itemCategoryId=${initialData.itemCategoryId}&take=100`,
-            );
+          // B. Ambil data item names secara global
+          try {
+            const resIN = await fetchApi("/item-names?take=500");
             const dataIN = await resIN.json();
             fetchedItemNames = dataIN.data || [];
+          } catch (e) {
+            console.error("Gagal mengambil Item Names:", e);
           }
         }
 
@@ -235,11 +250,14 @@ export default function FormProductCore({
 
   // ✨ 2. FUNGSI HANDLER MANUAL UNTUK DROPDOWN (Lebih stabil dari useEffect)
   const handleCategoryChange = async (val: string) => {
+    if (val === "ADD_NEW_CATEGORY") {
+      setIsCategoryModalOpen(true);
+      return;
+    }
     form.setValue("categoryId", val);
     form.setValue("itemCategoryId", ""); // Kosongkan anak
     form.setValue("itemNameId", ""); // Kosongkan cucu
     setItemCategories([]);
-    setItemNames([]);
 
     if (!val) return;
     try {
@@ -254,17 +272,56 @@ export default function FormProductCore({
   };
 
   const handleItemCategoryChange = async (val: string) => {
+    if (val === "ADD_NEW_ITEM_CATEGORY") {
+      setIsItemCategoryModalOpen(true);
+      return;
+    }
     form.setValue("itemCategoryId", val);
     form.setValue("itemNameId", ""); // Kosongkan cucu
-    setItemNames([]);
+  };
 
-    if (!val) return;
+  const handleCategoryAdded = (newCat: any) => {
+    setCategories((prev) => [...prev, newCat]);
+    form.setValue("categoryId", String(newCat.id));
+    form.setValue("itemCategoryId", "");
+    form.setValue("itemNameId", "");
+  };
+
+  const handleItemCategoryAdded = (newVal: any) => {
+    setItemCategories((prev) => [...prev, newVal]);
+    form.setValue("itemCategoryId", String(newVal.id));
+    form.setValue("itemNameId", "");
+  };
+
+  const handleItemNameAdded = (newVal: any) => {
+    setItemNames((prev) => [...prev, newVal]);
+    form.setValue("itemNameId", String(newVal.id));
+
+    // Auto-prefix product name with newly created item name
+    let currentName = form.getValues("name") || "";
+    if (!currentName.startsWith(newVal.name)) {
+      currentName = currentName ? `${newVal.name} ${currentName}` : newVal.name;
+      form.setValue("name", currentName);
+    }
+  };
+
+  const handleAddMaterialSubmit = async (values: any) => {
+    setIsSubmittingMaterial(true);
     try {
-      const res = await fetchApi(`/item-names?itemCategoryId=${val}&take=100`);
-      const result = await res.json();
-      setItemNames(result.data || []);
-    } catch (e) {
-      toast.error("Gagal memuat item names");
+      const res = await fetchApi("/material-types", {
+        method: "POST",
+        body: JSON.stringify(values),
+      });
+      if (!res.ok) throw new Error("Gagal menambah material");
+      const newVal = await res.json();
+      setMaterialTypes((prev) => [...prev, newVal]);
+      form.setValue("materialTypeId", String(newVal.id));
+      setIsMaterialModalOpen(false);
+      toast.success("Material berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menambah material");
+    } finally {
+      setIsSubmittingMaterial(false);
     }
   };
 
@@ -310,10 +367,33 @@ export default function FormProductCore({
     }
   };
 
+  const onInvalid = (errors: any) => {
+    const fieldLabels: Record<string, string> = {
+      name: "Nama Produk",
+      categoryId: "Kategori Produk",
+      itemCategoryId: "Item Category",
+      itemNameId: "Item Name",
+      materialTypeId: "Material Type",
+      basePrice: "Harga Dasar",
+      description: "Deskripsi",
+      sku: "SKU",
+      weight: "Berat",
+      length: "Panjang",
+      width: "Lebar",
+      height: "Tinggi",
+    };
+
+    const missingFields = Object.keys(errors)
+      .map((key) => fieldLabels[key] || key);
+
+    toast.error(`Mohon lengkapi field berikut: ${missingFields.join(", ")}`);
+  };
+
   return (
-    <Form {...form}>
+    <>
+      <Form {...form}>
       <form
-        onSubmit={form.handleSubmit(onSubmit)}
+        onSubmit={form.handleSubmit(onSubmit, onInvalid)}
         className="space-y-8 border p-6 rounded-md bg-white shadow-sm">
         
         {/* Keterangan Konfigurasi Dasar */}
@@ -383,7 +463,6 @@ export default function FormProductCore({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Kategori Utama</FormLabel>
-                  {/* Panggil fungsi manual di onValueChange */}
                   <Select
                     value={field.value || ""}
                     onValueChange={handleCategoryChange}
@@ -393,12 +472,18 @@ export default function FormProductCore({
                         <SelectValue placeholder="Pilih Kategori" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="bg-white border">
                       {categories.map((cat) => (
                         <SelectItem key={cat.id} value={String(cat.id)}>
-                          {cat.name_id || cat.name}
+                          {cat.name_id || cat.name} {cat.code && `(${cat.code})`}
                         </SelectItem>
                       ))}
+                      <div className="h-px bg-stone-200 my-1 mx-1" />
+                      <SelectItem
+                        value="ADD_NEW_CATEGORY"
+                        className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                        + Kategori Baru
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -415,18 +500,24 @@ export default function FormProductCore({
                   <Select
                     value={field.value || ""}
                     onValueChange={handleItemCategoryChange}
-                    disabled={loadingData || itemCategories.length === 0}>
+                    disabled={loadingData || !selectedCategoryId}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Pilih Sub Kategori" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="bg-white border">
                       {itemCategories.map((ic) => (
                         <SelectItem key={ic.id} value={String(ic.id)}>
                           {ic.name}
                         </SelectItem>
                       ))}
+                      <div className="h-px bg-stone-200 my-1 mx-1" />
+                      <SelectItem
+                        value="ADD_NEW_ITEM_CATEGORY"
+                        className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                        + Tambah Item Category Baru
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -442,19 +533,45 @@ export default function FormProductCore({
                   <FormLabel>Item Name</FormLabel>
                   <Select
                     value={field.value || ""}
-                    onValueChange={field.onChange}
-                    disabled={loadingData || itemNames.length === 0}>
+                    onValueChange={(val) => {
+                      if (val === "ADD_NEW_ITEM_NAME") {
+                        setIsItemNameModalOpen(true);
+                        return;
+                      }
+                      const oldVal = form.getValues("itemNameId");
+                      const oldItem = itemNames.find((inm) => inm.id === oldVal);
+                      const newItem = itemNames.find((inm) => inm.id === val);
+
+                      let currentName = form.getValues("name") || "";
+                      if (newItem) {
+                        if (oldItem && currentName.startsWith(oldItem.name)) {
+                          currentName = currentName.replace(oldItem.name, newItem.name);
+                        } else if (!currentName.startsWith(newItem.name)) {
+                          currentName = currentName ? `${newItem.name} ${currentName}` : newItem.name;
+                        }
+                        form.setValue("name", currentName);
+                      }
+
+                      field.onChange(val);
+                    }}
+                    disabled={loadingData}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Pilih Nama Item" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="bg-white border">
                       {itemNames.map((inm) => (
                         <SelectItem key={inm.id} value={String(inm.id)}>
                           {inm.name}
                         </SelectItem>
                       ))}
+                      <div className="h-px bg-stone-200 my-1 mx-1" />
+                      <SelectItem
+                        value="ADD_NEW_ITEM_NAME"
+                        className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                        + Tambah Item Name Baru
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -470,19 +587,31 @@ export default function FormProductCore({
                   <FormLabel>Material</FormLabel>
                   <Select
                     value={field.value || ""}
-                    onValueChange={field.onChange}
+                    onValueChange={(val) => {
+                      if (val === "ADD_NEW_MATERIAL") {
+                        setIsMaterialModalOpen(true);
+                        return;
+                      }
+                      field.onChange(val);
+                    }}
                     disabled={loadingData}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Pilih Material" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="bg-white border">
                       {materialTypes.map((mat) => (
                         <SelectItem key={mat.id} value={String(mat.id)}>
                           {mat.name}
                         </SelectItem>
                       ))}
+                      <div className="h-px bg-stone-200 my-1 mx-1" />
+                      <SelectItem
+                        value="ADD_NEW_MATERIAL"
+                        className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                        + Tambah Material Baru
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -774,5 +903,42 @@ export default function FormProductCore({
         </div>
       </form>
     </Form>
-  );
+
+    {/* MODALS */}
+    <CreateCategoryModal
+      isOpen={isCategoryModalOpen}
+      onClose={() => setIsCategoryModalOpen(false)}
+      onSuccess={handleCategoryAdded}
+    />
+
+    <AddItemCategoryModal
+      isOpen={isItemCategoryModalOpen}
+      onClose={() => setIsItemCategoryModalOpen(false)}
+      onSuccess={handleItemCategoryAdded}
+      parentCategoryId={selectedCategoryId}
+    />
+
+    <AddItemNameModal
+      isOpen={isItemNameModalOpen}
+      onClose={() => setIsItemNameModalOpen(false)}
+      onSuccess={handleItemNameAdded}
+      parentCategoryId={selectedCategoryId}
+      parentItemCategoryId={selectedItemCategoryId}
+      productCategories={categories}
+      itemCategories={itemCategories}
+    />
+
+    <Dialog open={isMaterialModalOpen} onOpenChange={setIsMaterialModalOpen}>
+      <DialogContent className="max-w-md bg-white text-slate-900 border">
+        <DialogHeader>
+          <DialogTitle className="text-slate-900">Tambah Material Baru</DialogTitle>
+        </DialogHeader>
+        <MaterialTypeForm
+          onSubmit={handleAddMaterialSubmit}
+          isSubmitting={isSubmittingMaterial}
+        />
+      </DialogContent>
+    </Dialog>
+  </>
+);
 }

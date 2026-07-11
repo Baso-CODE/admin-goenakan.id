@@ -96,7 +96,11 @@ export default function ProductCategoryForm({
       <CardContent className="pt-6">
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(handleSubmit)}
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              form.handleSubmit(handleSubmit)(e);
+            }}
             className="space-y-6">
             <div className="grid grid-cols-1 gap-6">
               {/* === Category Name === */}

@@ -160,12 +160,13 @@ export default function FormProductCore({
             fetchedItemCats = dataIC.data || [];
           }
 
-          if (initialData.itemCategoryId) {
-            const resIN = await fetchApi(
-              `/item-names?itemCategoryId=${initialData.itemCategoryId}&take=100`,
-            );
+          // B. Ambil data item names secara global
+          try {
+            const resIN = await fetchApi("/item-names?take=500");
             const dataIN = await resIN.json();
             fetchedItemNames = dataIN.data || [];
+          } catch (e) {
+            console.error("Gagal mengambil Item Names:", e);
           }
         }
 
@@ -223,7 +224,6 @@ export default function FormProductCore({
     form.setValue("itemCategoryId", ""); // Kosongkan anak
     form.setValue("itemNameId", ""); // Kosongkan cucu
     setItemCategories([]);
-    setItemNames([]);
 
     if (!val) return;
     try {
@@ -240,16 +240,6 @@ export default function FormProductCore({
   const handleItemCategoryChange = async (val: string) => {
     form.setValue("itemCategoryId", val);
     form.setValue("itemNameId", ""); // Kosongkan cucu
-    setItemNames([]);
-
-    if (!val) return;
-    try {
-      const res = await fetchApi(`/item-names?itemCategoryId=${val}&take=100`);
-      const result = await res.json();
-      setItemNames(result.data || []);
-    } catch (e) {
-      toast.error("Gagal memuat item names");
-    }
   };
 
   // 3. Fungsi Generate SKU
@@ -294,10 +284,32 @@ export default function FormProductCore({
     }
   };
 
+  const onInvalid = (errors: any) => {
+    const fieldLabels: Record<string, string> = {
+      name: "Nama Produk",
+      categoryId: "Kategori Produk",
+      itemCategoryId: "Item Category",
+      itemNameId: "Item Name",
+      materialTypeId: "Material Type",
+      basePrice: "Harga Dasar",
+      description: "Deskripsi",
+      sku: "SKU",
+      weight: "Berat",
+      length: "Panjang",
+      width: "Lebar",
+      height: "Tinggi",
+    };
+
+    const missingFields = Object.keys(errors)
+      .map((key) => fieldLabels[key] || key);
+
+    toast.error(`Mohon lengkapi field berikut: ${missingFields.join(", ")}`);
+  };
+
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit(onSubmit)}
+        onSubmit={form.handleSubmit(onSubmit, onInvalid)}
         className="space-y-8 border p-6 rounded-md bg-white shadow-sm">
         {/* SECTION 1: IDENTITAS PRODUK */}
         <div className="space-y-4">
@@ -419,8 +431,24 @@ export default function FormProductCore({
                   <FormLabel>Item Name</FormLabel>
                   <Select
                     value={field.value || ""}
-                    onValueChange={field.onChange}
-                    disabled={loadingData || itemNames.length === 0}>
+                    onValueChange={(val) => {
+                      const oldVal = form.getValues("itemNameId");
+                      const oldItem = itemNames.find((inm) => inm.id === oldVal);
+                      const newItem = itemNames.find((inm) => inm.id === val);
+
+                      let currentName = form.getValues("name") || "";
+                      if (newItem) {
+                        if (oldItem && currentName.startsWith(oldItem.name)) {
+                          currentName = currentName.replace(oldItem.name, newItem.name);
+                        } else if (!currentName.startsWith(newItem.name)) {
+                          currentName = currentName ? `${newItem.name} ${currentName}` : newItem.name;
+                        }
+                        form.setValue("name", currentName);
+                      }
+
+                      field.onChange(val);
+                    }}
+                    disabled={loadingData}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Pilih Nama Item" />
