@@ -22,6 +22,7 @@ export function useProductFormV2(
   const [itemCategories, setItemCategories] = useState<any[]>([]);
   const [itemNames, setItemNames] = useState<any[]>([]);
   const [tags, setTags] = useState<{ id: string; name: string }[]>([]);
+  const [tagCategories, setTagCategories] = useState<any[]>([]);
   const [materialTypes, setMaterialTypes] = useState<
     { id: string; name: string; code?: string }[]
   >([]);
@@ -96,14 +97,16 @@ export function useProductFormV2(
     const fetchMasterData = async () => {
       if (status === "loading" || status === "unauthenticated") return;
       try {
-        const [catRes, tagRes, matRes] = await Promise.all([
+        const [catRes, tagRes, matRes, tagCatRes] = await Promise.all([
           fetchApi("/product-categories/list"),
           fetchApi("/product-tags/list"),
           fetchApi("/material-types/list"),
+          fetchApi("/product-tags/categories"),
         ]);
         if (catRes.ok) setCategories(await catRes.json());
         if (tagRes.ok) setTags(await tagRes.json());
         if (matRes.ok) setMaterialTypes(await matRes.json());
+        if (tagCatRes.ok) setTagCategories(await tagCatRes.json());
       } catch (error) {
         console.error(error);
         toast.error("Failed to load master data.");
@@ -514,6 +517,7 @@ export function useProductFormV2(
       selectedItemCategoryId,
       productImagesFiles,
       attributesList,
+      tagCategories,
     },
     setters: {
       setIsCategoryModalOpen,
@@ -532,6 +536,7 @@ export function useProductFormV2(
       setAttributesList,
       setVariantMetas,
       setVariantFilesMap,
+      setTagCategories,
     },
     handlers: {
       handleBulkCreateTags,

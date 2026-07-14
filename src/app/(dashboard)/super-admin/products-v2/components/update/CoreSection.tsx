@@ -42,12 +42,13 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
-import { CheckCheck, ChevronsUpDown, RefreshCw, X } from "lucide-react";
+import { CheckCheck, ChevronsUpDown, RefreshCw, X, Plus } from "lucide-react";
 import CreateCategoryModal from "../../../product-categories/components/createCategoryModal";
 import { AddItemCategoryModal } from "../../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../../item-names-product/components/addItemNameModal";
 import MaterialTypeForm from "../../../product-materials/components/materialTypeForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { TagCategoryManagerModal } from "../TagCategoryManagerModal";
 
 
 const FormCoreSchema = z.object({
@@ -103,12 +104,14 @@ export default function FormProductCore({
   const [itemCategories, setItemCategories] = useState<any[]>([]);
   const [itemNames, setItemNames] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
+  const [tagCategories, setTagCategories] = useState<any[]>([]);
   const [materialTypes, setMaterialTypes] = useState<any[]>([]);
 
   const [tagSearchOpen, setTagSearchOpen] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState("");
   const [loadingData, setLoadingData] = useState(true);
   const [isGeneratingSku, setIsGeneratingSku] = useState(false);
+  const [isTagCategoryModalOpen, setIsTagCategoryModalOpen] = useState(false);
 
   // States for inline creation modals
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -157,20 +160,23 @@ export default function FormProductCore({
 
       try {
         // A. Ambil data Master (Category Induk, Tag, Material)
-        const [catRes, tagRes, matRes] = await Promise.all([
+        const [catRes, tagRes, matRes, tagCatRes] = await Promise.all([
           fetchApi("/product-categories/list"),
           fetchApi("/product-tags/list"),
           fetchApi("/material-types/list"),
+          fetchApi("/product-tags/categories"),
         ]);
 
         const cats = await catRes.json();
         const tagsData = await tagRes.json();
         const mats = await matRes.json();
+        const tagCatsData = await tagCatRes.json().catch(() => []);
 
         if (!isMounted) return;
         setCategories(cats || []);
         setTags(tagsData || []);
         setMaterialTypes(mats || []);
+        setTagCategories(tagCatsData || []);
 
         // B. Jika Mode Edit, ambil data turunannya
         let fetchedItemCats: any[] = [];
@@ -739,7 +745,63 @@ export default function FormProductCore({
                 const selectedTags = field.value || [];
                 return (
                   <FormItem className="md:col-span-4">
-                    <FormLabel>Product Tags</FormLabel>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Product Tags</FormLabel>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsTagCategoryModalOpen(true)}
+                        className="text-xs h-7 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50 px-2 flex items-center gap-1 font-medium"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Kelola Group</span>
+                      </Button>
+                    </div>
+
+                    {/* Category Quick-Select Pills */}
+                    {tagCategories && tagCategories.length > 0 && (
+                      <div className="flex flex-wrap gap-2 items-center mb-3 mt-1.5 p-2 bg-slate-50 dark:bg-stone-900 rounded-md border border-slate-100 dark:border-stone-800">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mr-1 select-none">Tag Groups:</span>
+                        {tagCategories.map((cat) => {
+                          const catTags = cat.tags || [];
+                          const catTagIds = catTags.map((t: any) => t.id);
+                          if (catTagIds.length === 0) return null;
+                          
+                          const selectedCatTags = catTagIds.filter((id: string) => selectedTags.includes(id));
+                          const isAllSelected = selectedCatTags.length === catTagIds.length;
+                          const isPartSelected = selectedCatTags.length > 0 && !isAllSelected;
+
+                          return (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => {
+                                if (isAllSelected) {
+                                  // Deselect all
+                                  field.onChange(selectedTags.filter((id: string) => !catTagIds.includes(id)));
+                                } else {
+                                  // Select all (union)
+                                  field.onChange(Array.from(new Set([...selectedTags, ...catTagIds])));
+                                }
+                              }}
+                              className={cn(
+                                "text-xs px-2.5 py-1 rounded-full border transition-all duration-150 font-medium select-none",
+                                isAllSelected
+                                  ? "bg-indigo-600 border-indigo-600 text-white font-semibold shadow-xs"
+                                  : isPartSelected
+                                  ? "bg-indigo-50 border-dashed border-indigo-350 text-indigo-755 font-semibold"
+                                  : "bg-white border-slate-200 text-slate-655 hover:bg-slate-100 hover:text-slate-900"
+                              )}
+                              title={`${cat.name} (${catTags.map((t: any) => t.name).join(", ")})`}
+                            >
+                              {cat.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
                     <Popover
                       open={tagSearchOpen}
                       onOpenChange={setTagSearchOpen}>
@@ -939,6 +1001,17 @@ export default function FormProductCore({
         />
       </DialogContent>
     </Dialog>
+
+    {/* Tag Category Manager Modal */}
+    <TagCategoryManagerModal
+      isOpen={isTagCategoryModalOpen}
+      onClose={() => setIsTagCategoryModalOpen(false)}
+      availableTags={tags}
+      tagCategories={tagCategories}
+      onCategoriesChange={(updated) => {
+        setTagCategories(updated);
+      }}
+    />
   </>
 );
 }
