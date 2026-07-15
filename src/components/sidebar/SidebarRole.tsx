@@ -17,6 +17,7 @@ import { checkAccess } from "@/lib/roleAccess";
 import {
   AlignHorizontalDistributeStart,
   AudioWaveform,
+  Calculator,
   Command,
   FileSpreadsheet,
   FileText,
@@ -202,6 +203,18 @@ export default function SidebarRole({ ...props }) {
             title: "Product Attributes",
             url: "/super-admin/product-attributes",
             icon: AlignHorizontalDistributeStart,
+          },
+        ],
+      },
+      {
+        title: "Supplier COGS",
+        url: "#",
+        icon: Calculator,
+        items: [
+          {
+            title: "COGS Calculator",
+            url: "/super-admin/supplier-cogs",
+            icon: Calculator,
           },
         ],
       },
