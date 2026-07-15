@@ -598,7 +598,7 @@ export default function ProductFormV2({
                               </div>
 
                               {/* Category Quick-Select Pills */}
-                              {state.tagCategories && state.tagCategories.length > 0 && (
+                              {Array.isArray(state.tagCategories) && state.tagCategories.length > 0 && (
                                 <div className="flex flex-wrap gap-2 items-center mb-3 mt-1.5 p-2 bg-slate-50 dark:bg-stone-900 rounded-md border border-slate-100 dark:border-stone-800">
                                   <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mr-1 select-none">Tag Groups:</span>
                                   {state.tagCategories.map((cat) => {
@@ -1352,6 +1352,9 @@ export default function ProductFormV2({
         tagCategories={state.tagCategories}
         onCategoriesChange={(updated) => {
           setters.setTagCategories(updated);
+        }}
+        onTagCreated={(newTag) => {
+          setters.setTags((prev) => [...prev, newTag]);
         }}
       />
     </>

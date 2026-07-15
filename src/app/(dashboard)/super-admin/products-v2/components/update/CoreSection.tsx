@@ -176,7 +176,7 @@ export default function FormProductCore({
         setCategories(cats || []);
         setTags(tagsData || []);
         setMaterialTypes(mats || []);
-        setTagCategories(tagCatsData || []);
+        setTagCategories(Array.isArray(tagCatsData) ? tagCatsData : []);
 
         // B. Jika Mode Edit, ambil data turunannya
         let fetchedItemCats: any[] = [];
@@ -760,7 +760,7 @@ export default function FormProductCore({
                     </div>
 
                     {/* Category Quick-Select Pills */}
-                    {tagCategories && tagCategories.length > 0 && (
+                    {Array.isArray(tagCategories) && tagCategories.length > 0 && (
                       <div className="flex flex-wrap gap-2 items-center mb-3 mt-1.5 p-2 bg-slate-50 dark:bg-stone-900 rounded-md border border-slate-100 dark:border-stone-800">
                         <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mr-1 select-none">Tag Groups:</span>
                         {tagCategories.map((cat) => {
@@ -1010,6 +1010,9 @@ export default function FormProductCore({
       tagCategories={tagCategories}
       onCategoriesChange={(updated) => {
         setTagCategories(updated);
+      }}
+      onTagCreated={(newTag) => {
+        setTags((prev) => [...prev, newTag]);
       }}
     />
   </>

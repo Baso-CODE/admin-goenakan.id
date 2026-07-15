@@ -24,6 +24,7 @@ interface TagCategoryManagerModalProps {
   availableTags: { id: string; name: string }[];
   tagCategories: any[];
   onCategoriesChange: (updated: any[]) => void;
+  onTagCreated?: (newTag: { id: string; name: string }) => void;
 }
 
 export function TagCategoryManagerModal({
@@ -32,6 +33,7 @@ export function TagCategoryManagerModal({
   availableTags = [],
   tagCategories = [],
   onCategoriesChange,
+  onTagCreated,
 }: TagCategoryManagerModalProps) {
   const { fetchApi } = useApi();
   
@@ -44,6 +46,41 @@ export function TagCategoryManagerModal({
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [searchTagQuery, setSearchTagQuery] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
+
+  const handleCreateNewTagInline = async () => {
+    const newTagName = searchTagQuery.trim();
+    if (!newTagName) return;
+    
+    setIsCreatingTag(true);
+    try {
+      const res = await fetchApi("/product-tags", {
+        method: "POST",
+        body: JSON.stringify({ name: newTagName }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Gagal membuat tag");
+      }
+
+      const newTag = await res.json();
+      toast.success(`Tag "${newTagName}" berhasil dibuat!`);
+      
+      // Notify parent so it updates availableTags list
+      if (onTagCreated) {
+        onTagCreated(newTag);
+      }
+      
+      // Auto select the new tag
+      setSelectedTagIds((prev) => [...prev, newTag.id]);
+      setSearchTagQuery(""); // clear search
+    } catch (err: any) {
+      toast.error(err.message || "Gagal membuat tag");
+    } finally {
+      setIsCreatingTag(false);
+    }
+  };
 
   // Reset form when opening/closing or switching screens
   useEffect(() => {
@@ -225,6 +262,19 @@ export function TagCategoryManagerModal({
                   />
                 </div>
 
+                {searchTagQuery.trim() && !availableTags.some(t => t.name.toLowerCase() === searchTagQuery.trim().toLowerCase()) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleCreateNewTagInline}
+                    className="w-full text-xs h-8 text-indigo-650 hover:text-indigo-850 hover:bg-indigo-50 border border-dashed border-indigo-200 flex items-center justify-center gap-1.5 mt-1 bg-white"
+                    disabled={isCreatingTag}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>{isCreatingTag ? "Membuat..." : `Buat tag baru: "${searchTagQuery.trim()}"`}</span>
+                  </Button>
+                )}
+
                 {/* Selectable tags list */}
                 <div className="border rounded-md max-h-48 overflow-y-auto p-2 bg-slate-50 mt-2 space-y-1">
                   {filteredTags.map((tag) => {
@@ -277,7 +327,7 @@ export function TagCategoryManagerModal({
             </form>
           ) : (
             <div className="space-y-3">
-              {tagCategories.map((cat) => (
+              {Array.isArray(tagCategories) && tagCategories.map((cat) => (
                 <div
                   key={cat.id}
                   className="flex items-center justify-between p-3 border rounded-lg bg-slate-50 hover:bg-slate-100/80 transition"
@@ -306,7 +356,7 @@ export function TagCategoryManagerModal({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 hover:bg-slate-200 text-slate-600 hover:text-slate-900"
+                      className="h-8 w-8 hover:bg-slate-200 text-slate-605 hover:text-slate-900"
                       onClick={() => setEditingCategoryId(cat.id)}
                     >
                       <Edit2 className="h-4 w-4" />
@@ -323,7 +373,7 @@ export function TagCategoryManagerModal({
                   </div>
                 </div>
               ))}
-              {tagCategories.length === 0 && (
+              {(!Array.isArray(tagCategories) || tagCategories.length === 0) && (
                 <div className="text-center py-8 text-slate-400 text-sm">
                   Belum ada kategori tag. Klik "+ Tambah Group" untuk membuat.
                 </div>

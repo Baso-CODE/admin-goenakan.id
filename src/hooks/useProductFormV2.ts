@@ -106,7 +106,10 @@ export function useProductFormV2(
         if (catRes.ok) setCategories(await catRes.json());
         if (tagRes.ok) setTags(await tagRes.json());
         if (matRes.ok) setMaterialTypes(await matRes.json());
-        if (tagCatRes.ok) setTagCategories(await tagCatRes.json());
+        if (tagCatRes.ok) {
+          const tagCatsData = await tagCatRes.json();
+          setTagCategories(Array.isArray(tagCatsData) ? tagCatsData : []);
+        }
       } catch (error) {
         console.error(error);
         toast.error("Failed to load master data.");
@@ -529,6 +532,7 @@ export function useProductFormV2(
       setTagSearchQuery,
       setBulkTagInput,
       setCategories,
+      setTags,
       setItemCategories,
       setItemNames,
       setProductImagesFiles,
