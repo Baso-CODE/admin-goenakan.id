@@ -192,7 +192,14 @@ export default function EditProductPage() {
 
   const handleUpdateMediaMetadata = async (
     mediaId: string,
-    updates: { altText?: string; isFeatured?: boolean },
+    updates: {
+      altText?: string;
+      isFeatured?: boolean;
+      attributeValueId?: string | null;
+      printPositionValueId?: string | null;
+      printSideValueId?: string | null;
+      mockupSideName?: string | null;
+    },
   ) => {
     setIsSubmitting(true);
     try {
@@ -371,7 +378,7 @@ export default function EditProductPage() {
     }
   };
 
-  const handleAddImage = async (file: File): Promise<void> => {
+  const handleAddImage = async (file: File): Promise<any> => {
     try {
       const formData = new FormData();
       formData.append("image", file);
@@ -389,11 +396,15 @@ export default function EditProductPage() {
       const updatedProduct = await res.json();
       setProductData(updatedProduct);
       toast.success("Gambar berhasil diunggah!");
+      
+      const newImage = updatedProduct.images[updatedProduct.images.length - 1];
+      return newImage;
     } catch (err) {
       console.error("Error adding image:", err);
       toast.error(
         err instanceof Error ? err.message : "Gagal menambahkan gambar",
       );
+      throw err;
     }
   };
 
@@ -565,7 +576,8 @@ export default function EditProductPage() {
 
       combination.forEach((val) => {
         attributeMap[val.attributeId] = val.id;
-        nameParts.push(val.value);
+        const valText = val.value.includes("|") ? val.value.split("|")[0] : val.value;
+        nameParts.push(valText);
       });
 
       return {
@@ -769,6 +781,7 @@ export default function EditProductPage() {
             onUpdateMediaMockups={handleUpdateMediaMockups}
             onUpdateMockupSettings={handleUpdateMockupSettings}
             onUpdateMediaMetadata={handleUpdateMediaMetadata}
+            onAddImage={handleAddImage}
           />
           <FormUpdateVariants
             initialData={productData}

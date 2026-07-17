@@ -242,7 +242,10 @@ export default function FormUpdateVariants({
       form.reset({
         variants: initialData.productVariants.map((v: any) => ({
           id: v.id,
-          variantName: v.variantName ?? "",
+          variantName: (v.variantName ?? "")
+            .split(" • ")
+            .map((part: string) => (part.includes("|") ? part.split("|")[0] : part))
+            .join(" • "),
           description: v.description ?? "",
           sku: v.sku ?? "",
           price: Number(v.price) ?? 0,

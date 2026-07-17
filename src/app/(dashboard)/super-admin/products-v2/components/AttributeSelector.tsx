@@ -30,6 +30,8 @@ import { ColorValueInput } from "@/components/ui/color-value-input";
 
 
 
+
+
 // --- TIPE DATA ---
 
 type AttributeFromServer = {
@@ -83,6 +85,8 @@ export function AttributeSelector({
       name: "",
       type: "TEXT",
       values: [{ value: "", hasSubAttributes: false }],
+      allowCustomColor: false,
+      allowFullSide: false,
     },
   });
 
@@ -110,7 +114,12 @@ export function AttributeSelector({
   useEffect(() => {
     const cleanLocal = local.map((row) => {
       const attr = available.find((a) => a.id === row.attributeId);
-      if (attr?.type === "MOCKUP_SIDE" && row.isVariantGenerator !== false) {
+      if (
+        (attr?.type === "MOCKUP_SIDE" ||
+          attr?.type === "PRINT_SIDE" ||
+          attr?.type === "PRINT_METHOD") &&
+        row.isVariantGenerator !== false
+      ) {
         return { ...row, isVariantGenerator: false };
       }
       return row;
@@ -369,6 +378,34 @@ export function AttributeSelector({
       })
     );
 
+  const toggleAllValues = (index: number, attrValues: any[]) =>
+    setLocal((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        const allIds = attrValues.map((v) => v.id);
+        const allSelected = allIds.every((id) => row.valueIds.includes(id));
+        
+        const nextValueIds = allSelected ? [] : allIds;
+        const nextModifiers = allSelected ? {} : { ...row.priceModifiers };
+        const nextWeights = allSelected ? {} : { ...row.weights };
+        const nextWidths = allSelected ? {} : { ...row.widths };
+        const nextHeights = allSelected ? {} : { ...row.heights };
+        const nextLengths = allSelected ? {} : { ...row.lengths };
+
+        return {
+          ...row,
+          valueIds: nextValueIds,
+          priceModifiers: nextModifiers,
+          weights: nextWeights,
+          widths: nextWidths,
+          heights: nextHeights,
+          lengths: nextLengths,
+        };
+      })
+    );
+
+
+
   // Filter available attributes that are already selected in other rows and whose parent is selected
   const getUnselectedAttributes = (currentId: string) => {
     const selectedIds = local
@@ -430,10 +467,18 @@ export function AttributeSelector({
 
   const handleOpenEdit = (attr: AttributeFromServer) => {
     setEditingAttributeId(attr.id);
+    const hasCustom = attr.values.some(
+      (v) => v.value.toLowerCase().includes("custom") || v.value.toLowerCase().includes("kustom")
+    );
+    const hasFullSide = attr.values.some(
+      (v) => v.value.toLowerCase().includes("full side")
+    );
     localForm.reset({
       name: attr.name,
       type: attr.type || "TEXT",
       values: mapValuesFromApi(attr.values),
+      allowCustomColor: hasCustom,
+      allowFullSide: hasFullSide,
     });
     setIsCreateOpen(true);
   };
@@ -468,7 +513,51 @@ export function AttributeSelector({
       toast.error("Attribute name is required.");
       return;
     }
-    const formattedValues = formatValuesRecursive(data.values);
+    
+    let valuesToSend = [...data.values];
+    if (data.type === "COLOR") {
+      const hasCustom = valuesToSend.some(
+        (v) => !v.deleted && (v.value.toLowerCase().includes("custom") || v.value.toLowerCase().includes("kustom"))
+      );
+      if (data.allowCustomColor && !hasCustom) {
+        valuesToSend.push({
+          value: "Custom Color|#ffffff|cmyk(0,0,0,0)",
+          hasSubAttributes: false,
+        });
+      } else if (!data.allowCustomColor && hasCustom) {
+        valuesToSend = valuesToSend.map((v) => {
+          if (v.value.toLowerCase().includes("custom") || v.value.toLowerCase().includes("kustom")) {
+            if (v.id) {
+              return { ...v, deleted: true };
+            }
+            return null;
+          }
+          return v;
+        }).filter(Boolean);
+      }
+    } else if (data.type === "PRINT_SIDE") {
+      const hasFullSide = valuesToSend.some(
+        (v) => !v.deleted && v.value.toLowerCase().includes("full side")
+      );
+      if (data.allowFullSide && !hasFullSide) {
+        valuesToSend.push({
+          value: "Full Side",
+          hasSubAttributes: false,
+        });
+      } else if (!data.allowFullSide && hasFullSide) {
+        valuesToSend = valuesToSend.map((v) => {
+          if (v.value.toLowerCase().includes("full side")) {
+            if (v.id) {
+              return { ...v, deleted: true };
+            }
+            return null;
+          }
+          return v;
+        }).filter(Boolean);
+      }
+    }
+
+    const formattedValues = formatValuesRecursive(valuesToSend);
     const activeValues = formattedValues.filter((v) => !v.deleted);
     if (activeValues.length === 0) {
       toast.error("At least one active value is required.");
@@ -511,6 +600,8 @@ export function AttributeSelector({
         name: "",
         type: "TEXT",
         values: [{ value: "", hasSubAttributes: false }],
+        allowCustomColor: false,
+        allowFullSide: false,
       });
     } catch (error: any) {
       console.error(error);
@@ -603,6 +694,8 @@ export function AttributeSelector({
                 name: "",
                 type: "TEXT",
                 values: [{ value: "", hasSubAttributes: false }],
+                allowCustomColor: false,
+                allowFullSide: false,
               });
             }
           }}>
@@ -612,7 +705,10 @@ export function AttributeSelector({
                 <span>Create Local Attribute</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md w-full bg-white text-slate-900 border max-h-[85vh] flex flex-col">
+            <DialogContent 
+              className="max-w-md w-full bg-white text-slate-900 border max-h-[85vh] flex flex-col"
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -653,8 +749,41 @@ export function AttributeSelector({
                         <SelectItem value="COLOR" className="hover:bg-slate-50">Color Swatch</SelectItem>
                         <SelectItem value="SIZE" className="hover:bg-slate-50">Size / Capacity</SelectItem>
                         <SelectItem value="MOCKUP_SIDE" className="hover:bg-slate-50">Mockup Side / Print Position</SelectItem>
+                        <SelectItem value="PRINT_SIDE" className="hover:bg-slate-50">Jumlah Sisi Print</SelectItem>
+                        <SelectItem value="MODEL_SHAPE" className="hover:bg-slate-50">Model / Shape</SelectItem>
+                        <SelectItem value="PRINT_METHOD" className="hover:bg-slate-50">Printing Method</SelectItem>
                       </SelectContent>
                     </Select>
+
+                    {currentLocalType === "COLOR" && (
+                      <div className="flex items-center space-x-2 select-none border border-indigo-100 bg-indigo-50/30 p-2.5 rounded-md mt-2">
+                        <Checkbox
+                          id="modal-allow-custom-color"
+                          checked={localForm.watch("allowCustomColor") || false}
+                          onCheckedChange={(checked) => {
+                            localForm.setValue("allowCustomColor", !!checked);
+                          }}
+                        />
+                        <label htmlFor="modal-allow-custom-color" className="text-xs font-bold text-indigo-700 cursor-pointer">
+                          Aktifkan Pilihan Warna Kustom (Pembeli bebas pilih warna sendiri)
+                        </label>
+                      </div>
+                    )}
+
+                    {currentLocalType === "PRINT_SIDE" && (
+                      <div className="flex items-center space-x-2 select-none border border-indigo-100 bg-indigo-50/30 p-2.5 rounded-md mt-2">
+                        <Checkbox
+                          id="modal-allow-full-side"
+                          checked={localForm.watch("allowFullSide") || false}
+                          onCheckedChange={(checked) => {
+                            localForm.setValue("allowFullSide", !!checked);
+                          }}
+                        />
+                        <label htmlFor="modal-allow-full-side" className="text-xs font-bold text-indigo-700 cursor-pointer">
+                          Aktifkan Pilihan "Full Side" (Cetak Full Area / Keliling)
+                        </label>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="space-y-3">
@@ -699,7 +828,10 @@ export function AttributeSelector({
                 <span>Clone Attribute</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md w-full bg-white text-slate-900 border">
+            <DialogContent 
+              className="max-w-md w-full bg-white text-slate-900 border"
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
               <form onSubmit={handleCloneAttribute} className="space-y-4">
                 <DialogHeader>
                   <DialogTitle className="text-slate-900">Clone Attribute</DialogTitle>
@@ -831,16 +963,34 @@ export function AttributeSelector({
                         Attribute #{idx + 1}
                         {attr && (
                           <>
-                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${
+                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${
                               attr.type === "COLOR"
                                 ? "bg-rose-50 text-rose-700 border border-rose-200"
                                 : attr.type === "SIZE"
                                 ? "bg-amber-50 text-amber-700 border border-amber-200"
                                 : attr.type === "MOCKUP_SIDE"
                                 ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                : attr.type === "PRINT_SIDE"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : attr.type === "MODEL_SHAPE"
+                                ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                : attr.type === "PRINT_METHOD"
+                                ? "bg-cyan-50 text-cyan-700 border border-cyan-200"
                                 : "bg-stone-50 text-stone-700 border border-stone-200"
                             }`}>
-                              {attr.type === "COLOR" ? "Color Swatch" : attr.type === "SIZE" ? "Size / Capacity" : attr.type === "MOCKUP_SIDE" ? "Mockup Side / Print Position" : "Text"}
+                              {attr.type === "COLOR"
+                                ? "Color Swatch"
+                                : attr.type === "SIZE"
+                                ? "Size / Capacity"
+                                : attr.type === "MOCKUP_SIDE"
+                                ? "Mockup Side / Print Position"
+                                : attr.type === "PRINT_SIDE"
+                                ? "Jumlah Sisi Print"
+                                : attr.type === "MODEL_SHAPE"
+                                ? "Model / Shape"
+                                : attr.type === "PRINT_METHOD"
+                                ? "Printing Method"
+                                : "Text"}
                             </span>
                             {attr.parentValue && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-indigo-50 text-indigo-750 border border-indigo-200 uppercase tracking-wider">
@@ -862,12 +1012,12 @@ export function AttributeSelector({
                             {/* Tampilkan attribute yang sudah dipilih + yang belum dipilih lainnya */}
                             {unselectedAttributes.map((a) => (
                               <SelectItem key={a.id} value={a.id}>
-                                {a.name} ({a.type === "COLOR" ? "Color" : a.type === "SIZE" ? "Size" : a.type === "MOCKUP_SIDE" ? "Mockup Side" : "Text"} - {a.values.length} values)
+                                {a.name} ({a.type === "COLOR" ? "Color" : a.type === "SIZE" ? "Size" : a.type === "MOCKUP_SIDE" ? "Mockup Side" : a.type === "PRINT_SIDE" ? "Jumlah Sisi" : a.type === "MODEL_SHAPE" ? "Model / Shape" : a.type === "PRINT_METHOD" ? "Print Method" : "Text"} - {a.values.length} values)
                               </SelectItem>
                             ))}
                             {attr && (
                               <SelectItem key={attr.id} value={attr.id}>
-                                {attr.name} ({attr.type === "COLOR" ? "Color" : attr.type === "SIZE" ? "Size" : attr.type === "MOCKUP_SIDE" ? "Mockup Side" : "Text"} - Currently Selected)
+                                {attr.name} ({attr.type === "COLOR" ? "Color" : attr.type === "SIZE" ? "Size" : attr.type === "MOCKUP_SIDE" ? "Mockup Side" : attr.type === "PRINT_SIDE" ? "Jumlah Sisi" : attr.type === "MODEL_SHAPE" ? "Model / Shape" : attr.type === "PRINT_METHOD" ? "Print Method" : "Text"} - Currently Selected)
                               </SelectItem>
                             )}
                           </SelectContent>
@@ -905,10 +1055,25 @@ export function AttributeSelector({
                         <div className="flex items-center space-x-2 mt-2">
                           <Checkbox
                             id={`generate-variants-${idx}`}
-                            checked={attr?.type === "MOCKUP_SIDE" ? false : row.isVariantGenerator !== false}
-                            disabled={attr?.type === "MOCKUP_SIDE"}
+                            checked={
+                              (attr?.type === "MOCKUP_SIDE" ||
+                                attr?.type === "PRINT_SIDE" ||
+                                attr?.type === "PRINT_METHOD")
+                                ? false
+                                : row.isVariantGenerator !== false
+                            }
+                            disabled={
+                              attr?.type === "MOCKUP_SIDE" ||
+                              attr?.type === "PRINT_SIDE" ||
+                              attr?.type === "PRINT_METHOD"
+                            }
                             onCheckedChange={(checked) => {
-                              if (attr?.type === "MOCKUP_SIDE") return;
+                              if (
+                                attr?.type === "MOCKUP_SIDE" ||
+                                attr?.type === "PRINT_SIDE" ||
+                                attr?.type === "PRINT_METHOD"
+                              )
+                                return;
                               setLocal((prev) =>
                                 prev.map((r, i) =>
                                   i === idx ? { ...r, isVariantGenerator: !!checked } : r
@@ -918,14 +1083,26 @@ export function AttributeSelector({
                             className="h-4 w-4 shrink-0"
                           />
                           <label
-                            htmlFor={attr?.type === "MOCKUP_SIDE" ? undefined : `generate-variants-${idx}`}
+                            htmlFor={
+                              attr?.type === "MOCKUP_SIDE" ||
+                              attr?.type === "PRINT_SIDE" ||
+                              attr?.type === "PRINT_METHOD"
+                                ? undefined
+                                : `generate-variants-${idx}`
+                            }
                             className={`text-xs font-semibold select-none ${
-                              attr?.type === "MOCKUP_SIDE"
+                              attr?.type === "MOCKUP_SIDE" ||
+                              attr?.type === "PRINT_SIDE" ||
+                              attr?.type === "PRINT_METHOD"
                                 ? "text-gray-300 cursor-not-allowed italic"
                                 : "text-gray-500 cursor-pointer"
                             }`}
                           >
-                            Gunakan untuk menghasilkan variasi kombinasi (Stok & SKU) {attr?.type === "MOCKUP_SIDE" && "(Dinonaktifkan untuk Posisi Cetak)"}
+                            Gunakan untuk menghasilkan variasi kombinasi (Stok & SKU){" "}
+                            {(attr?.type === "MOCKUP_SIDE" ||
+                              attr?.type === "PRINT_SIDE" ||
+                              attr?.type === "PRINT_METHOD") &&
+                              "(Dinonaktifkan untuk Tipe Cetak)"}
                           </label>
                         </div>
                       )}
@@ -945,15 +1122,32 @@ export function AttributeSelector({
 
                 {/* BAGIAN BAWAH: VALUES CHECKBOXES */}
                 <div className="pt-3 border-t">
-                  <Label className="text-sm font-semibold mb-2 block">
-                    Available Values
-                  </Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-sm font-semibold block">
+                      Available Values
+                    </Label>
+                    {attr && attr.values.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleAllValues(idx, attr.values)}
+                        className="h-7 text-xs px-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-bold"
+                      >
+                        {attr.values.every((v) => row.valueIds.includes(v.id))
+                          ? "🚫 Hapus Pilihan Semua"
+                          : "✅ Pilih Semua"}
+                      </Button>
+                    )}
+                  </div>
 
                   {attr ? (
                     attr.values.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-y-3 gap-x-4">
                         {attr.values.map((val, valIdx) => {
                           const isDragging = draggedAttrId === attr.id && draggedIndex === valIdx;
+                          const parsed = parseColorValue(val.value);
+                          const isCustomColor = parsed.name.toLowerCase().includes("custom") || parsed.name.toLowerCase().includes("kustom");
                           return (
                             <label
                               key={val.id}
@@ -985,23 +1179,44 @@ export function AttributeSelector({
                                 />
                                 <span className="truncate flex-1 font-medium flex items-center gap-1.5 text-xs text-slate-700">
                                   {attr.type === "COLOR" ? (
-                                    (() => {
-                                      const parsed = parseColorValue(val.value);
-                                      return (
-                                        <>
-                                          <span
-                                            className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
-                                            style={{ backgroundColor: parsed.hex }}
-                                          />
-                                          <span className="truncate">
-                                            {parsed.name || parsed.hex}
-                                          </span>
-                                          <span className="text-[9px] text-slate-400 font-mono shrink-0">
-                                            CMYK({parsed.cmyk.c},{parsed.cmyk.m},{parsed.cmyk.y},{parsed.cmyk.k})
-                                          </span>
-                                        </>
-                                      );
-                                    })()
+                                    <>
+                                      <span
+                                        className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
+                                        style={{
+                                          background: isCustomColor
+                                            ? "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)"
+                                            : parsed.hex
+                                        }}
+                                      />
+                                      <span className="truncate">
+                                        {parsed.name || parsed.hex}
+                                      </span>
+                                      {!isCustomColor && (
+                                        <span className="text-[9px] text-slate-400 font-mono shrink-0">
+                                          CMYK({parsed.cmyk.c},{parsed.cmyk.m},{parsed.cmyk.y},{parsed.cmyk.k})
+                                        </span>
+                                      )}
+                                    </>
+                                  ) : attr.type === "MODEL_SHAPE" ? (
+                                    <>
+                                      {(() => {
+                                        const p = val.value.split("|");
+                                        const mName = p[0] || "";
+                                        const mUrl = p[1] || "";
+                                        return (
+                                          <>
+                                            {mUrl && (
+                                              <img
+                                                src={mUrl}
+                                                alt={mName}
+                                                className="w-4 h-4 object-cover rounded-sm border shrink-0 bg-slate-50"
+                                              />
+                                            )}
+                                            <span className="truncate">{mName}</span>
+                                          </>
+                                        );
+                                      })()}
+                                    </>
                                   ) : (
                                     val.value
                                   )}
@@ -1050,7 +1265,7 @@ export function AttributeSelector({
                                         <span className="text-[9px] text-gray-500 font-semibold w-12 shrink-0">Berat (g):</span>
                                         <input
                                           type="number"
-                                          placeholder="Gr"
+                                          placeholder="Gram"
                                           value={row.weights?.[val.id] !== undefined ? row.weights[val.id] : ""}
                                           onChange={(e) => updateWeight(idx, val.id, parseFloat(e.target.value) || 0)}
                                           className="w-full text-xs border rounded p-1 text-slate-700 bg-white"
@@ -1061,8 +1276,8 @@ export function AttributeSelector({
                                         <input
                                           type="number"
                                           placeholder="Cm"
-                                          value={row.lengths?.[val.id] !== undefined ? row.lengths[val.id] : ""}
-                                          onChange={(e) => updateLength(idx, val.id, parseFloat(e.target.value) || 0)}
+                                          value={row.widths?.[val.id] !== undefined ? row.widths[val.id] : ""}
+                                          onChange={(e) => updateWidth(idx, val.id, parseFloat(e.target.value) || 0)}
                                           className="w-full text-xs border rounded p-1 text-slate-700 bg-white"
                                         />
                                       </div>
@@ -1071,8 +1286,8 @@ export function AttributeSelector({
                                         <input
                                           type="number"
                                           placeholder="Cm"
-                                          value={row.widths?.[val.id] !== undefined ? row.widths[val.id] : ""}
-                                          onChange={(e) => updateWidth(idx, val.id, parseFloat(e.target.value) || 0)}
+                                          value={row.lengths?.[val.id] !== undefined ? row.lengths[val.id] : ""}
+                                          onChange={(e) => updateLength(idx, val.id, parseFloat(e.target.value) || 0)}
                                           className="w-full text-xs border rounded p-1 text-slate-700 bg-white"
                                         />
                                       </div>
@@ -1157,10 +1372,23 @@ function LocalFieldArrayEditor({
         return (
           <div key={field.id} className="border border-stone-200 p-3 rounded-md bg-stone-50/20 space-y-3 shadow-xs">
             <div className="flex items-center gap-2">
-              {currentLocalType === "COLOR" ? (
+              {currentLocalType === "MODEL_SHAPE" ? (
+                <ModelShapeValueInput
+                  value={valValue}
+                  onChange={(newVal) => localForm.setValue(`${valuePath}.value`, newVal)}
+                />
+              ) : currentLocalType === "COLOR" ? (
                 <ColorValueInput
                   value={valValue}
                   onChange={(newVal) => localForm.setValue(`${valuePath}.value`, newVal)}
+                />
+              ) : currentLocalType === "PRINT_SIDE" ? (
+                <Input
+                  type="number"
+                  placeholder="Enter number of print sides..."
+                  {...localForm.register(`${valuePath}.value`)}
+                  className="flex-1 border-slate-300 text-slate-800 bg-white"
+                  required
                 />
               ) : (
                 <Input
@@ -1324,10 +1552,23 @@ function LocalSubValuesEditor({
         return (
           <div key={field.id} className="space-y-2 border-b pb-3 last:border-b-0 last:pb-0">
             <div className="flex items-center gap-2">
-              {type === "COLOR" ? (
+              {type === "MODEL_SHAPE" ? (
+                <ModelShapeValueInput
+                  value={valValue}
+                  onChange={(newVal) => form.setValue(`${valuePath}.value`, newVal)}
+                />
+              ) : type === "COLOR" ? (
                 <ColorValueInput
                   value={valValue}
                   onChange={(newVal) => form.setValue(`${valuePath}.value`, newVal)}
+                />
+              ) : type === "PRINT_SIDE" ? (
+                <Input
+                  type="number"
+                  placeholder="Enter number of print sides..."
+                  {...form.register(`${valuePath}.value`)}
+                  className="flex-1 h-9 border-slate-300 bg-white"
+                  required
                 />
               ) : (
                 <Input
@@ -1398,6 +1639,121 @@ function LocalSubValuesEditor({
       >
         <Plus className="h-3 w-3 mr-1" /> Add Value Choice
       </Button>
+    </div>
+  );
+}
+
+// ===================== MODEL / SHAPE ATTRIBUTE VALUE IMAGE UPLOADER ===================== //
+
+interface ModelShapeValueInputProps {
+  value: string;
+  onChange: (val: string) => void;
+}
+
+function ModelShapeValueInput({ value, onChange }: ModelShapeValueInputProps) {
+  const parts = value ? value.split("|") : [];
+  const name = parts[0] || "";
+  const imageUrl = parts[1] || "";
+
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const CLOUDINARY_CLOUD_NAME = "do9sfnf5k";
+      const CLOUDINARY_UPLOAD_PRESET = "ml_default";
+      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+      const res = await fetch(cloudinaryUrl, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Gagal upload ke Cloudinary");
+
+      const data = await res.json();
+      const newUrl = data.secure_url;
+      onChange(`${name}|${newUrl}`);
+      toast.success("Gambar model berhasil diunggah!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal mengunggah gambar model");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    onChange(imageUrl ? `${newName}|${imageUrl}` : newName);
+  };
+
+  const handleRemoveImage = () => {
+    onChange(name);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+      <Input
+        placeholder="Nama Model / Shape (e.g. Oval, Bulat)"
+        value={name}
+        onChange={handleNameChange}
+        className="flex-1 border-slate-300 text-slate-800 bg-white h-9"
+        required
+      />
+
+      <div className="flex items-center gap-2 shrink-0">
+        {imageUrl ? (
+          <div className="relative w-9 h-9 border rounded bg-slate-100 flex items-center justify-center overflow-hidden">
+            <img src={imageUrl} alt={name} className="w-full h-full object-cover" />
+            <button
+              type="button"
+              onClick={handleRemoveImage}
+              className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 flex items-center justify-center text-white text-[9px] font-bold transition-opacity"
+            >
+              Hapus
+            </button>
+          </div>
+        ) : (
+          <label className="w-9 h-9 border border-dashed rounded border-slate-300 hover:border-slate-500 bg-white flex items-center justify-center cursor-pointer transition-colors relative">
+            {isUploading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+            ) : (
+              <div className="flex flex-col items-center justify-center text-stone-400">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={isUploading}
+              onChange={handleFileChange}
+            />
+          </label>
+        )}
+        <span className="text-[10px] text-stone-500 max-w-[80px] leading-tight select-none">
+          {imageUrl ? "Gambar Terpilih" : "Unggah Gambar"}
+        </span>
+      </div>
     </div>
   );
 }
