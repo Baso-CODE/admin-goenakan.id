@@ -483,7 +483,8 @@ export default function EditProductPage() {
 
       combination.forEach((val) => {
         attributeMap[val.attributeId] = val.id;
-        nameParts.push(val.value);
+        const valText = val.value.includes("|") ? val.value.split("|")[0] : val.value;
+        nameParts.push(valText);
       });
 
       return {

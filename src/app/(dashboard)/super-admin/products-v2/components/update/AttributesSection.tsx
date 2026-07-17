@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { AttributeSelector, SelectedAttributeRow } from "../AttributeSelector";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Layers, Loader2, X, Plus } from "lucide-react";
+import { Layers, Loader2, X, Plus, ChevronDown, Trash2 } from "lucide-react";
 import { MockupAreaSelector } from "../MockupAreaSelector";
 
 export default function FormUpdateAttributes({
@@ -26,6 +26,7 @@ export default function FormUpdateAttributes({
   onUpdateMediaMockups,
   onUpdateMockupSettings,
   onUpdateMediaMetadata,
+  onAddImage,
 }: {
   initialData: any;
   isSubmitting: boolean;
@@ -41,6 +42,7 @@ export default function FormUpdateAttributes({
     mockupBackImageId: string | null;
   }) => Promise<void>;
   onUpdateMediaMetadata?: (mediaId: string, updates: any) => Promise<void>;
+  onAddImage?: (file: File) => Promise<any>;
 }) {
   const [attributeSelections, setAttributeSelections] = useState<
     SelectedAttributeRow[]
@@ -59,27 +61,90 @@ export default function FormUpdateAttributes({
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   const [mockupSides, setMockupSides] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const getProductAttributeValues = () => {
+    const list: { id: string; value: string; attributeName: string; attributeType: string }[] = [];
+    
+    attributesFullList.forEach((attr) => {
+      const selection = attributeSelections.find((sel) => sel.attributeId === attr.id);
+      if (!selection) return;
+      attr.values?.forEach((val: any) => {
+        if (selection.valueIds.includes(val.id)) {
+          list.push({
+            id: val.id,
+            value: val.value.includes("|") ? val.value.split("|")[0] : val.value,
+            attributeName: attr.name,
+            attributeType: attr.type || "TEXT",
+          });
+        }
+      });
+    });
+
+    if (list.length === 0 && initialData?.attributeValues) {
+      initialData.attributeValues.forEach((item: any) => {
+        if (item.attributeValue) {
+          list.push({
+            id: item.attributeValue.id,
+            value: item.attributeValue.value.includes("|") ? item.attributeValue.value.split("|")[0] : item.attributeValue.value,
+            attributeName: item.attributeValue.attribute?.name || "",
+            attributeType: item.attributeValue.attribute?.type || "TEXT",
+          });
+        }
+      });
+    }
+
+    return list;
+  };
+
+  const handleAddMockupSide = () => {
+    setMockupSides((prev) => [
+      ...prev,
+      {
+        id: `new-${Date.now()}-${Math.random()}`,
+        name: "",
+        imageId: "",
+        mockupAreas: [],
+        attributeValueId: null,
+        printPositionValueId: null,
+        url: "",
+      },
+    ]);
+  };
+
+  const handleRemoveMockupSide = async (id: string, imageId: string | null) => {
+    try {
+      if (imageId && onUpdateMediaMetadata) {
+        await onUpdateMediaMetadata(imageId, {
+          mockupSideName: null,
+          attributeValueId: null,
+          printSideValueId: null,
+          printPositionValueId: null,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to unlink image metadata on delete", err);
+    }
+    setMockupSides((prev) => prev.filter((m) => m.id !== id));
+  };
 
   useEffect(() => {
     if (initialData?.images) {
-      const existingMockups = initialData.images
-        .filter((img: any) => {
-          return (img.mockupAreas && img.mockupAreas.length > 0) || 
-                 img.attributeValueId ||
-                 img.printPositionValueId;
-        })
+      const initialMockupSides = initialData.images
+        .filter((img: any) => img.mockupSideName || img.attributeValueId || img.printSideValueId || img.printPositionValueId || (img.mockupAreas && img.mockupAreas.length > 0))
         .map((img: any) => ({
           id: img.id,
           name: img.mockupSideName || "",
           imageId: img.id,
           mockupAreas: img.mockupAreas || [],
           attributeValueId: img.attributeValueId || null,
+          printSideValueId: img.printSideValueId || null,
           printPositionValueId: img.printPositionValueId || null,
           url: img.url,
         }));
-      setMockupSides(existingMockups);
+      setMockupSides(initialMockupSides);
     }
-  }, [initialData?.id]);
+  }, [initialData?.images]);
 
   // Prefill dari initialData.attributeValues
   useEffect(() => {
@@ -132,9 +197,12 @@ export default function FormUpdateAttributes({
         rowLengths[id] = lengths[id] || 0;
       });
 
-      const isVariantGenerator = initialData.productVariants?.length > 0
-        ? (variantGeneratingAttrIds.size > 0 ? variantGeneratingAttrIds.has(attributeId) : true)
-        : true;
+      const existingSelection = attributeSelections.find((sel) => sel.attributeId === attributeId);
+      const isVariantGenerator = existingSelection && existingSelection.isVariantGenerator !== undefined
+        ? existingSelection.isVariantGenerator
+        : initialData.productVariants?.length > 0
+          ? (variantGeneratingAttrIds.size > 0 ? variantGeneratingAttrIds.has(attributeId) : true)
+          : true;
 
       return {
         attributeId,
@@ -260,40 +328,75 @@ export default function FormUpdateAttributes({
     }
   };
 
-  const handleAddMockupSide = () => {
-    const tempId = `temp-${Date.now()}`;
-    setMockupSides((prev) => [
-      ...prev,
-      {
-        id: tempId,
-        name: "",
-        imageId: "",
-        mockupAreas: [],
-        attributeValueId: null,
-        url: "",
-      },
-    ]);
-  };
-
-  const handleRemoveMockupSide = async (id: string, imageId: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus sisi mockup ini?")) return;
-    
-    if (imageId && !id.startsWith("temp-")) {
+  const handleClearSlot = async (id: string) => {
+    const item = mockupSides.find((m) => m.id === id);
+    if (!item) return;
+    if (item.imageId && !item.id.startsWith("slot-")) {
       try {
         if (onUpdateMediaMockups) {
-          await onUpdateMediaMockups(imageId, []);
+          await onUpdateMediaMockups(item.imageId, []);
         }
         if (onUpdateMediaMetadata) {
-          await onUpdateMediaMetadata(imageId, { mockupSideName: null, attributeValueId: null, printPositionValueId: null });
+          await onUpdateMediaMetadata(item.imageId, {
+            mockupSideName: null,
+            attributeValueId: null,
+            printSideValueId: null,
+            printPositionValueId: null,
+          });
         }
-        toast.success("Sisi mockup berhasil dihapus.");
       } catch (err) {
-        console.error(err);
-        toast.error("Gagal menghapus sisi mockup di server.");
+        toast.error("Gagal mereset slot di server");
+        return;
       }
     }
-    
-    setMockupSides((prev) => prev.filter((item) => item.id !== id));
+    setMockupSides((prev) =>
+      prev.map((m) =>
+        m.id === id
+          ? {
+              ...m,
+              imageId: "",
+              url: "",
+              mockupAreas: [],
+            }
+          : m
+      )
+    );
+    toast.success("Slot berhasil dikosongkan");
+  };
+
+  const [copiedMockupAreas, setCopiedMockupAreas] = useState<any[] | null>(null);
+
+  const handleCopyMockupConfig = (areas: any[]) => {
+    setCopiedMockupAreas(areas);
+    toast.success("Konfigurasi area mockup berhasil disalin!");
+  };
+
+  const handlePasteMockupConfig = async (id: string) => {
+    if (!copiedMockupAreas) return;
+    const targetItem = mockupSides.find((m) => m.id === id);
+    if (!targetItem || !targetItem.imageId) {
+      toast.error("Pilih gambar terlebih dahulu sebelum menempel area mockup");
+      return;
+    }
+
+    const pastedAreas = copiedMockupAreas.map((area) => ({
+      ...area,
+      id: `area-${Date.now()}-${Math.random()}`,
+    }));
+
+    try {
+      if (onUpdateMediaMockups) {
+        await onUpdateMediaMockups(targetItem.imageId, pastedAreas);
+        setMockupSides((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, mockupAreas: pastedAreas } : item
+          )
+        );
+        toast.success("Konfigurasi area mockup berhasil ditempel!");
+      }
+    } catch (err) {
+      toast.error("Gagal menempel konfigurasi area mockup");
+    }
   };
 
   const handleSaveName = async (item: any, newName: string) => {
@@ -308,8 +411,9 @@ export default function FormUpdateAttributes({
     }
   };
 
-  const handleImageSelect = async (itemIndex: number, newImageId: string) => {
-    const prevItem = mockupSides[itemIndex];
+  const handleImageSelect = async (id: string, newImageId: string) => {
+    const prevItem = mockupSides.find((m) => m.id === id);
+    if (!prevItem) return;
     const oldImageId = prevItem.imageId;
     
     if (newImageId === oldImageId) return;
@@ -317,20 +421,25 @@ export default function FormUpdateAttributes({
     const selectedImg = initialData?.images?.find((img: any) => img.id === newImageId);
     if (!selectedImg) return;
     
-    const updated = [...mockupSides];
-    updated[itemIndex] = {
-      ...prevItem,
-      id: newImageId,
-      imageId: newImageId,
-      url: selectedImg.url,
-    };
-    setMockupSides(updated);
+    setMockupSides((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              id: newImageId,
+              imageId: newImageId,
+              url: selectedImg.url,
+            }
+          : item
+      )
+    );
     
     try {
       if (onUpdateMediaMetadata) {
         await onUpdateMediaMetadata(newImageId, { 
           mockupSideName: prevItem.name || null,
           attributeValueId: prevItem.attributeValueId || null,
+          printSideValueId: prevItem.printSideValueId || null,
           printPositionValueId: prevItem.printPositionValueId || null
         });
       }
@@ -340,7 +449,7 @@ export default function FormUpdateAttributes({
       
       if (oldImageId && !oldImageId.startsWith("temp-")) {
         if (onUpdateMediaMetadata) {
-          await onUpdateMediaMetadata(oldImageId, { mockupSideName: null, attributeValueId: null, printPositionValueId: null });
+          await onUpdateMediaMetadata(oldImageId, { mockupSideName: null, attributeValueId: null, printSideValueId: null, printPositionValueId: null });
         }
         if (onUpdateMediaMockups) {
           await onUpdateMediaMockups(oldImageId, []);
@@ -354,39 +463,7 @@ export default function FormUpdateAttributes({
     }
   };
 
-  const getProductAttributeValues = () => {
-    const list: { id: string; value: string; attributeName: string; attributeType: string }[] = [];
-    
-    attributesFullList.forEach((attr) => {
-      const selection = attributeSelections.find((sel) => sel.attributeId === attr.id);
-      if (!selection) return;
-      attr.values?.forEach((val: any) => {
-        if (selection.valueIds.includes(val.id)) {
-          list.push({
-            id: val.id,
-            value: val.value.includes("|") ? val.value.split("|")[0] : val.value,
-            attributeName: attr.name,
-            attributeType: attr.type || "TEXT",
-          });
-        }
-      });
-    });
 
-    if (list.length === 0 && initialData?.attributeValues) {
-      initialData.attributeValues.forEach((item: any) => {
-        if (item.attributeValue) {
-          list.push({
-            id: item.attributeValue.id,
-            value: item.attributeValue.value.includes("|") ? item.attributeValue.value.split("|")[0] : item.attributeValue.value,
-            attributeName: item.attributeValue.attribute?.name || "",
-            attributeType: item.attributeValue.attribute?.type || "TEXT",
-          });
-        }
-      });
-    }
-
-    return list;
-  };
 
   useEffect(() => {
     onAttributesChange(attributeSelections, attributesFullList);
@@ -425,18 +502,8 @@ export default function FormUpdateAttributes({
           <CardContent className="space-y-6 pt-6">
             <div className="flex items-center justify-between">
               <p className="text-xs text-stone-500 dark:text-stone-400">
-                Tambahkan posisi mockup dan tautkan ke gambar produk.
+                Unggah gambar mockup dan atur area cetak untuk masing-masing slot sisi print di bawah ini.
               </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddMockupSide}
-                className="space-x-1 border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Tambah Posisi Mockup</span>
-              </Button>
             </div>
 
             <div className="pt-4 border-t border-stone-100 dark:border-stone-800">
@@ -451,76 +518,129 @@ export default function FormUpdateAttributes({
                         <span className="text-amber-500 font-bold text-base mt-0.5">⚠️</span>
                         <div className="text-xs text-amber-800 dark:text-amber-300">
                           <p className="font-bold mb-0.5">Aturan Template Mockup Berdasarkan Ukuran / Kapasitas</p>
-                          <p className="leading-relaxed">Produk ini memiliki atribut ukuran/kapasitas. Silakan unggah gambar mockup terpisah untuk masing-masing ukuran di tab Media, lalu tautkan gambar tersebut ke atribut ukurannya di bawah ini. Customizer pembeli akan otomatis memuat gambar mockup dan area cetak yang sesuai dengan ukuran yang dipilih.</p>
+                          <p className="leading-relaxed">Produk ini memiliki atribut ukuran/kapasitas. Silakan unggah gambar mockup terpisah untuk masing-masing ukuran di tab Media, lalu tautkan gambar tersebut ke slot ukurannya di bawah ini.</p>
                         </div>
                       </div>
                     )}
-
-                    {mockupSides.length === 0 ? (
+                                        {mockupSides.length === 0 ? (
                       <div className="text-center py-8 border border-dashed rounded-lg border-stone-300 dark:border-stone-750">
-                        <p className="text-sm text-stone-500 italic">Belum ada posisi mockup yang ditambahkan.</p>
-                        <Button type="button" variant="outline" size="sm" onClick={handleAddMockupSide} className="mt-3">
-                          <Plus className="h-4 w-4 mr-1" /> Tambah Posisi Mockup
-                        </Button>
+                        <p className="text-sm text-stone-500 italic">Belum ada mockup yang ditambahkan. Silakan klik tombol di bawah untuk menambah mockup.</p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        {mockupSides.map((item, itemIdx) => {
+                        {mockupSides.map((item) => {
                           const availableImages = (initialData?.images || []).filter((img: any) => {
                             return img.id === item.imageId || !mockupSides.some((m) => m.imageId === img.id);
                           });
-                          
                           return (
-                            <div key={item.id} className="border border-stone-200 dark:border-stone-800 rounded-lg p-3 bg-stone-50/50 dark:bg-stone-900/20 flex flex-col gap-3 relative shadow-xs">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="absolute top-2 right-2 h-7 w-7 bg-white dark:bg-stone-850 hover:bg-red-50 dark:hover:bg-red-950/30 border border-stone-200 dark:border-stone-700 text-stone-500 hover:text-red-650 rounded-full shadow-sm flex items-center justify-center z-10"
-                                onClick={() => handleRemoveMockupSide(item.id, item.imageId)}
-                                title="Hapus posisi mockup"
-                              >
-                                <X className="h-4 w-4 text-red-500" />
-                              </Button>
-                              
+                            <div key={item.id} className="border border-stone-200 dark:border-stone-800 rounded-lg p-3 bg-white dark:bg-stone-900/60 flex flex-col gap-3 relative shadow-xs">
+                              <div className="pr-12">
+                                <h4 className="text-xs font-bold text-indigo-655 dark:text-indigo-400 truncate mb-0.5">
+                                  {item.name || "Posisi Mockup Baru"}
+                                </h4>
+                              </div>
+
+                              <div className="absolute top-2 right-2 flex items-center gap-1">
+                                {item.imageId && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 bg-white dark:bg-stone-850 hover:bg-stone-50 border border-stone-200 dark:border-stone-700 text-stone-500 rounded-full shadow-sm flex items-center justify-center"
+                                    onClick={() => handleClearSlot(item.id)}
+                                    title="Kosongkan gambar"
+                                  >
+                                    <X className="h-3.5 w-3.5 text-stone-500" />
+                                  </Button>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 bg-white dark:bg-stone-850 hover:bg-red-50 hover:text-red-600 border border-stone-200 dark:border-stone-700 text-stone-500 rounded-full shadow-sm flex items-center justify-center"
+                                  onClick={() => handleRemoveMockupSide(item.id, item.imageId)}
+                                  title="Hapus mockup"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+
                               {item.url ? (
                                 <div className="relative aspect-video w-full rounded border dark:border-stone-800 overflow-hidden bg-white dark:bg-stone-950 shrink-0">
                                   <img src={item.url} alt="thumbnail" className="w-full h-full object-cover" />
                                 </div>
                               ) : (
-                                <div className="relative aspect-video w-full rounded border border-dashed border-stone-300 dark:border-stone-700 overflow-hidden bg-stone-100 dark:bg-stone-950 shrink-0 flex items-center justify-center text-xs text-stone-400 font-medium italic">
-                                  Pilih Gambar Terlebih Dahulu
+                                <div className="relative aspect-video w-full rounded border border-dashed border-stone-300 dark:border-stone-770 overflow-hidden bg-stone-100 dark:bg-stone-950 shrink-0 flex items-center justify-center text-xs text-stone-400 font-medium italic text-center p-2">
+                                  Silakan Unggah atau Pilih Gambar
                                 </div>
                               )}
-                              
+
                               <div className="flex-1 flex flex-col justify-between gap-2.5">
                                 <div className="space-y-2">
                                   <div className="space-y-1">
                                     <Label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                                      Pilih Gambar dari Galeri
+                                      Pilih Gambar
                                     </Label>
-                                    <Select
-                                      value={item.imageId || "none"}
-                                      onValueChange={(val) => handleImageSelect(itemIdx, val)}
-                                    >
-                                      <SelectTrigger className="w-full h-8 text-xs">
-                                        <SelectValue placeholder="Pilih gambar galeri..." />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="none" disabled className="text-xs">Pilih gambar galeri...</SelectItem>
-                                        {availableImages.map((img: any) => (
-                                          <SelectItem key={img.id} value={img.id} className="text-xs">
-                                            <div className="flex items-center gap-2">
-                                              <span className="truncate max-w-[180px]">
-                                                {img.altText || `Gambar (${img.id.slice(0, 8)})`}
-                                              </span>
-                                            </div>
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
+                                    <div className="flex gap-1.5 items-center">
+                                      <div className="flex-1">
+                                        <Select
+                                          value={item.imageId || "none"}
+                                          onValueChange={(val) => handleImageSelect(item.id, val)}
+                                          disabled={isUploading}
+                                        >
+                                          <SelectTrigger className="w-full h-8 text-xs">
+                                            <SelectValue placeholder={isUploading ? "Uploading..." : "Pilih gambar..."} />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="none" disabled className="text-xs">Pilih gambar...</SelectItem>
+                                            {availableImages.map((img: any) => (
+                                              <SelectItem key={img.id} value={img.id} className="text-xs">
+                                                <span className="truncate max-w-[180px]">
+                                                  {img.altText || `Gambar (${img.id.slice(0, 8)})`}
+                                                </span>
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+
+                                      <Label className="shrink-0 cursor-pointer">
+                                        <Input
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          disabled={isUploading}
+                                          onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file && onAddImage) {
+                                              try {
+                                                const uploadedImg = await onAddImage(file);
+                                                if (uploadedImg && uploadedImg.id) {
+                                                  setMockupSides((prev) =>
+                                                    prev.map((m) =>
+                                                      m.id === item.id
+                                                        ? {
+                                                            ...m,
+                                                            imageId: uploadedImg.id,
+                                                            url: uploadedImg.url || URL.createObjectURL(file),
+                                                          }
+                                                        : m
+                                                    )
+                                                  );
+                                                }
+                                              } catch (err) {
+                                                console.error("Upload failed in card select", err);
+                                              }
+                                            }
+                                          }}
+                                        />
+                                        <span className="flex items-center justify-center h-8 px-2.5 border border-stone-200 dark:border-stone-850 hover:bg-stone-100 dark:hover:bg-stone-900 rounded text-xs font-semibold text-stone-700 dark:text-stone-300">
+                                          Browse
+                                        </span>
+                                      </Label>
+                                    </div>
                                   </div>
-                                  
+
                                   <div className="space-y-1">
                                     <Label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
                                       Nama Posisi / Sisi Mockup
@@ -531,113 +651,157 @@ export default function FormUpdateAttributes({
                                       onChange={(e) => {
                                         const newName = e.target.value;
                                         setMockupSides((prev) =>
-                                          prev.map((m, idx) =>
-                                            idx === itemIdx ? { ...m, name: newName } : m
+                                          prev.map((m) =>
+                                            m.id === item.id ? { ...m, name: newName } : m
                                           )
                                         );
                                       }}
-                                      onBlur={(e) => handleSaveName(item, e.target.value.trim())}
+                                      onBlur={() => handleSaveName(item, item.name)}
                                       className="h-8 text-xs bg-white text-slate-800"
                                       disabled={!item.imageId}
                                     />
                                   </div>
 
-                                  <div className="grid grid-cols-2 gap-2 pt-1">
-                                    <div className="space-y-1">
-                                      <Label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                                        Varian / Ukuran
-                                      </Label>
-                                      <Select
-                                        value={item.attributeValueId || "none"}
-                                        disabled={!item.imageId}
-                                        onValueChange={async (val) => {
-                                          const targetVal = val === "none" ? null : val;
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                                      Hubungkan Ukuran
+                                    </Label>
+                                    <Select
+                                      value={item.attributeValueId || "none"}
+                                      onValueChange={async (val) => {
+                                        const targetVal = val === "none" ? null : val;
+                                        setMockupSides((prev) =>
+                                          prev.map((m) => m.id === item.id ? { ...m, attributeValueId: targetVal } : m)
+                                        );
+                                        if (item.imageId && onUpdateMediaMetadata) {
                                           try {
-                                            if (onUpdateMediaMetadata) {
-                                              await onUpdateMediaMetadata(item.imageId, { attributeValueId: targetVal });
-                                              setMockupSides((prev) =>
-                                                prev.map((m, idx) =>
-                                                  idx === itemIdx ? { ...m, attributeValueId: targetVal } : m
-                                                )
-                                              );
-                                              toast.success("Gambar berhasil ditautkan ke varian!");
-                                            }
+                                            await onUpdateMediaMetadata(item.imageId, { attributeValueId: targetVal });
+                                            toast.success("Ukuran mockup berhasil disinkronkan!");
                                           } catch (err) {
-                                            toast.error("Gagal menautkan gambar ke varian");
+                                            toast.error("Gagal menyinkronkan ukuran");
                                           }
-                                        }}
-                                      >
-                                        <SelectTrigger className="w-full h-8 text-[11px]">
-                                          <SelectValue placeholder="Select Variant" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="none" className="text-xs">Select Variant</SelectItem>
-                                          {fullAttributeValuesList.filter(v => v.attributeType === "SIZE").map((val) => (
-                                            <SelectItem key={val.id} value={val.id} className="text-xs">
-                                              {val.value}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
+                                        }
+                                      }}
+                                    >
+                                      <SelectTrigger className="w-full h-8 text-xs">
+                                        <SelectValue placeholder="Semua Ukuran" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none" className="text-xs">Semua Ukuran</SelectItem>
+                                        {fullAttributeValuesList.filter(v => v.attributeType === "SIZE").map((val) => (
+                                          <SelectItem key={val.id} value={val.id} className="text-xs">
+                                            {val.value}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
 
-                                    <div className="space-y-1">
-                                      <Label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                                        Posisi Cetak (Harga)
-                                      </Label>
-                                      <Select
-                                        value={item.printPositionValueId || "none"}
-                                        disabled={!item.imageId}
-                                        onValueChange={async (val) => {
-                                          const targetVal = val === "none" ? null : val;
+                                  <div className="space-y-1">
+                                    <Label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                                      Posisi Cetak (Harga Modifier)
+                                    </Label>
+                                    <Select
+                                      value={item.printPositionValueId || "none"}
+                                      disabled={!item.imageId}
+                                      onValueChange={async (val) => {
+                                        const targetVal = val === "none" ? null : val;
+                                        const targetOpt = fullAttributeValuesList.find(o => o.id === targetVal);
+                                        setMockupSides((prev) =>
+                                          prev.map((m) =>
+                                            m.id === item.id
+                                              ? {
+                                                  ...m,
+                                                  printPositionValueId: targetVal,
+                                                  name: targetOpt ? targetOpt.value : m.name
+                                                }
+                                              : m
+                                          )
+                                        );
+                                        if (item.imageId && onUpdateMediaMetadata) {
                                           try {
-                                            if (onUpdateMediaMetadata) {
-                                              await onUpdateMediaMetadata(item.imageId, { printPositionValueId: targetVal });
-                                              setMockupSides((prev) =>
-                                                prev.map((m, idx) =>
-                                                  idx === itemIdx ? { ...m, printPositionValueId: targetVal } : m
-                                                )
-                                              );
-                                              toast.success("Gambar berhasil ditautkan ke posisi cetak!");
-                                            }
+                                            await onUpdateMediaMetadata(item.imageId, {
+                                              printPositionValueId: targetVal,
+                                              mockupSideName: targetOpt ? targetOpt.value : item.name || null
+                                            });
+                                            toast.success("Posisi cetak mockup berhasil disinkronkan!");
                                           } catch (err) {
-                                            toast.error("Gagal menautkan gambar ke posisi cetak");
+                                            toast.error("Gagal menyinkronkan posisi cetak");
                                           }
-                                        }}
-                                      >
-                                        <SelectTrigger className="w-full h-8 text-[11px]">
-                                          <SelectValue placeholder="Bebas Sisi" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="none" className="text-xs">Bebas Sisi</SelectItem>
-                                          {fullAttributeValuesList.filter(v => v.attributeType === "MOCKUP_SIDE").map((val) => (
-                                            <SelectItem key={val.id} value={val.id} className="text-xs">
-                                              {val.value}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
+                                        }
+                                      }}
+                                    >
+                                      <SelectTrigger className="w-full h-8 text-[11px]">
+                                        <SelectValue placeholder="Bebas" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none" className="text-xs">Bebas Posisi</SelectItem>
+                                        {fullAttributeValuesList.filter(v => v.attributeType === "MOCKUP_SIDE").map((val) => (
+                                          <SelectItem key={val.id} value={val.id} className="text-xs">
+                                            {val.value}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
                                   </div>
                                 </div>
 
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleOpenMockupModal({ id: item.imageId, mockupAreas: item.mockupAreas, url: item.url })}
-                                  className="w-full text-xs font-semibold h-8 flex items-center gap-1.5"
-                                  disabled={!item.imageId}
-                                >
-                                  <Layers className="h-3.5 w-3.5 text-indigo-500" />
-                                  Atur Area Mockup
-                                </Button>
+                                <div className="flex gap-1.5 w-full mt-2.5">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleOpenMockupModal(item)}
+                                    className="flex-1 text-xs font-semibold h-8 flex items-center justify-center gap-1.5"
+                                    disabled={!item.imageId}
+                                  >
+                                    <Layers className="h-3.5 w-3.5 text-indigo-500" />
+                                    Atur Area
+                                  </Button>
+
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleCopyMockupConfig(item.mockupAreas || [])}
+                                    className="text-xs font-medium h-8 px-2 flex items-center justify-center"
+                                    disabled={!item.imageId || !item.mockupAreas || item.mockupAreas.length === 0}
+                                    title="Salin area mockup"
+                                  >
+                                    Copy
+                                  </Button>
+
+                                  {copiedMockupAreas && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handlePasteMockupConfig(item.id)}
+                                      className="text-xs font-medium h-8 px-2 flex items-center justify-center border-indigo-200 bg-indigo-50/30 hover:bg-indigo-50 text-indigo-600 dark:text-indigo-400"
+                                      disabled={!item.imageId}
+                                      title="Tempel area mockup"
+                                    >
+                                      Paste
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           );
                         })}
                       </div>
                     )}
+
+                    <div className="flex justify-end pt-4">
+                      <Button
+                        type="button"
+                        onClick={handleAddMockupSide}
+                        className="text-xs font-semibold space-x-1.5 h-8 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 shadow-xs"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Tambah Posisi Mockup</span>
+                      </Button>
+                    </div>
                   </>
                 );
               })()}

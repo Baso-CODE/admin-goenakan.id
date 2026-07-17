@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useProductFormV2 } from "@/hooks/useProductFormV2";
 import { cn } from "@/lib/utils";
-import { Check, ChevronsUpDown, Loader2, RefreshCw, X, Layers, PlusCircle, Trash2, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, RefreshCw, X, Layers, PlusCircle, Trash2, Plus, ChevronDown } from "lucide-react";
 import { AddItemCategoryModal } from "../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../item-names-product/components/addItemNameModal";
 import CreateCategoryModal from "../../product-categories/components/createCategoryModal";
@@ -81,19 +81,11 @@ export default function ProductFormV2({
   const [globalStock, setGlobalStock] = useState<string>("");
 
   const [mockupSides, setMockupSides] = useState<any[]>([]);
-  const [selectedMockupImage, setSelectedMockupImage] = useState<any | null>(null);
-  const [isMockupModalOpen, setIsMockupModalOpen] = useState(false);
-  const [mockupAreasState, setMockupAreasState] = useState<any[]>([]);
-
-  useEffect(() => {
-    form.setValue("mockupSides", mockupSides);
-  }, [mockupSides]);
-
   const handleAddMockupSide = () => {
     setMockupSides((prev) => [
       ...prev,
       {
-        id: `temp-${Date.now()}-${Math.random()}`,
+        id: `new-${Date.now()}-${Math.random()}`,
         name: "",
         imageId: "",
         mockupAreas: [],
@@ -105,10 +97,53 @@ export default function ProductFormV2({
   };
 
   const handleRemoveMockupSide = (id: string) => {
-    setMockupSides((prev) => prev.filter((item) => item.id !== id));
+    setMockupSides((prev) => prev.filter((m) => m.id !== id));
   };
 
-  const handleImageSelect = (itemIndex: number, val: string) => {
+  const [selectedMockupImage, setSelectedMockupImage] = useState<any | null>(null);
+  const [isMockupModalOpen, setIsMockupModalOpen] = useState(false);
+  const [mockupAreasState, setMockupAreasState] = useState<any[]>([]);
+  const [copiedMockupAreas, setCopiedMockupAreas] = useState<any[] | null>(null);
+
+  const handleCopyMockupConfig = (areas: any[]) => {
+    setCopiedMockupAreas(areas);
+    toast.success("Konfigurasi area mockup berhasil disalin!");
+  };
+
+  const handlePasteMockupConfig = (targetId: string) => {
+    if (!copiedMockupAreas) return;
+    const pastedAreas = copiedMockupAreas.map((area) => ({
+      ...area,
+      id: `area-${Date.now()}-${Math.random()}`,
+    }));
+    setMockupSides((prev) =>
+      prev.map((item) =>
+        item.id === targetId ? { ...item, mockupAreas: pastedAreas } : item
+      )
+    );
+    toast.success("Konfigurasi area mockup berhasil ditempel!");
+  };
+
+  useEffect(() => {
+    form.setValue("mockupSides", mockupSides);
+  }, [mockupSides]);
+
+  const handleClearSlot = (id: string) => {
+    setMockupSides((prev) =>
+      prev.map((m) =>
+        m.id === id
+          ? {
+              ...m,
+              imageId: "",
+              url: "",
+              mockupAreas: [],
+            }
+          : m
+      )
+    );
+  };
+
+  const handleImageSelect = (id: string, val: string) => {
     if (val === "none") return;
     const fileIdx = parseInt(val.replace("index-", ""));
     const file = state.productImagesFiles[fileIdx];
@@ -116,8 +151,8 @@ export default function ProductFormV2({
 
     const url = URL.createObjectURL(file);
     setMockupSides((prev) =>
-      prev.map((item, idx) =>
-        idx === itemIndex
+      prev.map((item) =>
+        item.id === id
           ? {
               ...item,
               imageId: val,
@@ -883,18 +918,8 @@ export default function ProductFormV2({
                       <CardContent className="space-y-6 pt-6">
                         <div className="flex items-center justify-between">
                           <p className="text-xs text-stone-500 dark:text-stone-400">
-                            Tambahkan posisi mockup dan tautkan ke gambar produk.
+                            Unggah gambar mockup dan atur area cetak untuk masing-masing slot sisi print di bawah ini.
                           </p>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleAddMockupSide}
-                            className="space-x-1 border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold"
-                          >
-                            <PlusCircle className="h-4 w-4" />
-                            <span>Tambah Posisi Mockup</span>
-                          </Button>
                         </div>
 
                         <div className="pt-4 border-t border-stone-100 dark:border-stone-800">
@@ -909,43 +934,60 @@ export default function ProductFormV2({
                                     <span className="text-amber-500 font-bold text-base mt-0.5">⚠️</span>
                                     <div className="text-xs text-amber-800 dark:text-amber-300">
                                       <p className="font-bold mb-0.5">Aturan Template Mockup Berdasarkan Ukuran / Kapasitas</p>
-                                      <p className="leading-relaxed">Produk ini memiliki atribut ukuran/kapasitas. Silakan unggah gambar mockup terpisah untuk masing-masing ukuran di tab Media, lalu tautkan gambar tersebut ke atribut ukurannya di bawah ini. Customizer pembeli akan otomatis memuat gambar mockup dan area cetak yang sesuai dengan ukuran yang dipilih.</p>
+                                      <p className="leading-relaxed">Produk ini memiliki atribut ukuran/kapasitas. Silakan unggah gambar mockup terpisah untuk masing-masing ukuran di tab Media, lalu tautkan gambar tersebut ke slot ukurannya di bawah ini.</p>
                                     </div>
                                   </div>
                                 )}
 
                                 {mockupSides.length === 0 ? (
                                   <div className="text-center py-8 border border-dashed rounded-lg border-stone-300 dark:border-stone-750">
-                                    <p className="text-sm text-stone-500 italic">Belum ada posisi mockup yang ditambahkan.</p>
-                                    <Button type="button" variant="outline" size="sm" onClick={handleAddMockupSide} className="mt-3">
-                                      <PlusCircle className="h-4 w-4 mr-1" /> Tambah Posisi Mockup
-                                    </Button>
+                                    <p className="text-sm text-stone-500 italic">Belum ada mockup yang ditambahkan. Silakan klik tombol di bawah untuk menambah mockup.</p>
                                   </div>
                                 ) : (
                                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                    {mockupSides.map((item, itemIdx) => {
+                                    {mockupSides.map((item) => {
                                       const availableImageIndexes = (state.productImagesFiles || []).map((_, idx) => `index-${idx}`);
 
                                       return (
-                                        <div key={item.id} className="border border-stone-200 dark:border-stone-800 rounded-lg p-3 bg-stone-50/50 dark:bg-stone-900/20 flex flex-col gap-3 relative shadow-xs">
-                                          <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="absolute top-2 right-2 h-7 w-7 bg-white dark:bg-stone-850 hover:bg-red-50 dark:hover:bg-red-950/30 border border-stone-200 dark:border-stone-700 text-stone-500 hover:text-red-650 rounded-full shadow-sm flex items-center justify-center z-10"
-                                            onClick={() => handleRemoveMockupSide(item.id)}
-                                            title="Hapus posisi mockup"
-                                          >
-                                            <X className="h-4 w-4 text-red-500" />
-                                          </Button>
+                                        <div key={item.id} className="border border-stone-200 dark:border-stone-800 rounded-lg p-3 bg-white dark:bg-stone-900/60 flex flex-col gap-3 relative shadow-xs">
+                                          <div className="pr-12">
+                                            <h4 className="text-xs font-bold text-indigo-650 dark:text-indigo-400 truncate mb-0.5">
+                                              {item.name || "Posisi Mockup Baru"}
+                                            </h4>
+                                          </div>
+
+                                          <div className="absolute top-2 right-2 flex items-center gap-1">
+                                            {item.imageId && (
+                                              <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7 bg-white dark:bg-stone-850 hover:bg-stone-50 border border-stone-200 dark:border-stone-700 text-stone-500 rounded-full shadow-sm flex items-center justify-center"
+                                                onClick={() => handleClearSlot(item.id)}
+                                                title="Kosongkan gambar"
+                                              >
+                                                <X className="h-3.5 w-3.5 text-stone-500" />
+                                              </Button>
+                                            )}
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-7 w-7 bg-white dark:bg-stone-850 hover:bg-red-50 hover:text-red-600 border border-stone-200 dark:border-stone-700 text-stone-500 rounded-full shadow-sm flex items-center justify-center"
+                                              onClick={() => handleRemoveMockupSide(item.id)}
+                                              title="Hapus mockup"
+                                            >
+                                              <Trash2 className="h-3.5 w-3.5" />
+                                            </Button>
+                                          </div>
 
                                           {item.url ? (
                                             <div className="relative aspect-video w-full rounded border dark:border-stone-800 overflow-hidden bg-white dark:bg-stone-950 shrink-0">
                                               <img src={item.url} alt="thumbnail" className="w-full h-full object-cover" />
                                             </div>
                                           ) : (
-                                            <div className="relative aspect-video w-full rounded border border-dashed border-stone-300 dark:border-stone-770 overflow-hidden bg-stone-100 dark:bg-stone-950 shrink-0 flex items-center justify-center text-xs text-stone-400 font-medium italic">
-                                              Pilih Gambar Terlebih Dahulu
+                                            <div className="relative aspect-video w-full rounded border border-dashed border-stone-300 dark:border-stone-770 overflow-hidden bg-stone-100 dark:bg-stone-950 shrink-0 flex items-center justify-center text-xs text-stone-400 font-medium italic text-center p-2">
+                                              Silakan Unggah atau Pilih Gambar
                                             </div>
                                           )}
 
@@ -953,28 +995,65 @@ export default function ProductFormV2({
                                             <div className="space-y-2">
                                               <div className="space-y-1">
                                                 <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                                                  Pilih Gambar dari Galeri
+                                                  Pilih Gambar
                                                 </label>
-                                                <Select
-                                                  value={item.imageId || "none"}
-                                                  onValueChange={(val) => handleImageSelect(itemIdx, val)}
-                                                >
-                                                  <SelectTrigger className="w-full h-8 text-xs">
-                                                    <SelectValue placeholder="Pilih gambar galeri..." />
-                                                  </SelectTrigger>
-                                                  <SelectContent>
-                                                    <SelectItem value="none" disabled className="text-xs">Pilih gambar galeri...</SelectItem>
-                                                    {availableImageIndexes.map((val) => {
-                                                      const fileIdx = parseInt(val.replace("index-", ""));
-                                                      const file = state.productImagesFiles[fileIdx];
-                                                      return (
-                                                        <SelectItem key={val} value={val} className="text-xs">
-                                                          Gambar #{fileIdx + 1} ({file?.name || "unnamed"})
-                                                        </SelectItem>
-                                                      );
-                                                    })}
-                                                  </SelectContent>
-                                                </Select>
+                                                <div className="flex gap-1.5 items-center">
+                                                  <div className="flex-1">
+                                                    <Select
+                                                      value={item.imageId || "none"}
+                                                      onValueChange={(val) => handleImageSelect(item.id, val)}
+                                                    >
+                                                      <SelectTrigger className="w-full h-8 text-xs">
+                                                        <SelectValue placeholder="Pilih gambar..." />
+                                                      </SelectTrigger>
+                                                      <SelectContent>
+                                                        <SelectItem value="none" disabled className="text-xs">Pilih gambar...</SelectItem>
+                                                        {availableImageIndexes.map((val) => {
+                                                          const fileIdx = parseInt(val.replace("index-", ""));
+                                                          const file = state.productImagesFiles[fileIdx];
+                                                          return (
+                                                            <SelectItem key={val} value={val} className="text-xs">
+                                                              Gambar #{fileIdx + 1} ({file?.name || "unnamed"})
+                                                            </SelectItem>
+                                                          );
+                                                        })}
+                                                      </SelectContent>
+                                                    </Select>
+                                                  </div>
+
+                                                  <label className="shrink-0">
+                                                    <input
+                                                      type="file"
+                                                      accept="image/*"
+                                                      className="hidden"
+                                                      onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) {
+                                                          const newFiles = [...(state.productImagesFiles || []), file];
+                                                          setters.setProductImagesFiles(newFiles);
+
+                                                          const newIndex = newFiles.length - 1;
+                                                          const imageId = `index-${newIndex}`;
+                                                          const url = URL.createObjectURL(file);
+                                                          setMockupSides((prev) =>
+                                                            prev.map((m) =>
+                                                              m.id === item.id
+                                                                ? {
+                                                                    ...m,
+                                                                    imageId,
+                                                                    url,
+                                                                  }
+                                                                : m
+                                                            )
+                                                          );
+                                                        }
+                                                      }}
+                                                    />
+                                                    <span className="flex items-center justify-center h-8 px-2.5 border border-stone-200 dark:border-stone-850 hover:bg-stone-100 dark:hover:bg-stone-900 rounded text-xs font-semibold cursor-pointer text-stone-700 dark:text-stone-300">
+                                                      Browse
+                                                    </span>
+                                                  </label>
+                                                </div>
                                               </div>
 
                                               <div className="space-y-1">
@@ -987,8 +1066,8 @@ export default function ProductFormV2({
                                                   onChange={(e) => {
                                                     const newName = e.target.value;
                                                     setMockupSides((prev) =>
-                                                      prev.map((m, idx) =>
-                                                        idx === itemIdx ? { ...m, name: newName } : m
+                                                      prev.map((m) =>
+                                                        m.id === item.id ? { ...m, name: newName } : m
                                                       )
                                                     );
                                                   }}
@@ -997,86 +1076,128 @@ export default function ProductFormV2({
                                                 />
                                               </div>
 
-                                              <div className="grid grid-cols-2 gap-2 pt-1">
-                                                <div className="space-y-1">
-                                                  <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                                                    Varian / Ukuran
-                                                  </label>
-                                                  <Select
-                                                    value={item.attributeValueId || "none"}
-                                                    disabled={!item.imageId}
-                                                    onValueChange={(val) => {
-                                                      const targetVal = val === "none" ? null : val;
-                                                      setMockupSides((prev) =>
-                                                        prev.map((m, idx) =>
-                                                          idx === itemIdx ? { ...m, attributeValueId: targetVal } : m
-                                                        )
-                                                      );
-                                                    }}
-                                                  >
-                                                    <SelectTrigger className="w-full h-8 text-[11px]">
-                                                      <SelectValue placeholder="Select Variant" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                      <SelectItem value="none" className="text-xs">Select Variant</SelectItem>
-                                                      {fullAttributeValuesList.filter(v => v.attributeType === "SIZE").map((val) => (
-                                                        <SelectItem key={val.id} value={val.id} className="text-xs">
-                                                          {val.value}
-                                                        </SelectItem>
-                                                      ))}
-                                                    </SelectContent>
-                                                  </Select>
-                                                </div>
+                                              <div className="space-y-1">
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                                                  Hubungkan Ukuran
+                                                </label>
+                                                <Select
+                                                  value={item.attributeValueId || "none"}
+                                                  onValueChange={(val) => {
+                                                    const targetVal = val === "none" ? null : val;
+                                                    setMockupSides((prev) =>
+                                                      prev.map((m) => m.id === item.id ? { ...m, attributeValueId: targetVal } : m)
+                                                    );
+                                                  }}
+                                                >
+                                                  <SelectTrigger className="w-full h-8 text-xs">
+                                                    <SelectValue placeholder="Semua Ukuran" />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="none" className="text-xs">Semua Ukuran</SelectItem>
+                                                    {fullAttributeValuesList.filter(v => v.attributeType === "SIZE").map((val) => (
+                                                      <SelectItem key={val.id} value={val.id} className="text-xs">
+                                                        {val.value}
+                                                      </SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
 
-                                                <div className="space-y-1">
-                                                  <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                                                    Posisi Cetak (Harga)
-                                                  </label>
-                                                  <Select
-                                                    value={item.printPositionValueId || "none"}
-                                                    disabled={!item.imageId}
-                                                    onValueChange={(val) => {
-                                                      const targetVal = val === "none" ? null : val;
-                                                      setMockupSides((prev) =>
-                                                        prev.map((m, idx) =>
-                                                          idx === itemIdx ? { ...m, printPositionValueId: targetVal } : m
-                                                        )
-                                                      );
-                                                    }}
-                                                  >
-                                                    <SelectTrigger className="w-full h-8 text-[11px]">
-                                                      <SelectValue placeholder="Bebas Sisi" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                      <SelectItem value="none" className="text-xs">Bebas Sisi</SelectItem>
-                                                      {fullAttributeValuesList.filter(v => v.attributeType === "MOCKUP_SIDE").map((val) => (
-                                                        <SelectItem key={val.id} value={val.id} className="text-xs">
-                                                          {val.value}
-                                                        </SelectItem>
-                                                      ))}
-                                                    </SelectContent>
-                                                  </Select>
-                                                </div>
+
+                                              <div className="space-y-1">
+                                                <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                                                  Posisi Cetak (Harga Modifier)
+                                                </label>
+                                                <Select
+                                                  value={item.printPositionValueId || "none"}
+                                                  disabled={!item.imageId}
+                                                  onValueChange={(val) => {
+                                                    const targetVal = val === "none" ? null : val;
+                                                    const targetOpt = fullAttributeValuesList.find(o => o.id === targetVal);
+                                                    setMockupSides((prev) =>
+                                                      prev.map((m) =>
+                                                        m.id === item.id
+                                                          ? {
+                                                              ...m,
+                                                              printPositionValueId: targetVal,
+                                                              name: targetOpt ? targetOpt.value : m.name
+                                                            }
+                                                          : m
+                                                      )
+                                                    );
+                                                  }}
+                                                >
+                                                  <SelectTrigger className="w-full h-8 text-[11px]">
+                                                    <SelectValue placeholder="Bebas" />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="none" className="text-xs">Bebas Posisi</SelectItem>
+                                                    {fullAttributeValuesList.filter(v => v.attributeType === "MOCKUP_SIDE").map((val) => (
+                                                      <SelectItem key={val.id} value={val.id} className="text-xs">
+                                                        {val.value}
+                                                      </SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
                                               </div>
                                             </div>
 
-                                            <Button
-                                              type="button"
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={() => handleOpenMockupModal(item)}
-                                              className="w-full text-xs font-semibold h-8 flex items-center gap-1.5"
-                                              disabled={!item.imageId}
-                                            >
-                                              <Layers className="h-3.5 w-3.5 text-indigo-500" />
-                                              Atur Area Mockup
-                                            </Button>
+                                            <div className="flex gap-1.5 w-full mt-2.5">
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleOpenMockupModal(item)}
+                                                className="flex-1 text-xs font-semibold h-8 flex items-center justify-center gap-1.5"
+                                                disabled={!item.imageId}
+                                              >
+                                                <Layers className="h-3.5 w-3.5 text-indigo-500" />
+                                                Atur Area
+                                              </Button>
+
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleCopyMockupConfig(item.mockupAreas || [])}
+                                                className="text-xs font-medium h-8 px-2 flex items-center justify-center"
+                                                disabled={!item.imageId || !item.mockupAreas || item.mockupAreas.length === 0}
+                                                title="Salin area mockup"
+                                              >
+                                                Copy
+                                              </Button>
+
+                                              {copiedMockupAreas && (
+                                                <Button
+                                                  type="button"
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() => handlePasteMockupConfig(item.id)}
+                                                  className="text-xs font-medium h-8 px-2 flex items-center justify-center border-indigo-200 bg-indigo-50/30 hover:bg-indigo-50 text-indigo-600 dark:text-indigo-400"
+                                                  disabled={!item.imageId}
+                                                  title="Tempel area mockup"
+                                                >
+                                                  Paste
+                                                </Button>
+                                              )}
+                                            </div>
                                           </div>
                                         </div>
                                       );
                                     })}
                                   </div>
                                 )}
+
+                                <div className="flex justify-end pt-4">
+                                  <Button
+                                    type="button"
+                                    onClick={handleAddMockupSide}
+                                    className="text-xs font-semibold space-x-1.5 h-8 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 shadow-xs"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                    <span>Tambah Posisi Mockup</span>
+                                  </Button>
+                                </div>
                               </>
                             );
                           })()}

@@ -79,6 +79,7 @@ export default function AddProductPage() {
               mockupSideName: side.name,
               attributeValueId: side.attributeValueId,
               printPositionValueId: side.printPositionValueId,
+              printSideValueId: side.printSideValueId,
             }),
           });
 
