@@ -62,6 +62,13 @@ export default function FormUpdateAttributes({
 
   const [mockupSides, setMockupSides] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [prevProductId, setPrevProductId] = useState<string | null>(null);
+
+  if (initialData?.id && initialData.id !== prevProductId) {
+    setPrevProductId(initialData.id);
+    setIsInitialized(false);
+  }
 
   const getProductAttributeValues = () => {
     const list: { id: string; value: string; attributeName: string; attributeType: string }[] = [];
@@ -129,7 +136,7 @@ export default function FormUpdateAttributes({
   };
 
   useEffect(() => {
-    if (initialData?.images) {
+    if (initialData?.images && !isInitialized) {
       const initialMockupSides = initialData.images
         .filter((img: any) => img.mockupSideName || img.attributeValueId || img.printSideValueId || img.printPositionValueId || (img.mockupAreas && img.mockupAreas.length > 0))
         .map((img: any) => ({
@@ -143,8 +150,9 @@ export default function FormUpdateAttributes({
           url: img.url,
         }));
       setMockupSides(initialMockupSides);
+      setIsInitialized(true);
     }
-  }, [initialData?.images]);
+  }, [initialData?.images, isInitialized]);
 
   // Prefill dari initialData.attributeValues
   useEffect(() => {
