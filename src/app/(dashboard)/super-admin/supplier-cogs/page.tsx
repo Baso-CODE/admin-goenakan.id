@@ -168,7 +168,7 @@ export default function SupplierCogsCalculatorPage() {
 
   const handleAddCurrencyFast = async (data: any) => {
     try {
-      const res = await fetchApi("/currency", {
+      const res = await fetchApi("/currencies", {
         method: "POST",
         body: JSON.stringify(data),
       });
@@ -358,7 +358,7 @@ export default function SupplierCogsCalculatorPage() {
         const [prodRes, vendRes, currRes] = await Promise.all([
           fetchApi("/products/order"),
           fetchApi("/vendors/order/add"),
-          fetchApi("/currency"),
+          fetchApi("/currencies"),
         ]);
 
         if (prodRes.ok) {
