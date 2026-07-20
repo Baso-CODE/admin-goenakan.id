@@ -23,6 +23,8 @@ import {
   Copy,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import FastCurrencyForm from "@/app/(dashboard)/admin-invoice/currency/components/formCurrencyFast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -160,8 +162,33 @@ export default function SupplierCogsCalculatorPage() {
   const [supplierContactName, setSupplierContactName] = useState<string>("");
   const [supplierContactLink, setSupplierContactLink] = useState<string>("");
 
-  // Master Currencies
+  // Master Currencies & Fast Currency Dialog
   const [masterCurrencies, setMasterCurrencies] = useState<any[]>([]);
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState<boolean>(false);
+
+  const handleAddCurrencyFast = async (data: any) => {
+    try {
+      const res = await fetchApi("/currency", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal membuat currency");
+      }
+
+      const responseData = await res.json();
+      const newCurrency = responseData.data || responseData;
+
+      setMasterCurrencies((prev) => [...prev, newCurrency]);
+      setCurrency(newCurrency.code);
+      setIsCurrencyModalOpen(false);
+      toast.success("Currency berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat membuat currency.");
+    }
+  };
 
   // Mode Calculation: FIXED vs VARIABLE
   const [calculationMode, setCalculationMode] = useState<"FIXED" | "VARIABLE">("FIXED");
@@ -1249,28 +1276,53 @@ export default function SupplierCogsCalculatorPage() {
                 {/* 3. SUPPLIER PRICING DETAILS */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-stone-600">Mata Uang (Master)</Label>
-                    <Select value={currency} onValueChange={setCurrency}>
+                    <Label className="text-xs font-bold uppercase text-stone-600 flex items-center gap-1.5">
+                      <Coins className="w-4 h-4 text-stone-500" /> Mata Uang
+                    </Label>
+
+                    <Dialog
+                      open={isCurrencyModalOpen}
+                      onOpenChange={setIsCurrencyModalOpen}
+                    >
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Tambah Currency Baru</DialogTitle>
+                        </DialogHeader>
+                        <FastCurrencyForm onSubmit={handleAddCurrencyFast} />
+                      </DialogContent>
+                    </Dialog>
+
+                    <Select
+                      onValueChange={(val) => {
+                        if (val === "add_new_currency") {
+                          setIsCurrencyModalOpen(true);
+                        } else {
+                          setCurrency(val);
+                        }
+                      }}
+                      value={currency}
+                    >
                       <SelectTrigger className="bg-stone-50 border-stone-300">
-                        <SelectValue />
+                        <SelectValue placeholder="Pilih Currency" />
                       </SelectTrigger>
                       <SelectContent>
-                        {masterCurrencies.length > 0 ? (
-                          masterCurrencies.map((c) => (
-                            <SelectItem key={c.id || c.code} value={c.code}>
-                              <div className="flex items-center justify-between w-full gap-2">
-                                <span>{c.code} {c.name ? `- ${c.name}` : ""}</span>
-                                {c.symbol && <span className="text-stone-400 font-mono text-[10px]">({c.symbol})</span>}
-                              </div>
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <>
-                            <SelectItem value="RMB">RMB (Yuan)</SelectItem>
-                            <SelectItem value="USD">USD (Dollar)</SelectItem>
-                            <SelectItem value="IDR">IDR (Rupiah)</SelectItem>
-                          </>
-                        )}
+                        {masterCurrencies.map((cur) => (
+                          <SelectItem key={cur.code} value={cur.code}>
+                            {cur.code} ({cur.symbol || "$"}) - {cur.name || cur.code}
+                          </SelectItem>
+                        ))}
+
+                        <div className="h-px bg-stone-200 my-1 mx-2" />
+                        <SelectItem
+                          value="add_new_currency"
+                          textValue="Buat Currency Baru"
+                          className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Buat Currency Baru...
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
