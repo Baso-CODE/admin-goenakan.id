@@ -66,6 +66,13 @@ export default function SupplierCogsCalculatorPage() {
   const [selectedProductId, setSelectedProductId] = useState<string>("sandbox");
   const [tempProductName, setTempProductName] = useState<string>("");
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
+  const [vendorTypeFilter, setVendorTypeFilter] = useState<"ALL" | "PRODUCT" | "SERVICE">("ALL");
+
+  const filteredVendors = vendors.filter((v) => {
+    if (vendorTypeFilter === "ALL") return true;
+    if (!v.types || v.types.length === 0) return true;
+    return v.types.includes(vendorTypeFilter);
+  });
   
   // Pricing
   const [foreignPrice, setForeignPrice] = useState<number>(8);
@@ -97,7 +104,7 @@ export default function SupplierCogsCalculatorPage() {
       try {
         const [prodRes, vendRes] = await Promise.all([
           fetchApi("/products/order"),
-          fetchApi("/vendors"),
+          fetchApi("/vendors/order/add"),
         ]);
 
         if (prodRes.ok) {
@@ -590,17 +597,61 @@ export default function SupplierCogsCalculatorPage() {
 
                 {/* 2. SELECT SUPPLIER */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase text-stone-600">Supplier / Vendor</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold uppercase text-stone-600">Supplier / Vendor</Label>
+                    <div className="flex gap-1 bg-stone-100 p-0.5 rounded text-[10px] font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => setVendorTypeFilter("ALL")}
+                        className={`px-2 py-0.5 rounded transition-colors ${
+                          vendorTypeFilter === "ALL" ? "bg-white text-stone-900 shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
+                        }`}
+                      >
+                        Semua ({vendors.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVendorTypeFilter("PRODUCT")}
+                        className={`px-2 py-0.5 rounded transition-colors ${
+                          vendorTypeFilter === "PRODUCT" ? "bg-white text-stone-900 shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
+                        }`}
+                      >
+                        Product
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVendorTypeFilter("SERVICE")}
+                        className={`px-2 py-0.5 rounded transition-colors ${
+                          vendorTypeFilter === "SERVICE" ? "bg-white text-stone-900 shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
+                        }`}
+                      >
+                        Service
+                      </button>
+                    </div>
+                  </div>
+
                   <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
                     <SelectTrigger className="bg-stone-50 border-stone-300">
-                      <SelectValue placeholder="Pilih Supplier" />
+                      <SelectValue placeholder="Pilih Supplier / Vendor" />
                     </SelectTrigger>
                     <SelectContent>
-                      {vendors.map((v) => (
-                        <SelectItem key={v.id} value={v.id}>
-                          {v.companyName}
-                        </SelectItem>
-                      ))}
+                      {filteredVendors.map((v) => {
+                        const typeLabel = v.types && v.types.length > 0 
+                          ? v.types.map((t: string) => t === "PRODUCT" ? "Product" : "Service").join(" & ")
+                          : "";
+                        return (
+                          <SelectItem key={v.id} value={v.id}>
+                            <div className="flex items-center justify-between w-full gap-4">
+                              <span>{v.companyName}</span>
+                              {typeLabel && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-stone-100 text-stone-600 border border-stone-200 uppercase ml-2">
+                                  {typeLabel}
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
