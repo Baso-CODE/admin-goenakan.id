@@ -1225,6 +1225,86 @@ export default function SupplierCogsCalculatorPage() {
                 </Card>
               ) : (
                 <>
+                  {/* FIXED MODE TIERING MATRIX TABLE */}
+                  <Card className="bg-white border border-stone-200 shadow-sm overflow-hidden">
+                    <CardHeader className="bg-stone-50 border-b pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs font-bold uppercase text-stone-800 flex items-center gap-2">
+                          <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                          Fixed Mode Tiering Matrix (Simulasi MOQ Step)
+                        </CardTitle>
+                        <Badge className="bg-stone-800 text-white font-bold text-[10px] uppercase">
+                          MOQ {Math.max(1, Math.ceil(qtyPcs / (qtyPerCtn || 1)))} Ctn ({Math.max(1, Math.ceil(qtyPcs / (qtyPerCtn || 1))) * qtyPerCtn} Pcs)
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-0 overflow-x-auto">
+                      <Table>
+                        <TableHeader className="bg-stone-100/70">
+                          <TableRow>
+                            <TableHead className="text-[10px] font-bold text-stone-700 uppercase">Pcs / Ctn</TableHead>
+                            <TableHead className="text-[10px] font-bold text-stone-700 uppercase">Cost SEA/Pcs</TableHead>
+                            <TableHead className="text-[10px] font-bold text-stone-700 uppercase">Cost AIR/Pcs</TableHead>
+                            <TableHead className="text-[10px] font-bold text-blue-900 uppercase">COGS (SEA)</TableHead>
+                            <TableHead className="text-[10px] font-bold text-amber-900 uppercase">COGS (AIR)</TableHead>
+                            <TableHead className="text-[10px] font-bold text-indigo-900 uppercase">Jual (SEA)</TableHead>
+                            <TableHead className="text-[10px] font-bold text-amber-900 uppercase">Jual (AIR)</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {[0, 1, 2, 3, 4].map((step) => {
+                            const baseMoqCtn = Math.max(1, Math.ceil(qtyPcs / (qtyPerCtn || 1)));
+                            const stepCtn = baseMoqCtn + step;
+                            const stepPcs = stepCtn * (qtyPerCtn || 1);
+                            
+                            // Cost SEA/Pcs: (cbmPerCtn * 10,000,000) / qtyPerCtn
+                            const cbmPerCtn = (length * width * height) / 1000000;
+                            const costSeaPcs = qtyPerCtn > 0 ? (cbmPerCtn * 10000000) / qtyPerCtn : 0;
+                            
+                            // Cost AIR/Pcs: (volWeight vs Weight) * 260,000 / qtyPerCtn
+                            const volWeight = (length * width * height) / 6000;
+                            const airWeightPerCtn = Math.max(volWeight, weight);
+                            const costAirPcs = qtyPerCtn > 0 ? (260000 * airWeightPerCtn) / qtyPerCtn : 0;
+
+                            const cogsSeaTier = baseCostPcs + costSeaPcs + localFreight;
+                            const cogsAirTier = baseCostPcs + costAirPcs + localFreight;
+
+                            const sponsorMult = 1 + (sponsorPercent / 100);
+                            const sellSeaTier = Math.ceil(((cogsSeaTier * sponsorMult) + margin) / 1000) * 1000;
+                            const sellAirTier = Math.ceil(((cogsAirTier * sponsorMult) + margin) / 1000) * 1000;
+
+                            return (
+                              <TableRow key={step} className="hover:bg-stone-50 text-xs">
+                                <TableCell className="font-bold text-stone-800">
+                                  {stepPcs} pcs
+                                  <span className="block text-[10px] text-stone-500 font-normal">({stepCtn} ctn)</span>
+                                </TableCell>
+                                <TableCell className="text-stone-600 font-medium">
+                                  Rp {Math.round(costSeaPcs).toLocaleString("id-ID")}
+                                </TableCell>
+                                <TableCell className="text-stone-600 font-medium">
+                                  Rp {Math.round(costAirPcs).toLocaleString("id-ID")}
+                                </TableCell>
+                                <TableCell className="font-semibold text-blue-900">
+                                  Rp {Math.round(cogsSeaTier).toLocaleString("id-ID")}
+                                </TableCell>
+                                <TableCell className="font-semibold text-amber-900">
+                                  Rp {Math.round(cogsAirTier).toLocaleString("id-ID")}
+                                </TableCell>
+                                <TableCell className="font-black text-indigo-700 bg-indigo-50/50">
+                                  Rp {sellSeaTier.toLocaleString("id-ID")}
+                                </TableCell>
+                                <TableCell className="font-black text-amber-700 bg-amber-50/50">
+                                  Rp {sellAirTier.toLocaleString("id-ID")}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+
                   {/* SEA FREIGHT CALC CARD */}
               <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 shadow-sm relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-3 opacity-10">
