@@ -18,6 +18,8 @@ import {
   ArrowLeft,
   Edit2,
   Eye,
+  Check,
+  Tag,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -67,6 +69,8 @@ export default function SupplierCogsCalculatorPage() {
   const [tempProductName, setTempProductName] = useState<string>("");
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
   const [selectedServiceVendorId, setSelectedServiceVendorId] = useState<string>("");
+  const [cogsStatus, setCogsStatus] = useState<"EXISTING" | "POTENTIAL">("POTENTIAL");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<"ALL" | "EXISTING" | "POTENTIAL">("ALL");
 
   const productVendors = vendors.filter((v) => !v.types || v.types.length === 0 || v.types.includes("PRODUCT"));
   const serviceVendors = vendors.filter((v) => !v.types || v.types.length === 0 || v.types.includes("SERVICE"));
@@ -228,6 +232,7 @@ export default function SupplierCogsCalculatorPage() {
       const payload = {
         productId: selectedProductId === "sandbox" ? undefined : selectedProductId,
         tempProductName: selectedProductId === "sandbox" ? tempProductName.trim() : undefined,
+        status: cogsStatus,
         vendorId: selectedVendorId && selectedVendorId !== "none" ? selectedVendorId : undefined,
         serviceVendorId: selectedServiceVendorId && selectedServiceVendorId !== "none" ? selectedServiceVendorId : undefined,
         foreignPrice,
@@ -276,6 +281,7 @@ export default function SupplierCogsCalculatorPage() {
     setTempProductName("");
     setSelectedVendorId("");
     setSelectedServiceVendorId("");
+    setCogsStatus("POTENTIAL");
     setForeignPrice(8);
     setCurrency("RMB");
     setExchangeRate(ratesData.RMB || 2250);
@@ -302,8 +308,9 @@ export default function SupplierCogsCalculatorPage() {
     setEditingRecord(rec);
     setSelectedProductId(rec.productId || "sandbox");
     setTempProductName(rec.tempProductName || "");
-    setSelectedVendorId(rec.vendorId);
+    setSelectedVendorId(rec.vendorId || "");
     setSelectedServiceVendorId(rec.serviceVendorId || "");
+    setCogsStatus(rec.status || (rec.productId ? "EXISTING" : "POTENTIAL"));
     setForeignPrice(Number(rec.foreignPrice));
     setCurrency(rec.currencyCode);
     setExchangeRate(Number(rec.exchangeRate));
@@ -345,9 +352,15 @@ export default function SupplierCogsCalculatorPage() {
   const filteredRecords = records.filter((rec) => {
     const productName = rec.product ? rec.product.name : (rec.tempProductName || "");
     const vendorName = rec.vendor ? rec.vendor.companyName : "";
+    const serviceVendorName = rec.serviceVendor ? rec.serviceVendor.companyName : "";
     const notesContent = rec.notes || "";
-    const searchString = `${productName} ${vendorName} ${notesContent}`.toLowerCase();
-    return searchString.includes(searchQuery.toLowerCase());
+    const searchString = `${productName} ${vendorName} ${serviceVendorName} ${notesContent}`.toLowerCase();
+    const matchesSearch = searchString.includes(searchQuery.toLowerCase());
+
+    const recStatus = rec.status || (rec.productId ? "EXISTING" : "POTENTIAL");
+    const matchesStatus = historyStatusFilter === "ALL" || recStatus === historyStatusFilter;
+
+    return matchesSearch && matchesStatus;
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / itemsPerPage));
@@ -402,6 +415,48 @@ export default function SupplierCogsCalculatorPage() {
                   />
                 </div>
 
+                {/* STATUS FILTER PILLS */}
+                <div className="flex gap-1 bg-stone-100 p-0.5 rounded text-[11px] font-semibold border border-stone-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryStatusFilter("ALL");
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded transition-colors ${
+                      historyStatusFilter === "ALL" ? "bg-white text-stone-900 shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
+                    }`}
+                  >
+                    Semua
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryStatusFilter("EXISTING");
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1 ${
+                      historyStatusFilter === "EXISTING" ? "bg-emerald-600 text-white shadow-2xs font-bold" : "text-emerald-700 hover:text-emerald-900"
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
+                    Existing
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryStatusFilter("POTENTIAL");
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1 ${
+                      historyStatusFilter === "POTENTIAL" ? "bg-sky-600 text-white shadow-2xs font-bold" : "text-sky-700 hover:text-sky-900"
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-300"></span>
+                    Potential
+                  </button>
+                </div>
+
                 {/* ADD NEW BUTTON */}
                 <Button
                   onClick={handleAddNew}
@@ -433,7 +488,7 @@ export default function SupplierCogsCalculatorPage() {
                   {paginatedRecords.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center text-stone-400 py-8 text-sm">
-                        {searchQuery ? "Tidak ditemukan catatan harga yang cocok." : "Belum ada catatan harga supplier yang disimpan."}
+                        {searchQuery || historyStatusFilter !== "ALL" ? "Tidak ditemukan catatan harga yang cocok." : "Belum ada catatan harga supplier yang disimpan."}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -446,13 +501,28 @@ export default function SupplierCogsCalculatorPage() {
                         year: "numeric",
                       });
 
+                      const isExisting = rec.status === "EXISTING" || (!rec.status && rec.productId);
+
                       return (
                         <TableRow key={rec.id} className="hover:bg-stone-50 transition-colors">
                           <TableCell className="font-medium text-stone-850">
-                            {displayProdName}
-                            {!rec.productId && (
-                              <Badge className="ml-2 bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-100 text-[9px] px-1.5 py-0.5">Sourcing Draft</Badge>
-                            )}
+                            <div>
+                              <span>{displayProdName}</span>
+                              <div className="flex items-center gap-1 mt-1">
+                                {isExisting ? (
+                                  <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                    Existing
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                    Potential
+                                  </Badge>
+                                )}
+                                {!rec.productId && (
+                                  <Badge className="bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-100 text-[9px] px-1.5 py-0.2">Draft</Badge>
+                                )}
+                              </div>
+                            </div>
                           </TableCell>
                           <TableCell className="text-stone-600">
                             <div>
@@ -569,35 +639,92 @@ export default function SupplierCogsCalculatorPage() {
               <CardContent className="space-y-6 pt-6">
                 
                 {/* 1. SELECT PRODUCT OR SANDBOX */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-stone-600">Master Product Catalog</Label>
-                    <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                      <SelectTrigger className="bg-stone-50 border-stone-300">
-                        <SelectValue placeholder="Pilih Produk" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sandbox">⭐ [Sourcing Sandbox / Item Baru]</SelectItem>
-                        {products.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name} ({p.sku})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-stone-600">Master Product Catalog</Label>
+                      <Select value={selectedProductId} onValueChange={(val) => {
+                        setSelectedProductId(val);
+                        if (val !== "sandbox") {
+                          setCogsStatus("EXISTING");
+                        }
+                      }}>
+                        <SelectTrigger className="bg-stone-50 border-stone-300">
+                          <SelectValue placeholder="Pilih Produk" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sandbox">⭐ [Sourcing Sandbox / Item Baru]</SelectItem>
+                          {products.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name} ({p.sku})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {selectedProductId === "sandbox" && (
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase text-stone-600">Nama Produk Sourcing</Label>
+                        <Input
+                          placeholder="Contoh: Tumbler Ceramic Type-D"
+                          value={tempProductName}
+                          onChange={(e) => setTempProductName(e.target.value)}
+                          className="bg-stone-50 border-stone-300"
+                        />
+                      </div>
+                    )}
                   </div>
 
-                  {selectedProductId === "sandbox" && (
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase text-stone-600">Nama Produk Sourcing</Label>
-                      <Input
-                        placeholder="Contoh: Tumbler Ceramic Type-D"
-                        value={tempProductName}
-                        onChange={(e) => setTempProductName(e.target.value)}
-                        className="bg-stone-50 border-stone-300"
-                      />
+                  {/* STATUS / TAG SELECTION */}
+                  <div className="space-y-2 pt-2 border-t border-stone-100">
+                    <Label className="text-xs font-bold uppercase text-stone-600 flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-stone-500" /> Status / Tag Produk COGS
+                    </Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setCogsStatus("EXISTING")}
+                        className={`p-3 rounded-md border text-left flex flex-col gap-1 transition-all cursor-pointer ${
+                          cogsStatus === "EXISTING"
+                            ? "border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-600 shadow-2xs"
+                            : "border-stone-200 bg-stone-50 hover:bg-stone-100"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            Existing Product
+                          </span>
+                          {cogsStatus === "EXISTING" && <Check className="w-4 h-4 text-emerald-600" />}
+                        </div>
+                        <p className="text-[10px] text-stone-600 leading-tight">
+                          Produk yang sudah pernah dibeli atau dijual dalam katalog.
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setCogsStatus("POTENTIAL")}
+                        className={`p-3 rounded-md border text-left flex flex-col gap-1 transition-all cursor-pointer ${
+                          cogsStatus === "POTENTIAL"
+                            ? "border-sky-600 bg-sky-50/70 ring-1 ring-sky-600 shadow-2xs"
+                            : "border-stone-200 bg-stone-50 hover:bg-stone-100"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-sky-950 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                            Potential Product
+                          </span>
+                          {cogsStatus === "POTENTIAL" && <Check className="w-4 h-4 text-sky-600" />}
+                        </div>
+                        <p className="text-[10px] text-stone-600 leading-tight">
+                          Potensi produk sourcing baru untuk dipakai/dibeli nanti.
+                        </p>
+                      </button>
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* 2. SELECT SUPPLIER & SERVICE VENDOR (SIDE BY SIDE) */}
