@@ -23,6 +23,8 @@ import {
   Copy,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import FastCurrencyForm from "@/app/(dashboard)/admin-invoice/currency/components/formCurrencyFast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -154,6 +156,40 @@ export default function SupplierCogsCalculatorPage() {
   const [cogsStatus, setCogsStatus] = useState<"EXISTING" | "POTENTIAL">("POTENTIAL");
   const [historyStatusFilter, setHistoryStatusFilter] = useState<"ALL" | "EXISTING" | "POTENTIAL">("ALL");
 
+  // Potential Supplier Sourcing & Contact Details
+  const [supplierPlatform, setSupplierPlatform] = useState<string>("1688");
+  const [supplierPlatformCustom, setSupplierPlatformCustom] = useState<string>("");
+  const [supplierContactName, setSupplierContactName] = useState<string>("");
+  const [supplierContactLink, setSupplierContactLink] = useState<string>("");
+
+  // Master Currencies & Fast Currency Dialog
+  const [masterCurrencies, setMasterCurrencies] = useState<any[]>([]);
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState<boolean>(false);
+
+  const handleAddCurrencyFast = async (data: any) => {
+    try {
+      const res = await fetchApi("/currencies", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal membuat currency");
+      }
+
+      const responseData = await res.json();
+      const newCurrency = responseData.data || responseData;
+
+      setMasterCurrencies((prev) => [...prev, newCurrency]);
+      setCurrency(newCurrency.code);
+      setIsCurrencyModalOpen(false);
+      toast.success("Currency berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat membuat currency.");
+    }
+  };
+
   // Mode Calculation: FIXED vs VARIABLE
   const [calculationMode, setCalculationMode] = useState<"FIXED" | "VARIABLE">("FIXED");
   const [variableTiers, setVariableTiers] = useState<Array<{ id: string; totalPcs: number; pricePcs: number; gzCost: number }>>([
@@ -223,6 +259,21 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedVendorId(rec.vendorId || "");
     setSelectedServiceVendorId(rec.serviceVendorId || "");
     setCogsStatus(rec.status || (rec.productId ? "EXISTING" : "POTENTIAL"));
+    const stdPlatforms = ["1688", "Alibaba", "WeChat", "Taobao", "Made-In-China", "WhatsApp", "Lokal / Indonesia"];
+    if (rec.supplierPlatform) {
+      if (stdPlatforms.includes(rec.supplierPlatform)) {
+        setSupplierPlatform(rec.supplierPlatform);
+        setSupplierPlatformCustom("");
+      } else {
+        setSupplierPlatform("Lainnya");
+        setSupplierPlatformCustom(rec.supplierPlatform);
+      }
+    } else {
+      setSupplierPlatform("1688");
+      setSupplierPlatformCustom("");
+    }
+    setSupplierContactName(rec.supplierContactName || "");
+    setSupplierContactLink(rec.supplierContactLink || "");
     
     setForeignPrice(Number(rec.foreignPrice));
     setCurrency(rec.currencyCode);
@@ -262,6 +313,8 @@ export default function SupplierCogsCalculatorPage() {
       if (firstTier) {
         setForeignPrice(Number(firstTier.pricePcs) || Number(rec.foreignPrice));
         setGzDeliveryCost(Number(firstTier.gzCost) || Number(rec.gzDeliveryCost));
+        const computedMoq = Math.max(1, Math.ceil((firstTier.totalPcs || 1) / (qtyPerCtn || 1)));
+        setMoqCtn(computedMoq);
       }
       setCalculationMode("FIXED");
       toast.success("Catatan disalin dan dikonversi ke Fixed Mode. Silakan simpan sebagai catatan baru!");
@@ -302,29 +355,31 @@ export default function SupplierCogsCalculatorPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [prodRes, vendRes] = await Promise.all([
+        const [prodRes, vendRes, currRes] = await Promise.all([
           fetchApi("/products/order"),
           fetchApi("/vendors/order/add"),
+          fetchApi("/currencies"),
         ]);
 
         if (prodRes.ok) {
           const prods = await prodRes.json();
-          setProducts(prods.data || prods || []);
+          setProducts(prods);
         }
-
         if (vendRes.ok) {
           const vends = await vendRes.json();
-          setVendors(vends.data || vends || []);
+          setVendors(vends);
         }
-
-        loadHistory();
-        fetchExchangeRates("RMB");
-        fetchExchangeRates("USD");
-      } catch (err) {
-        toast.error("Gagal memuat master data.");
+        if (currRes && currRes.ok) {
+          const currs = await currRes.json();
+          const currList = Array.isArray(currs) ? currs : (currs.data || []);
+          setMasterCurrencies(currList);
+        }
+      } catch (e) {
+        console.error("Gagal memuat master data", e);
       }
     };
     loadData();
+    loadHistory();
   }, []);
 
   const loadHistory = async () => {
@@ -335,14 +390,16 @@ export default function SupplierCogsCalculatorPage() {
         setRecords(data);
       }
     } catch (e) {
-      console.error(e);
+      console.error("Gagal memuat history COGS", e);
     }
   };
 
+  // Fetch exchange rate automatically
   const fetchExchangeRates = async (base: string) => {
+    if (base === "IDR") return;
     setFetchingRates(true);
     try {
-      const res = await fetchApi(`/supplier-cogs/rates?base=${base}`);
+      const res = await fetch(`https://open.er-api.com/v6/latest/${base}`);
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.rates) {
@@ -379,8 +436,14 @@ export default function SupplierCogsCalculatorPage() {
 
   // Sync exchange rate input when currency changes
   useEffect(() => {
-    setExchangeRate(ratesData[currency] || (currency === "RMB" ? 2250 : 16200));
-  }, [currency, ratesData]);
+    // If master currency has a default exchange rate, use it, or fallback to live rate
+    const foundMaster = masterCurrencies.find((c) => c.code === currency);
+    if (foundMaster && foundMaster.rate) {
+      setExchangeRate(Number(foundMaster.rate));
+    } else {
+      setExchangeRate(ratesData[currency] || (currency === "RMB" ? 2250 : currency === "USD" ? 16200 : 1));
+    }
+  }, [currency, ratesData, masterCurrencies]);
 
   // --- MATHEMATICAL COGS FORMULAS ---
   const calcResults = calculateCogsAndSellingPrice({
@@ -423,6 +486,10 @@ export default function SupplierCogsCalculatorPage() {
 
     setSaving(true);
     try {
+      const finalPlatform = supplierPlatform === "Lainnya"
+        ? (supplierPlatformCustom.trim() || "Lainnya")
+        : supplierPlatform.trim();
+
       const payload = {
         productId: selectedProductId === "sandbox" ? undefined : selectedProductId,
         tempProductName: selectedProductId === "sandbox" ? tempProductName.trim() : undefined,
@@ -431,6 +498,9 @@ export default function SupplierCogsCalculatorPage() {
         tiers: calculationMode === "VARIABLE" ? variableTiers : undefined,
         vendorId: selectedVendorId && selectedVendorId !== "none" ? selectedVendorId : undefined,
         serviceVendorId: selectedServiceVendorId && selectedServiceVendorId !== "none" ? selectedServiceVendorId : undefined,
+        supplierPlatform: finalPlatform || undefined,
+        supplierContactName: supplierContactName.trim() || undefined,
+        supplierContactLink: supplierContactLink.trim() || undefined,
         foreignPrice,
         currencyCode: currency,
         exchangeRate,
@@ -481,6 +551,10 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedVendorId("");
     setSelectedServiceVendorId("");
     setCogsStatus("POTENTIAL");
+    setSupplierPlatform("1688");
+    setSupplierPlatformCustom("");
+    setSupplierContactName("");
+    setSupplierContactLink("");
     setCalculationMode("FIXED");
     setVariableTiers([
       { id: "1", totalPcs: 12, pricePcs: 85, gzCost: 0 },
@@ -518,6 +592,22 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedVendorId(rec.vendorId || "");
     setSelectedServiceVendorId(rec.serviceVendorId || "");
     setCogsStatus(rec.status || (rec.productId ? "EXISTING" : "POTENTIAL"));
+    
+    const stdPlatforms = ["1688", "Alibaba", "WeChat", "Taobao", "Made-In-China", "WhatsApp", "Lokal / Indonesia"];
+    if (rec.supplierPlatform) {
+      if (stdPlatforms.includes(rec.supplierPlatform)) {
+        setSupplierPlatform(rec.supplierPlatform);
+        setSupplierPlatformCustom("");
+      } else {
+        setSupplierPlatform("Lainnya");
+        setSupplierPlatformCustom(rec.supplierPlatform);
+      }
+    } else {
+      setSupplierPlatform("1688");
+      setSupplierPlatformCustom("");
+    }
+    setSupplierContactName(rec.supplierContactName || "");
+    setSupplierContactLink(rec.supplierContactLink || "");
     setCalculationMode(rec.calculationMode || "FIXED");
     if (rec.tiers && Array.isArray(rec.tiers) && rec.tiers.length > 0) {
       setVariableTiers(rec.tiers);
@@ -792,10 +882,47 @@ export default function SupplierCogsCalculatorPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-stone-600">
-                            <div>
-                              <p className="font-medium text-stone-800">{rec.vendor?.companyName || "-"}</p>
+                            <div className="space-y-1">
+                              {rec.vendor?.companyName ? (
+                                <p className="font-medium text-stone-800">{rec.vendor.companyName}</p>
+                              ) : rec.supplierContactName || rec.supplierPlatform ? (
+                                <div className="space-y-0.5">
+                                  {rec.supplierPlatform && (
+                                    <Badge className="bg-amber-50 text-amber-800 border border-amber-200 text-[9px] px-1.5 py-0 font-bold uppercase">
+                                      🌐 {rec.supplierPlatform}
+                                    </Badge>
+                                  )}
+                                  {rec.supplierContactName && (
+                                    <p className="font-semibold text-stone-800 text-xs flex items-center gap-1">
+                                      👤 {rec.supplierContactName}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-stone-400 text-xs">- Tanpa Supplier -</p>
+                              )}
+
+                              {rec.supplierContactLink && (
+                                <div className="text-[11px]">
+                                  {rec.supplierContactLink.startsWith("http://") || rec.supplierContactLink.startsWith("https://") ? (
+                                    <a
+                                      href={rec.supplierContactLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-indigo-600 hover:underline font-semibold flex items-center gap-1 text-[10px]"
+                                    >
+                                      🔗 Buka Link Supplier ↗
+                                    </a>
+                                  ) : (
+                                    <span className="text-stone-500 font-mono text-[10px]">
+                                      💬 {rec.supplierContactLink}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
                               {rec.serviceVendor && (
-                                <p className="text-[10px] text-stone-500 font-normal flex items-center gap-1 mt-0.5">
+                                <p className="text-[10px] text-stone-500 font-normal flex items-center gap-1 pt-0.5">
                                   <span>🚚 Logistik:</span> {rec.serviceVendor.companyName}
                                 </p>
                               )}
@@ -1089,18 +1216,113 @@ export default function SupplierCogsCalculatorPage() {
                   </div>
                 </div>
 
+                {/* 2.5 POTENTIAL SUPPLIER SOURCING & CONTACT INFO */}
+                <div className="border-t pt-4 space-y-3">
+                  <Label className="text-xs font-bold uppercase text-stone-700 flex items-center justify-between">
+                    <span>🌐 Platform Sourcing & Kontak Supplier</span>
+                    <span className="text-[10px] text-stone-400 font-normal">Memudahkan kontak supplier saat ingin order</span>
+                  </Label>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-stone-500">Platform Sourcing</Label>
+                      <Select value={supplierPlatform} onValueChange={setSupplierPlatform}>
+                        <SelectTrigger className="bg-stone-50 border-stone-300">
+                          <SelectValue placeholder="Pilih Platform" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1688">1688 (China)</SelectItem>
+                          <SelectItem value="Alibaba">Alibaba International</SelectItem>
+                          <SelectItem value="WeChat">WeChat Supplier Direct</SelectItem>
+                          <SelectItem value="Taobao">Taobao / Tmall</SelectItem>
+                          <SelectItem value="Made-In-China">Made-In-China</SelectItem>
+                          <SelectItem value="WhatsApp">WhatsApp Supplier</SelectItem>
+                          <SelectItem value="Lokal / Indonesia">Lokal / Indonesia</SelectItem>
+                          <SelectItem value="Lainnya">Lainnya (Ketik Manual)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {supplierPlatform === "Lainnya" && (
+                        <Input
+                          placeholder="Ketik nama platform sourcing..."
+                          value={supplierPlatformCustom}
+                          onChange={(e) => setSupplierPlatformCustom(e.target.value)}
+                          className="bg-white border-stone-300 text-xs mt-1.5"
+                        />
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-stone-500">Nama / PIC Kontak Supplier</Label>
+                      <Input
+                        placeholder="Contoh: Sales Manager - Chen"
+                        value={supplierContactName}
+                        onChange={(e) => setSupplierContactName(e.target.value)}
+                        className="bg-stone-50 border-stone-300"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-stone-500">Link Produk / Kontak / WeChat ID</Label>
+                      <Input
+                        placeholder="Contoh: https://1688.com/... / WeChat ID / No HP"
+                        value={supplierContactLink}
+                        onChange={(e) => setSupplierContactLink(e.target.value)}
+                        className="bg-stone-50 border-stone-300"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* 3. SUPPLIER PRICING DETAILS */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-stone-600">Mata Uang</Label>
-                    <Select value={currency} onValueChange={setCurrency}>
+                    <Label className="text-xs font-bold uppercase text-stone-600 flex items-center gap-1.5">
+                      <Coins className="w-4 h-4 text-stone-500" /> Mata Uang
+                    </Label>
+
+                    <Dialog
+                      open={isCurrencyModalOpen}
+                      onOpenChange={setIsCurrencyModalOpen}
+                    >
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Tambah Currency Baru</DialogTitle>
+                        </DialogHeader>
+                        <FastCurrencyForm onSubmit={handleAddCurrencyFast} />
+                      </DialogContent>
+                    </Dialog>
+
+                    <Select
+                      onValueChange={(val) => {
+                        if (val === "add_new_currency") {
+                          setIsCurrencyModalOpen(true);
+                        } else {
+                          setCurrency(val);
+                        }
+                      }}
+                      value={currency}
+                    >
                       <SelectTrigger className="bg-stone-50 border-stone-300">
-                        <SelectValue />
+                        <SelectValue placeholder="Pilih Currency" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="RMB">RMB (Yuan)</SelectItem>
-                        <SelectItem value="USD">USD (Dollar)</SelectItem>
-                        <SelectItem value="IDR">IDR (Rupiah)</SelectItem>
+                        {masterCurrencies.map((cur) => (
+                          <SelectItem key={cur.code} value={cur.code}>
+                            {cur.code} ({cur.symbol || "$"}) - {cur.name || cur.code}
+                          </SelectItem>
+                        ))}
+
+                        <div className="h-px bg-stone-200 my-1 mx-2" />
+                        <SelectItem
+                          value="add_new_currency"
+                          textValue="Buat Currency Baru"
+                          className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Buat Currency Baru...
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
