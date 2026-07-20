@@ -218,10 +218,6 @@ export default function SupplierCogsCalculatorPage() {
 
   // --- SAVE OR UPDATE CALCULATION ---
   const handleSaveRecord = async () => {
-    if (!selectedVendorId) {
-      toast.error("Mohon pilih supplier/vendor terlebih dahulu");
-      return;
-    }
     if (selectedProductId === "sandbox" && !tempProductName.trim()) {
       toast.error("Mohon masukkan nama produk sourcing");
       return;
@@ -232,7 +228,7 @@ export default function SupplierCogsCalculatorPage() {
       const payload = {
         productId: selectedProductId === "sandbox" ? undefined : selectedProductId,
         tempProductName: selectedProductId === "sandbox" ? tempProductName.trim() : undefined,
-        vendorId: selectedVendorId,
+        vendorId: selectedVendorId && selectedVendorId !== "none" ? selectedVendorId : undefined,
         serviceVendorId: selectedServiceVendorId && selectedServiceVendorId !== "none" ? selectedServiceVendorId : undefined,
         foreignPrice,
         currencyCode: currency,
@@ -616,6 +612,7 @@ export default function SupplierCogsCalculatorPage() {
                         <SelectValue placeholder="Pilih Supplier Product" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="none">-- Tanpa Vendor Product --</SelectItem>
                         {productVendors.map((v) => (
                           <SelectItem key={v.id} value={v.id}>
                             <div className="flex items-center justify-between w-full gap-2">
