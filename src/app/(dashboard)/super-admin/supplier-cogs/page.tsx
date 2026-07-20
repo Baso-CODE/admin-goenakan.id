@@ -72,6 +72,37 @@ export default function SupplierCogsCalculatorPage() {
   const [cogsStatus, setCogsStatus] = useState<"EXISTING" | "POTENTIAL">("POTENTIAL");
   const [historyStatusFilter, setHistoryStatusFilter] = useState<"ALL" | "EXISTING" | "POTENTIAL">("ALL");
 
+  // Mode Calculation: FIXED vs VARIABLE
+  const [calculationMode, setCalculationMode] = useState<"FIXED" | "VARIABLE">("FIXED");
+  const [variableTiers, setVariableTiers] = useState<Array<{ id: string; totalPcs: number; pricePcs: number; gzCost: number }>>([
+    { id: "1", totalPcs: 12, pricePcs: 85, gzCost: 0 },
+    { id: "2", totalPcs: 18, pricePcs: 83, gzCost: 0 },
+  ]);
+
+  const handleAddTier = () => {
+    const lastTier = variableTiers[variableTiers.length - 1];
+    const newQty = lastTier ? lastTier.totalPcs + 10 : 20;
+    const newPrice = lastTier ? lastTier.pricePcs : 10;
+    setVariableTiers([
+      ...variableTiers,
+      { id: Date.now().toString(), totalPcs: newQty, pricePcs: newPrice, gzCost: 0 }
+    ]);
+  };
+
+  const handleRemoveTier = (id: string) => {
+    if (variableTiers.length <= 1) {
+      toast.error("Minimal harus ada 1 tier kuantitas");
+      return;
+    }
+    setVariableTiers(variableTiers.filter((t) => t.id !== id));
+  };
+
+  const handleUpdateTier = (id: string, field: "totalPcs" | "pricePcs" | "gzCost", value: number) => {
+    setVariableTiers(
+      variableTiers.map((t) => (t.id === id ? { ...t, [field]: value } : t))
+    );
+  };
+
   const productVendors = vendors.filter((v) => !v.types || v.types.length === 0 || v.types.includes("PRODUCT"));
   const serviceVendors = vendors.filter((v) => !v.types || v.types.length === 0 || v.types.includes("SERVICE"));
   
@@ -233,6 +264,8 @@ export default function SupplierCogsCalculatorPage() {
         productId: selectedProductId === "sandbox" ? undefined : selectedProductId,
         tempProductName: selectedProductId === "sandbox" ? tempProductName.trim() : undefined,
         status: cogsStatus,
+        calculationMode,
+        tiers: calculationMode === "VARIABLE" ? variableTiers : undefined,
         vendorId: selectedVendorId && selectedVendorId !== "none" ? selectedVendorId : undefined,
         serviceVendorId: selectedServiceVendorId && selectedServiceVendorId !== "none" ? selectedServiceVendorId : undefined,
         foreignPrice,
@@ -282,6 +315,11 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedVendorId("");
     setSelectedServiceVendorId("");
     setCogsStatus("POTENTIAL");
+    setCalculationMode("FIXED");
+    setVariableTiers([
+      { id: "1", totalPcs: 12, pricePcs: 85, gzCost: 0 },
+      { id: "2", totalPcs: 18, pricePcs: 83, gzCost: 0 },
+    ]);
     setForeignPrice(8);
     setCurrency("RMB");
     setExchangeRate(ratesData.RMB || 2250);
@@ -311,6 +349,10 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedVendorId(rec.vendorId || "");
     setSelectedServiceVendorId(rec.serviceVendorId || "");
     setCogsStatus(rec.status || (rec.productId ? "EXISTING" : "POTENTIAL"));
+    setCalculationMode(rec.calculationMode || "FIXED");
+    if (rec.tiers && Array.isArray(rec.tiers) && rec.tiers.length > 0) {
+      setVariableTiers(rec.tiers);
+    }
     setForeignPrice(Number(rec.foreignPrice));
     setCurrency(rec.currencyCode);
     setExchangeRate(Number(rec.exchangeRate));
@@ -629,12 +671,42 @@ export default function SupplierCogsCalculatorPage() {
             
             {/* INPUT PANEL (LEFT COLUMN) */}
             <Card className="xl:col-span-7 bg-white shadow-sm border border-stone-200">
-              <CardHeader className="border-b pb-4">
-                <CardTitle className="text-md font-bold uppercase text-stone-700 flex items-center gap-2">
-                  <Calculator className="h-5 w-5 text-stone-600" />
-                  Konfigurasi Cost Sourcing
-                </CardTitle>
-                <CardDescription>Tentukan parameter harga beli supplier, berat, dimensi dan markup harga.</CardDescription>
+              <CardHeader className="border-b pb-4 space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-md font-bold uppercase text-stone-700 flex items-center gap-2">
+                      <Calculator className="h-5 w-5 text-stone-600" />
+                      Konfigurasi Cost Sourcing
+                    </CardTitle>
+                    <CardDescription>Tentukan parameter harga beli supplier, berat, dimensi dan markup harga.</CardDescription>
+                  </div>
+                  
+                  {/* MODE SWITCHER */}
+                  <div className="flex gap-1 bg-stone-100 p-1 rounded-md border border-stone-200 self-start md:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setCalculationMode("FIXED")}
+                      className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                        calculationMode === "FIXED"
+                          ? "bg-white text-stone-900 shadow-2xs border border-stone-200"
+                          : "text-stone-500 hover:text-stone-800"
+                      }`}
+                    >
+                      📏 Fixed Mode
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCalculationMode("VARIABLE")}
+                      className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                        calculationMode === "VARIABLE"
+                          ? "bg-indigo-600 text-white shadow-2xs"
+                          : "text-stone-500 hover:text-stone-800"
+                      }`}
+                    >
+                      📊 Variable Mode
+                    </button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-6 pt-6">
                 
@@ -888,6 +960,96 @@ export default function SupplierCogsCalculatorPage() {
                   </div>
                 </div>
 
+                {/* 4.5 VARIABLE QUANTITY TIER INPUT TABLE (VARIABLE MODE ONLY) */}
+                {calculationMode === "VARIABLE" && (
+                  <div className="border-t pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-xs font-bold uppercase text-stone-700 flex items-center gap-1.5">
+                          📊 Tier Pricing Kuantitas (Variable Mode)
+                        </Label>
+                        <p className="text-[11px] text-stone-500">Tentukan harga beli per Pcs berdasarkan tier jumlah pesanan (Total Pcs).</p>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={handleAddTier}
+                        size="sm"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8 flex items-center gap-1"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Tambah Tier
+                      </Button>
+                    </div>
+
+                    <div className="rounded-md border border-stone-200 overflow-hidden bg-stone-50/50">
+                      <Table>
+                        <TableHeader className="bg-stone-100">
+                          <TableRow>
+                            <TableHead className="text-xs font-bold text-stone-700">Total Pcs</TableHead>
+                            <TableHead className="text-xs font-bold text-stone-700">Total Ctn</TableHead>
+                            <TableHead className="text-xs font-bold text-stone-700">Harga / Pcs ({currency})</TableHead>
+                            <TableHead className="text-xs font-bold text-stone-700">GZ Cost ({currency})</TableHead>
+                            <TableHead className="text-xs font-bold text-right text-stone-700">Aksi</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {variableTiers.map((tier) => {
+                            const computedCtn = (tier.totalPcs / (qtyPerCtn || 1)).toFixed(2);
+                            return (
+                              <TableRow key={tier.id}>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={tier.totalPcs}
+                                    onChange={(e) => handleUpdateTier(tier.id, "totalPcs", Number(e.target.value))}
+                                    className="bg-white h-8 text-xs font-semibold w-24"
+                                  />
+                                </TableCell>
+                                <TableCell className="text-xs font-bold text-stone-600">
+                                  {computedCtn} Ctn
+                                </TableCell>
+                                <TableCell>
+                                  <div className="relative">
+                                    <span className="absolute left-2.5 top-1.5 text-xs text-stone-400 font-bold">{currency}</span>
+                                    <Input
+                                      type="number"
+                                      value={tier.pricePcs}
+                                      onChange={(e) => handleUpdateTier(tier.id, "pricePcs", Number(e.target.value))}
+                                      className="bg-white h-8 text-xs font-semibold pl-10 w-28"
+                                    />
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="relative">
+                                    <span className="absolute left-2.5 top-1.5 text-xs text-stone-400 font-bold">{currency}</span>
+                                    <Input
+                                      type="number"
+                                      value={tier.gzCost}
+                                      onChange={(e) => handleUpdateTier(tier.id, "gzCost", Number(e.target.value))}
+                                      className="bg-white h-8 text-xs font-semibold pl-10 w-24"
+                                    />
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleRemoveTier(tier.id)}
+                                    className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700"
+                                  >
+                                    <Trash className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
                 {/* 5. LOGISTICS FEES */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
                   <div className="space-y-2">
@@ -981,7 +1143,89 @@ export default function SupplierCogsCalculatorPage() {
             {/* RESULTS PANEL (RIGHT COLUMN) */}
             <div className="xl:col-span-5 space-y-6">
               
-              {/* SEA FREIGHT CALC CARD */}
+              {calculationMode === "VARIABLE" ? (
+                <Card className="bg-white border border-stone-200 shadow-sm overflow-hidden">
+                  <CardHeader className="bg-stone-50 border-b pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-bold uppercase text-stone-800 flex items-center gap-2">
+                        <FileSpreadsheet className="h-4 w-4 text-indigo-600" />
+                        Matriks Hasil Variable COGS & Harga Jual
+                      </CardTitle>
+                      <Badge className="bg-indigo-600 text-white font-bold text-[10px] uppercase">
+                        Variable Mode
+                      </Badge>
+                    </div>
+                    <CardDescription className="text-xs">
+                      Rincian COGS dan Harga Jual (SEA & AIR) per tier kuantitas berdasarkan spreadsheet.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0 overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-stone-100/70">
+                        <TableRow>
+                          <TableHead className="text-[10px] font-bold text-stone-700 uppercase">Pcs / Ctn</TableHead>
+                          <TableHead className="text-[10px] font-bold text-stone-700 uppercase">Harga/Pcs ({currency})</TableHead>
+                          <TableHead className="text-[10px] font-bold text-stone-700 uppercase">COGS (SEA)</TableHead>
+                          <TableHead className="text-[10px] font-bold text-stone-700 uppercase">COGS (AIR)</TableHead>
+                          <TableHead className="text-[10px] font-bold text-indigo-900 uppercase">Jual (SEA)</TableHead>
+                          <TableHead className="text-[10px] font-bold text-amber-900 uppercase">Jual (AIR)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {variableTiers.map((tier) => {
+                          const computedCtn = (tier.totalPcs / (qtyPerCtn || 1)).toFixed(2);
+                          const baseCost = (tier.pricePcs + tier.gzCost) * exchangeRate;
+                          
+                          // CBM Calculation
+                          const cbmPerCtn = (length * width * height) / 1000000;
+                          const costSeaPcs = qtyPerCtn > 0 ? (cbmPerCtn * 10000000) / qtyPerCtn : 0;
+                          
+                          // Air Weight Calculation
+                          const volWeight = (length * width * height) / 6000;
+                          const airWeightPerCtn = Math.max(volWeight, weight);
+                          const costAirPcs = qtyPerCtn > 0 ? (260000 * airWeightPerCtn) / qtyPerCtn : 0;
+
+                          const localFreightPcs = tier.totalPcs > 0 ? localFreight / tier.totalPcs : 0;
+
+                          const cogsSeaTier = baseCost + costSeaPcs + localFreightPcs;
+                          const cogsAirTier = baseCost + costAirPcs + localFreightPcs;
+
+                          const sponsorMult = 1 + (sponsorPercent / 100);
+                          const sellSeaTier = Math.ceil(((cogsSeaTier * sponsorMult) + margin) / 1000) * 1000;
+                          const sellAirTier = Math.ceil(((cogsAirTier * sponsorMult) + margin) / 1000) * 1000;
+
+                          return (
+                            <TableRow key={tier.id} className="hover:bg-stone-50 text-xs">
+                              <TableCell className="font-bold text-stone-800">
+                                {tier.totalPcs} pcs
+                                <span className="block text-[10px] text-stone-500 font-normal">({computedCtn} ctn)</span>
+                              </TableCell>
+                              <TableCell className="font-semibold text-stone-700">
+                                {currency} {tier.pricePcs.toLocaleString("id-ID")}
+                                {tier.gzCost > 0 && <span className="block text-[9px] text-stone-400">+ GZ {tier.gzCost}</span>}
+                              </TableCell>
+                              <TableCell className="font-semibold text-blue-900">
+                                Rp {Math.round(cogsSeaTier).toLocaleString("id-ID")}
+                              </TableCell>
+                              <TableCell className="font-semibold text-amber-900">
+                                Rp {Math.round(cogsAirTier).toLocaleString("id-ID")}
+                              </TableCell>
+                              <TableCell className="font-black text-indigo-700 bg-indigo-50/50">
+                                Rp {sellSeaTier.toLocaleString("id-ID")}
+                              </TableCell>
+                              <TableCell className="font-black text-amber-700 bg-amber-50/50">
+                                Rp {sellAirTier.toLocaleString("id-ID")}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  {/* SEA FREIGHT CALC CARD */}
               <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 shadow-sm relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-3 opacity-10">
                   <FileSpreadsheet className="h-24 w-24 text-blue-900" />
@@ -1074,6 +1318,8 @@ export default function SupplierCogsCalculatorPage() {
                   </div>
                 </CardContent>
               </Card>
+            </>
+          )}
 
               {/* RATE REFERENCE GUIDELINES */}
               <Card className="bg-stone-50 border border-stone-200 shadow-sm">
