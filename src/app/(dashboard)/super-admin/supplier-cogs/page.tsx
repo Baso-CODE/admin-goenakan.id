@@ -20,6 +20,7 @@ import {
   Eye,
   Check,
   Tag,
+  Copy,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -138,6 +139,7 @@ export default function SupplierCogsCalculatorPage() {
   // Search & Pagination State
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [historyModeFilter, setHistoryModeFilter] = useState<"ALL" | "FIXED" | "VARIABLE">("ALL");
   const itemsPerPage = 10;
 
   // Rates State
@@ -181,6 +183,91 @@ export default function SupplierCogsCalculatorPage() {
     setVariableTiers(
       variableTiers.map((t) => (t.id === id ? { ...t, [field]: value } : t))
     );
+  };
+
+  // --- CONVERT CURRENT FORM DATA BETWEEN FIXED & VARIABLE MODE ---
+  const handleToggleOrConvertMode = (targetMode: "FIXED" | "VARIABLE") => {
+    if (targetMode === calculationMode) return;
+
+    if (targetMode === "VARIABLE") {
+      // Fixed -> Variable Conversion
+      const baseMoq = Math.max(1, moqCtn || 1);
+      const safeQtyPerCtn = Math.max(1, qtyPerCtn || 1);
+      
+      const newTiers = [
+        { id: "1", totalPcs: baseMoq * safeQtyPerCtn, pricePcs: foreignPrice, gzCost: gzDeliveryCost },
+        { id: "2", totalPcs: (baseMoq + 1) * safeQtyPerCtn, pricePcs: foreignPrice, gzCost: gzDeliveryCost },
+        { id: "3", totalPcs: (baseMoq + 2) * safeQtyPerCtn, pricePcs: foreignPrice, gzCost: gzDeliveryCost },
+      ];
+      setVariableTiers(newTiers);
+      setCalculationMode("VARIABLE");
+      toast.success("Dikonversi ke Variable Mode. Anda dapat menyesuaikan harga per tier kuantitas.");
+    } else {
+      // Variable -> Fixed Conversion
+      const firstTier = variableTiers[0];
+      if (firstTier) {
+        setForeignPrice(firstTier.pricePcs || 0);
+        setGzDeliveryCost(firstTier.gzCost || 0);
+        const computedMoq = Math.max(1, Math.ceil((firstTier.totalPcs || 1) / (qtyPerCtn || 1)));
+        setMoqCtn(computedMoq);
+      }
+      setCalculationMode("FIXED");
+      toast.success("Dikonversi ke Fixed Mode!");
+    }
+  };
+
+  // --- COPY RECORD TO OPPOSITE MODE (DUPLICATE AS NEW RECORD IN OTHER MODE) ---
+  const handleCopyAndConvertMode = (rec: any) => {
+    setSelectedProductId(rec.productId || "sandbox");
+    setTempProductName(rec.tempProductName || "");
+    setSelectedVendorId(rec.vendorId || "");
+    setSelectedServiceVendorId(rec.serviceVendorId || "");
+    setCogsStatus(rec.status || (rec.productId ? "EXISTING" : "POTENTIAL"));
+    
+    setForeignPrice(Number(rec.foreignPrice));
+    setCurrency(rec.currencyCode);
+    setExchangeRate(Number(rec.exchangeRate));
+    setQtyPerCtn(rec.qtyPerCtn || 1);
+    setLength(Number(rec.length) || 0);
+    setWidth(Number(rec.width) || 0);
+    setHeight(Number(rec.height) || 0);
+    setWeight(Number(rec.weight) || 0);
+    setGzDeliveryCost(Number(rec.gzDeliveryCost) || 0);
+    setLocalFreight(Number(rec.localFreight) || 0);
+    setSeaFreightRate(Number(rec.seaFreightRate) || 10000000);
+    setAirFreightRate(Number(rec.airFreightRate) || 260000);
+    setMoqCtn(Number(rec.moqCtn) || 10);
+    setMargin(Number(rec.margin) || 0);
+    setSponsorPercent(Number(rec.sponsorPercent) * 100);
+    setNotes(rec.notes ? `${rec.notes} (Salinan Mode)` : "Salinan Mode");
+
+    // Set editingRecord to null so saving creates a NEW entry
+    setEditingRecord(null);
+
+    const currentRecMode = rec.calculationMode || "FIXED";
+    if (currentRecMode === "FIXED") {
+      const baseMoq = Number(rec.moqCtn) || 1;
+      const safeQtyPerCtn = Number(rec.qtyPerCtn) || 1;
+      const fPrice = Number(rec.foreignPrice) || 0;
+      const gzCost = Number(rec.gzDeliveryCost) || 0;
+      setVariableTiers([
+        { id: "1", totalPcs: baseMoq * safeQtyPerCtn, pricePcs: fPrice, gzCost },
+        { id: "2", totalPcs: (baseMoq + 1) * safeQtyPerCtn, pricePcs: fPrice, gzCost },
+        { id: "3", totalPcs: (baseMoq + 2) * safeQtyPerCtn, pricePcs: fPrice, gzCost },
+      ]);
+      setCalculationMode("VARIABLE");
+      toast.success("Catatan disalin dan dikonversi ke Variable Mode. Silakan simpan sebagai catatan baru!");
+    } else {
+      const firstTier = rec.tiers && rec.tiers[0];
+      if (firstTier) {
+        setForeignPrice(Number(firstTier.pricePcs) || Number(rec.foreignPrice));
+        setGzDeliveryCost(Number(firstTier.gzCost) || Number(rec.gzDeliveryCost));
+      }
+      setCalculationMode("FIXED");
+      toast.success("Catatan disalin dan dikonversi ke Fixed Mode. Silakan simpan sebagai catatan baru!");
+    }
+
+    setView("form");
   };
 
   const productVendors = vendors.filter((v) => !v.types || v.types.length === 0 || v.types.includes("PRODUCT"));
@@ -487,7 +574,10 @@ export default function SupplierCogsCalculatorPage() {
     const recStatus = rec.status || (rec.productId ? "EXISTING" : "POTENTIAL");
     const matchesStatus = historyStatusFilter === "ALL" || recStatus === historyStatusFilter;
 
-    return matchesSearch && matchesStatus;
+    const recMode = rec.calculationMode || "FIXED";
+    const matchesMode = historyModeFilter === "ALL" || recMode === historyModeFilter;
+
+    return matchesSearch && matchesStatus && matchesMode;
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / itemsPerPage));
@@ -542,6 +632,46 @@ export default function SupplierCogsCalculatorPage() {
                   />
                 </div>
 
+                {/* MODE FILTER PILLS */}
+                <div className="flex gap-1 bg-stone-100 p-0.5 rounded text-[11px] font-semibold border border-stone-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryModeFilter("ALL");
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded transition-colors ${
+                      historyModeFilter === "ALL" ? "bg-white text-stone-900 shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
+                    }`}
+                  >
+                    Semua Mode
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryModeFilter("FIXED");
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded transition-colors ${
+                      historyModeFilter === "FIXED" ? "bg-stone-800 text-white shadow-2xs font-bold" : "text-stone-600 hover:text-stone-900"
+                    }`}
+                  >
+                    📏 Fixed
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryModeFilter("VARIABLE");
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded transition-colors ${
+                      historyModeFilter === "VARIABLE" ? "bg-indigo-600 text-white shadow-2xs font-bold" : "text-indigo-700 hover:text-indigo-900"
+                    }`}
+                  >
+                    📊 Variable
+                  </button>
+                </div>
+
                 {/* STATUS FILTER PILLS */}
                 <div className="flex gap-1 bg-stone-100 p-0.5 rounded text-[11px] font-semibold border border-stone-200">
                   <button
@@ -554,7 +684,7 @@ export default function SupplierCogsCalculatorPage() {
                       historyStatusFilter === "ALL" ? "bg-white text-stone-900 shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
                     }`}
                   >
-                    Semua
+                    Semua Status
                   </button>
                   <button
                     type="button"
@@ -615,7 +745,7 @@ export default function SupplierCogsCalculatorPage() {
                   {paginatedRecords.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center text-stone-400 py-8 text-sm">
-                        {searchQuery || historyStatusFilter !== "ALL" ? "Tidak ditemukan catatan harga yang cocok." : "Belum ada catatan harga supplier yang disimpan."}
+                        {searchQuery || historyStatusFilter !== "ALL" || historyModeFilter !== "ALL" ? "Tidak ditemukan catatan harga yang cocok." : "Belum ada catatan harga supplier yang disimpan."}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -629,13 +759,14 @@ export default function SupplierCogsCalculatorPage() {
                       });
 
                       const isExisting = rec.status === "EXISTING" || (!rec.status && rec.productId);
+                      const isVariable = rec.calculationMode === "VARIABLE";
 
                       return (
                         <TableRow key={rec.id} className="hover:bg-stone-50 transition-colors">
                           <TableCell className="font-medium text-stone-850">
                             <div>
                               <span>{displayProdName}</span>
-                              <div className="flex items-center gap-1 mt-1">
+                              <div className="flex flex-wrap items-center gap-1 mt-1">
                                 {isExisting ? (
                                   <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
                                     Existing
@@ -643,6 +774,15 @@ export default function SupplierCogsCalculatorPage() {
                                 ) : (
                                   <Badge className="bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
                                     Potential
+                                  </Badge>
+                                )}
+                                {isVariable ? (
+                                  <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                    📊 Variable
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-100 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                    📏 Fixed
                                   </Badge>
                                 )}
                                 {!rec.productId && (
@@ -671,12 +811,22 @@ export default function SupplierCogsCalculatorPage() {
                           </TableCell>
                           <TableCell className="text-stone-500 text-xs">{formattedDate}</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleCopyAndConvertMode(rec)}
+                                className="text-stone-700 border-stone-200 hover:bg-stone-100 text-[11px] h-8 font-semibold flex items-center gap-1"
+                                title={`Salin data ini dan konversi ke ${isVariable ? "Fixed Mode" : "Variable Mode"}`}
+                              >
+                                <Copy className="h-3 w-3 text-indigo-600" />
+                                Salin ke {isVariable ? "Fixed" : "Variable"}
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleLoadDetails(rec)}
-                                className="text-stone-700 border-stone-200 hover:bg-stone-100 text-xs font-semibold flex items-center gap-1"
+                                className="text-stone-700 border-stone-200 hover:bg-stone-100 text-xs font-semibold flex items-center gap-1 h-8"
                               >
                                 <Eye className="h-3 w-3" />
                                 Detail
@@ -766,27 +916,29 @@ export default function SupplierCogsCalculatorPage() {
                     <CardDescription>Tentukan parameter harga beli supplier, berat, dimensi dan markup harga.</CardDescription>
                   </div>
                   
-                  {/* MODE SWITCHER */}
+                  {/* MODE SWITCHER & CONVERT */}
                   <div className="flex gap-1 bg-stone-100 p-1 rounded-md border border-stone-200 self-start md:self-auto">
                     <button
                       type="button"
-                      onClick={() => setCalculationMode("FIXED")}
+                      onClick={() => handleToggleOrConvertMode("FIXED")}
                       className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
                         calculationMode === "FIXED"
                           ? "bg-white text-stone-900 shadow-2xs border border-stone-200"
                           : "text-stone-500 hover:text-stone-800"
                       }`}
+                      title="Konversi / Alihkan ke Fixed Mode"
                     >
                       📏 Fixed Mode
                     </button>
                     <button
                       type="button"
-                      onClick={() => setCalculationMode("VARIABLE")}
+                      onClick={() => handleToggleOrConvertMode("VARIABLE")}
                       className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
                         calculationMode === "VARIABLE"
                           ? "bg-indigo-600 text-white shadow-2xs"
                           : "text-stone-500 hover:text-stone-800"
                       }`}
+                      title="Konversi / Alihkan ke Variable Mode"
                     >
                       📊 Variable Mode
                     </button>
