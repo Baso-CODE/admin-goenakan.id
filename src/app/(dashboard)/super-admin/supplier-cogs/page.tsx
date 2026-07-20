@@ -43,6 +43,86 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
+function calculateCogsAndSellingPrice({
+  foreignPrice,
+  gzDeliveryCost,
+  exchangeRate,
+  qtyPcs,
+  qtyPerCtn,
+  length,
+  width,
+  height,
+  weight,
+  seaFreightRate,
+  airFreightRate,
+  localFreight,
+  margin,
+  sponsorPercent,
+}: {
+  foreignPrice: number;
+  gzDeliveryCost: number;
+  exchangeRate: number;
+  qtyPcs: number;
+  qtyPerCtn: number;
+  length: number;
+  width: number;
+  height: number;
+  weight: number;
+  seaFreightRate: number;
+  airFreightRate: number;
+  localFreight: number;
+  margin: number;
+  sponsorPercent: number;
+}) {
+  const safeQtyPerCtn = Math.max(1, qtyPerCtn || 1);
+  const safeQtyPcs = Math.max(1, qtyPcs || safeQtyPerCtn);
+  const totalCtn = Math.max(1, Math.ceil(safeQtyPcs / safeQtyPerCtn));
+
+  // Volumetric conversions
+  const cbmPerCtn = (length * width * height) / 1000000;
+  const totalCbm = cbmPerCtn * totalCtn;
+  const totalSeaCbmAlloc = Math.max(0.1, totalCbm); // Min 0.1 CBM
+
+  // Air weight allocation (comparison of Sea CBM vs weight + 2kg packaging overhead per carton)
+  const totalAirWeightAlloc = Math.max(totalSeaCbmAlloc, (weight + 2) * totalCtn);
+
+  // Freight costs per piece
+  const seaFreightCostPcs = (totalSeaCbmAlloc * seaFreightRate) / safeQtyPcs;
+  const airFreightCostPcs = (totalAirWeightAlloc * airFreightRate) / safeQtyPcs;
+
+  // Guangzhou delivery cost per piece
+  const gzDeliveryCostPcs = gzDeliveryCost * exchangeRate;
+
+  // Base cost per piece
+  const baseCostPcs = foreignPrice * exchangeRate;
+
+  // Total COGS
+  const cogsSea = baseCostPcs + gzDeliveryCostPcs + seaFreightCostPcs + localFreight;
+  const cogsAir = baseCostPcs + gzDeliveryCostPcs + airFreightCostPcs + localFreight;
+
+  // Suggested Selling Prices
+  const sponsorMultiplier = 1 + (sponsorPercent / 100);
+  const rawSellSea = (cogsSea * sponsorMultiplier) + margin;
+  const rawSellAir = (cogsAir * sponsorMultiplier) + margin;
+
+  const sellPriceSea = Math.ceil(rawSellSea / 1000) * 1000;
+  const sellPriceAir = Math.ceil(rawSellAir / 1000) * 1000;
+
+  return {
+    totalCtn,
+    totalSeaCbmAlloc,
+    totalAirWeightAlloc,
+    seaFreightCostPcs,
+    airFreightCostPcs,
+    gzDeliveryCostPcs,
+    baseCostPcs,
+    cogsSea,
+    cogsAir,
+    sellPriceSea,
+    sellPriceAir,
+  };
+}
+
 export default function SupplierCogsCalculatorPage() {
   const { fetchApi } = useApi();
 
@@ -216,41 +296,36 @@ export default function SupplierCogsCalculatorPage() {
   }, [currency, ratesData]);
 
   // --- MATHEMATICAL COGS FORMULAS ---
-  
-  // 1. Total Carton allocation
-  const totalCtn = Math.max(1, Math.ceil(qtyPcs / qtyPerCtn));
+  const calcResults = calculateCogsAndSellingPrice({
+    foreignPrice,
+    gzDeliveryCost,
+    exchangeRate,
+    qtyPcs,
+    qtyPerCtn,
+    length,
+    width,
+    height,
+    weight,
+    seaFreightRate,
+    airFreightRate,
+    localFreight,
+    margin,
+    sponsorPercent,
+  });
 
-  // 2. Volumetric conversions
-  const cbmPerCtn = (length * width * height) / 1000000;
-  const totalCbm = cbmPerCtn * totalCtn;
-  const totalSeaCbmAlloc = Math.max(0.1, totalCbm); // Min 0.1 CBM
-
-  // Air weight (exact Excel logic: comparison of Sea CBM vs weight + 2kg packaging overhead per carton)
-  const totalAirWeightAlloc = Math.max(totalSeaCbmAlloc, (weight + 2) * totalCtn);
-
-  // 3. Freight costs per piece
-  const seaFreightCostPcs = (totalSeaCbmAlloc * seaFreightRate) / qtyPcs;
-  const airFreightCostPcs = (totalAirWeightAlloc * airFreightRate) / qtyPcs;
-  
-  // 4. Guangzhou delivery cost per piece (Excel logic: flat per-piece foreign rate conversion)
-  const gzDeliveryCostPcs = gzDeliveryCost * exchangeRate;
-
-  // 5. Base cost per piece
-  const baseCostPcs = foreignPrice * exchangeRate;
-
-  // 6. Total COGS
-  const cogsSea = baseCostPcs + gzDeliveryCostPcs + seaFreightCostPcs + localFreight;
-  const cogsAir = baseCostPcs + gzDeliveryCostPcs + airFreightCostPcs + localFreight;
-
-  // 7. Suggested Selling Prices (Sponsor fee % + Margin + Rounding)
-  const sponsorMultiplier = 1 + (sponsorPercent / 100);
-  
-  const rawSellSea = (cogsSea * sponsorMultiplier) + margin;
-  const rawSellAir = (cogsAir * sponsorMultiplier) + margin;
-
-  // Round up to nearest 1,000 IDR
-  const sellPriceSea = Math.ceil(rawSellSea / 1000) * 1000;
-  const sellPriceAir = Math.ceil(rawSellAir / 1000) * 1000;
+  const {
+    totalCtn,
+    totalSeaCbmAlloc,
+    totalAirWeightAlloc,
+    seaFreightCostPcs,
+    airFreightCostPcs,
+    gzDeliveryCostPcs,
+    baseCostPcs,
+    cogsSea,
+    cogsAir,
+    sellPriceSea,
+    sellPriceAir,
+  } = calcResults;
 
   // --- SAVE OR UPDATE CALCULATION ---
   const handleSaveRecord = async () => {
@@ -1224,48 +1299,44 @@ export default function SupplierCogsCalculatorPage() {
                       </TableHeader>
                       <TableBody>
                         {variableTiers.map((tier) => {
-                          const computedCtn = (tier.totalPcs / (qtyPerCtn || 1)).toFixed(2);
-                          const baseCost = (tier.pricePcs + tier.gzCost) * exchangeRate;
-                          
-                          // CBM Calculation
-                          const cbmPerCtn = (length * width * height) / 1000000;
-                          const costSeaPcs = qtyPerCtn > 0 ? (cbmPerCtn * 10000000) / qtyPerCtn : 0;
-                          
-                          // Air Weight Calculation
-                          const volWeight = (length * width * height) / 6000;
-                          const airWeightPerCtn = Math.max(volWeight, weight);
-                          const costAirPcs = qtyPerCtn > 0 ? (260000 * airWeightPerCtn) / qtyPerCtn : 0;
-
-                          const localFreightPcs = tier.totalPcs > 0 ? localFreight / tier.totalPcs : 0;
-
-                          const cogsSeaTier = baseCost + costSeaPcs + localFreightPcs;
-                          const cogsAirTier = baseCost + costAirPcs + localFreightPcs;
-
-                          const sponsorMult = 1 + (sponsorPercent / 100);
-                          const sellSeaTier = Math.ceil(((cogsSeaTier * sponsorMult) + margin) / 1000) * 1000;
-                          const sellAirTier = Math.ceil(((cogsAirTier * sponsorMult) + margin) / 1000) * 1000;
+                          const tierCalc = calculateCogsAndSellingPrice({
+                            foreignPrice: tier.pricePcs,
+                            gzDeliveryCost: tier.gzCost,
+                            exchangeRate,
+                            qtyPcs: tier.totalPcs,
+                            qtyPerCtn,
+                            length,
+                            width,
+                            height,
+                            weight,
+                            seaFreightRate,
+                            airFreightRate,
+                            localFreight,
+                            margin,
+                            sponsorPercent,
+                          });
 
                           return (
                             <TableRow key={tier.id} className="hover:bg-stone-50 text-xs">
                               <TableCell className="font-bold text-stone-800">
                                 {tier.totalPcs} pcs
-                                <span className="block text-[10px] text-stone-500 font-normal">({computedCtn} ctn)</span>
+                                <span className="block text-[10px] text-stone-500 font-normal">({tierCalc.totalCtn} ctn)</span>
                               </TableCell>
                               <TableCell className="font-semibold text-stone-700">
                                 {currency} {tier.pricePcs.toLocaleString("id-ID")}
                                 {tier.gzCost > 0 && <span className="block text-[9px] text-stone-400">+ GZ {tier.gzCost}</span>}
                               </TableCell>
                               <TableCell className="font-semibold text-blue-900">
-                                Rp {Math.round(cogsSeaTier).toLocaleString("id-ID")}
+                                Rp {Math.round(tierCalc.cogsSea).toLocaleString("id-ID")}
                               </TableCell>
                               <TableCell className="font-semibold text-amber-900">
-                                Rp {Math.round(cogsAirTier).toLocaleString("id-ID")}
+                                Rp {Math.round(tierCalc.cogsAir).toLocaleString("id-ID")}
                               </TableCell>
                               <TableCell className="font-black text-indigo-700 bg-indigo-50/50">
-                                Rp {sellSeaTier.toLocaleString("id-ID")}
+                                Rp {tierCalc.sellPriceSea.toLocaleString("id-ID")}
                               </TableCell>
                               <TableCell className="font-black text-amber-700 bg-amber-50/50">
-                                Rp {sellAirTier.toLocaleString("id-ID")}
+                                Rp {tierCalc.sellPriceAir.toLocaleString("id-ID")}
                               </TableCell>
                             </TableRow>
                           );
@@ -1304,25 +1375,26 @@ export default function SupplierCogsCalculatorPage() {
                         </TableHeader>
                         <TableBody>
                           {[0, 1, 2, 3, 4].map((step) => {
-                            const baseMoqCtn = Math.max(1, Math.ceil(qtyPcs / (qtyPerCtn || 1)));
+                            const baseMoqCtn = Math.max(1, moqCtn || 1);
                             const stepCtn = baseMoqCtn + step;
                             const stepPcs = stepCtn * (qtyPerCtn || 1);
                             
-                            // Cost SEA/Pcs: (cbmPerCtn * 10,000,000) / qtyPerCtn
-                            const cbmPerCtn = (length * width * height) / 1000000;
-                            const costSeaPcs = qtyPerCtn > 0 ? (cbmPerCtn * 10000000) / qtyPerCtn : 0;
-                            
-                            // Cost AIR/Pcs: (volWeight vs Weight) * 260,000 / qtyPerCtn
-                            const volWeight = (length * width * height) / 6000;
-                            const airWeightPerCtn = Math.max(volWeight, weight);
-                            const costAirPcs = qtyPerCtn > 0 ? (260000 * airWeightPerCtn) / qtyPerCtn : 0;
-
-                            const cogsSeaTier = baseCostPcs + costSeaPcs + localFreight;
-                            const cogsAirTier = baseCostPcs + costAirPcs + localFreight;
-
-                            const sponsorMult = 1 + (sponsorPercent / 100);
-                            const sellSeaTier = Math.ceil(((cogsSeaTier * sponsorMult) + margin) / 1000) * 1000;
-                            const sellAirTier = Math.ceil(((cogsAirTier * sponsorMult) + margin) / 1000) * 1000;
+                            const stepCalc = calculateCogsAndSellingPrice({
+                              foreignPrice,
+                              gzDeliveryCost,
+                              exchangeRate,
+                              qtyPcs: stepPcs,
+                              qtyPerCtn,
+                              length,
+                              width,
+                              height,
+                              weight,
+                              seaFreightRate,
+                              airFreightRate,
+                              localFreight,
+                              margin,
+                              sponsorPercent,
+                            });
 
                             return (
                               <TableRow key={step} className="hover:bg-stone-50 text-xs">
@@ -1331,22 +1403,22 @@ export default function SupplierCogsCalculatorPage() {
                                   <span className="block text-[10px] text-stone-500 font-normal">({stepCtn} ctn)</span>
                                 </TableCell>
                                 <TableCell className="text-stone-600 font-medium">
-                                  Rp {Math.round(costSeaPcs).toLocaleString("id-ID")}
+                                  Rp {Math.round(stepCalc.seaFreightCostPcs).toLocaleString("id-ID")}
                                 </TableCell>
                                 <TableCell className="text-stone-600 font-medium">
-                                  Rp {Math.round(costAirPcs).toLocaleString("id-ID")}
+                                  Rp {Math.round(stepCalc.airFreightCostPcs).toLocaleString("id-ID")}
                                 </TableCell>
                                 <TableCell className="font-semibold text-blue-900">
-                                  Rp {Math.round(cogsSeaTier).toLocaleString("id-ID")}
+                                  Rp {Math.round(stepCalc.cogsSea).toLocaleString("id-ID")}
                                 </TableCell>
                                 <TableCell className="font-semibold text-amber-900">
-                                  Rp {Math.round(cogsAirTier).toLocaleString("id-ID")}
+                                  Rp {Math.round(stepCalc.cogsAir).toLocaleString("id-ID")}
                                 </TableCell>
                                 <TableCell className="font-black text-indigo-700 bg-indigo-50/50">
-                                  Rp {sellSeaTier.toLocaleString("id-ID")}
+                                  Rp {stepCalc.sellPriceSea.toLocaleString("id-ID")}
                                 </TableCell>
                                 <TableCell className="font-black text-amber-700 bg-amber-50/50">
-                                  Rp {sellAirTier.toLocaleString("id-ID")}
+                                  Rp {stepCalc.sellPriceAir.toLocaleString("id-ID")}
                                 </TableCell>
                               </TableRow>
                             );
