@@ -97,7 +97,7 @@ export default function CustomerAnalyticTab() {
         !error && (
           <>
             {/* 
-                ✨ PERBAIKAN DI SINI ✨
+                 PERBAIKAN DI SINI 
                 Kita melakukan "Passing Props" dengan memasukkan data spesifik 
                 dari API ke masing-masing komponen anak.
             */}

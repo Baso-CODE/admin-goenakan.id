@@ -8,7 +8,7 @@ import { useInvoiceDialog } from "../../hooks/useInvoiceDialog";
 import { GenerateInvoiceDialog } from "./GenerateInvoiceDialog";
 
 interface InvoiceDialogWrapperProps {
-  orderId: string | null; // ✨ Harus mengizinkan null
+  orderId: string | null; //  Harus mengizinkan null
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -104,7 +104,7 @@ export function InvoiceDialogWrapper({
     }
   }, [invoiceDialog.invoiceDialogOpen]);
 
-  // ✨ Jangan return null, lebih baik return fragment kosong agar mount stabil
+  //  Jangan return null, lebih baik return fragment kosong agar mount stabil
   if (!order) return <></>;
 
   return (

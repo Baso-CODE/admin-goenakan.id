@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// ✨ PERBAIKAN 1: Sesuaikan interface dengan nama kunci dari Backend
+//  PERBAIKAN 1: Sesuaikan interface dengan nama kunci dari Backend
 interface ProductData {
   sku: string;
   name: string;
@@ -90,7 +90,7 @@ export default function SalesTopBottomProducts({
                       <TableCell className="font-medium">{item.name}</TableCell>
 
                       <TableCell className="text-right">
-                        {/* ✨ PERBAIKAN 2: Panggil `totalQuantity` */}
+                        {/*  PERBAIKAN 2: Panggil `totalQuantity` */}
                         {(item.totalQuantity || 0).toLocaleString("id-ID")}
                       </TableCell>
 
@@ -155,7 +155,7 @@ export default function SalesTopBottomProducts({
                       <TableCell className="font-medium">{item.name}</TableCell>
 
                       <TableCell className="text-right">
-                        {/* ✨ PERBAIKAN 3: Panggil `totalQuantity` */}
+                        {/*  PERBAIKAN 3: Panggil `totalQuantity` */}
                         {(item.totalQuantity || 0).toLocaleString("id-ID")}
                       </TableCell>
 

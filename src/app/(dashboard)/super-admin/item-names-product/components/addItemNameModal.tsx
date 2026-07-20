@@ -30,7 +30,7 @@ interface AddItemNameModalProps {
   parentCategoryId?: string;
   parentItemCategoryId?: string;
 
-  // ✨ TAMBAHAN BARU: Terima data langsung dari form utama
+  //  TAMBAHAN BARU: Terima data langsung dari form utama
   productCategories: any[];
   itemCategories: any[];
 }
@@ -41,8 +41,8 @@ export function AddItemNameModal({
   onSuccess,
   parentCategoryId = "",
   parentItemCategoryId = "",
-  productCategories = [], // ✨ Tangkap datanya
-  itemCategories = [], // ✨ Tangkap datanya
+  productCategories = [], //  Tangkap datanya
+  itemCategories = [], //  Tangkap datanya
 }: AddItemNameModalProps) {
   const { fetchApi } = useApi();
   const [loading, setLoading] = useState(false);

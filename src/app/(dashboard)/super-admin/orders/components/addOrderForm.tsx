@@ -48,7 +48,7 @@ import {
   ShoppingBag,
   Trash2,
 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation"; // ✨ Import useSearchParams
+import { useRouter, useSearchParams } from "next/navigation"; //  Import useSearchParams
 import { useEffect, useState } from "react";
 import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -62,6 +62,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DatePickerHelper } from "@/helper/datePickerHelper";
+import { useCurrencyConvert } from "@/hooks/use-currency-convert";
 import { useApi } from "@/hooks/useApi";
 import { format } from "date-fns";
 import ClientAddForm from "../../clients/components/addClientForm";
@@ -71,7 +72,6 @@ import PurchaseChannelForm, {
 import { OrderFormValues, orderSchema } from "../order-schema";
 import { postOrder } from "../order-service";
 import {
-  Client,
   Currency,
   Product,
   PurchaseChannel,
@@ -82,6 +82,7 @@ import { SampleFollowUpSection, SampleStepItem } from "./sampleFollowUpSection";
 
 export default function AddOrderForm() {
   const { fetchApi, status } = useApi();
+  const { convert, loading: convertLoading } = useCurrencyConvert();
   const router = useRouter();
   const searchParams = useSearchParams();
   const typeParam = searchParams.get("type");
@@ -132,6 +133,8 @@ export default function AddOrderForm() {
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
+  console.log("Ini adalah currencies", currencies);
+
   const [quotationRefs, setQuotationRefs] = useState<QuotationRef[]>([]);
   const [sampleOrderRefs, setSampleOrderRefs] = useState<SampleOrderRef[]>([]);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
@@ -146,9 +149,11 @@ export default function AddOrderForm() {
   const selectedClientId = watch("clientId");
   const salesCategory = watch("salesCategory");
   const selectedCurrencyCode = watch("currencyCode");
+  const [baseCurrencyCode, setBaseCurrencyCode] = useState("IDR");
+  const [isConvertingPrices, setIsConvertingPrices] = useState(false);
+
   const [sampleSteps, setSampleSteps] = useState<SampleStepItem[]>([]);
 
-  // Load Initial Master Data (Tanpa Vendor)
   useEffect(() => {
     async function load() {
       if (status !== "authenticated") return;
@@ -325,27 +330,95 @@ export default function AddOrderForm() {
   const currentCurrencySymbol =
     currencies.find((c) => c.code === selectedCurrencyCode)?.symbol || "Rp";
 
-  const handleClientAdded = async (newClient: Client) => {
-    try {
-      const res = await fetchApi("/clients/order");
-      if (res.ok) {
-        const clientData = await res.json();
-        setClients(clientData);
+  useEffect(() => {
+    if (
+      selectedCurrencyCode &&
+      selectedCurrencyCode !== baseCurrencyCode &&
+      fields.length > 0
+    ) {
+      // Check apakah ada harga yang non-zero
+      const hasNonZeroPrices = fields.some((_, idx) => {
+        const price = watch(`products.${idx}.price`);
+        return price && price > 0;
+      });
 
-        const addedClient = clientData.find(
-          (c: Client) => c.id === newClient.id,
+      if (hasNonZeroPrices) {
+        console.log("✅ Setting isConvertingPrices to true"); // 🔥 Debug
+        setIsConvertingPrices(true);
+      }
+    }
+  }, [selectedCurrencyCode, baseCurrencyCode, fields.length]); // 🔥 Fixed dependency
+
+  const convertAllPrices = async () => {
+    // 🔥 Validation
+    if (!selectedCurrencyCode) {
+      toast.error("❌ Pilih currency terlebih dahulu");
+      return;
+    }
+
+    if (!baseCurrencyCode) {
+      toast.error("❌ Base currency tidak valid");
+      return;
+    }
+
+    if (selectedCurrencyCode === baseCurrencyCode) {
+      toast.info("ℹ️ Currency sama, tidak perlu konversi");
+      setIsConvertingPrices(false);
+      return;
+    }
+
+    console.log("🔄 Starting conversion...", {
+      from: baseCurrencyCode,
+      to: selectedCurrencyCode,
+    });
+
+    try {
+      let convertedCount = 0;
+
+      for (let i = 0; i < fields.length; i++) {
+        const currentPrice = watch(`products.${i}.price`);
+
+        if (!currentPrice || currentPrice <= 0) {
+          console.log(`Product ${i}: Skipped (price: ${currentPrice})`);
+          continue;
+        }
+
+        console.log(
+          `Converting ${currentPrice} from ${baseCurrencyCode} to ${selectedCurrencyCode}`,
         );
-        if (addedClient) {
-          form.setValue("clientId", addedClient.id);
-          if (addedClient.type === "B2C") {
-            form.setValue("phone", addedClient.phone);
-          }
-          form.setValue("shippingAddress", addedClient.address);
+
+        const result = await convert(
+          baseCurrencyCode,
+          selectedCurrencyCode,
+          currentPrice,
+        );
+
+        if (result?.success) {
+          console.log(`✅ Product ${i} converted:`, result);
+          form.setValue(
+            `products.${i}.price`,
+            parseFloat(result.convertedAmount.toFixed(2)),
+          );
+          convertedCount++;
+        } else {
+          console.warn(`⚠️ Product ${i} conversion failed`, result);
         }
       }
+
+      if (convertedCount > 0) {
+        toast.success(
+          `✅ ${convertedCount} produk dikonversi ke ${selectedCurrencyCode}`,
+        );
+        setIsConvertingPrices(false);
+        setBaseCurrencyCode(selectedCurrencyCode);
+      } else {
+        toast.info("ℹ️ Tidak ada produk yang dikonversi");
+      }
     } catch (error) {
-      console.error(error);
-      toast.error("Gagal refresh data client");
+      console.error("❌ Conversion error:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Gagal konversi harga",
+      );
     }
   };
   const titleText =
@@ -362,6 +435,50 @@ export default function AddOrderForm() {
           {titleText}
         </CardTitle>
       </CardHeader>
+
+      {isConvertingPrices && (
+        <div className="mx-6 mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+          <div>
+            <p className="font-medium text-blue-900 flex items-center gap-2">
+              🔄 Konversi Harga Produk?
+            </p>
+            <p className="text-sm text-blue-700 mt-2">
+              Kamu mengubah currency dari <strong>{baseCurrencyCode}</strong> ke{" "}
+              <strong>{selectedCurrencyCode}</strong>. Klik tombol dibawah untuk
+              konversi semua harga otomatis dengan rate terkini dari
+              exchangerate.host.
+            </p>
+          </div>
+          <div className="flex gap-2 ml-4 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsConvertingPrices(false)}
+              size="sm">
+              Biarkan Manual
+            </Button>
+            <Button
+              type="button"
+              onClick={convertAllPrices}
+              disabled={convertLoading}
+              className="bg-blue-600 hover:bg-blue-700"
+              size="sm">
+              {convertLoading ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  Converting...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Konversi Semua
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <CardContent>
         <Form {...form}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -850,7 +967,7 @@ export default function AddOrderForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Purchase Channel</FormLabel>
-                    {/* ✨ MODAL TAMBAH CHANNEL */}
+                    {/*  MODAL TAMBAH CHANNEL */}
                     <Dialog
                       open={isChannelModalOpen}
                       onOpenChange={setIsChannelModalOpen}>
@@ -925,31 +1042,6 @@ export default function AddOrderForm() {
               <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
                 Internal
               </h3>
-
-              {/* <FormField
-                control={control}
-                name="salesId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>PIC Sales</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="h-10">
-                          <SelectValue placeholder="Select sales person" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {sales.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              /> */}
 
               <FormField
                 control={control}

@@ -29,7 +29,7 @@ export default function AddFinanceTransactionPage() {
       if (status !== "authenticated") return;
 
       try {
-        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        //  Gunakan fetchApi (Otomatis handle Base URL dan Token)
         const res = await fetchApi("/finance/categories?isActive=true");
 
         if (!res.ok) {
@@ -60,7 +60,7 @@ export default function AddFinanceTransactionPage() {
 
     setIsSubmitting(true);
     try {
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
+      //  Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
       const res = await fetchApi("/finance/transactions", {
         method: "POST",
         body: JSON.stringify(data),

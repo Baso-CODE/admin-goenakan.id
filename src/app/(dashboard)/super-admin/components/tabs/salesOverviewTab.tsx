@@ -22,7 +22,7 @@ export default function SalesOverviewTab() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✨ Mengambil fetchApi dari custom hook milikmu
+  //  Mengambil fetchApi dari custom hook milikmu
   const { fetchApi } = useApi();
 
   // Data dummy sebagai fallback
@@ -33,7 +33,7 @@ export default function SalesOverviewTab() {
     profit: "$0",
   };
 
-  // ✨ Menggunakan useCallback dan fetchApi persis seperti pola kodemu
+  //  Menggunakan useCallback dan fetchApi persis seperti pola kodemu
   const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -48,7 +48,7 @@ export default function SalesOverviewTab() {
         if (customEndDate) params.append("endDate", customEndDate);
       }
 
-      // ✨ Menggunakan fetchApi (URL tidak perlu http://localhost lagi jika sudah diatur di useApi)
+      //  Menggunakan fetchApi (URL tidak perlu http://localhost lagi jika sudah diatur di useApi)
       const res = await fetchApi(
         `/analytics/sales-overview?${params.toString()}`,
       );

@@ -107,7 +107,7 @@ import { useApi } from "@/hooks/useApi";
 import { Table } from "@tiptap/extension-table";
 
 // =========================================================================
-// ✨ KOMPONEN BARU: REACT NODE VIEW UNTUK RESIZE GAMBAR (DRAG TO RESIZE)
+//  KOMPONEN BARU: REACT NODE VIEW UNTUK RESIZE GAMBAR (DRAG TO RESIZE)
 // =========================================================================
 const ResizableImageNode = (props: any) => {
   const { node, updateAttributes, selected } = props;

@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 
-// ✨ UPDATE: Interface untuk props data grafik
+//  UPDATE: Interface untuk props data grafik
 interface CustomerRetentionGraphsProps {
   data?: any[];
 }

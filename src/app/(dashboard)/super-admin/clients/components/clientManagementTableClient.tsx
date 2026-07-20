@@ -53,7 +53,7 @@ import { format } from "date-fns";
 
 type ClientType = "B2B" | "B2C";
 
-// ✨ UPDATE: Tambahkan 'status' pada interface
+//  UPDATE: Tambahkan 'status' pada interface
 interface ClientBase {
   id: string;
   custCode: string;
@@ -85,7 +85,7 @@ interface PaginationMeta {
   hasPrevious: boolean;
 }
 
-// ✨ UPDATE: Tambahkan 'status' ke Query Export
+//  UPDATE: Tambahkan 'status' ke Query Export
 interface ClientExportQuery {
   type?: ClientType | "ALL";
   status?: string;
@@ -113,7 +113,7 @@ export default function ClientManagementTable() {
   const [search, setSearch] = useState<string>("");
   const debouncedSearch = useDebounce(search, 500);
   const [clientTypeFilter, setClientTypeFilter] = useState<string>("ALL");
-  const [clientStatusFilter, setClientStatusFilter] = useState<string>("ALL"); // ✨ UPDATE: State Status
+  const [clientStatusFilter, setClientStatusFilter] = useState<string>("ALL"); //  UPDATE: State Status
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
@@ -125,7 +125,7 @@ export default function ClientManagementTable() {
     if (filterUpdate.type !== undefined) {
       setClientTypeFilter(filterUpdate.type);
     }
-    // ✨ UPDATE: Update filter status
+    //  UPDATE: Update filter status
     if (filterUpdate.status !== undefined) {
       setClientStatusFilter(filterUpdate.status);
     }
@@ -140,7 +140,7 @@ export default function ClientManagementTable() {
         page: meta.page.toString(),
         take: meta.perPage.toString(),
         type: clientTypeFilter,
-        status: clientStatusFilter, // ✨ UPDATE: Kirim status ke backend
+        status: clientStatusFilter, //  UPDATE: Kirim status ke backend
         ...(startDate && { startDate }),
         ...(endDate && { endDate }),
       });
@@ -166,7 +166,7 @@ export default function ClientManagementTable() {
     meta.page,
     meta.perPage,
     clientTypeFilter,
-    clientStatusFilter, // ✨ UPDATE: Tambahkan ke dependencies
+    clientStatusFilter, //  UPDATE: Tambahkan ke dependencies
     debouncedSearch,
     startDate,
     endDate,
@@ -183,7 +183,7 @@ export default function ClientManagementTable() {
     try {
       const exportFilters: ClientExportQuery & { search?: string } = {
         type: clientTypeFilter as ClientType | "ALL",
-        status: clientStatusFilter, // ✨ UPDATE: Kirim parameter saat export
+        status: clientStatusFilter, //  UPDATE: Kirim parameter saat export
         ...(startDate && { startDate }),
         ...(endDate && { endDate }),
         ...(search.trim() && { search: search.trim() }),
@@ -276,7 +276,7 @@ export default function ClientManagementTable() {
           </CardTitle>
 
           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-            {/* ✨ UPDATE: FILTER STATUS BARU */}
+            {/*  UPDATE: FILTER STATUS BARU */}
             <Select
               value={clientStatusFilter}
               onValueChange={(val) => handleFilterChange({ status: val })}>
@@ -396,7 +396,7 @@ export default function ClientManagementTable() {
                   Nama / Perusahaan
                 </TableHead>
                 <TableHead className="font-semibold">Tipe</TableHead>
-                {/* ✨ UPDATE: Kolom Baru Status */}
+                {/*  UPDATE: Kolom Baru Status */}
                 <TableHead className="font-semibold">Status</TableHead>
                 <TableHead className="min-w-36 font-semibold">
                   Kontak Utama
@@ -452,7 +452,7 @@ export default function ClientManagementTable() {
                     colSpan={8}
                     className="text-center text-red-500 py-6">
                     {" "}
-                    {/* ✨ UPDATE: colSpan 8 */}
+                    {/*  UPDATE: colSpan 8 */}
                     {error}
                   </TableCell>
                 </TableRow>
@@ -477,7 +477,7 @@ export default function ClientManagementTable() {
                       </Badge>
                     </TableCell>
 
-                    {/* ✨ UPDATE: Cell Baru Status */}
+                    {/*  UPDATE: Cell Baru Status */}
                     <TableCell>
                       <Badge
                         variant="outline"
@@ -544,7 +544,7 @@ export default function ClientManagementTable() {
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={8} // ✨ UPDATE: colSpan 8
+                    colSpan={8} //  UPDATE: colSpan 8
                     className="text-center py-6 text-muted-foreground">
                     No clients found.
                   </TableCell>

@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 
-// ✨ UPDATE: Menambahkan props untuk custom date
+//  UPDATE: Menambahkan props untuk custom date
 interface CustomerFilterProps {
   dateRange: string;
   setDateRange: (val: string) => void;

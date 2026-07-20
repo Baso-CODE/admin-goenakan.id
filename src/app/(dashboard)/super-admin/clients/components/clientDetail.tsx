@@ -387,7 +387,7 @@ export default function ClientDetail() {
     if (status !== "authenticated") return;
 
     try {
-      // ✨ Gunakan fetchApi dengan method DELETE
+      //  Gunakan fetchApi dengan method DELETE
       const res = await fetchApi(`/clients/${clientId}`, {
         method: "DELETE",
       });

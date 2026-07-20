@@ -290,7 +290,7 @@ export default function ItemCategories() {
               Export Excel
             </Button>
 
-            {/* ✨ UPDATE: Buka Modal, Bukan Pindah Halaman */}
+            {/*  UPDATE: Buka Modal, Bukan Pindah Halaman */}
             <Button
               className="bg-primary hover:bg-accent text-white gap-2 h-10"
               onClick={() => setIsAddModalOpen(true)}>
@@ -341,7 +341,7 @@ export default function ItemCategories() {
                   <TableRow
                     key={item.id}
                     className="hover:bg-[oklch(0.98_0.02_90)] transition-colors">
-                    {/* ✨ BARU: Menampilkan Kategori Induk */}
+                    {/*  BARU: Menampilkan Kategori Induk */}
                     <TableCell className="font-medium text-muted-foreground">
                       {item.productCategory?.name_id ||
                         item.productCategory?.name ||
@@ -435,7 +435,7 @@ export default function ItemCategories() {
         </div>
       )}
 
-      {/* ✨ RENDER MODAL DI SINI */}
+      {/*  RENDER MODAL DI SINI */}
       <AddItemCategoryModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}

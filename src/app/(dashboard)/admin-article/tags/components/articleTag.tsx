@@ -347,7 +347,7 @@ export default function ArticleTags() {
             </Popover>
           </div>
 
-          {/* ✨ TOMBOL ADD DIGANTI UNTUK MEMBUKA MODAL */}
+          {/*  TOMBOL ADD DIGANTI UNTUK MEMBUKA MODAL */}
           <Button
             size="sm"
             className="gap-2 ml-auto bg-[#C4A48E] hover:bg-[#a38975]"
@@ -409,7 +409,7 @@ export default function ArticleTags() {
                     </TableCell>
                     <TableCell>{formatDate(data.createdAt)}</TableCell>
                     <TableCell className="text-right space-x-2">
-                      {/* ✨ TOMBOL EDIT DIGANTI UNTUK MEMBUKA MODAL */}
+                      {/*  TOMBOL EDIT DIGANTI UNTUK MEMBUKA MODAL */}
                       <Button
                         variant="outline"
                         size="sm"

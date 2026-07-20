@@ -105,7 +105,7 @@ export function ProductSeoForm({ productId }: ProductSeoFormProps) {
 
     setIsSubmitting(true);
     try {
-      // ✨ Gunakan fetchApi dengan metode PUT
+      //  Gunakan fetchApi dengan metode PUT
       const res = await fetchApi(`/products/${productId}/seo`, {
         method: "PUT",
         body: JSON.stringify(values),

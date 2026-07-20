@@ -66,7 +66,7 @@ export default function OrderDetailPage() {
       if (status !== "authenticated") return;
 
       try {
-        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        //  Gunakan fetchApi (Otomatis handle Base URL dan Token)
         const res = await fetchApi("/invoice-notes/categories/list");
 
         if (!res.ok) throw new Error("Failed to fetch");

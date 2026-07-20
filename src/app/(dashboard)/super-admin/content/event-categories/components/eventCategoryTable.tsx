@@ -36,7 +36,7 @@ type EventCategory = {
   title: string;
   image?: string | null;
   displayOrder: number;
-  orderCount: number; // ✨ TAMBAHAN: Menyimpan data ordered times
+  orderCount: number; //  TAMBAHAN: Menyimpan data ordered times
   isActive: boolean;
   createdAt: string;
 };
@@ -205,7 +205,7 @@ export default function EventCategoryTable() {
                   <TableHead className="w-24">Image</TableHead>
                   <TableHead className="min-w-64">Category Title</TableHead>
                   <TableHead className="text-center">Ordered</TableHead>
-                  {/* ✨ HEADER BARU */}
+                  {/*  HEADER BARU */}
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -216,7 +216,7 @@ export default function EventCategoryTable() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      {/* ✨ colSpan diubah jadi 7 karena ada tambahan 1 kolom */}
+                      {/*  colSpan diubah jadi 7 karena ada tambahan 1 kolom */}
                       <TableCell colSpan={7}>
                         <Skeleton className="h-12 w-full" />
                       </TableCell>

@@ -90,7 +90,7 @@ const ArticleCategories = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      // ✨ 3. Panggil API tanpa fetch token manual
+      //  3. Panggil API tanpa fetch token manual
       const res = await fetchApi(`/article-categories?${params}`);
 
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
@@ -112,7 +112,7 @@ const ArticleCategories = () => {
 
     setIsDeleting(true);
     try {
-      // ✨ 4. DELETE menggunakan fetchApi
+      //  4. DELETE menggunakan fetchApi
       const res = await fetchApi(`/article-categories/${deleteId}`, {
         method: "DELETE",
       });
@@ -150,7 +150,7 @@ const ArticleCategories = () => {
         exportFilters as Record<string, string>,
       ).toString();
 
-      // ✨ 5. Export menggunakan fetchApi
+      //  5. Export menggunakan fetchApi
       const response = await fetchApi(
         `/article-categories/export/excel?${queryString}`,
       );

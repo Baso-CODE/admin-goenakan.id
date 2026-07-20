@@ -26,7 +26,7 @@ export default function EditProductTag() {
 
       setIsLoading(true);
       try {
-        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        //  Gunakan fetchApi (Otomatis handle Base URL dan Token)
         const res = await fetchApi(`/product-tags/${id}`);
 
         if (!res.ok) {

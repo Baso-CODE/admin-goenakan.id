@@ -299,7 +299,7 @@ export default function MaterialTypes() {
                   Material Name
                 </TableHead>
                 <TableHead className=" text-foreground">Code</TableHead>
-                {/* ✨ TAMBAH KOLOM HEADER */}
+                {/*  TAMBAH KOLOM HEADER */}
                 <TableHead className=" text-foreground">Slug</TableHead>
                 <TableHead className=" text-foreground">Description</TableHead>
                 <TableHead className=" text-foreground">Created</TableHead>
@@ -313,7 +313,7 @@ export default function MaterialTypes() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {/* ✨ UPDATE: Panjang array jadi 6 karena kolom bertambah */}
+                    {/*  UPDATE: Panjang array jadi 6 karena kolom bertambah */}
                     {Array.from({ length: 6 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-5 w-full" />
@@ -329,7 +329,7 @@ export default function MaterialTypes() {
                     <TableCell className="font-bold text-primary">
                       {item.name}
                     </TableCell>
-                    {/* ✨ BARU: Tampilan Kolom Code */}
+                    {/*  BARU: Tampilan Kolom Code */}
                     <TableCell>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
                         {item.code}
@@ -370,7 +370,7 @@ export default function MaterialTypes() {
                 ))
               ) : (
                 <TableRow>
-                  {/* ✨ UPDATE: colSpan jadi 6 agar pesan berada di tengah tabel */}
+                  {/*  UPDATE: colSpan jadi 6 agar pesan berada di tengah tabel */}
                   <TableCell
                     colSpan={6}
                     className="text-center py-10 text-muted-foreground italic">

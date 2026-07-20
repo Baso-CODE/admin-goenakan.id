@@ -14,7 +14,7 @@ import {
   ShoppingCart,
 } from "lucide-react";
 
-// ✨ UPDATE: Sesuaikan tipe data menjadi number karena API mengirimkan angka
+//  UPDATE: Sesuaikan tipe data menjadi number karena API mengirimkan angka
 interface MetricsData {
   revenue: number;
   orders: number;
@@ -22,7 +22,7 @@ interface MetricsData {
   profit: number;
 }
 
-// ✨ FUNGSI HELPER: Untuk merapikan angka menjadi format mata uang
+//  FUNGSI HELPER: Untuk merapikan angka menjadi format mata uang
 const formatCurrency = (val: number) => {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -32,7 +32,7 @@ const formatCurrency = (val: number) => {
   }).format(val || 0);
 };
 
-// ✨ FUNGSI HELPER: Untuk merapikan angka biasa (ribuan)
+//  FUNGSI HELPER: Untuk merapikan angka biasa (ribuan)
 const formatNumber = (val: number) => {
   return new Intl.NumberFormat("id-ID").format(val || 0);
 };
@@ -64,7 +64,7 @@ export default function SalesOverviewCard({
           <DollarSign className="h-4 w-4 text-emerald-600" />
         </CardHeader>
         <CardContent>
-          {/* ✨ Terapkan format mata uang di sini */}
+          {/*  Terapkan format mata uang di sini */}
           <div className="text-2xl font-bold">
             {formatCurrency(safeMetrics.revenue)}
           </div>
@@ -87,7 +87,7 @@ export default function SalesOverviewCard({
           <ShoppingCart className="h-4 w-4 text-blue-600" />
         </CardHeader>
         <CardContent>
-          {/* ✨ Terapkan format angka di sini */}
+          {/*  Terapkan format angka di sini */}
           <div className="text-2xl font-bold">
             {formatNumber(safeMetrics.orders)}
           </div>
@@ -107,7 +107,7 @@ export default function SalesOverviewCard({
           <Receipt className="h-4 w-4 text-amber-600" />
         </CardHeader>
         <CardContent>
-          {/* ✨ Terapkan format mata uang di sini */}
+          {/*  Terapkan format mata uang di sini */}
           <div className="text-2xl font-bold">
             {formatCurrency(safeMetrics.averagePurchase)}
           </div>
@@ -133,7 +133,7 @@ export default function SalesOverviewCard({
           </div>
         </CardHeader>
         <CardContent>
-          {/* ✨ Terapkan format mata uang di sini */}
+          {/*  Terapkan format mata uang di sini */}
           <div className="text-2xl font-bold text-indigo-700">
             {formatCurrency(safeMetrics.profit)}
           </div>

@@ -19,7 +19,7 @@ import {
   YAxis,
 } from "recharts";
 
-// ✨ UPDATE: Tambahkan interface untuk props data dari API
+//  UPDATE: Tambahkan interface untuk props data dari API
 interface SalesOverviewGraphsProps {
   data?: any[]; // Menerima array grafik dari parent
 }
@@ -45,7 +45,7 @@ export default function SalesOverviewGraphs({
         <CardContent>
           <div className="h-62.5 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
-              {/* ✨ Ganti monthlyData menjadi chartData */}
+              {/*  Ganti monthlyData menjadi chartData */}
               <BarChart
                 data={chartData}
                 margin={{ top: 0, right: 0, left: 10, bottom: 0 }}>
@@ -107,7 +107,7 @@ export default function SalesOverviewGraphs({
         <CardContent>
           <div className="h-62.5 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
-              {/* ✨ Ganti monthlyData menjadi chartData */}
+              {/*  Ganti monthlyData menjadi chartData */}
               <BarChart
                 data={chartData}
                 margin={{ top: 0, right: 0, left: -10, bottom: 0 }}>
@@ -169,7 +169,7 @@ export default function SalesOverviewGraphs({
         <CardContent>
           <div className="h-62.5 w-full mt-1">
             <ResponsiveContainer width="100%" height="100%">
-              {/* ✨ Ganti monthlyData menjadi chartData */}
+              {/*  Ganti monthlyData menjadi chartData */}
               <LineChart
                 data={chartData}
                 margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
