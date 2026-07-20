@@ -165,6 +165,53 @@
   --sidebar-ring: oklch(0.7 0.12 45);
 }
 
+.dark .simple-editor {
+  @apply bg-slate-950 text-slate-100;
+
+  p {
+    @apply text-slate-100;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply text-slate-100;
+  }
+
+  code {
+    @apply bg-slate-800 text-slate-100;
+  }
+
+  blockquote {
+    @apply border-slate-700 text-slate-300;
+  }
+
+  ul,
+  ol {
+    @apply text-slate-100;
+  }
+
+  a {
+    @apply text-blue-400 hover:text-blue-300;
+  }
+
+  table {
+    @apply border-slate-700;
+
+    th,
+    td {
+      @apply border-slate-700 bg-slate-900;
+    }
+
+    th {
+      @apply bg-slate-800;
+    }
+  }
+}
+
 /* TIPTAP TABLE STYLES */
 .simple-editor table {
   border-collapse: collapse;

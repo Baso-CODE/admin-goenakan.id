@@ -54,6 +54,7 @@ import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import FastCurrencyForm from "@/app/(dashboard)/admin-invoice/currency/components/formCurrencyFast";
+import { ClientData } from "@/app/(dashboard)/admin-invoice/quotations/components/quotationForm";
 import {
   Dialog,
   DialogContent,
@@ -63,6 +64,7 @@ import {
 import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useApi } from "@/hooks/useApi";
 import { format } from "date-fns";
+import ClientAddForm from "../../clients/components/addClientForm";
 import PurchaseChannelForm, {
   PurchaseChannelFormValues,
 } from "../../purchase-channel/components/formPurchaseChannel";
@@ -121,8 +123,7 @@ export default function AddOrderForm() {
     name: "products",
   });
 
-  // Master Data States
-  const [clients, setClients] = useState<Client[]>([]);
+  const [clients, setClients] = useState<ClientData[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
 
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
@@ -133,6 +134,7 @@ export default function AddOrderForm() {
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [quotationRefs, setQuotationRefs] = useState<QuotationRef[]>([]);
   const [sampleOrderRefs, setSampleOrderRefs] = useState<SampleOrderRef[]>([]);
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
 
@@ -323,6 +325,29 @@ export default function AddOrderForm() {
   const currentCurrencySymbol =
     currencies.find((c) => c.code === selectedCurrencyCode)?.symbol || "Rp";
 
+  const handleClientAdded = async (newClient: Client) => {
+    try {
+      const res = await fetchApi("/clients/order");
+      if (res.ok) {
+        const clientData = await res.json();
+        setClients(clientData);
+
+        const addedClient = clientData.find(
+          (c: Client) => c.id === newClient.id,
+        );
+        if (addedClient) {
+          form.setValue("clientId", addedClient.id);
+          if (addedClient.type === "B2C") {
+            form.setValue("phone", addedClient.phone);
+          }
+          form.setValue("shippingAddress", addedClient.address);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal refresh data client");
+    }
+  };
   const titleText =
     salesCategory === "SAMPLE" ? "Create Sample Order" : "Create Sales Order";
   return (
@@ -681,13 +706,32 @@ export default function AddOrderForm() {
               <h3 className="md:col-span-2 font-medium text-lg text-gray-700">
                 Customer & Logistics
               </h3>
-
               <FormField
                 control={control}
                 name="clientId"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Client / PIC</FormLabel>
+
+                    <Dialog
+                      open={isClientModalOpen}
+                      onOpenChange={setIsClientModalOpen}>
+                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Tambah Client Baru</DialogTitle>
+                        </DialogHeader>
+                        <ClientAddForm
+                          onSuccess={(newClient: ClientData) => {
+                            setClients((prev) => [...prev, newClient]);
+                            form.setValue("clientId", newClient.id);
+                            setIsClientModalOpen(false);
+                            setClientOpen(false);
+                          }}
+                          isModal={true}
+                        />
+                      </DialogContent>
+                    </Dialog>
+
                     <Popover open={clientOpen} onOpenChange={setClientOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -732,6 +776,14 @@ export default function AddOrderForm() {
                                   {client.name}
                                 </CommandItem>
                               ))}
+                              <div className="h-px bg-stone-200 my-1" />
+                              <CommandItem
+                                value="add_new_client"
+                                onSelect={() => setIsClientModalOpen(true)}
+                                className="text-blue-600 font-semibold cursor-pointer">
+                                <Plus className="w-4 h-4 mr-2" />
+                                Tambah Client Baru...
+                              </CommandItem>
                             </CommandGroup>
                           </CommandList>
                         </Command>
@@ -741,7 +793,6 @@ export default function AddOrderForm() {
                   </FormItem>
                 )}
               />
-
               {isB2B && (
                 <FormField
                   control={control}
@@ -776,7 +827,6 @@ export default function AddOrderForm() {
                   )}
                 />
               )}
-
               <FormField
                 control={control}
                 name="phone"
@@ -794,7 +844,6 @@ export default function AddOrderForm() {
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={control}
                 name="purchaseChannelId"

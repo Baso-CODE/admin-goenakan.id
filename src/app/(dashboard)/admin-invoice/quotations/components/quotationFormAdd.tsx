@@ -573,7 +573,7 @@ export default function QuotationAddForm({
       status: "DRAFT",
       picId: "",
       clientId: "",
-      currencyCode: "IDR", // Default mata uang
+      currencyCode: "IDR",
       paymentTerms: "",
       items: [
         {

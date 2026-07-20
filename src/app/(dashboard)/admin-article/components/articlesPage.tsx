@@ -21,21 +21,25 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-// === Type definitions ===
 type Article = {
   id: string;
-  title: string;
   slug: string;
+  title_id: string;
+  title_en?: string;
   published: boolean;
   publishedAt: string | null;
-  createdAt: string;
+  authorId: string;
+  author: {
+    id: string;
+    name: string;
+  };
+  categoryId: string;
   category: {
     id: string;
     name: string;
   };
-  author: {
-    name: string;
-  };
+  createdAt: string;
+  updatedAt: string;
 };
 
 type Meta = {
@@ -210,16 +214,16 @@ export default function ArticlesSection() {
                 articles.map((data) => (
                   <TableRow key={data.id}>
                     {/* Title & Slug */}
+                    {/* Title & Slug */}
                     <TableCell className="font-medium">
                       <Link
-                        href={`${process.env.NEXT_PUBLIC_CLIENT_ARTICLE_URL || "https://client.edumatrixindonesia.cloud/en/article"}/${data.slug}`}
+                        href={`${process.env.NEXT_PUBLIC_CLIENT_ARTICLE_URL}/${data.slug}`}
                         target="_blank"
-                        rel="noopener noreferrer"
-                        className="block group cursor-pointer">
+                        rel="noopener noreferrer">
                         <div
-                          className="line-clamp-1 transition-colors group-hover:text-blue-600 group-hover:underline"
-                          title={data.title}>
-                          {data.title}
+                          className="line-clamp-1 hover:text-blue-600 hover:underline cursor-pointer"
+                          title={data.title_id}>
+                          {data.title_id}
                         </div>
                         <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
                           /{data.slug}

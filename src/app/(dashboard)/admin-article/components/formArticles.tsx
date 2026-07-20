@@ -521,7 +521,6 @@ export default function FormArticle({
                         </FormLabel>
                       </div>
 
-                      {/* ✨ MODAL TAG (Diletakkan di luar Popover) */}
                       <Dialog
                         open={isTagModalOpen}
                         onOpenChange={setIsTagModalOpen}>
@@ -568,14 +567,12 @@ export default function FormArticle({
                         </PopoverTrigger>
                         <PopoverContent className="w-full p-0" align="start">
                           <Command>
-                            {/* ✨ Tangkap teks yang diketik untuk diteruskan ke modal */}
                             <CommandInput
                               placeholder="Ketik nama tag..."
                               value={tagSearchQuery}
                               onValueChange={setTagSearchQuery}
                             />
                             <CommandList>
-                              {/* ✨ JIKA TAG TIDAK DITEMUKAN MUNCUL TOMBOL INI */}
                               <CommandEmpty className="py-4 flex flex-col items-center justify-center gap-2">
                                 <span className="text-sm text-muted-foreground">
                                   Tag tidak ditemukan.
@@ -617,7 +614,6 @@ export default function FormArticle({
                                 ))}
                               </CommandGroup>
 
-                              {/* ✨ OPSI TAMBAH TAG YANG SELALU MUNCUL DI BAWAH */}
                               {availableTags.length > 0 && (
                                 <>
                                   <div className="h-1px bg-stone-100 my-1 mx-2" />
@@ -638,13 +634,11 @@ export default function FormArticle({
                   )}
                 />
 
-                {/* ✨ IMPLEMENTASI BARU: PRODUK TERKAIT (COMBOBOX SEARCH + SELECTED LIST) */}
                 <FormField
                   control={form.control}
                   name="productIds"
                   render={({ field }) => {
                     const selectedProductIds = field.value || [];
-                    // Temukan data lengkap produk dari ID yang dipilih
                     const selectedProducts = products.filter((p) =>
                       selectedProductIds.includes(p.id),
                     );
@@ -688,7 +682,7 @@ export default function FormArticle({
                                   {products.map((product) => (
                                     <CommandItem
                                       key={product.id}
-                                      value={product.name} // Diperlukan agar pencarian Command berfungsi berdasarkan nama
+                                      value={product.name}
                                       onSelect={() => {
                                         const isSelected =
                                           selectedProductIds.includes(
@@ -831,11 +825,10 @@ export default function FormArticle({
                           <Select
                             value={field.value}
                             onValueChange={(value) => {
-                              // ✨ CEGAT VALUE DI SINI
                               if (value === "add_new_category") {
-                                setIsCategoryModalOpen(true); // Buka modal
+                                setIsCategoryModalOpen(true);
                               } else {
-                                field.onChange(value); // Simpan ID kategori seperti biasa
+                                field.onChange(value);
                               }
                             }}>
                             <FormControl>
@@ -853,7 +846,6 @@ export default function FormArticle({
                               {/* Garis Pemisah Visual */}
                               <div className="h-1px bg-stone-200 my-1 mx-2" />
 
-                              {/* ✨ OPSI TAMBAH KATEGORI */}
                               <SelectItem
                                 value="add_new_category"
                                 className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer">
@@ -975,12 +967,10 @@ export default function FormArticle({
             <FormSeo control={form.control} />
           </TabsContent>
         </Tabs>
-
-        <div className="sticky bottom-4 z-20">
+        <div className="sticky bottom-4 z-20 px-4 sm:px-0">
           <Button
             type="submit"
-            size="lg"
-            className="w-full font-bold shadow-xl bg-primary hover:bg-accent text-primary-foreground py-7 text-lg rounded-2xl transition-all active:scale-[0.98]"
+            className="w-full  text-white font-semibold py-4 px-4 rounded-lg shadow-md hover:shadow-lg transition-all active:scale-95"
             disabled={isSubmitting}>
             {isSubmitting ? (
               <>

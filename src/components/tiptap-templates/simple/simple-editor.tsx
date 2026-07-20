@@ -542,7 +542,6 @@ export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
       TaskItem.configure({ nested: true }),
       Highlight.configure({ multicolor: true }),
 
-      // ✨ UPDATE: Daftarkan CustomResizableImage yang mendukung drag resize
       CustomResizableImage,
       Typography,
       Superscript,
@@ -597,10 +596,8 @@ export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
   if (!editor) return null;
 
   return (
-    // ✨ Pastikan "overflow-hidden" dihapus dari sini agar sticky bekerja
-    <div className="simple-editor-wrapper border rounded-md shadow-sm bg-white relative">
+    <div className="simple-editor-wrapper border rounded-md shadow-sm  relative">
       <EditorContext.Provider value={{ editor }}>
-        {/* ✨ Menggunakan sticky top-0 z-50 untuk mengunci Toolbar */}
         <div className="bg-stone-50 border-b sticky top-0 z-50">
           <Toolbar
             ref={toolbarRef}
@@ -628,7 +625,7 @@ export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
         </div>
 
         {/* Content Area */}
-        <div className="bg-white">
+        <div className="">
           <EditorContent
             editor={editor}
             role="presentation"
