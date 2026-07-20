@@ -123,6 +123,7 @@ export default function SupplierCogsCalculatorPage() {
   const [localFreight, setLocalFreight] = useState<number>(7000);
   const [seaFreightRate, setSeaFreightRate] = useState<number>(10000000); // per CBM
   const [airFreightRate, setAirFreightRate] = useState<number>(260000); // per KG
+  const [moqCtn, setMoqCtn] = useState<number>(10); // MOQ in Carton
   const [qtyPcs, setQtyPcs] = useState<number>(100);
   const [margin, setMargin] = useState<number>(10000);
   const [sponsorPercent, setSponsorPercent] = useState<number>(2); // 2%
@@ -278,6 +279,9 @@ export default function SupplierCogsCalculatorPage() {
         weight,
         gzDeliveryCost,
         localFreight,
+        seaFreightRate,
+        airFreightRate,
+        moqCtn,
         margin,
         sponsorPercent: sponsorPercent / 100,
         notes: notes.trim() || undefined,
@@ -330,6 +334,9 @@ export default function SupplierCogsCalculatorPage() {
     setWeight(10);
     setGzDeliveryCost(1);
     setLocalFreight(7000);
+    setSeaFreightRate(10000000);
+    setAirFreightRate(260000);
+    setMoqCtn(10);
     setQtyPcs(100);
     setMargin(10000);
     setSponsorPercent(2);
@@ -363,6 +370,9 @@ export default function SupplierCogsCalculatorPage() {
     setWeight(Number(rec.weight) || 0);
     setGzDeliveryCost(Number(rec.gzDeliveryCost) || 0);
     setLocalFreight(Number(rec.localFreight) || 0);
+    setSeaFreightRate(Number(rec.seaFreightRate) || 10000000);
+    setAirFreightRate(Number(rec.airFreightRate) || 260000);
+    setMoqCtn(Number(rec.moqCtn) || 10);
     setMargin(Number(rec.margin) || 0);
     setSponsorPercent(Number(rec.sponsorPercent) * 100);
     setNotes(rec.notes || "");
@@ -1050,31 +1060,72 @@ export default function SupplierCogsCalculatorPage() {
                   </div>
                 )}
 
-                {/* 5. LOGISTICS FEES */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-stone-600">GZ Delivery Cost (Guangzhou)</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
+                {/* 5. LOGISTICS & SHIPPING FREIGHT RATES */}
+                <div className="border-t pt-4 space-y-4">
+                  <h4 className="text-xs font-bold uppercase text-stone-600 tracking-wider">Shipping & Freight Rates (Tarif Pengiriman)</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-stone-600">SEA Freight Rate (Rp / CBM)</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
+                        <Input
+                          type="number"
+                          value={seaFreightRate}
+                          onChange={(e) => setSeaFreightRate(Number(e.target.value))}
+                          className="pl-9 bg-stone-50 border-stone-300 font-semibold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-stone-600">AIR Freight Rate (Rp / KG)</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
+                        <Input
+                          type="number"
+                          value={airFreightRate}
+                          onChange={(e) => setAirFreightRate(Number(e.target.value))}
+                          className="pl-9 bg-stone-50 border-stone-300 font-semibold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-stone-600">MOQ Sourcing (Carton)</Label>
                       <Input
                         type="number"
-                        value={gzDeliveryCost}
-                        onChange={(e) => setGzDeliveryCost(Number(e.target.value))}
-                        className="pl-12 bg-stone-50 border-stone-300"
+                        value={moqCtn}
+                        onChange={(e) => setMoqCtn(Number(e.target.value))}
+                        className="bg-stone-50 border-stone-300 font-semibold"
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-stone-600">Local Delivery IDR (Warehouse)</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
-                      <Input
-                        type="number"
-                        value={localFreight}
-                        onChange={(e) => setLocalFreight(Number(e.target.value))}
-                        className="pl-9 bg-stone-50 border-stone-300"
-                      />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                    <div className="space-y-2">
+                      <Label className="text-xs text-stone-500 font-semibold uppercase">GZ Delivery Cost (Guangzhou)</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
+                        <Input
+                          type="number"
+                          value={gzDeliveryCost}
+                          onChange={(e) => setGzDeliveryCost(Number(e.target.value))}
+                          className="pl-12 bg-stone-50 border-stone-300"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs text-stone-500 font-semibold uppercase">Local Delivery (Warehouse IDR)</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
+                        <Input
+                          type="number"
+                          value={localFreight}
+                          onChange={(e) => setLocalFreight(Number(e.target.value))}
+                          className="pl-9 bg-stone-50 border-stone-300"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
