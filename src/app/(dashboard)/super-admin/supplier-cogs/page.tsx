@@ -154,6 +154,11 @@ export default function SupplierCogsCalculatorPage() {
   const [cogsStatus, setCogsStatus] = useState<"EXISTING" | "POTENTIAL">("POTENTIAL");
   const [historyStatusFilter, setHistoryStatusFilter] = useState<"ALL" | "EXISTING" | "POTENTIAL">("ALL");
 
+  // Potential Supplier Sourcing & Contact Details
+  const [supplierPlatform, setSupplierPlatform] = useState<string>("1688");
+  const [supplierContactName, setSupplierContactName] = useState<string>("");
+  const [supplierContactLink, setSupplierContactLink] = useState<string>("");
+
   // Mode Calculation: FIXED vs VARIABLE
   const [calculationMode, setCalculationMode] = useState<"FIXED" | "VARIABLE">("FIXED");
   const [variableTiers, setVariableTiers] = useState<Array<{ id: string; totalPcs: number; pricePcs: number; gzCost: number }>>([
@@ -223,6 +228,9 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedVendorId(rec.vendorId || "");
     setSelectedServiceVendorId(rec.serviceVendorId || "");
     setCogsStatus(rec.status || (rec.productId ? "EXISTING" : "POTENTIAL"));
+    setSupplierPlatform(rec.supplierPlatform || "1688");
+    setSupplierContactName(rec.supplierContactName || "");
+    setSupplierContactLink(rec.supplierContactLink || "");
     
     setForeignPrice(Number(rec.foreignPrice));
     setCurrency(rec.currencyCode);
@@ -309,22 +317,18 @@ export default function SupplierCogsCalculatorPage() {
 
         if (prodRes.ok) {
           const prods = await prodRes.json();
-          setProducts(prods.data || prods || []);
+          setProducts(prods);
         }
-
         if (vendRes.ok) {
           const vends = await vendRes.json();
-          setVendors(vends.data || vends || []);
+          setVendors(vends);
         }
-
-        loadHistory();
-        fetchExchangeRates("RMB");
-        fetchExchangeRates("USD");
-      } catch (err) {
-        toast.error("Gagal memuat master data.");
+      } catch (e) {
+        console.error("Gagal memuat master data", e);
       }
     };
     loadData();
+    loadHistory();
   }, []);
 
   const loadHistory = async () => {
@@ -335,14 +339,16 @@ export default function SupplierCogsCalculatorPage() {
         setRecords(data);
       }
     } catch (e) {
-      console.error(e);
+      console.error("Gagal memuat history COGS", e);
     }
   };
 
+  // Fetch exchange rate automatically
   const fetchExchangeRates = async (base: string) => {
+    if (base === "IDR") return;
     setFetchingRates(true);
     try {
-      const res = await fetchApi(`/supplier-cogs/rates?base=${base}`);
+      const res = await fetch(`https://open.er-api.com/v6/latest/${base}`);
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.rates) {
@@ -431,6 +437,9 @@ export default function SupplierCogsCalculatorPage() {
         tiers: calculationMode === "VARIABLE" ? variableTiers : undefined,
         vendorId: selectedVendorId && selectedVendorId !== "none" ? selectedVendorId : undefined,
         serviceVendorId: selectedServiceVendorId && selectedServiceVendorId !== "none" ? selectedServiceVendorId : undefined,
+        supplierPlatform: supplierPlatform.trim() || undefined,
+        supplierContactName: supplierContactName.trim() || undefined,
+        supplierContactLink: supplierContactLink.trim() || undefined,
         foreignPrice,
         currencyCode: currency,
         exchangeRate,
@@ -481,6 +490,9 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedVendorId("");
     setSelectedServiceVendorId("");
     setCogsStatus("POTENTIAL");
+    setSupplierPlatform("1688");
+    setSupplierContactName("");
+    setSupplierContactLink("");
     setCalculationMode("FIXED");
     setVariableTiers([
       { id: "1", totalPcs: 12, pricePcs: 85, gzCost: 0 },
@@ -518,6 +530,9 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedVendorId(rec.vendorId || "");
     setSelectedServiceVendorId(rec.serviceVendorId || "");
     setCogsStatus(rec.status || (rec.productId ? "EXISTING" : "POTENTIAL"));
+    setSupplierPlatform(rec.supplierPlatform || "1688");
+    setSupplierContactName(rec.supplierContactName || "");
+    setSupplierContactLink(rec.supplierContactLink || "");
     setCalculationMode(rec.calculationMode || "FIXED");
     if (rec.tiers && Array.isArray(rec.tiers) && rec.tiers.length > 0) {
       setVariableTiers(rec.tiers);
@@ -792,10 +807,47 @@ export default function SupplierCogsCalculatorPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-stone-600">
-                            <div>
-                              <p className="font-medium text-stone-800">{rec.vendor?.companyName || "-"}</p>
+                            <div className="space-y-1">
+                              {rec.vendor?.companyName ? (
+                                <p className="font-medium text-stone-800">{rec.vendor.companyName}</p>
+                              ) : rec.supplierContactName || rec.supplierPlatform ? (
+                                <div className="space-y-0.5">
+                                  {rec.supplierPlatform && (
+                                    <Badge className="bg-amber-50 text-amber-800 border border-amber-200 text-[9px] px-1.5 py-0 font-bold uppercase">
+                                      🌐 {rec.supplierPlatform}
+                                    </Badge>
+                                  )}
+                                  {rec.supplierContactName && (
+                                    <p className="font-semibold text-stone-800 text-xs flex items-center gap-1">
+                                      👤 {rec.supplierContactName}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-stone-400 text-xs">- Tanpa Supplier -</p>
+                              )}
+
+                              {rec.supplierContactLink && (
+                                <div className="text-[11px]">
+                                  {rec.supplierContactLink.startsWith("http://") || rec.supplierContactLink.startsWith("https://") ? (
+                                    <a
+                                      href={rec.supplierContactLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-indigo-600 hover:underline font-semibold flex items-center gap-1 text-[10px]"
+                                    >
+                                      🔗 Buka Link Supplier ↗
+                                    </a>
+                                  ) : (
+                                    <span className="text-stone-500 font-mono text-[10px]">
+                                      💬 {rec.supplierContactLink}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
                               {rec.serviceVendor && (
-                                <p className="text-[10px] text-stone-500 font-normal flex items-center gap-1 mt-0.5">
+                                <p className="text-[10px] text-stone-500 font-normal flex items-center gap-1 pt-0.5">
                                   <span>🚚 Logistik:</span> {rec.serviceVendor.companyName}
                                 </p>
                               )}
@@ -1086,6 +1138,55 @@ export default function SupplierCogsCalculatorPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                {/* 2.5 POTENTIAL SUPPLIER SOURCING & CONTACT INFO */}
+                <div className="border-t pt-4 space-y-3">
+                  <Label className="text-xs font-bold uppercase text-stone-700 flex items-center justify-between">
+                    <span>🌐 Platform Sourcing & Kontak Supplier</span>
+                    <span className="text-[10px] text-stone-400 font-normal">Memudahkan kontak supplier saat ingin order</span>
+                  </Label>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-stone-500">Platform Sourcing</Label>
+                      <Select value={supplierPlatform} onValueChange={setSupplierPlatform}>
+                        <SelectTrigger className="bg-stone-50 border-stone-300">
+                          <SelectValue placeholder="Pilih Platform" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1688">1688 (China)</SelectItem>
+                          <SelectItem value="Alibaba">Alibaba International</SelectItem>
+                          <SelectItem value="WeChat">WeChat Supplier Direct</SelectItem>
+                          <SelectItem value="Taobao">Taobao / Tmall</SelectItem>
+                          <SelectItem value="Made-In-China">Made-In-China</SelectItem>
+                          <SelectItem value="WhatsApp">WhatsApp Supplier</SelectItem>
+                          <SelectItem value="Lokal / Indonesia">Lokal / Indonesia</SelectItem>
+                          <SelectItem value="Lainnya">Lainnya</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-stone-500">Nama / PIC Kontak Supplier</Label>
+                      <Input
+                        placeholder="Contoh: Sales Manager - Chen"
+                        value={supplierContactName}
+                        onChange={(e) => setSupplierContactName(e.target.value)}
+                        className="bg-stone-50 border-stone-300"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-stone-500">Link Produk / Kontak / WeChat ID</Label>
+                      <Input
+                        placeholder="Contoh: https://1688.com/... / WeChat ID / No HP"
+                        value={supplierContactLink}
+                        onChange={(e) => setSupplierContactLink(e.target.value)}
+                        className="bg-stone-50 border-stone-300"
+                      />
+                    </div>
                   </div>
                 </div>
 
