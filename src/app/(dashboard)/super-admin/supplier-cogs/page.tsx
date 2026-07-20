@@ -66,13 +66,10 @@ export default function SupplierCogsCalculatorPage() {
   const [selectedProductId, setSelectedProductId] = useState<string>("sandbox");
   const [tempProductName, setTempProductName] = useState<string>("");
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
-  const [vendorTypeFilter, setVendorTypeFilter] = useState<"ALL" | "PRODUCT" | "SERVICE">("ALL");
+  const [selectedServiceVendorId, setSelectedServiceVendorId] = useState<string>("");
 
-  const filteredVendors = vendors.filter((v) => {
-    if (vendorTypeFilter === "ALL") return true;
-    if (!v.types || v.types.length === 0) return true;
-    return v.types.includes(vendorTypeFilter);
-  });
+  const productVendors = vendors.filter((v) => !v.types || v.types.length === 0 || v.types.includes("PRODUCT"));
+  const serviceVendors = vendors.filter((v) => !v.types || v.types.length === 0 || v.types.includes("SERVICE"));
   
   // Pricing
   const [foreignPrice, setForeignPrice] = useState<number>(8);
@@ -236,6 +233,7 @@ export default function SupplierCogsCalculatorPage() {
         productId: selectedProductId === "sandbox" ? undefined : selectedProductId,
         tempProductName: selectedProductId === "sandbox" ? tempProductName.trim() : undefined,
         vendorId: selectedVendorId,
+        serviceVendorId: selectedServiceVendorId && selectedServiceVendorId !== "none" ? selectedServiceVendorId : undefined,
         foreignPrice,
         currencyCode: currency,
         exchangeRate,
@@ -253,7 +251,7 @@ export default function SupplierCogsCalculatorPage() {
 
       const isEdit = !!editingRecord;
       const url = isEdit ? `/supplier-cogs/${editingRecord.id}` : "/supplier-cogs";
-      const method = isEdit ? "PATCH" : "POST";
+      const method = isEdit ? "PUT" : "POST";
 
       const res = await fetchApi(url, {
         method,
@@ -261,10 +259,10 @@ export default function SupplierCogsCalculatorPage() {
       });
 
       if (res.ok) {
-        toast.success(isEdit ? "Catatan harga supplier berhasil diperbarui!" : "Catatan harga supplier berhasil disimpan!");
-        loadHistory();
-        setView("list");
+        toast.success(isEdit ? "Catatan COGS berhasil diperbarui!" : "Catatan COGS berhasil disimpan!");
         resetForm();
+        setView("list");
+        loadHistory();
       } else {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message || "Gagal menyimpan catatan.");
@@ -281,6 +279,7 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedProductId("sandbox");
     setTempProductName("");
     setSelectedVendorId("");
+    setSelectedServiceVendorId("");
     setForeignPrice(8);
     setCurrency("RMB");
     setExchangeRate(ratesData.RMB || 2250);
@@ -308,6 +307,7 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedProductId(rec.productId || "sandbox");
     setTempProductName(rec.tempProductName || "");
     setSelectedVendorId(rec.vendorId);
+    setSelectedServiceVendorId(rec.serviceVendorId || "");
     setForeignPrice(Number(rec.foreignPrice));
     setCurrency(rec.currencyCode);
     setExchangeRate(Number(rec.exchangeRate));
@@ -458,7 +458,16 @@ export default function SupplierCogsCalculatorPage() {
                               <Badge className="ml-2 bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-100 text-[9px] px-1.5 py-0.5">Sourcing Draft</Badge>
                             )}
                           </TableCell>
-                          <TableCell className="text-stone-600">{rec.vendor?.companyName || "-"}</TableCell>
+                          <TableCell className="text-stone-600">
+                            <div>
+                              <p className="font-medium text-stone-800">{rec.vendor?.companyName || "-"}</p>
+                              {rec.serviceVendor && (
+                                <p className="text-[10px] text-stone-500 font-normal flex items-center gap-1 mt-0.5">
+                                  <span>🚚 Logistik:</span> {rec.serviceVendor.companyName}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell className="font-semibold text-stone-700">
                             {rec.currencyCode} {Number(rec.foreignPrice).toLocaleString("id-ID")}
                           </TableCell>
@@ -595,65 +604,56 @@ export default function SupplierCogsCalculatorPage() {
                   )}
                 </div>
 
-                {/* 2. SELECT SUPPLIER */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold uppercase text-stone-600">Supplier / Vendor</Label>
-                    <div className="flex gap-1 bg-stone-100 p-0.5 rounded text-[10px] font-semibold">
-                      <button
-                        type="button"
-                        onClick={() => setVendorTypeFilter("ALL")}
-                        className={`px-2 py-0.5 rounded transition-colors ${
-                          vendorTypeFilter === "ALL" ? "bg-white text-stone-900 shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
-                        }`}
-                      >
-                        Semua ({vendors.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setVendorTypeFilter("PRODUCT")}
-                        className={`px-2 py-0.5 rounded transition-colors ${
-                          vendorTypeFilter === "PRODUCT" ? "bg-white text-stone-900 shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
-                        }`}
-                      >
-                        Product
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setVendorTypeFilter("SERVICE")}
-                        className={`px-2 py-0.5 rounded transition-colors ${
-                          vendorTypeFilter === "SERVICE" ? "bg-white text-stone-900 shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
-                        }`}
-                      >
-                        Service
-                      </button>
-                    </div>
-                  </div>
-
-                  <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
-                    <SelectTrigger className="bg-stone-50 border-stone-300">
-                      <SelectValue placeholder="Pilih Supplier / Vendor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredVendors.map((v) => {
-                        const typeLabel = v.types && v.types.length > 0 
-                          ? v.types.map((t: string) => t === "PRODUCT" ? "Product" : "Service").join(" & ")
-                          : "";
-                        return (
+                {/* 2. SELECT SUPPLIER & SERVICE VENDOR (SIDE BY SIDE) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Product Vendor */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase text-stone-600">
+                      Supplier / Vendor Product
+                    </Label>
+                    <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
+                      <SelectTrigger className="bg-stone-50 border-stone-300">
+                        <SelectValue placeholder="Pilih Supplier Product" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {productVendors.map((v) => (
                           <SelectItem key={v.id} value={v.id}>
-                            <div className="flex items-center justify-between w-full gap-4">
+                            <div className="flex items-center justify-between w-full gap-2">
                               <span>{v.companyName}</span>
-                              {typeLabel && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-stone-100 text-stone-600 border border-stone-200 uppercase ml-2">
-                                  {typeLabel}
-                                </span>
-                              )}
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 uppercase ml-2">
+                                Product
+                              </span>
                             </div>
                           </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Service Vendor */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase text-stone-600">
+                      Vendor Ekspedisi / Service (Opsional)
+                    </Label>
+                    <Select value={selectedServiceVendorId} onValueChange={setSelectedServiceVendorId}>
+                      <SelectTrigger className="bg-stone-50 border-stone-300">
+                        <SelectValue placeholder="Pilih Vendor Service (Opsional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">-- Tanpa Vendor Service --</SelectItem>
+                        {serviceVendors.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            <div className="flex items-center justify-between w-full gap-2">
+                              <span>{v.companyName}</span>
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 uppercase ml-2">
+                                Service
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {/* 3. SUPPLIER PRICING DETAILS */}
