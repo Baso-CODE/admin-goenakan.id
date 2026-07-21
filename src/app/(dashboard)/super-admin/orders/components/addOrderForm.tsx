@@ -1199,7 +1199,7 @@ export default function AddOrderForm() {
                       key={field.id}
                       className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
                       <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                        <div className="md:col-span-4 space-y-4">
+                        <div className="md:col-span-2 space-y-4">
                           {/* 1. SEARCHABLE PRODUCT DROPDOWN (COMBOBOX) */}
                           <FormField
                             control={control}
@@ -1237,7 +1237,7 @@ export default function AddOrderForm() {
                                     </FormControl>
                                   </PopoverTrigger>
                                   <PopoverContent
-                                    className="w-[300px] p-0"
+                                    className="w-75 p-0"
                                     align="start">
                                     <Command>
                                       <CommandInput placeholder="Search by name or SKU..." />
@@ -1314,90 +1314,94 @@ export default function AddOrderForm() {
                             </div>
                           )}
 
-                          {/* FITUR BARU: UI PANDUAN VARIAN (QUICK SELECT) */}
-                          {selectedProduct?.productVariants &&
-                            selectedProduct.productVariants.length > 0 && (
-                              <div className="bg-blue-50/50 border border-blue-100 rounded-md p-3 space-y-2">
-                                <p className="text-xs font-semibold text-blue-800 flex items-center gap-1">
-                                  <Bookmark className="w-3 h-3" /> Panduan
-                                  Varian Tersedia
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {selectedProduct.productVariants.map(
-                                    (variant) => (
-                                      <button
-                                        key={variant.id}
-                                        type="button"
-                                        onClick={() =>
-                                          handleQuickSelectVariant(variant)
-                                        }
-                                        className={cn(
-                                          "text-[10px] font-medium px-2 py-1 rounded border transition-colors",
-                                          currentVariantId === variant.id
-                                            ? "bg-blue-600 text-white border-blue-600"
-                                            : "bg-white text-gray-600 border-gray-300 hover:bg-blue-50",
-                                        )}>
-                                        {variant.attributesDescription ||
-                                          variant.variantName ||
-                                          `SKU: ${variant.sku}`}
-                                      </button>
+                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start mt-4">
+                            {/* KIRI: FITUR PANDUAN VARIAN (QUICK SELECT) */}
+                            {selectedProduct?.productVariants &&
+                              selectedProduct.productVariants.length > 0 && (
+                                <div className="bg-blue-50/50 border border-blue-100 rounded-md p-3 space-y-2 h-full">
+                                  <p className="text-xs font-semibold text-blue-800 flex items-center gap-1">
+                                    <Bookmark className="w-3 h-3" /> Panduan
+                                    Varian Tersedia
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {selectedProduct.productVariants.map(
+                                      (variant) => (
+                                        <button
+                                          key={variant.id}
+                                          type="button"
+                                          onClick={() =>
+                                            handleQuickSelectVariant(variant)
+                                          }
+                                          className={cn(
+                                            "text-[10px] font-medium px-2 py-1 rounded border transition-colors",
+                                            currentVariantId === variant.id
+                                              ? "bg-blue-600 text-white border-blue-600"
+                                              : "bg-white text-gray-600 border-gray-300 hover:bg-blue-50",
+                                          )}>
+                                          {variant.attributesDescription ||
+                                            variant.variantName ||
+                                            `SKU: ${variant.sku}`}
+                                        </button>
+                                      ),
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-gray-400 italic">
+                                    Klik tombol di atas untuk mengisi dropdown
+                                    otomatis.
+                                  </p>
+                                </div>
+                              )}
+
+                            {/* KANAN: DYNAMIC ATTRIBUTE SELECTION */}
+                            {selectedProduct?.availableAttributes &&
+                              selectedProduct.availableAttributes.length >
+                                0 && (
+                                <div className="bg-gray-50 border rounded-md p-3 space-y-3 h-full">
+                                  <p className="text-xs font-semibold text-gray-600 mb-1">
+                                    Select Attributes:
+                                  </p>
+                                  {selectedProduct.availableAttributes.map(
+                                    (attr) => (
+                                      <div
+                                        key={attr.attributeId}
+                                        className="flex flex-col space-y-1">
+                                        <label className="text-xs text-gray-500">
+                                          {attr.attributeName}
+                                        </label>
+                                        <Select
+                                          value={
+                                            currentSelectedAttrs[
+                                              attr.attributeId
+                                            ] || ""
+                                          }
+                                          onValueChange={(val) =>
+                                            handleAttributeSelect(
+                                              attr.attributeId,
+                                              val,
+                                            )
+                                          }>
+                                          <SelectTrigger className="h-8 text-sm bg-white">
+                                            <SelectValue
+                                              placeholder={`Select ${attr.attributeName}`}
+                                            />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {attr.values.map((val) => (
+                                              <SelectItem
+                                                key={val.valueId}
+                                                value={val.valueId}>
+                                                {val.value}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
                                     ),
                                   )}
                                 </div>
-                                <p className="text-[10px] text-gray-400 italic">
-                                  Klik tombol di atas untuk mengisi dropdown
-                                  secara otomatis.
-                                </p>
-                              </div>
-                            )}
-
-                          {/* 2. DYNAMIC ATTRIBUTE SELECTION */}
-                          {selectedProduct?.availableAttributes &&
-                            selectedProduct.availableAttributes.length > 0 && (
-                              <div className="bg-gray-50 border rounded-md p-3 space-y-3">
-                                <p className="text-xs font-semibold text-gray-600 mb-1">
-                                  Select Attributes:
-                                </p>
-                                {selectedProduct.availableAttributes.map(
-                                  (attr) => (
-                                    <div
-                                      key={attr.attributeId}
-                                      className="flex flex-col space-y-1">
-                                      <label className="text-xs text-gray-500">
-                                        {attr.attributeName}
-                                      </label>
-                                      <Select
-                                        value={
-                                          currentSelectedAttrs[
-                                            attr.attributeId
-                                          ] || ""
-                                        }
-                                        onValueChange={(val) =>
-                                          handleAttributeSelect(
-                                            attr.attributeId,
-                                            val,
-                                          )
-                                        }>
-                                        <SelectTrigger className="h-8 text-sm bg-white">
-                                          <SelectValue
-                                            placeholder={`Select ${attr.attributeName}`}
-                                          />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {attr.values.map((val) => (
-                                            <SelectItem
-                                              key={val.valueId}
-                                              value={val.valueId}>
-                                              {val.value}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                  ),
-                                )}
-                              </div>
-                            )}
+                              )}
+                          </div>
+                          {/* ========================================== */}
                         </div>
 
                         <div className="md:col-span-2">
