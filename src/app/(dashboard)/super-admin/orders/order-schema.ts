@@ -33,6 +33,7 @@ export const orderSchema = z.object({
         price: z.number().min(0, "Price cannot be negative"),
         customization: z.string().optional(),
         remarks: z.string().optional(),
+        selectedAttributes: z.record(z.string(), z.any()).optional(),
       }),
     )
     .min(1, "At least one product required"),

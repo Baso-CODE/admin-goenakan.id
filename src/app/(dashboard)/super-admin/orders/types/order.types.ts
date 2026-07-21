@@ -113,8 +113,36 @@ export type Client = {
 export type Sales = { id: string; name: string; phone: string };
 export type Vendor = { id: string; companyName: string };
 
-export type ProductVariant = { id: string; variantName: string; price: number };
-export type PriceTier = { minQuantity: number; price: number };
+export type AttributeValueOption = {
+  valueId: string;
+  value: string;
+  priceModifier: number;
+  productAttributeValueId: string;
+};
+
+export type AvailableAttribute = {
+  attributeId: string;
+  attributeName: string;
+  attributeType: string;
+  values: AttributeValueOption[];
+};
+
+export type PriceTier = {
+  id: string;
+  minQuantity: number;
+  price: number;
+};
+
+export type ProductVariant = {
+  id: string;
+  sku: string;
+  variantName: string;
+  price: number;
+  stock: number;
+  combinationIds: string[];
+  attributesDescription: string;
+};
+
 export type Product = {
   id: string;
   sku: string;
@@ -122,7 +150,9 @@ export type Product = {
   name: string;
   basePrice: number;
   isCustom: boolean;
+  stock: number;
+  category?: { id: string; name: string } | null;
+  availableAttributes: AvailableAttribute[];
   productVariants: ProductVariant[];
   priceTiers: PriceTier[];
-  stock: number;
 };
