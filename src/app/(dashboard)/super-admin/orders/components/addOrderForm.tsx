@@ -1100,6 +1100,7 @@ export default function AddOrderForm() {
               <div className="space-y-4">
                 {fields.map((field, index) => {
                   const currentProductId = watch(`products.${index}.productId`);
+                  const currentVariantId = watch(`products.${index}.variantId`); // Tambahan untuk memantau varian terpilih
                   const selectedProduct = products.find(
                     (p) => p.id === currentProductId,
                   );
@@ -1110,6 +1111,7 @@ export default function AddOrderForm() {
                     (watch(`products.${index}.price`) || 0) *
                     (watch(`products.${index}.quantity`) || 0);
 
+                  // 1. LOGIKA PENCOCOKAN FLEKSIBEL
                   const handleAttributeSelect = (
                     attributeId: string,
                     valueId: string,
@@ -1123,43 +1125,73 @@ export default function AddOrderForm() {
                       newAttrs,
                     );
 
-                    if (selectedProduct?.availableAttributes) {
-                      // Cek apakah semua atribut yang dibutuhkan sudah dipilih
-                      const isAllSelected =
-                        selectedProduct.availableAttributes.every(
-                          (attr) => newAttrs[attr.attributeId],
+                    if (selectedProduct?.productVariants) {
+                      const selectedValIds = Object.values(newAttrs);
+
+                      // Cari varian yang syarat kombinasi ID-nya terpenuhi oleh pilihan admin.
+                      // Diurutkan dari yang syaratnya paling banyak agar lebih akurat.
+                      const matchedVariant = [
+                        ...selectedProduct.productVariants,
+                      ]
+                        .sort(
+                          (a, b) =>
+                            b.combinationIds.length - a.combinationIds.length,
+                        )
+                        .find(
+                          (v) =>
+                            v.combinationIds.length > 0 &&
+                            v.combinationIds.every((id) =>
+                              selectedValIds.includes(id),
+                            ),
                         );
 
-                      if (isAllSelected) {
-                        // Cari varian yang combinationIds-nya sama persis dengan yang dipilih
-                        const selectedValIds = Object.values(newAttrs);
-                        const matchedVariant =
-                          selectedProduct.productVariants.find(
-                            (v) =>
-                              v.combinationIds.length ===
-                                selectedValIds.length &&
-                              v.combinationIds.every((id) =>
-                                selectedValIds.includes(id),
-                              ),
-                          );
+                      if (matchedVariant) {
+                        form.setValue(
+                          `products.${index}.variantId`,
+                          matchedVariant.id,
+                        );
+                        form.setValue(
+                          `products.${index}.price`,
+                          Number(matchedVariant.price),
+                        );
+                      } else {
+                        // Jika admin mengubah pilihan dan varian tidak cocok lagi, kosongkan ID varian
+                        form.setValue(`products.${index}.variantId`, "");
 
-                        if (matchedVariant) {
-                          form.setValue(
-                            `products.${index}.variantId`,
-                            matchedVariant.id,
-                          );
-                          form.setValue(
-                            `products.${index}.price`,
-                            Number(matchedVariant.price),
-                          );
-                        } else {
-                          form.setValue(`products.${index}.variantId`, "");
-                          toast.warning(
-                            "Kombinasi varian ini tidak ditemukan.",
-                          );
-                        }
+                        // Kita matikan toast.warning agar tidak mengganggu admin saat sedang memilih-milih
                       }
                     }
+                  };
+
+                  // 2. FUNGSI UNTUK TOMBOL "QUICK SELECT" VARIAN
+                  const handleQuickSelectVariant = (variant: any) => {
+                    const newAttrs: Record<string, string> = {
+                      ...currentSelectedAttrs,
+                    };
+
+                    // Cocokkan ID dari varian ke ID dropdown atribut
+                    selectedProduct?.availableAttributes?.forEach((attr) => {
+                      const matchedValue = attr.values.find((v) =>
+                        variant.combinationIds.includes(v.valueId),
+                      );
+                      if (matchedValue) {
+                        newAttrs[attr.attributeId] = matchedValue.valueId;
+                      }
+                    });
+
+                    // Set otomatis semua nilai form
+                    form.setValue(
+                      `products.${index}.selectedAttributes`,
+                      newAttrs,
+                    );
+                    form.setValue(`products.${index}.variantId`, variant.id);
+                    form.setValue(
+                      `products.${index}.price`,
+                      Number(variant.price),
+                    );
+                    toast.success(
+                      `Varian ${variant.variantName || "terpilih"} diaplikasikan.`,
+                    );
                   };
 
                   return (
@@ -1281,6 +1313,43 @@ export default function AddOrderForm() {
                               </span>
                             </div>
                           )}
+
+                          {/* FITUR BARU: UI PANDUAN VARIAN (QUICK SELECT) */}
+                          {selectedProduct?.productVariants &&
+                            selectedProduct.productVariants.length > 0 && (
+                              <div className="bg-blue-50/50 border border-blue-100 rounded-md p-3 space-y-2">
+                                <p className="text-xs font-semibold text-blue-800 flex items-center gap-1">
+                                  <Bookmark className="w-3 h-3" /> Panduan
+                                  Varian Tersedia
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {selectedProduct.productVariants.map(
+                                    (variant) => (
+                                      <button
+                                        key={variant.id}
+                                        type="button"
+                                        onClick={() =>
+                                          handleQuickSelectVariant(variant)
+                                        }
+                                        className={cn(
+                                          "text-[10px] font-medium px-2 py-1 rounded border transition-colors",
+                                          currentVariantId === variant.id
+                                            ? "bg-blue-600 text-white border-blue-600"
+                                            : "bg-white text-gray-600 border-gray-300 hover:bg-blue-50",
+                                        )}>
+                                        {variant.attributesDescription ||
+                                          variant.variantName ||
+                                          `SKU: ${variant.sku}`}
+                                      </button>
+                                    ),
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-gray-400 italic">
+                                  Klik tombol di atas untuk mengisi dropdown
+                                  secara otomatis.
+                                </p>
+                              </div>
+                            )}
 
                           {/* 2. DYNAMIC ATTRIBUTE SELECTION */}
                           {selectedProduct?.availableAttributes &&
@@ -1449,7 +1518,42 @@ export default function AddOrderForm() {
 
                       {/* Additional Details (Customization & Remarks) */}
                       <div className="bg-gray-50/50 p-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4 rounded-b-lg">
-                        {/* ... Kode input customization dan remarks tetap sama ... */}
+                        <FormField
+                          control={control}
+                          name={`products.${index}.customization`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input
+                                    placeholder="Add Customization details..."
+                                    {...field}
+                                    className="text-sm border-gray-200 pl-8 bg-white"
+                                  />
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={control}
+                          name={`products.${index}.remarks`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input
+                                    placeholder="Internal remarks (optional)..."
+                                    {...field}
+                                    className="text-sm border-gray-200 pl-8 bg-white"
+                                  />
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </div>
                     </div>
                   );
