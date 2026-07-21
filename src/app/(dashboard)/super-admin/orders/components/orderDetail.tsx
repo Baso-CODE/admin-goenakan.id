@@ -58,11 +58,10 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     loadOrder();
-  }, [id, status, fetchApi]); // Tambahkan dependensi lengkap
+  }, [id, status, fetchApi]);
   // === FETCH NOTE CATEGORIES ===
   useEffect(() => {
     const fetchNoteCategories = async () => {
-      // 🛑 Guard: Tunggu hingga status 'authenticated'
       if (status !== "authenticated") return;
 
       try {
@@ -79,7 +78,7 @@ export default function OrderDetailPage() {
     };
 
     fetchNoteCategories();
-  }, [status, fetchApi]); // Tambahkan dependensi lengkap
+  }, [status, fetchApi]);
   // === FINANCIAL CALCULATIONS ===
   const totalOrderAmount = order ? Number(order.totalAmount) : 0;
 
@@ -175,6 +174,7 @@ export default function OrderDetailPage() {
       <FinancialSummaryCard
         totalOrderAmount={totalOrderAmount}
         totalInvoiced={totalInvoiced}
+        currencyCode={order.currencyCode}
         totalPaid={totalPaid}
         remainingToInvoice={remainingToInvoice}
         paymentProgress={paymentProgress}

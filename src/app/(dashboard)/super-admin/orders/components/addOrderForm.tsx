@@ -1100,7 +1100,7 @@ export default function AddOrderForm() {
               <div className="space-y-4">
                 {fields.map((field, index) => {
                   const currentProductId = watch(`products.${index}.productId`);
-                  const currentVariantId = watch(`products.${index}.variantId`); // Tambahan untuk memantau varian terpilih
+                  const currentVariantId = watch(`products.${index}.variantId`);
                   const selectedProduct = products.find(
                     (p) => p.id === currentProductId,
                   );
@@ -1128,8 +1128,6 @@ export default function AddOrderForm() {
                     if (selectedProduct?.productVariants) {
                       const selectedValIds = Object.values(newAttrs);
 
-                      // Cari varian yang syarat kombinasi ID-nya terpenuhi oleh pilihan admin.
-                      // Diurutkan dari yang syaratnya paling banyak agar lebih akurat.
                       const matchedVariant = [
                         ...selectedProduct.productVariants,
                       ]
@@ -1155,10 +1153,7 @@ export default function AddOrderForm() {
                           Number(matchedVariant.price),
                         );
                       } else {
-                        // Jika admin mengubah pilihan dan varian tidak cocok lagi, kosongkan ID varian
                         form.setValue(`products.${index}.variantId`, "");
-
-                        // Kita matikan toast.warning agar tidak mengganggu admin saat sedang memilih-milih
                       }
                     }
                   };
@@ -1199,7 +1194,7 @@ export default function AddOrderForm() {
                       key={field.id}
                       className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
                       <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                        <div className="md:col-span-2 space-y-4">
+                        <div className="md:col-span-4 space-y-4">
                           {/* 1. SEARCHABLE PRODUCT DROPDOWN (COMBOBOX) */}
                           <FormField
                             control={control}
@@ -1479,6 +1474,7 @@ export default function AddOrderForm() {
                                     <Input
                                       type="number"
                                       min={0}
+                                      step="any"
                                       {...field}
                                       onChange={(e) => {
                                         const val = e.target.valueAsNumber;

@@ -13,7 +13,7 @@ export const orderSchema = z.object({
   // salesId: z.string().min(1, "Sales PIC is required"),
   clientPoNumber: z.string().optional(),
   remark: z.string().optional(),
-  currencyCode: z.string().optional(),
+  currencyCode: z.string().min(1, "Currency is required"),
   referenceQuotationId: z.string().optional(),
   referenceSampleId: z.string().optional(),
 

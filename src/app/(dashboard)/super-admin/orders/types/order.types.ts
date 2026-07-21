@@ -40,6 +40,7 @@ export interface OrderDetail {
   salesCategory: "SALES" | "SAMPLE";
   shippingAddress: string;
   totalAmount: number;
+  currencyCode: string;
   createdAt: string;
   purchaseChannelName: string;
   clientInfo: {

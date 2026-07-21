@@ -1,8 +1,12 @@
-// Fungsi utilitas untuk format mata uang
-export const formatCurrency = (amount: number) => {
+// Fungsi utilitas untuk format mata uang dinamis
+export const formatCurrency = (
+  amount: number,
+  currencyCode: string = "IDR",
+) => {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
-    currency: "IDR",
+    currency: currencyCode,
     minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(amount);
 };
