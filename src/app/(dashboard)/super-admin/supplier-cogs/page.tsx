@@ -1360,6 +1360,37 @@ export default function SupplierCogsCalculatorPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 pt-6">
+                {/* 0. TIPE IMPOR SELECTOR */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase text-stone-600 flex items-center gap-1.5">
+                    <Coins className="w-3.5 h-3.5 text-stone-500" /> Tipe Impor
+                  </Label>
+                  <div className="flex bg-stone-100 p-0.5 rounded-lg border border-stone-200 max-w-xs">
+                    <button
+                      type="button"
+                      onClick={() => setImportType("BORONGAN")}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                        importType === "BORONGAN"
+                          ? "bg-white text-stone-900 shadow-xs"
+                          : "text-stone-500 hover:text-stone-900"
+                      }`}
+                    >
+                      📦 Borongan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImportType("RESMI")}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                        importType === "RESMI"
+                          ? "bg-white text-stone-900 shadow-xs"
+                          : "text-stone-500 hover:text-stone-900"
+                      }`}
+                    >
+                      🏦 Resmi
+                    </button>
+                  </div>
+                </div>
+
                 {/* 1. STATUS / TAG SELECTION */}
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -1906,44 +1937,17 @@ export default function SupplierCogsCalculatorPage() {
                   </div>
                 )}
 
-                {/* TIPE IMPOR SELECTOR & RESMI FIELDS */}
-                <div className="border-t pt-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold uppercase text-stone-600">Tipe Impor</Label>
-                    <div className="flex bg-stone-100 p-0.5 rounded-lg border border-stone-200">
-                      <button
-                        type="button"
-                        onClick={() => setImportType("BORONGAN")}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
-                          importType === "BORONGAN"
-                            ? "bg-white text-stone-900 shadow-xs"
-                            : "text-stone-500 hover:text-stone-900"
-                        }`}
-                      >
-                        📦 Borongan (All-In)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setImportType("RESMI")}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
-                          importType === "RESMI"
-                            ? "bg-white text-stone-900 shadow-xs"
-                            : "text-stone-500 hover:text-stone-900"
-                        }`}
-                      >
-                        🏦 Resmi (Official)
-                      </button>
-                    </div>
-                  </div>
-
-                  {importType === "RESMI" && (
+                {/* RESMI ONLY: IMPORT TAXES & HS CODE */}
+                {importType === "RESMI" && (
+                  <div className="border-t pt-4 space-y-4">
+                    <h4 className="text-xs font-bold uppercase text-stone-600 tracking-wider">Import Taxes & HS Code (Pajak & HS Code Resmi)</h4>
                     <div className="bg-stone-50 border border-stone-200 p-4 rounded-xl space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                           <Label className="text-xs text-stone-500 font-semibold flex items-center justify-between">
                             <span>Kode HS Code</span>
                             <a
-                              href="https://eservice.insw.go.id/"
+                              href="https://insw.go.id/intr"
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 font-bold"
@@ -1955,7 +1959,7 @@ export default function SupplierCogsCalculatorPage() {
                             placeholder="Contoh: 9503.00.90"
                             value={hsCode}
                             onChange={(e) => setHsCode(e.target.value)}
-                            className="bg-white border-stone-300"
+                            className="bg-white border-stone-300 font-semibold"
                           />
                         </div>
 
@@ -1967,7 +1971,7 @@ export default function SupplierCogsCalculatorPage() {
                               type="number"
                               value={formECost}
                               onChange={(e) => setFormECost(Number(e.target.value))}
-                              className="pl-12 bg-white border-stone-300"
+                              className="pl-12 bg-white border-stone-300 font-semibold"
                             />
                           </div>
                         </div>
@@ -1980,7 +1984,7 @@ export default function SupplierCogsCalculatorPage() {
                             type="number"
                             value={beaMasukPercent}
                             onChange={(e) => setBeaMasukPercent(Number(e.target.value))}
-                            className="bg-white border-stone-300"
+                            className="bg-white border-stone-300 font-semibold"
                           />
                         </div>
 
@@ -1990,7 +1994,7 @@ export default function SupplierCogsCalculatorPage() {
                             type="number"
                             value={ppnPercent}
                             onChange={(e) => setPpnPercent(Number(e.target.value))}
-                            className="bg-white border-stone-300"
+                            className="bg-white border-stone-300 font-semibold"
                           />
                         </div>
 
@@ -2000,7 +2004,7 @@ export default function SupplierCogsCalculatorPage() {
                             type="number"
                             value={pphPercent}
                             onChange={(e) => setPphPercent(Number(e.target.value))}
-                            className="bg-white border-stone-300"
+                            className="bg-white border-stone-300 font-semibold"
                           />
                         </div>
 
@@ -2010,7 +2014,7 @@ export default function SupplierCogsCalculatorPage() {
                             type="number"
                             value={insurancePercent}
                             onChange={(e) => setInsurancePercent(Number(e.target.value))}
-                            className="bg-white border-stone-300"
+                            className="bg-white border-stone-300 font-semibold"
                           />
                         </div>
                       </div>
@@ -2024,7 +2028,7 @@ export default function SupplierCogsCalculatorPage() {
                               type="number"
                               value={handlingCost}
                               onChange={(e) => setHandlingCost(Number(e.target.value))}
-                              className="pl-9 bg-white border-stone-300"
+                              className="pl-9 bg-white border-stone-300 font-semibold"
                             />
                           </div>
                         </div>
@@ -2037,21 +2041,23 @@ export default function SupplierCogsCalculatorPage() {
                               type="number"
                               value={otherCost}
                               onChange={(e) => setOtherCost(Number(e.target.value))}
-                              className="pl-9 bg-white border-stone-300"
+                              className="pl-9 bg-white border-stone-300 font-semibold"
                             />
                           </div>
                         </div>
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* 5. LOGISTICS & SHIPPING FREIGHT RATES */}
                 <div className="border-t pt-4 space-y-4">
                   <h4 className="text-xs font-bold uppercase text-stone-600 tracking-wider">Shipping & Freight Rates (Tarif Pengiriman)</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase text-stone-600">SEA Freight Rate (Rp / CBM)</Label>
+                      <Label className="text-xs font-bold uppercase text-stone-600">
+                        {importType === "RESMI" ? "Forwarder SEA Freight (Rp / CBM)" : "SEA Freight Rate (Rp / CBM)"}
+                      </Label>
                       <div className="relative">
                         <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
                         <Input
@@ -2064,7 +2070,9 @@ export default function SupplierCogsCalculatorPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase text-stone-600">AIR Freight Rate (Rp / KG)</Label>
+                      <Label className="text-xs font-bold uppercase text-stone-600">
+                        {importType === "RESMI" ? "Forwarder AIR Freight (Rp / KG)" : "AIR Freight Rate (Rp / KG)"}
+                      </Label>
                       <div className="relative">
                         <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
                         <Input
@@ -2090,28 +2098,32 @@ export default function SupplierCogsCalculatorPage() {
                   <div className={`grid grid-cols-1 ${calculationMode === "VARIABLE" ? "" : "md:grid-cols-2"} gap-4 pt-1`}>
                     {calculationMode !== "VARIABLE" && (
                       <div className="space-y-2">
-                        <Label className="text-xs text-stone-500 font-semibold uppercase">GZ Delivery Cost (Guangzhou)</Label>
+                        <Label className="text-xs text-stone-500 font-semibold uppercase">
+                          {importType === "RESMI" ? "Local Trucking Negara Asal (Valas)" : "GZ Delivery Cost (Guangzhou)"}
+                        </Label>
                         <div className="relative">
                           <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
                           <Input
                             type="number"
                             value={gzDeliveryCost}
                             onChange={(e) => setGzDeliveryCost(Number(e.target.value))}
-                            className="pl-12 bg-stone-50 border-stone-300"
+                            className="pl-12 bg-stone-50 border-stone-300 font-semibold"
                           />
                         </div>
                       </div>
                     )}
 
                     <div className="space-y-2">
-                      <Label className="text-xs text-stone-500 font-semibold uppercase">Local Delivery (Warehouse IDR)</Label>
+                      <Label className="text-xs text-stone-500 font-semibold uppercase">
+                        {importType === "RESMI" ? "Local Trucking Negara Tujuan (IDR)" : "Local Delivery (Warehouse IDR)"}
+                      </Label>
                       <div className="relative">
                         <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
                         <Input
                           type="number"
                           value={localFreight}
                           onChange={(e) => setLocalFreight(Number(e.target.value))}
-                          className="pl-9 bg-stone-50 border-stone-300"
+                          className="pl-9 bg-stone-50 border-stone-300 font-semibold"
                         />
                       </div>
                     </div>
