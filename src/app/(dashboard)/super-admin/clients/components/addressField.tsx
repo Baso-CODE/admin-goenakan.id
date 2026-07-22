@@ -23,6 +23,7 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const WILAYAH_BASE_PATH = "/wilayah";
+const GLOBAL_API_URL = "https://countriesnow.space/api/v0.1";
 
 // ==========================================
 // TYPES
@@ -98,9 +99,9 @@ function RegionCombobox({
               )}
               <CommandGroup>
                 {Array.isArray(list) &&
-                  list.map((item) => (
+                  list.map((item, idx) => (
                     <CommandItem
-                      key={item.code}
+                      key={item.code || idx} // Fallback ke idx jika code tidak ada
                       value={item.name}
                       onSelect={() => {
                         onChange(item.name);
@@ -130,14 +131,25 @@ function RegionCombobox({
 export default function AddressField({ value, onChange }: AddressFieldProps) {
   const { fetchApi } = useApi();
   const [openCountry, setOpenCountry] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // States untuk Indonesia (Local API)
   const [provinces, setProvinces] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
   const [subDistricts, setSubDistricts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  // Fetch provinces sekali saat mount
+  // States untuk Global (CountriesNow API)
+  const [globalStates, setGlobalStates] = useState<any[]>([]);
+  const [globalCities, setGlobalCities] = useState<any[]>([]);
+
+  const isIndonesia = value.country === "Indonesia";
+
+  // ==========================================
+  // FETCH LOGIC: INDONESIA
+  // ==========================================
   useEffect(() => {
+    if (!isIndonesia) return;
     const fetch = async () => {
       try {
         setLoading(true);
@@ -145,20 +157,18 @@ export default function AddressField({ value, onChange }: AddressFieldProps) {
         const data = await res.json();
         if (Array.isArray(data.data)) setProvinces(data.data);
       } catch (err) {
-        console.error("Error fetching provinces:", err);
+        console.error("Error fetching Indo provinces:", err);
       } finally {
         setLoading(false);
       }
     };
     fetch();
-  }, [fetchApi]);
+  }, [fetchApi, isIndonesia]);
 
-  // Fetch cities saat province berubah
   useEffect(() => {
-    if (!value.province || value.country !== "Indonesia") return;
+    if (!isIndonesia || !value.province) return;
     const prov = provinces.find((p: any) => p.name === value.province);
     if (!prov) return;
-
     const fetchCities = async () => {
       try {
         setLoading(true);
@@ -168,20 +178,18 @@ export default function AddressField({ value, onChange }: AddressFieldProps) {
         const data = await res.json();
         if (Array.isArray(data.data)) setCities(data.data);
       } catch (err) {
-        console.error("Error fetching cities:", err);
+        console.error("Error fetching Indo cities:", err);
       } finally {
         setLoading(false);
       }
     };
     fetchCities();
-  }, [value.province, value.country, provinces, fetchApi]);
+  }, [value.province, isIndonesia, provinces, fetchApi]);
 
-  // Fetch districts saat city berubah
   useEffect(() => {
-    if (!value.city || value.country !== "Indonesia") return;
+    if (!isIndonesia || !value.city) return;
     const c = cities.find((p: any) => p.name === value.city);
     if (!c) return;
-
     const fetchDistricts = async () => {
       try {
         setLoading(true);
@@ -189,20 +197,18 @@ export default function AddressField({ value, onChange }: AddressFieldProps) {
         const data = await res.json();
         if (Array.isArray(data.data)) setDistricts(data.data);
       } catch (err) {
-        console.error("Error fetching districts:", err);
+        console.error("Error fetching Indo districts:", err);
       } finally {
         setLoading(false);
       }
     };
     fetchDistricts();
-  }, [value.city, value.country, cities, fetchApi]);
+  }, [value.city, isIndonesia, cities, fetchApi]);
 
-  // Fetch villages saat district berubah
   useEffect(() => {
-    if (!value.district || value.country !== "Indonesia") return;
+    if (!isIndonesia || !value.district) return;
     const dist = districts.find((p: any) => p.name === value.district);
     if (!dist) return;
-
     const fetchSubDistricts = async () => {
       try {
         setLoading(true);
@@ -212,14 +218,79 @@ export default function AddressField({ value, onChange }: AddressFieldProps) {
         const data = await res.json();
         if (Array.isArray(data.data)) setSubDistricts(data.data);
       } catch (err) {
-        console.error("Error fetching villages:", err);
+        console.error("Error fetching Indo villages:", err);
       } finally {
         setLoading(false);
       }
     };
     fetchSubDistricts();
-  }, [value.district, value.country, districts, fetchApi]);
+  }, [value.district, isIndonesia, districts, fetchApi]);
 
+  // ==========================================
+  // FETCH LOGIC: GLOBAL (CountriesNow API)
+  // ==========================================
+  // Fetch Global States
+  useEffect(() => {
+    if (isIndonesia || !value.country) return;
+    const fetchGlobalStates = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${GLOBAL_API_URL}/countries/states`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ country: value.country }),
+        });
+        const json = await res.json();
+        if (json.data && json.data.states) {
+          // Mapping agar formatnya sesuai dengan RegionCombobox (butuh {name})
+          setGlobalStates(json.data.states.map((s: any) => ({ name: s.name })));
+        } else {
+          setGlobalStates([]); // Jika negara tersebut tidak punya data state
+        }
+      } catch (err) {
+        console.error("Error fetching global states:", err);
+        setGlobalStates([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGlobalStates();
+  }, [value.country, isIndonesia]);
+
+  // Fetch Global Cities
+  useEffect(() => {
+    if (isIndonesia || !value.country || !value.province) return;
+    const fetchGlobalCities = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${GLOBAL_API_URL}/countries/state/cities`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            country: value.country,
+            state: value.province,
+          }),
+        });
+        const json = await res.json();
+        if (json.data) {
+          // JSON.data berupa array of string ["City A", "City B"]
+          setGlobalCities(json.data.map((c: string) => ({ name: c })));
+        } else {
+          setGlobalCities([]);
+        }
+      } catch (err) {
+        console.error("Error fetching global cities:", err);
+        setGlobalCities([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGlobalCities();
+  }, [value.country, value.province, isIndonesia]);
+
+  // ==========================================
+  // RENDER
+  // ==========================================
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* COUNTRY */}
@@ -247,7 +318,9 @@ export default function AddressField({ value, onChange }: AddressFieldProps) {
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-75 p-0" align="start">
+          <PopoverContent
+            className="w-[--radix-popover-trigger-width] p-0"
+            align="start">
             <Command>
               <CommandInput placeholder="Cari negara..." />
               <CommandList>
@@ -288,12 +361,12 @@ export default function AddressField({ value, onChange }: AddressFieldProps) {
         </Popover>
       </div>
 
-      {/* PROVINCE */}
-      {value.country === "Indonesia" ? (
+      {/* PROVINCE / STATE */}
+      {isIndonesia || globalStates.length > 0 ? (
         <RegionCombobox
-          label="Provinsi"
+          label="Provinsi / State"
           placeholder="Pilih Provinsi"
-          list={provinces}
+          list={isIndonesia ? provinces : globalStates}
           value={value.province}
           disabled={!value.country}
           loading={loading}
@@ -303,21 +376,22 @@ export default function AddressField({ value, onChange }: AddressFieldProps) {
         />
       ) : (
         <div className="space-y-2">
-          <Label>Provinsi</Label>
+          <Label>Provinsi / State</Label>
           <Input
             placeholder="Masukkan Provinsi"
             value={value.province}
             onChange={(e) => onChange({ province: e.target.value })}
+            disabled={!value.country}
           />
         </div>
       )}
 
       {/* CITY */}
-      {value.country === "Indonesia" ? (
+      {isIndonesia || globalCities.length > 0 ? (
         <RegionCombobox
           label="Kota / Kabupaten"
-          placeholder="Pilih Kota / Kabupaten"
-          list={cities}
+          placeholder="Pilih Kota"
+          list={isIndonesia ? cities : globalCities}
           value={value.city}
           disabled={!value.province}
           loading={loading}
@@ -332,12 +406,13 @@ export default function AddressField({ value, onChange }: AddressFieldProps) {
             placeholder="Masukkan Kota"
             value={value.city}
             onChange={(e) => onChange({ city: e.target.value })}
+            disabled={!value.province}
           />
         </div>
       )}
 
-      {/* DISTRICT */}
-      {value.country === "Indonesia" ? (
+      {/* DISTRICT (Hanya List Kombobox untuk Indonesia, sisanya teks) */}
+      {isIndonesia ? (
         <RegionCombobox
           label="Kecamatan"
           placeholder="Pilih Kecamatan"
@@ -349,17 +424,18 @@ export default function AddressField({ value, onChange }: AddressFieldProps) {
         />
       ) : (
         <div className="space-y-2">
-          <Label>Kecamatan</Label>
+          <Label>Kecamatan (Opsional)</Label>
           <Input
             placeholder="Masukkan Kecamatan"
             value={value.district}
             onChange={(e) => onChange({ district: e.target.value })}
+            disabled={!value.city}
           />
         </div>
       )}
 
-      {/* SUBDISTRICT */}
-      {value.country === "Indonesia" ? (
+      {/* SUBDISTRICT (Hanya List Kombobox untuk Indonesia, sisanya teks) */}
+      {isIndonesia ? (
         <RegionCombobox
           label="Kelurahan"
           placeholder="Pilih Kelurahan"
@@ -371,11 +447,12 @@ export default function AddressField({ value, onChange }: AddressFieldProps) {
         />
       ) : (
         <div className="space-y-2">
-          <Label>Kelurahan</Label>
+          <Label>Kelurahan (Opsional)</Label>
           <Input
             placeholder="Masukkan Kelurahan"
             value={value.subDistrict}
             onChange={(e) => onChange({ subDistrict: e.target.value })}
+            disabled={!value.city}
           />
         </div>
       )}

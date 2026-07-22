@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useState } from "react";
 
 interface PhotonFeature {
   properties: {
@@ -12,7 +12,7 @@ interface PhotonFeature {
     country?: string;
   };
   geometry: {
-    coordinates: [number, number]; // [lng, lat]
+    coordinates: [number, number];
   };
 }
 
@@ -32,7 +32,7 @@ export default function FreeGlobalAddressAutocomplete({
     if (!query.trim()) return setSuggestions([]);
 
     const res = await fetch(
-      `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}`
+      `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}`,
     );
     const data = await res.json();
 
@@ -42,7 +42,7 @@ export default function FreeGlobalAddressAutocomplete({
   // 👉 Get FULL ADDRESS from Nominatim (lat/lon)
   const fetchFullAddress = async (lat: number, lon: number) => {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
     );
 
     const json = await res.json();
@@ -85,8 +85,7 @@ export default function FreeGlobalAddressAutocomplete({
                   onSelect(full);
                   setSuggestions([]);
                 }}
-                className="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm"
-              >
+                className="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm">
                 {label}
               </button>
             );

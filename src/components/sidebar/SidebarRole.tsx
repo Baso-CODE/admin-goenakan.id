@@ -152,7 +152,6 @@ export default function SidebarRole({ ...props }) {
         items: [
           { title: "All Client", url: "/super-admin/clients" },
           { title: "Departments", url: "/super-admin/departments" },
-          { title: "Add Client", url: "/super-admin/clients/add" },
         ],
       },
       {
@@ -198,7 +197,11 @@ export default function SidebarRole({ ...props }) {
         url: "#",
         icon: Package,
         items: [
-          { title: "Products V2", url: "/super-admin/products-v2", icon: Package },
+          {
+            title: "Products V2",
+            url: "/super-admin/products-v2",
+            icon: Package,
+          },
           {
             title: "Product Attributes",
             url: "/super-admin/product-attributes",
