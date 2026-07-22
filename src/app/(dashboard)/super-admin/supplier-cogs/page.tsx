@@ -580,6 +580,7 @@ export default function SupplierCogsCalculatorPage() {
   const handleAddNew = () => {
     resetForm();
     setView("form");
+    fetchExchangeRates("RMB");
   };
 
   // --- LOAD HISTORICAL RECORD TO EDIT/DETAIL FORM ---
