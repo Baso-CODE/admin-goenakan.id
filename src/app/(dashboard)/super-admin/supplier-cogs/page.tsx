@@ -1257,11 +1257,13 @@ export default function SupplierCogsCalculatorPage() {
                           <SelectValue placeholder="Pilih Produk dari Katalog" />
                         </SelectTrigger>
                         <SelectContent>
-                          {products.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name} ({p.sku})
-                            </SelectItem>
-                          ))}
+                          {products
+                            .filter((p) => p.id !== "sandbox" && p.sku !== "sandbox")
+                            .map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.name} ({p.sku})
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     </div>
