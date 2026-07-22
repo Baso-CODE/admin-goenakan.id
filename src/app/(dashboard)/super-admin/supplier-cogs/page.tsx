@@ -2007,11 +2007,19 @@ export default function SupplierCogsCalculatorPage() {
                               sponsorPercent,
                             });
 
+                            const nextStepPcs = (baseMoqCtn + step + 1) * (qtyPerCtn || 1);
+                            const qtyLabel = step < 4
+                              ? `${stepPcs} - ${nextStepPcs - 1} pcs`
+                              : `≥ ${stepPcs} pcs`;
+                            const ctnLabel = step < 4
+                              ? `(${stepCtn} ctn)`
+                              : `(≥ ${stepCtn} ctn)`;
+
                             return (
                               <TableRow key={step} className="hover:bg-stone-50 text-xs">
                                 <TableCell className="font-bold text-stone-800">
-                                  {stepPcs} pcs
-                                  <span className="block text-[10px] text-stone-500 font-normal">({stepCtn} ctn)</span>
+                                  {qtyLabel}
+                                  <span className="block text-[10px] text-stone-500 font-normal">{ctnLabel}</span>
                                 </TableCell>
                                 <TableCell className="text-stone-600 font-medium">
                                   Rp {Math.round(stepCalc.seaFreightCostPcs).toLocaleString("id-ID")}
