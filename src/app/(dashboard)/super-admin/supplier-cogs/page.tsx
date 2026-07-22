@@ -209,6 +209,7 @@ export default function SupplierCogsCalculatorPage() {
   const [selectedServiceVendorId, setSelectedServiceVendorId] = useState<string>("");
   const [cogsStatus, setCogsStatus] = useState<"EXISTING" | "POTENTIAL">("POTENTIAL");
   const [historyStatusFilter, setHistoryStatusFilter] = useState<"ALL" | "EXISTING" | "POTENTIAL">("ALL");
+  const [historyTypeFilter, setHistoryTypeFilter] = useState<"ALL" | "BORONGAN" | "RESMI">("ALL");
 
   // Potential Supplier Sourcing & Contact Details
   const [supplierPlatform, setSupplierPlatform] = useState<string>("1688");
@@ -877,7 +878,10 @@ export default function SupplierCogsCalculatorPage() {
     const recMode = rec.calculationMode || "FIXED";
     const matchesMode = historyModeFilter === "ALL" || recMode === historyModeFilter;
 
-    return matchesSearch && matchesStatus && matchesMode;
+    const recType = rec.importType || "BORONGAN";
+    const matchesType = historyTypeFilter === "ALL" || recType === historyTypeFilter;
+
+    return matchesSearch && matchesStatus && matchesMode && matchesType;
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / itemsPerPage));
@@ -1023,6 +1027,46 @@ export default function SupplierCogsCalculatorPage() {
                   </button>
                 </div>
 
+                {/* IMPORT TYPE FILTER PILLS */}
+                <div className="flex gap-1 bg-stone-100 p-0.5 rounded text-[11px] font-semibold border border-stone-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryTypeFilter("ALL");
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded transition-colors ${
+                      historyTypeFilter === "ALL" ? "bg-white text-stone-900 shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
+                    }`}
+                  >
+                    Semua Tipe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryTypeFilter("BORONGAN");
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded transition-colors ${
+                      historyTypeFilter === "BORONGAN" ? "bg-slate-700 text-white shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
+                    }`}
+                  >
+                    📦 Borongan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryTypeFilter("RESMI");
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded transition-colors ${
+                      historyTypeFilter === "RESMI" ? "bg-indigo-600 text-white shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
+                    }`}
+                  >
+                    🏦 Resmi
+                  </button>
+                </div>
+
                 {/* ADD NEW BUTTON */}
                 <Button
                   onClick={handleAddNew}
@@ -1106,6 +1150,15 @@ export default function SupplierCogsCalculatorPage() {
                                 ) : (
                                   <Badge className="bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-100 text-[9px] px-1.5 py-0.2 font-bold uppercase">
                                     📏 Fixed
+                                  </Badge>
+                                )}
+                                {rec.importType === "RESMI" ? (
+                                  <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                    🏦 Resmi
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                    📦 Borongan
                                   </Badge>
                                 )}
                                 {!rec.productId && (
