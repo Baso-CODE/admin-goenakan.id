@@ -399,7 +399,8 @@ export default function SupplierCogsCalculatorPage() {
     if (base === "IDR") return;
     setFetchingRates(true);
     try {
-      const res = await fetch(`https://open.er-api.com/v6/latest/${base}`);
+      const apiBase = base === "RMB" ? "CNY" : base;
+      const res = await fetch(`https://open.er-api.com/v6/latest/${apiBase}`);
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.rates) {
