@@ -159,7 +159,6 @@ export default function SupplierCogsCalculatorPage() {
 
   // Potential Supplier Sourcing & Contact Details
   const [supplierPlatform, setSupplierPlatform] = useState<string>("1688");
-  const [supplierPlatformCustom, setSupplierPlatformCustom] = useState<string>("");
   const [supplierContactName, setSupplierContactName] = useState<string>("");
   const [supplierContactLink, setSupplierContactLink] = useState<string>("");
 
@@ -307,19 +306,7 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedVendorId(rec.vendorId || "");
     setSelectedServiceVendorId(rec.serviceVendorId || "");
     setCogsStatus(rec.status || (rec.productId ? "EXISTING" : "POTENTIAL"));
-    const stdPlatforms = ["1688", "Alibaba", "WeChat", "Taobao", "Made-In-China", "WhatsApp", "Lokal / Indonesia"];
-    if (rec.supplierPlatform) {
-      if (stdPlatforms.includes(rec.supplierPlatform)) {
-        setSupplierPlatform(rec.supplierPlatform);
-        setSupplierPlatformCustom("");
-      } else {
-        setSupplierPlatform("Lainnya");
-        setSupplierPlatformCustom(rec.supplierPlatform);
-      }
-    } else {
-      setSupplierPlatform("1688");
-      setSupplierPlatformCustom("");
-    }
+    setSupplierPlatform(rec.supplierPlatform || "1688");
     setSupplierContactName(rec.supplierContactName || "");
     setSupplierContactLink(rec.supplierContactLink || "");
     
@@ -533,10 +520,6 @@ export default function SupplierCogsCalculatorPage() {
 
     setSaving(true);
     try {
-      const finalPlatform = supplierPlatform === "Lainnya"
-        ? (supplierPlatformCustom.trim() || "Lainnya")
-        : supplierPlatform.trim();
-
       const payload = {
         productId: selectedProductId === "sandbox" ? undefined : selectedProductId,
         tempProductName: selectedProductId === "sandbox" ? tempProductName.trim() : undefined,
@@ -545,7 +528,7 @@ export default function SupplierCogsCalculatorPage() {
         tiers: calculationMode === "VARIABLE" ? variableTiers : undefined,
         vendorId: selectedVendorId && selectedVendorId !== "none" ? selectedVendorId : undefined,
         serviceVendorId: selectedServiceVendorId && selectedServiceVendorId !== "none" ? selectedServiceVendorId : undefined,
-        supplierPlatform: finalPlatform || undefined,
+        supplierPlatform: supplierPlatform.trim() || undefined,
         supplierContactName: supplierContactName.trim() || undefined,
         supplierContactLink: supplierContactLink.trim() || undefined,
         foreignPrice,
@@ -599,7 +582,6 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedServiceVendorId("");
     setCogsStatus("POTENTIAL");
     setSupplierPlatform("1688");
-    setSupplierPlatformCustom("");
     setSupplierContactName("");
     setSupplierContactLink("");
     setCalculationMode("FIXED");
@@ -641,19 +623,7 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedServiceVendorId(rec.serviceVendorId || "");
     setCogsStatus(rec.status || (rec.productId ? "EXISTING" : "POTENTIAL"));
     
-    const stdPlatforms = ["1688", "Alibaba", "WeChat", "Taobao", "Made-In-China", "WhatsApp", "Lokal / Indonesia"];
-    if (rec.supplierPlatform) {
-      if (stdPlatforms.includes(rec.supplierPlatform)) {
-        setSupplierPlatform(rec.supplierPlatform);
-        setSupplierPlatformCustom("");
-      } else {
-        setSupplierPlatform("Lainnya");
-        setSupplierPlatformCustom(rec.supplierPlatform);
-      }
-    } else {
-      setSupplierPlatform("1688");
-      setSupplierPlatformCustom("");
-    }
+    setSupplierPlatform(rec.supplierPlatform || "1688");
     setSupplierContactName(rec.supplierContactName || "");
     setSupplierContactLink(rec.supplierContactLink || "");
     setCalculationMode(rec.calculationMode || "FIXED");
@@ -729,6 +699,7 @@ export default function SupplierCogsCalculatorPage() {
     new Set([
       ...defaultPlatforms,
       ...customPlatforms.map((p) => p.name || p),
+      ...(supplierPlatform ? [supplierPlatform] : []),
     ])
   );
 
@@ -1346,18 +1317,8 @@ export default function SupplierCogsCalculatorPage() {
                               Buat Platform Baru...
                             </div>
                           </SelectItem>
-
-                          <SelectItem value="Lainnya">Lainnya (Ketik Manual)</SelectItem>
                         </SelectContent>
                       </Select>
-                      {supplierPlatform === "Lainnya" && (
-                        <Input
-                          placeholder="Ketik nama platform sourcing..."
-                          value={supplierPlatformCustom}
-                          onChange={(e) => setSupplierPlatformCustom(e.target.value)}
-                          className="bg-white border-stone-300 text-xs mt-1.5"
-                        />
-                      )}
                     </div>
 
                     <div className="space-y-1.5">
