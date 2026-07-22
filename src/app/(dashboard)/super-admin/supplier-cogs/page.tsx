@@ -21,6 +21,7 @@ import {
   Check,
   Tag,
   Copy,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -195,6 +196,48 @@ export default function SupplierCogsCalculatorPage() {
     }
   };
 
+  // Master Platforms & Dialog Sourcing
+  const [customPlatforms, setCustomPlatforms] = useState<any[]>([]);
+  const [isPlatformModalOpen, setIsPlatformModalOpen] = useState<boolean>(false);
+  const [newPlatformName, setNewPlatformName] = useState<string>("");
+  const [isSubmittingPlatform, setIsSubmittingPlatform] = useState<boolean>(false);
+
+  const handleAddPlatformFast = async () => {
+    if (!newPlatformName.trim()) {
+      toast.error("Nama platform tidak boleh kosong");
+      return;
+    }
+    setIsSubmittingPlatform(true);
+    try {
+      const res = await fetchApi("/contact-platforms", {
+        method: "POST",
+        body: JSON.stringify({
+          name: newPlatformName.trim(),
+          icon: "Globe",
+          isActive: true
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || "Gagal membuat platform");
+      }
+
+      const responseData = await res.json();
+      const newPlatform = responseData.data || responseData;
+
+      setCustomPlatforms((prev) => [...prev, newPlatform]);
+      setSupplierPlatform(newPlatform.name);
+      setIsPlatformModalOpen(false);
+      setNewPlatformName("");
+      toast.success("Platform Sourcing berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat membuat platform.");
+    } finally {
+      setIsSubmittingPlatform(false);
+    }
+  };
+
   // Mode Calculation: FIXED vs VARIABLE
   const [calculationMode, setCalculationMode] = useState<"FIXED" | "VARIABLE">("FIXED");
   const [variableTiers, setVariableTiers] = useState<Array<{ id: string; totalPcs: number; pricePcs: number; gzCost: number }>>([
@@ -360,10 +403,11 @@ export default function SupplierCogsCalculatorPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [prodRes, vendRes, currRes] = await Promise.all([
+        const [prodRes, vendRes, currRes, platRes] = await Promise.all([
           fetchApi("/products/order"),
           fetchApi("/vendors/order/add"),
           fetchApi("/currencies"),
+          fetchApi("/contact-platforms/active"),
         ]);
 
         if (prodRes.ok) {
@@ -378,6 +422,11 @@ export default function SupplierCogsCalculatorPage() {
           const currs = await currRes.json();
           const currList = Array.isArray(currs) ? currs : (currs.data || []);
           setMasterCurrencies(currList);
+        }
+        if (platRes && platRes.ok) {
+          const plats = await platRes.json();
+          const platList = Array.isArray(plats) ? plats : (plats.data || []);
+          setCustomPlatforms(platList);
         }
       } catch (e) {
         console.error("Gagal memuat master data", e);
@@ -673,6 +722,14 @@ export default function SupplierCogsCalculatorPage() {
   const paginatedRecords = filteredRecords.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
+  );
+
+  const defaultPlatforms = ["1688", "Alibaba", "WeChat", "Taobao", "Made-In-China", "WhatsApp", "Lokal / Indonesia"];
+  const uniquePlatformList = Array.from(
+    new Set([
+      ...defaultPlatforms,
+      ...customPlatforms.map((p) => p.name || p),
+    ])
   );
 
   return (
@@ -1225,18 +1282,71 @@ export default function SupplierCogsCalculatorPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-stone-500">Platform Sourcing</Label>
-                      <Select value={supplierPlatform} onValueChange={setSupplierPlatform}>
+
+                      <Dialog
+                        open={isPlatformModalOpen}
+                        onOpenChange={setIsPlatformModalOpen}
+                      >
+                        <DialogContent className="sm:max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Tambah Platform Sourcing Baru</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4 pt-2">
+                            <div className="space-y-2">
+                              <Label>Nama Platform</Label>
+                              <Input
+                                placeholder="Contoh: Shopee, DHgate, WeChat Agent"
+                                value={newPlatformName}
+                                onChange={(e) => setNewPlatformName(e.target.value)}
+                              />
+                            </div>
+                            <div className="flex justify-end pt-2">
+                              <Button
+                                onClick={handleAddPlatformFast}
+                                disabled={isSubmittingPlatform}
+                              >
+                                {isSubmittingPlatform && (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                )}
+                                Tambah Platform
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+
+                      <Select
+                        value={supplierPlatform}
+                        onValueChange={(val) => {
+                          if (val === "add_new_platform") {
+                            setIsPlatformModalOpen(true);
+                          } else {
+                            setSupplierPlatform(val);
+                          }
+                        }}
+                      >
                         <SelectTrigger className="bg-stone-50 border-stone-300">
                           <SelectValue placeholder="Pilih Platform" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="1688">1688 (China)</SelectItem>
-                          <SelectItem value="Alibaba">Alibaba International</SelectItem>
-                          <SelectItem value="WeChat">WeChat Supplier Direct</SelectItem>
-                          <SelectItem value="Taobao">Taobao / Tmall</SelectItem>
-                          <SelectItem value="Made-In-China">Made-In-China</SelectItem>
-                          <SelectItem value="WhatsApp">WhatsApp Supplier</SelectItem>
-                          <SelectItem value="Lokal / Indonesia">Lokal / Indonesia</SelectItem>
+                          {uniquePlatformList.map((plat) => (
+                            <SelectItem key={plat} value={plat}>
+                              {plat}
+                            </SelectItem>
+                          ))}
+
+                          <div className="h-px bg-stone-200 my-1 mx-2" />
+                          <SelectItem
+                            value="add_new_platform"
+                            textValue="Buat Platform Baru"
+                            className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Plus className="w-4 h-4" />
+                              Buat Platform Baru...
+                            </div>
+                          </SelectItem>
+
                           <SelectItem value="Lainnya">Lainnya (Ketik Manual)</SelectItem>
                         </SelectContent>
                       </Select>
