@@ -504,9 +504,9 @@ export default function SupplierCogsCalculatorPage() {
     }
   };
 
-  // Sync dimensions when product selection changes
+  // Sync dimensions and pricing when product selection changes
   useEffect(() => {
-    if (selectedProductId !== "sandbox") {
+    if (selectedProductId !== "sandbox" && selectedProductId !== "") {
       const prod = products.find((p) => p.id === selectedProductId);
       if (prod) {
         setQtyPerCtn(prod.qtyPerCtn || 1);
@@ -515,9 +515,16 @@ export default function SupplierCogsCalculatorPage() {
         setHeight(prod.height || 0);
         setWeight(prod.weight || 0);
         setTempProductName("");
+        
+        // Auto-link catalog product base price to supplier pricing in IDR
+        if (cogsStatus === "EXISTING") {
+          setForeignPrice(Number(prod.basePrice) || 0);
+          setCurrency("IDR");
+          setExchangeRate(1);
+        }
       }
     }
-  }, [selectedProductId, products]);
+  }, [selectedProductId, products, cogsStatus]);
 
 
 
