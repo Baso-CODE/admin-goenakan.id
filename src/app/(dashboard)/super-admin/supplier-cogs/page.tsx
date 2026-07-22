@@ -408,13 +408,14 @@ export default function SupplierCogsCalculatorPage() {
       const res = await fetch(`https://open.er-api.com/v6/latest/${apiBase}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.success && data.rates) {
+        if (data.rates) {
+          const rateVal = data.rates.IDR;
           setRatesData((prev: any) => ({
             ...prev,
-            [base]: data.rates.IDR || prev[base],
+            [base]: rateVal || prev[base],
           }));
           if (currency === base) {
-            setExchangeRate(data.rates.IDR);
+            setExchangeRate(rateVal);
           }
         }
       }
