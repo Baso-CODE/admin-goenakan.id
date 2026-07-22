@@ -1673,7 +1673,7 @@ export default function SupplierCogsCalculatorPage() {
                                     type="number"
                                     value={tier.totalPcs}
                                     onChange={(e) => handleUpdateTier(tier.id, "totalPcs", Number(e.target.value))}
-                                    className="bg-white h-8 text-xs font-semibold w-24"
+                                    className="bg-white h-8 text-xs font-semibold w-28"
                                   />
                                 </TableCell>
                                 <TableCell className="text-xs font-bold text-stone-600">
@@ -1686,7 +1686,7 @@ export default function SupplierCogsCalculatorPage() {
                                       type="number"
                                       value={tier.pricePcs}
                                       onChange={(e) => handleUpdateTier(tier.id, "pricePcs", Number(e.target.value))}
-                                      className="bg-white h-8 text-xs font-semibold pl-10 w-28"
+                                      className="bg-white h-8 text-xs font-semibold pl-12 w-40"
                                     />
                                   </div>
                                 </TableCell>
@@ -1697,7 +1697,7 @@ export default function SupplierCogsCalculatorPage() {
                                       type="number"
                                       value={tier.gzCost}
                                       onChange={(e) => handleUpdateTier(tier.id, "gzCost", Number(e.target.value))}
-                                      className="bg-white h-8 text-xs font-semibold pl-10 w-24"
+                                      className="bg-white h-8 text-xs font-semibold pl-12 w-32"
                                     />
                                   </div>
                                 </TableCell>
