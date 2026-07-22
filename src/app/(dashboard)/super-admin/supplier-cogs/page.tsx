@@ -521,6 +521,17 @@ export default function SupplierCogsCalculatorPage() {
           setForeignPrice(Number(prod.basePrice) || 0);
           setCurrency("IDR");
           setExchangeRate(1);
+
+          // Link price tiers if available
+          if (prod.priceTiers && Array.isArray(prod.priceTiers) && prod.priceTiers.length > 0) {
+            const mappedTiers = prod.priceTiers.map((pt: any) => ({
+              id: pt.id || Math.random().toString(),
+              totalPcs: pt.minQuantity || 1,
+              pricePcs: Number(pt.price) || 0,
+              gzCost: 0,
+            }));
+            setVariableTiers(mappedTiers);
+          }
         }
       }
     }
