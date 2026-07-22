@@ -21,6 +21,9 @@ import {
   Check,
   Tag,
   Copy,
+  Loader2,
+  Image as ImageIcon,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -47,6 +50,14 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 
 function calculateCogsAndSellingPrice({
+  importType,
+  beaMasukPercent = 0,
+  ppnPercent = 11,
+  pphPercent = 2.5,
+  formECost = 0,
+  insurancePercent = 0,
+  handlingCost = 0,
+  otherCost = 0,
   foreignPrice,
   gzDeliveryCost,
   exchangeRate,
@@ -62,6 +73,14 @@ function calculateCogsAndSellingPrice({
   margin,
   sponsorPercent,
 }: {
+  importType: "BORONGAN" | "RESMI";
+  beaMasukPercent?: number;
+  ppnPercent?: number;
+  pphPercent?: number;
+  formECost?: number;
+  insurancePercent?: number;
+  handlingCost?: number;
+  otherCost?: number;
   foreignPrice: number;
   gzDeliveryCost: number;
   exchangeRate: number;
@@ -84,7 +103,7 @@ function calculateCogsAndSellingPrice({
   // Volumetric conversions
   const cbmPerCtn = (length * width * height) / 1000000;
   const totalCbm = cbmPerCtn * totalCtn;
-  const totalSeaCbmAlloc = Math.max(0.1, totalCbm); // Min 0.1 CBM
+  const totalSeaCbmAlloc = Math.max(0.1, totalCbm);
 
   // Air weight allocation (comparison of Sea CBM vs weight + 2kg packaging overhead per carton)
   const totalAirWeightAlloc = Math.max(totalSeaCbmAlloc, (weight + 2) * totalCtn);
@@ -99,9 +118,44 @@ function calculateCogsAndSellingPrice({
   // Base cost per piece
   const baseCostPcs = foreignPrice * exchangeRate;
 
-  // Total COGS
-  const cogsSea = baseCostPcs + gzDeliveryCostPcs + seaFreightCostPcs + localFreight;
-  const cogsAir = baseCostPcs + gzDeliveryCostPcs + airFreightCostPcs + localFreight;
+  let cogsSea = 0;
+  let cogsAir = 0;
+
+  if (importType === "RESMI") {
+    // Form E allocation per piece
+    const formECostPcs = (formECost * exchangeRate) / safeQtyPcs;
+
+    // Insurance allocation per piece
+    const insuranceCostPcs = (insurancePercent / 100) * baseCostPcs;
+
+    // CIF per piece
+    const cifSeaPcs = baseCostPcs + gzDeliveryCostPcs + formECostPcs + seaFreightCostPcs + insuranceCostPcs;
+    const cifAirPcs = baseCostPcs + gzDeliveryCostPcs + formECostPcs + airFreightCostPcs + insuranceCostPcs;
+
+    // Taxes
+    const bmSeaPcs = (beaMasukPercent / 100) * cifSeaPcs;
+    const bmAirPcs = (beaMasukPercent / 100) * cifAirPcs;
+
+    const ppnSeaPcs = (ppnPercent / 100) * (cifSeaPcs + bmSeaPcs);
+    const ppnAirPcs = (ppnPercent / 100) * (cifAirPcs + bmAirPcs);
+
+    const pphSeaPcs = (pphPercent / 100) * (cifSeaPcs + bmSeaPcs);
+    const pphAirPcs = (pphPercent / 100) * (cifAirPcs + bmAirPcs);
+
+    const taxSeaPcs = bmSeaPcs + ppnSeaPcs + pphSeaPcs;
+    const taxAirPcs = bmAirPcs + ppnAirPcs + pphAirPcs;
+
+    // Handling & Other flat costs allocation
+    const handlingCostPcs = handlingCost / safeQtyPcs;
+    const otherCostPcs = otherCost / safeQtyPcs;
+
+    cogsSea = cifSeaPcs + taxSeaPcs + handlingCostPcs + otherCostPcs + localFreight;
+    cogsAir = cifAirPcs + taxAirPcs + handlingCostPcs + otherCostPcs + localFreight;
+  } else {
+    // BORONGAN math
+    cogsSea = baseCostPcs + gzDeliveryCostPcs + seaFreightCostPcs + localFreight;
+    cogsAir = baseCostPcs + gzDeliveryCostPcs + airFreightCostPcs + localFreight;
+  }
 
   // Suggested Selling Prices
   const sponsorMultiplier = 1 + (sponsorPercent / 100);
@@ -155,12 +209,50 @@ export default function SupplierCogsCalculatorPage() {
   const [selectedServiceVendorId, setSelectedServiceVendorId] = useState<string>("");
   const [cogsStatus, setCogsStatus] = useState<"EXISTING" | "POTENTIAL">("POTENTIAL");
   const [historyStatusFilter, setHistoryStatusFilter] = useState<"ALL" | "EXISTING" | "POTENTIAL">("ALL");
+  const [historyTypeFilter, setHistoryTypeFilter] = useState<"ALL" | "BORONGAN" | "RESMI">("ALL");
 
   // Potential Supplier Sourcing & Contact Details
   const [supplierPlatform, setSupplierPlatform] = useState<string>("1688");
-  const [supplierPlatformCustom, setSupplierPlatformCustom] = useState<string>("");
   const [supplierContactName, setSupplierContactName] = useState<string>("");
   const [supplierContactLink, setSupplierContactLink] = useState<string>("");
+
+  // Potential Product Image Upload States & Handlers
+  const [imageUrl, setImageUrl] = useState<string>("");
+  const [imagePublicId, setImagePublicId] = useState<string>("");
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const CLOUDINARY_CLOUD_NAME = "do9sfnf5k";
+      const CLOUDINARY_UPLOAD_PRESET = "ml_default";
+      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+      const res = await fetch(cloudinaryUrl, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Gagal upload ke Cloudinary");
+
+      const data = await res.json();
+      setImageUrl(data.secure_url);
+      setImagePublicId(data.public_id);
+      toast.success("Foto produk berhasil diunggah!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal mengunggah foto produk");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Master Currencies & Fast Currency Dialog
   const [masterCurrencies, setMasterCurrencies] = useState<any[]>([]);
@@ -183,12 +275,70 @@ export default function SupplierCogsCalculatorPage() {
 
       setMasterCurrencies((prev) => [...prev, newCurrency]);
       setCurrency(newCurrency.code);
+      if (newCurrency.rate) {
+        setExchangeRate(Number(newCurrency.rate));
+      } else {
+        setExchangeRate(1);
+      }
       setIsCurrencyModalOpen(false);
       toast.success("Currency berhasil ditambahkan!");
     } catch (err: any) {
       toast.error(err.message || "Terjadi kesalahan saat membuat currency.");
     }
   };
+
+  // Master Platforms & Dialog Sourcing
+  const [customPlatforms, setCustomPlatforms] = useState<any[]>([]);
+  const [isPlatformModalOpen, setIsPlatformModalOpen] = useState<boolean>(false);
+  const [newPlatformName, setNewPlatformName] = useState<string>("");
+  const [isSubmittingPlatform, setIsSubmittingPlatform] = useState<boolean>(false);
+
+  const handleAddPlatformFast = async () => {
+    if (!newPlatformName.trim()) {
+      toast.error("Nama platform tidak boleh kosong");
+      return;
+    }
+    setIsSubmittingPlatform(true);
+    try {
+      const res = await fetchApi("/contact-platforms", {
+        method: "POST",
+        body: JSON.stringify({
+          name: newPlatformName.trim(),
+          icon: "Globe",
+          isActive: true
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || "Gagal membuat platform");
+      }
+
+      const responseData = await res.json();
+      const newPlatform = responseData.data || responseData;
+
+      setCustomPlatforms((prev) => [...prev, newPlatform]);
+      setSupplierPlatform(newPlatform.name);
+      setIsPlatformModalOpen(false);
+      setNewPlatformName("");
+      toast.success("Platform Sourcing berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat membuat platform.");
+    } finally {
+      setIsSubmittingPlatform(false);
+    }
+  };
+
+  // Import Mode: BORONGAN vs RESMI
+  const [importType, setImportType] = useState<"BORONGAN" | "RESMI">("BORONGAN");
+  const [hsCode, setHsCode] = useState<string>("");
+  const [beaMasukPercent, setBeaMasukPercent] = useState<number>(0);
+  const [ppnPercent, setPpnPercent] = useState<number>(11);
+  const [pphPercent, setPphPercent] = useState<number>(2.5);
+  const [formECost, setFormECost] = useState<number>(0);
+  const [insurancePercent, setInsurancePercent] = useState<number>(0);
+  const [handlingCost, setHandlingCost] = useState<number>(0);
+  const [otherCost, setOtherCost] = useState<number>(0);
 
   // Mode Calculation: FIXED vs VARIABLE
   const [calculationMode, setCalculationMode] = useState<"FIXED" | "VARIABLE">("FIXED");
@@ -259,19 +409,7 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedVendorId(rec.vendorId || "");
     setSelectedServiceVendorId(rec.serviceVendorId || "");
     setCogsStatus(rec.status || (rec.productId ? "EXISTING" : "POTENTIAL"));
-    const stdPlatforms = ["1688", "Alibaba", "WeChat", "Taobao", "Made-In-China", "WhatsApp", "Lokal / Indonesia"];
-    if (rec.supplierPlatform) {
-      if (stdPlatforms.includes(rec.supplierPlatform)) {
-        setSupplierPlatform(rec.supplierPlatform);
-        setSupplierPlatformCustom("");
-      } else {
-        setSupplierPlatform("Lainnya");
-        setSupplierPlatformCustom(rec.supplierPlatform);
-      }
-    } else {
-      setSupplierPlatform("1688");
-      setSupplierPlatformCustom("");
-    }
+    setSupplierPlatform(rec.supplierPlatform || "1688");
     setSupplierContactName(rec.supplierContactName || "");
     setSupplierContactLink(rec.supplierContactLink || "");
     
@@ -291,6 +429,18 @@ export default function SupplierCogsCalculatorPage() {
     setMargin(Number(rec.margin) || 0);
     setSponsorPercent(Number(rec.sponsorPercent) * 100);
     setNotes(rec.notes ? `${rec.notes} (Salinan Mode)` : "Salinan Mode");
+    setImageUrl(rec.imageUrl || "");
+    setImagePublicId(rec.imagePublicId || "");
+
+    setImportType((rec.importType as "BORONGAN" | "RESMI") || "BORONGAN");
+    setHsCode(rec.hsCode || "");
+    setBeaMasukPercent(Number(rec.beaMasukPercent) || 0);
+    setPpnPercent(Number(rec.ppnPercent) ?? 11);
+    setPphPercent(Number(rec.pphPercent) ?? 2.5);
+    setFormECost(Number(rec.formECost) || 0);
+    setInsurancePercent(Number(rec.insurancePercent) || 0);
+    setHandlingCost(Number(rec.handlingCost) || 0);
+    setOtherCost(Number(rec.otherCost) || 0);
 
     // Set editingRecord to null so saving creates a NEW entry
     setEditingRecord(null);
@@ -355,10 +505,11 @@ export default function SupplierCogsCalculatorPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [prodRes, vendRes, currRes] = await Promise.all([
+        const [prodRes, vendRes, currRes, platRes] = await Promise.all([
           fetchApi("/products/order"),
           fetchApi("/vendors/order/add"),
           fetchApi("/currencies"),
+          fetchApi("/contact-platforms/active"),
         ]);
 
         if (prodRes.ok) {
@@ -373,6 +524,11 @@ export default function SupplierCogsCalculatorPage() {
           const currs = await currRes.json();
           const currList = Array.isArray(currs) ? currs : (currs.data || []);
           setMasterCurrencies(currList);
+        }
+        if (platRes && platRes.ok) {
+          const plats = await platRes.json();
+          const platList = Array.isArray(plats) ? plats : (plats.data || []);
+          setCustomPlatforms(platList);
         }
       } catch (e) {
         console.error("Gagal memuat master data", e);
@@ -399,16 +555,18 @@ export default function SupplierCogsCalculatorPage() {
     if (base === "IDR") return;
     setFetchingRates(true);
     try {
-      const res = await fetch(`https://open.er-api.com/v6/latest/${base}`);
+      const apiBase = base === "RMB" ? "CNY" : base;
+      const res = await fetch(`https://open.er-api.com/v6/latest/${apiBase}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.success && data.rates) {
+        if (data.rates) {
+          const rateVal = data.rates.IDR;
           setRatesData((prev: any) => ({
             ...prev,
-            [base]: data.rates.IDR || prev[base],
+            [base]: rateVal || prev[base],
           }));
           if (currency === base) {
-            setExchangeRate(data.rates.IDR);
+            setExchangeRate(rateVal);
           }
         }
       }
@@ -419,9 +577,9 @@ export default function SupplierCogsCalculatorPage() {
     }
   };
 
-  // Sync dimensions when product selection changes
+  // Sync dimensions and pricing when product selection changes
   useEffect(() => {
-    if (selectedProductId !== "sandbox") {
+    if (selectedProductId !== "sandbox" && selectedProductId !== "") {
       const prod = products.find((p) => p.id === selectedProductId);
       if (prod) {
         setQtyPerCtn(prod.qtyPerCtn || 1);
@@ -430,23 +588,40 @@ export default function SupplierCogsCalculatorPage() {
         setHeight(prod.height || 0);
         setWeight(prod.weight || 0);
         setTempProductName("");
+        
+        // Auto-link catalog product base price to supplier pricing in IDR
+        if (cogsStatus === "EXISTING") {
+          setForeignPrice(Number(prod.basePrice) || 0);
+          setCurrency("IDR");
+          setExchangeRate(1);
+
+          // Link price tiers if available
+          if (prod.priceTiers && Array.isArray(prod.priceTiers) && prod.priceTiers.length > 0) {
+            const mappedTiers = prod.priceTiers.map((pt: any) => ({
+              id: pt.id || Math.random().toString(),
+              totalPcs: pt.minQuantity || 1,
+              pricePcs: Number(pt.price) || 0,
+              gzCost: 0,
+            }));
+            setVariableTiers(mappedTiers);
+          }
+        }
       }
     }
-  }, [selectedProductId, products]);
+  }, [selectedProductId, products, cogsStatus]);
 
-  // Sync exchange rate input when currency changes
-  useEffect(() => {
-    // If master currency has a default exchange rate, use it, or fallback to live rate
-    const foundMaster = masterCurrencies.find((c) => c.code === currency);
-    if (foundMaster && foundMaster.rate) {
-      setExchangeRate(Number(foundMaster.rate));
-    } else {
-      setExchangeRate(ratesData[currency] || (currency === "RMB" ? 2250 : currency === "USD" ? 16200 : 1));
-    }
-  }, [currency, ratesData, masterCurrencies]);
+
 
   // --- MATHEMATICAL COGS FORMULAS ---
   const calcResults = calculateCogsAndSellingPrice({
+    importType,
+    beaMasukPercent,
+    ppnPercent,
+    pphPercent,
+    formECost,
+    insurancePercent,
+    handlingCost,
+    otherCost,
     foreignPrice,
     gzDeliveryCost,
     exchangeRate,
@@ -477,28 +652,45 @@ export default function SupplierCogsCalculatorPage() {
     sellPriceAir,
   } = calcResults;
 
+  const activeQtyPcs = Math.max(1, qtyPcs);
+  const formECostPcsVal = (formECost * exchangeRate) / activeQtyPcs;
+  const insuranceCostPcsVal = (insurancePercent / 100) * baseCostPcs;
+  const cifSeaPcsVal = baseCostPcs + gzDeliveryCostPcs + formECostPcsVal + seaFreightCostPcs + insuranceCostPcsVal;
+  const cifAirPcsVal = baseCostPcs + gzDeliveryCostPcs + formECostPcsVal + airFreightCostPcs + insuranceCostPcsVal;
+  const bmSeaPcsVal = (beaMasukPercent / 100) * cifSeaPcsVal;
+  const bmAirPcsVal = (beaMasukPercent / 100) * cifAirPcsVal;
+  const ppnSeaPcsVal = (ppnPercent / 100) * (cifSeaPcsVal + bmSeaPcsVal);
+  const ppnAirPcsVal = (ppnPercent / 100) * (cifAirPcsVal + bmAirPcsVal);
+  const pphSeaPcsVal = (pphPercent / 100) * (cifSeaPcsVal + bmSeaPcsVal);
+  const pphAirPcsVal = (pphPercent / 100) * (cifAirPcsVal + bmAirPcsVal);
+  const handlingCostPcsVal = handlingCost / activeQtyPcs;
+  const otherCostPcsVal = otherCost / activeQtyPcs;
+
   // --- SAVE OR UPDATE CALCULATION ---
   const handleSaveRecord = async () => {
-    if (selectedProductId === "sandbox" && !tempProductName.trim()) {
+    if (cogsStatus === "POTENTIAL" && !tempProductName.trim()) {
       toast.error("Mohon masukkan nama produk sourcing");
+      return;
+    }
+
+    if (cogsStatus === "EXISTING" && (selectedProductId === "sandbox" || !selectedProductId)) {
+      toast.error("Mohon pilih produk dari katalog");
       return;
     }
 
     setSaving(true);
     try {
-      const finalPlatform = supplierPlatform === "Lainnya"
-        ? (supplierPlatformCustom.trim() || "Lainnya")
-        : supplierPlatform.trim();
-
       const payload = {
-        productId: selectedProductId === "sandbox" ? undefined : selectedProductId,
-        tempProductName: selectedProductId === "sandbox" ? tempProductName.trim() : undefined,
+        productId: cogsStatus === "EXISTING" ? selectedProductId : undefined,
+        tempProductName: cogsStatus === "POTENTIAL" ? tempProductName.trim() : undefined,
         status: cogsStatus,
+        imageUrl: cogsStatus === "POTENTIAL" ? (imageUrl || undefined) : undefined,
+        imagePublicId: cogsStatus === "POTENTIAL" ? (imagePublicId || undefined) : undefined,
         calculationMode,
         tiers: calculationMode === "VARIABLE" ? variableTiers : undefined,
         vendorId: selectedVendorId && selectedVendorId !== "none" ? selectedVendorId : undefined,
         serviceVendorId: selectedServiceVendorId && selectedServiceVendorId !== "none" ? selectedServiceVendorId : undefined,
-        supplierPlatform: finalPlatform || undefined,
+        supplierPlatform: supplierPlatform.trim() || undefined,
         supplierContactName: supplierContactName.trim() || undefined,
         supplierContactLink: supplierContactLink.trim() || undefined,
         foreignPrice,
@@ -517,6 +709,15 @@ export default function SupplierCogsCalculatorPage() {
         margin,
         sponsorPercent: sponsorPercent / 100,
         notes: notes.trim() || undefined,
+        importType,
+        hsCode: importType === "RESMI" ? (hsCode.trim() || undefined) : undefined,
+        beaMasukPercent: importType === "RESMI" ? beaMasukPercent : undefined,
+        ppnPercent: importType === "RESMI" ? ppnPercent : undefined,
+        pphPercent: importType === "RESMI" ? pphPercent : undefined,
+        formECost: importType === "RESMI" ? formECost : undefined,
+        insurancePercent: importType === "RESMI" ? insurancePercent : undefined,
+        handlingCost: importType === "RESMI" ? handlingCost : undefined,
+        otherCost: importType === "RESMI" ? otherCost : undefined,
       };
 
       const isEdit = !!editingRecord;
@@ -552,7 +753,6 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedServiceVendorId("");
     setCogsStatus("POTENTIAL");
     setSupplierPlatform("1688");
-    setSupplierPlatformCustom("");
     setSupplierContactName("");
     setSupplierContactLink("");
     setCalculationMode("FIXED");
@@ -577,11 +777,23 @@ export default function SupplierCogsCalculatorPage() {
     setMargin(10000);
     setSponsorPercent(2);
     setNotes("");
+    setImageUrl("");
+    setImagePublicId("");
+    setImportType("BORONGAN");
+    setHsCode("");
+    setBeaMasukPercent(0);
+    setPpnPercent(11);
+    setPphPercent(2.5);
+    setFormECost(0);
+    setInsurancePercent(0);
+    setHandlingCost(0);
+    setOtherCost(0);
   };
 
   const handleAddNew = () => {
     resetForm();
     setView("form");
+    fetchExchangeRates("RMB");
   };
 
   // --- LOAD HISTORICAL RECORD TO EDIT/DETAIL FORM ---
@@ -593,19 +805,7 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedServiceVendorId(rec.serviceVendorId || "");
     setCogsStatus(rec.status || (rec.productId ? "EXISTING" : "POTENTIAL"));
     
-    const stdPlatforms = ["1688", "Alibaba", "WeChat", "Taobao", "Made-In-China", "WhatsApp", "Lokal / Indonesia"];
-    if (rec.supplierPlatform) {
-      if (stdPlatforms.includes(rec.supplierPlatform)) {
-        setSupplierPlatform(rec.supplierPlatform);
-        setSupplierPlatformCustom("");
-      } else {
-        setSupplierPlatform("Lainnya");
-        setSupplierPlatformCustom(rec.supplierPlatform);
-      }
-    } else {
-      setSupplierPlatform("1688");
-      setSupplierPlatformCustom("");
-    }
+    setSupplierPlatform(rec.supplierPlatform || "1688");
     setSupplierContactName(rec.supplierContactName || "");
     setSupplierContactLink(rec.supplierContactLink || "");
     setCalculationMode(rec.calculationMode || "FIXED");
@@ -628,6 +828,17 @@ export default function SupplierCogsCalculatorPage() {
     setMargin(Number(rec.margin) || 0);
     setSponsorPercent(Number(rec.sponsorPercent) * 100);
     setNotes(rec.notes || "");
+    setImageUrl(rec.imageUrl || "");
+    setImagePublicId(rec.imagePublicId || "");
+    setImportType((rec.importType as "BORONGAN" | "RESMI") || "BORONGAN");
+    setHsCode(rec.hsCode || "");
+    setBeaMasukPercent(Number(rec.beaMasukPercent) || 0);
+    setPpnPercent(Number(rec.ppnPercent) ?? 11);
+    setPphPercent(Number(rec.pphPercent) ?? 2.5);
+    setFormECost(Number(rec.formECost) || 0);
+    setInsurancePercent(Number(rec.insurancePercent) || 0);
+    setHandlingCost(Number(rec.handlingCost) || 0);
+    setOtherCost(Number(rec.otherCost) || 0);
     setView("form");
   };
 
@@ -667,13 +878,25 @@ export default function SupplierCogsCalculatorPage() {
     const recMode = rec.calculationMode || "FIXED";
     const matchesMode = historyModeFilter === "ALL" || recMode === historyModeFilter;
 
-    return matchesSearch && matchesStatus && matchesMode;
+    const recType = rec.importType || "BORONGAN";
+    const matchesType = historyTypeFilter === "ALL" || recType === historyTypeFilter;
+
+    return matchesSearch && matchesStatus && matchesMode && matchesType;
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / itemsPerPage));
   const paginatedRecords = filteredRecords.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
+  );
+
+  const defaultPlatforms = ["1688", "Alibaba", "WeChat", "Taobao", "Made-In-China", "WhatsApp", "Lokal / Indonesia"];
+  const uniquePlatformList = Array.from(
+    new Set([
+      ...defaultPlatforms,
+      ...customPlatforms.map((p) => p.name || p),
+      ...(supplierPlatform ? [supplierPlatform] : []),
+    ])
   );
 
   return (
@@ -804,6 +1027,46 @@ export default function SupplierCogsCalculatorPage() {
                   </button>
                 </div>
 
+                {/* IMPORT TYPE FILTER PILLS */}
+                <div className="flex gap-1 bg-stone-100 p-0.5 rounded text-[11px] font-semibold border border-stone-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryTypeFilter("ALL");
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded transition-colors ${
+                      historyTypeFilter === "ALL" ? "bg-white text-stone-900 shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
+                    }`}
+                  >
+                    Semua Tipe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryTypeFilter("BORONGAN");
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded transition-colors ${
+                      historyTypeFilter === "BORONGAN" ? "bg-slate-700 text-white shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
+                    }`}
+                  >
+                    📦 Borongan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryTypeFilter("RESMI");
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded transition-colors ${
+                      historyTypeFilter === "RESMI" ? "bg-indigo-600 text-white shadow-2xs font-bold" : "text-stone-500 hover:text-stone-800"
+                    }`}
+                  >
+                    🏦 Resmi
+                  </button>
+                </div>
+
                 {/* ADD NEW BUTTON */}
                 <Button
                   onClick={handleAddNew}
@@ -854,8 +1117,22 @@ export default function SupplierCogsCalculatorPage() {
                       return (
                         <TableRow key={rec.id} className="hover:bg-stone-50 transition-colors">
                           <TableCell className="font-medium text-stone-850">
-                            <div>
-                              <span>{displayProdName}</span>
+                            <div className="flex items-center gap-3">
+                              {!isExisting && rec.imageUrl ? (
+                                <div className="relative w-10 h-10 border rounded bg-stone-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                  <img
+                                    src={rec.imageUrl}
+                                    alt={displayProdName || "Produk Sourcing"}
+                                    className="object-cover w-full h-full"
+                                  />
+                                </div>
+                              ) : !isExisting ? (
+                                <div className="w-10 h-10 border border-dashed rounded bg-stone-50 flex items-center justify-center text-stone-400 flex-shrink-0">
+                                  <ImageIcon className="w-4 h-4" />
+                                </div>
+                              ) : null}
+                              <div>
+                                <span>{displayProdName}</span>
                               <div className="flex flex-wrap items-center gap-1 mt-1">
                                 {isExisting ? (
                                   <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
@@ -875,12 +1152,22 @@ export default function SupplierCogsCalculatorPage() {
                                     📏 Fixed
                                   </Badge>
                                 )}
+                                {rec.importType === "RESMI" ? (
+                                  <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                    🏦 Resmi
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                    📦 Borongan
+                                  </Badge>
+                                )}
                                 {!rec.productId && (
                                   <Badge className="bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-100 text-[9px] px-1.5 py-0.2">Draft</Badge>
                                 )}
                               </div>
                             </div>
-                          </TableCell>
+                          </div>
+                        </TableCell>
                           <TableCell className="text-stone-600">
                             <div className="space-y-1">
                               {rec.vendor?.companyName ? (
@@ -1044,83 +1331,90 @@ export default function SupplierCogsCalculatorPage() {
                   </div>
                   
                   {/* MODE SWITCHER & CONVERT */}
-                  <div className="flex gap-1 bg-stone-100 p-1 rounded-md border border-stone-200 self-start md:self-auto">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleOrConvertMode("FIXED")}
-                      className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
-                        calculationMode === "FIXED"
-                          ? "bg-white text-stone-900 shadow-2xs border border-stone-200"
-                          : "text-stone-500 hover:text-stone-800"
-                      }`}
-                      title="Konversi / Alihkan ke Fixed Mode"
-                    >
-                      📏 Fixed Mode
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleOrConvertMode("VARIABLE")}
-                      className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
-                        calculationMode === "VARIABLE"
-                          ? "bg-indigo-600 text-white shadow-2xs"
-                          : "text-stone-500 hover:text-stone-800"
-                      }`}
-                      title="Konversi / Alihkan ke Variable Mode"
-                    >
-                      📊 Variable Mode
-                    </button>
-                  </div>
+                  {importType !== "RESMI" ? (
+                    <div className="flex gap-1 bg-stone-100 p-1 rounded-md border border-stone-200 self-start md:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleOrConvertMode("FIXED")}
+                        className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                          calculationMode === "FIXED"
+                            ? "bg-white text-stone-900 shadow-2xs border border-stone-200"
+                            : "text-stone-500 hover:text-stone-800"
+                        }`}
+                        title="Konversi / Alihkan ke Fixed Mode"
+                      >
+                        📏 Fixed Mode
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleOrConvertMode("VARIABLE")}
+                        className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                          calculationMode === "VARIABLE"
+                            ? "bg-indigo-600 text-white shadow-2xs"
+                            : "text-stone-500 hover:text-stone-800"
+                        }`}
+                        title="Konversi / Alihkan ke Variable Mode"
+                      >
+                        📊 Variable Mode
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 self-start md:self-auto select-none">
+                      📏 Fixed (Resmi)
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 pt-6">
-                
-                {/* 1. SELECT PRODUCT OR SANDBOX */}
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase text-stone-600">Master Product Catalog</Label>
-                      <Select value={selectedProductId} onValueChange={(val) => {
-                        setSelectedProductId(val);
-                        if (val !== "sandbox") {
-                          setCogsStatus("EXISTING");
-                        }
-                      }}>
-                        <SelectTrigger className="bg-stone-50 border-stone-300">
-                          <SelectValue placeholder="Pilih Produk" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sandbox">⭐ [Sourcing Sandbox / Item Baru]</SelectItem>
-                          {products.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name} ({p.sku})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {selectedProductId === "sandbox" && (
-                      <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase text-stone-600">Nama Produk Sourcing</Label>
-                        <Input
-                          placeholder="Contoh: Tumbler Ceramic Type-D"
-                          value={tempProductName}
-                          onChange={(e) => setTempProductName(e.target.value)}
-                          className="bg-stone-50 border-stone-300"
-                        />
-                      </div>
-                    )}
+                {/* 0. TIPE IMPOR SELECTOR */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase text-stone-600 flex items-center gap-1.5">
+                    <Coins className="w-3.5 h-3.5 text-stone-500" /> Tipe Impor
+                  </Label>
+                  <div className="flex bg-stone-100 p-0.5 rounded-lg border border-stone-200 max-w-xs">
+                    <button
+                      type="button"
+                      onClick={() => setImportType("BORONGAN")}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                        importType === "BORONGAN"
+                          ? "bg-white text-stone-900 shadow-xs"
+                          : "text-stone-500 hover:text-stone-900"
+                      }`}
+                    >
+                      📦 Borongan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImportType("RESMI");
+                        setCalculationMode("FIXED");
+                      }}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                        importType === "RESMI"
+                          ? "bg-white text-stone-900 shadow-xs"
+                          : "text-stone-500 hover:text-stone-900"
+                      }`}
+                    >
+                      🏦 Resmi
+                    </button>
                   </div>
+                </div>
 
-                  {/* STATUS / TAG SELECTION */}
-                  <div className="space-y-2 pt-2 border-t border-stone-100">
+                {/* 1. STATUS / TAG SELECTION */}
+                <div className="space-y-4">
+                  <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase text-stone-600 flex items-center gap-1.5">
                       <Tag className="w-3.5 h-3.5 text-stone-500" /> Status / Tag Produk COGS
                     </Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <button
                         type="button"
-                        onClick={() => setCogsStatus("EXISTING")}
+                        onClick={() => {
+                          setCogsStatus("EXISTING");
+                          if (selectedProductId === "sandbox") {
+                            setSelectedProductId("");
+                          }
+                        }}
                         className={`p-3 rounded-md border text-left flex flex-col gap-1 transition-all cursor-pointer ${
                           cogsStatus === "EXISTING"
                             ? "border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-600 shadow-2xs"
@@ -1141,7 +1435,10 @@ export default function SupplierCogsCalculatorPage() {
 
                       <button
                         type="button"
-                        onClick={() => setCogsStatus("POTENTIAL")}
+                        onClick={() => {
+                          setCogsStatus("POTENTIAL");
+                          setSelectedProductId("sandbox");
+                        }}
                         className={`p-3 rounded-md border text-left flex flex-col gap-1 transition-all cursor-pointer ${
                           cogsStatus === "POTENTIAL"
                             ? "border-sky-600 bg-sky-50/70 ring-1 ring-sky-600 shadow-2xs"
@@ -1161,6 +1458,84 @@ export default function SupplierCogsCalculatorPage() {
                       </button>
                     </div>
                   </div>
+
+                  {/* 2. DYNAMIC INPUTS BASED ON STATUS */}
+                  {cogsStatus === "EXISTING" ? (
+                    <div className="space-y-2 pt-2 border-t border-stone-100">
+                      <Label className="text-xs font-bold uppercase text-stone-600">Master Product Catalog</Label>
+                      <Select
+                        value={selectedProductId === "sandbox" ? "" : selectedProductId}
+                        onValueChange={setSelectedProductId}
+                      >
+                        <SelectTrigger className="bg-stone-50 border-stone-300">
+                          <SelectValue placeholder="Pilih Produk dari Katalog" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name} ({p.sku})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-stone-100">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase text-stone-600">Nama Produk Sourcing</Label>
+                        <Input
+                          placeholder="Contoh: Tumbler Ceramic Type-D"
+                          value={tempProductName}
+                          onChange={(e) => setTempProductName(e.target.value)}
+                          className="bg-stone-50 border-stone-300"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase text-stone-600">Foto Produk Potential</Label>
+                        {imageUrl ? (
+                          <div className="relative w-full h-[90px] border border-stone-200 rounded-md overflow-hidden bg-stone-50 flex items-center justify-center group">
+                            <img
+                              src={imageUrl}
+                              alt="Preview Produk"
+                              className="object-contain w-full h-full"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setImageUrl("");
+                                setImagePublicId("");
+                              }}
+                              className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="relative w-full h-[90px] border border-dashed border-stone-300 rounded-md bg-stone-50 hover:bg-stone-100/80 transition-colors flex flex-col items-center justify-center cursor-pointer">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageUpload}
+                              disabled={isUploading}
+                              className="absolute inset-0 opacity-0 cursor-pointer"
+                            />
+                            {isUploading ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                                <span className="text-[9px] text-stone-500">Mengunggah...</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-1.5 text-stone-400">
+                                <ImageIcon className="w-5 h-5" />
+                                <span className="text-[9px] text-stone-500">Upload Foto Produk</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. SELECT SUPPLIER & SERVICE VENDOR (SIDE BY SIDE) */}
@@ -1226,29 +1601,72 @@ export default function SupplierCogsCalculatorPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-stone-500">Platform Sourcing</Label>
-                      <Select value={supplierPlatform} onValueChange={setSupplierPlatform}>
+
+                      <Dialog
+                        open={isPlatformModalOpen}
+                        onOpenChange={setIsPlatformModalOpen}
+                      >
+                        <DialogContent className="sm:max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Tambah Platform Sourcing Baru</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4 pt-2">
+                            <div className="space-y-2">
+                              <Label>Nama Platform</Label>
+                              <Input
+                                placeholder="Contoh: Shopee, DHgate, WeChat Agent"
+                                value={newPlatformName}
+                                onChange={(e) => setNewPlatformName(e.target.value)}
+                              />
+                            </div>
+                            <div className="flex justify-end pt-2">
+                              <Button
+                                onClick={handleAddPlatformFast}
+                                disabled={isSubmittingPlatform}
+                              >
+                                {isSubmittingPlatform && (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                )}
+                                Tambah Platform
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+
+                      <Select
+                        value={supplierPlatform}
+                        onValueChange={(val) => {
+                          if (val === "add_new_platform") {
+                            setIsPlatformModalOpen(true);
+                          } else {
+                            setSupplierPlatform(val);
+                          }
+                        }}
+                      >
                         <SelectTrigger className="bg-stone-50 border-stone-300">
                           <SelectValue placeholder="Pilih Platform" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="1688">1688 (China)</SelectItem>
-                          <SelectItem value="Alibaba">Alibaba International</SelectItem>
-                          <SelectItem value="WeChat">WeChat Supplier Direct</SelectItem>
-                          <SelectItem value="Taobao">Taobao / Tmall</SelectItem>
-                          <SelectItem value="Made-In-China">Made-In-China</SelectItem>
-                          <SelectItem value="WhatsApp">WhatsApp Supplier</SelectItem>
-                          <SelectItem value="Lokal / Indonesia">Lokal / Indonesia</SelectItem>
-                          <SelectItem value="Lainnya">Lainnya (Ketik Manual)</SelectItem>
+                          {uniquePlatformList.map((plat) => (
+                            <SelectItem key={plat} value={plat}>
+                              {plat}
+                            </SelectItem>
+                          ))}
+
+                          <div className="h-px bg-stone-200 my-1 mx-2" />
+                          <SelectItem
+                            value="add_new_platform"
+                            textValue="Buat Platform Baru"
+                            className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Plus className="w-4 h-4" />
+                              Buat Platform Baru...
+                            </div>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
-                      {supplierPlatform === "Lainnya" && (
-                        <Input
-                          placeholder="Ketik nama platform sourcing..."
-                          value={supplierPlatformCustom}
-                          onChange={(e) => setSupplierPlatformCustom(e.target.value)}
-                          className="bg-white border-stone-300 text-xs mt-1.5"
-                        />
-                      )}
                     </div>
 
                     <div className="space-y-1.5">
@@ -1274,7 +1692,7 @@ export default function SupplierCogsCalculatorPage() {
                 </div>
 
                 {/* 3. SUPPLIER PRICING DETAILS */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
+                <div className={`grid grid-cols-1 ${calculationMode === "VARIABLE" ? "md:grid-cols-2" : "md:grid-cols-3"} gap-4 border-t pt-4`}>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase text-stone-600 flex items-center gap-1.5">
                       <Coins className="w-4 h-4 text-stone-500" /> Mata Uang
@@ -1298,6 +1716,12 @@ export default function SupplierCogsCalculatorPage() {
                           setIsCurrencyModalOpen(true);
                         } else {
                           setCurrency(val);
+                          const foundMaster = masterCurrencies.find((c) => c.code === val);
+                          if (foundMaster && foundMaster.rate) {
+                            setExchangeRate(Number(foundMaster.rate));
+                          } else {
+                            setExchangeRate(ratesData[val] || (val === "RMB" ? 2250 : val === "USD" ? 16200 : 1));
+                          }
                         }
                       }}
                       value={currency}
@@ -1327,18 +1751,20 @@ export default function SupplierCogsCalculatorPage() {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-stone-600">Harga Beli Supplier</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
-                      <Input
-                        type="number"
-                        value={foreignPrice}
-                        onChange={(e) => setForeignPrice(Number(e.target.value))}
-                        className="pl-12 bg-stone-50 border-stone-300"
-                      />
+                  {calculationMode !== "VARIABLE" && (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-stone-600">Harga Beli Supplier</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
+                        <Input
+                          type="number"
+                          value={foreignPrice}
+                          onChange={(e) => setForeignPrice(Number(e.target.value))}
+                          className="pl-12 bg-stone-50 border-stone-300"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase text-stone-600 flex items-center justify-between">
@@ -1452,59 +1878,183 @@ export default function SupplierCogsCalculatorPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {variableTiers.map((tier) => {
-                            const computedCtn = (tier.totalPcs / (qtyPerCtn || 1)).toFixed(2);
-                            return (
-                              <TableRow key={tier.id}>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={tier.totalPcs}
-                                    onChange={(e) => handleUpdateTier(tier.id, "totalPcs", Number(e.target.value))}
-                                    className="bg-white h-8 text-xs font-semibold w-24"
-                                  />
-                                </TableCell>
-                                <TableCell className="text-xs font-bold text-stone-600">
-                                  {computedCtn} Ctn
-                                </TableCell>
-                                <TableCell>
-                                  <div className="relative">
-                                    <span className="absolute left-2.5 top-1.5 text-xs text-stone-400 font-bold">{currency}</span>
+                          {(() => {
+                            const sortedTiers = [...variableTiers].sort((a, b) => Number(a.totalPcs) - Number(b.totalPcs));
+                            return variableTiers.map((tier) => {
+                              const idx = sortedTiers.findIndex((t) => t.id === tier.id);
+                              const rangeLabel = sortedTiers.length > 1 && idx > -1 && idx < sortedTiers.length - 1 && sortedTiers[idx + 1].totalPcs > tier.totalPcs
+                                ? `${tier.totalPcs} - ${sortedTiers[idx + 1].totalPcs - 1} pcs`
+                                : `≥ ${tier.totalPcs} pcs`;
+
+                              const computedCtn = (tier.totalPcs / (qtyPerCtn || 1)).toFixed(2);
+                              return (
+                                <TableRow key={tier.id}>
+                                  <TableCell>
                                     <Input
                                       type="number"
-                                      value={tier.pricePcs}
-                                      onChange={(e) => handleUpdateTier(tier.id, "pricePcs", Number(e.target.value))}
-                                      className="bg-white h-8 text-xs font-semibold pl-10 w-28"
+                                      value={tier.totalPcs}
+                                      onChange={(e) => handleUpdateTier(tier.id, "totalPcs", Number(e.target.value))}
+                                      className="bg-white h-8 text-xs font-semibold w-28"
                                     />
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="relative">
-                                    <span className="absolute left-2.5 top-1.5 text-xs text-stone-400 font-bold">{currency}</span>
-                                    <Input
-                                      type="number"
-                                      value={tier.gzCost}
-                                      onChange={(e) => handleUpdateTier(tier.id, "gzCost", Number(e.target.value))}
-                                      className="bg-white h-8 text-xs font-semibold pl-10 w-24"
-                                    />
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleRemoveTier(tier.id)}
-                                    className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700"
-                                  >
-                                    <Trash className="h-3.5 w-3.5" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
+                                    <span className="block text-[10px] text-stone-400 font-semibold mt-1 pl-1">
+                                      Range: {rangeLabel}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-xs font-bold text-stone-600">
+                                    {computedCtn} Ctn
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="relative">
+                                      <span className="absolute left-2.5 top-1.5 text-xs text-stone-400 font-bold">{currency}</span>
+                                      <Input
+                                        type="number"
+                                        value={tier.pricePcs}
+                                        onChange={(e) => handleUpdateTier(tier.id, "pricePcs", Number(e.target.value))}
+                                        className="bg-white h-8 text-xs font-semibold pl-12 w-40"
+                                      />
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="relative">
+                                      <span className="absolute left-2.5 top-1.5 text-xs text-stone-400 font-bold">{currency}</span>
+                                      <Input
+                                        type="number"
+                                        value={tier.gzCost}
+                                        onChange={(e) => handleUpdateTier(tier.id, "gzCost", Number(e.target.value))}
+                                        className="bg-white h-8 text-xs font-semibold pl-12 w-32"
+                                      />
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleRemoveTier(tier.id)}
+                                      className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700"
+                                    >
+                                      <Trash className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            });
+                          })()}
                         </TableBody>
                       </Table>
+                    </div>
+                  </div>
+                )}
+
+                {/* RESMI ONLY: IMPORT TAXES & HS CODE */}
+                {importType === "RESMI" && (
+                  <div className="border-t pt-4 space-y-4">
+                    <h4 className="text-xs font-bold uppercase text-stone-600 tracking-wider">Import Taxes & HS Code (Pajak & HS Code Resmi)</h4>
+                    <div className="bg-stone-50 border border-stone-200 p-4 rounded-xl space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold flex items-center justify-between">
+                            <span>Kode HS Code</span>
+                            <a
+                              href="https://insw.go.id/intr"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 font-bold"
+                            >
+                              Cek di INSW 🌐
+                            </a>
+                          </Label>
+                          <Input
+                            placeholder="Contoh: 9503.00.90"
+                            value={hsCode}
+                            onChange={(e) => setHsCode(e.target.value)}
+                            className="bg-white border-stone-300 font-semibold"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">Biaya Form E (Supplier tektokan)</Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
+                            <Input
+                              type="number"
+                              value={formECost}
+                              onChange={(e) => setFormECost(Number(e.target.value))}
+                              className="pl-12 bg-white border-stone-300 font-semibold"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">Bea Masuk (%)</Label>
+                          <Input
+                            type="number"
+                            value={beaMasukPercent}
+                            onChange={(e) => setBeaMasukPercent(Number(e.target.value))}
+                            className="bg-white border-stone-300 font-semibold"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">PPN (%)</Label>
+                          <Input
+                            type="number"
+                            value={ppnPercent}
+                            onChange={(e) => setPpnPercent(Number(e.target.value))}
+                            className="bg-white border-stone-300 font-semibold"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">PPh (%)</Label>
+                          <Input
+                            type="number"
+                            value={pphPercent}
+                            onChange={(e) => setPphPercent(Number(e.target.value))}
+                            className="bg-white border-stone-300 font-semibold"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">Asuransi (%)</Label>
+                          <Input
+                            type="number"
+                            value={insurancePercent}
+                            onChange={(e) => setInsurancePercent(Number(e.target.value))}
+                            className="bg-white border-stone-300 font-semibold"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">Handling & Undername Cost (IDR)</Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
+                            <Input
+                              type="number"
+                              value={handlingCost}
+                              onChange={(e) => setHandlingCost(Number(e.target.value))}
+                              className="pl-9 bg-white border-stone-300 font-semibold"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">Biaya Lain-lain (IDR)</Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
+                            <Input
+                              type="number"
+                              value={otherCost}
+                              onChange={(e) => setOtherCost(Number(e.target.value))}
+                              className="pl-9 bg-white border-stone-300 font-semibold"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1514,7 +2064,9 @@ export default function SupplierCogsCalculatorPage() {
                   <h4 className="text-xs font-bold uppercase text-stone-600 tracking-wider">Shipping & Freight Rates (Tarif Pengiriman)</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase text-stone-600">SEA Freight Rate (Rp / CBM)</Label>
+                      <Label className="text-xs font-bold uppercase text-stone-600">
+                        {importType === "RESMI" ? "Forwarder SEA Freight (Rp / CBM)" : "SEA Freight Rate (Rp / CBM)"}
+                      </Label>
                       <div className="relative">
                         <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
                         <Input
@@ -1527,7 +2079,9 @@ export default function SupplierCogsCalculatorPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase text-stone-600">AIR Freight Rate (Rp / KG)</Label>
+                      <Label className="text-xs font-bold uppercase text-stone-600">
+                        {importType === "RESMI" ? "Forwarder AIR Freight (Rp / KG)" : "AIR Freight Rate (Rp / KG)"}
+                      </Label>
                       <div className="relative">
                         <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
                         <Input
@@ -1550,29 +2104,35 @@ export default function SupplierCogsCalculatorPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                    <div className="space-y-2">
-                      <Label className="text-xs text-stone-500 font-semibold uppercase">GZ Delivery Cost (Guangzhou)</Label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
-                        <Input
-                          type="number"
-                          value={gzDeliveryCost}
-                          onChange={(e) => setGzDeliveryCost(Number(e.target.value))}
-                          className="pl-12 bg-stone-50 border-stone-300"
-                        />
+                  <div className={`grid grid-cols-1 ${calculationMode === "VARIABLE" ? "" : "md:grid-cols-2"} gap-4 pt-1`}>
+                    {calculationMode !== "VARIABLE" && (
+                      <div className="space-y-2">
+                        <Label className="text-xs text-stone-500 font-semibold uppercase">
+                          {importType === "RESMI" ? "Local Trucking Negara Asal (Valas)" : "GZ Delivery Cost (Guangzhou)"}
+                        </Label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
+                          <Input
+                            type="number"
+                            value={gzDeliveryCost}
+                            onChange={(e) => setGzDeliveryCost(Number(e.target.value))}
+                            className="pl-12 bg-stone-50 border-stone-300 font-semibold"
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     <div className="space-y-2">
-                      <Label className="text-xs text-stone-500 font-semibold uppercase">Local Delivery (Warehouse IDR)</Label>
+                      <Label className="text-xs text-stone-500 font-semibold uppercase">
+                        {importType === "RESMI" ? "Local Trucking Negara Tujuan (IDR)" : "Local Delivery (Warehouse IDR)"}
+                      </Label>
                       <div className="relative">
                         <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
                         <Input
                           type="number"
                           value={localFreight}
                           onChange={(e) => setLocalFreight(Number(e.target.value))}
-                          className="pl-9 bg-stone-50 border-stone-300"
+                          className="pl-9 bg-stone-50 border-stone-300 font-semibold"
                         />
                       </div>
                     </div>
@@ -1672,30 +2232,49 @@ export default function SupplierCogsCalculatorPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {variableTiers.map((tier) => {
-                          const tierCalc = calculateCogsAndSellingPrice({
-                            foreignPrice: tier.pricePcs,
-                            gzDeliveryCost: tier.gzCost,
-                            exchangeRate,
-                            qtyPcs: tier.totalPcs,
-                            qtyPerCtn,
-                            length,
-                            width,
-                            height,
-                            weight,
-                            seaFreightRate,
-                            airFreightRate,
-                            localFreight,
-                            margin,
-                            sponsorPercent,
-                          });
+                        {(() => {
+                          const sortedTiers = [...variableTiers].sort((a, b) => Number(a.totalPcs) - Number(b.totalPcs));
+                          return sortedTiers.map((tier, idx) => {
+                            const tierCalc = calculateCogsAndSellingPrice({
+                              importType,
+                              beaMasukPercent,
+                              ppnPercent,
+                              pphPercent,
+                              formECost,
+                              insurancePercent,
+                              handlingCost,
+                              otherCost,
+                              foreignPrice: tier.pricePcs,
+                              gzDeliveryCost: tier.gzCost,
+                              exchangeRate,
+                              qtyPcs: tier.totalPcs,
+                              qtyPerCtn,
+                              length,
+                              width,
+                              height,
+                              weight,
+                              seaFreightRate,
+                              airFreightRate,
+                              localFreight,
+                              margin,
+                              sponsorPercent,
+                            });
 
-                          return (
-                            <TableRow key={tier.id} className="hover:bg-stone-50 text-xs">
-                              <TableCell className="font-bold text-stone-800">
-                                {tier.totalPcs} pcs
-                                <span className="block text-[10px] text-stone-500 font-normal">({tierCalc.totalCtn} ctn)</span>
-                              </TableCell>
+                            const safeQtyPerCtn = qtyPerCtn || 1;
+                            const qtyLabel = sortedTiers.length > 1 && idx < sortedTiers.length - 1 && sortedTiers[idx + 1].totalPcs > tier.totalPcs
+                              ? `${tier.totalPcs} - ${sortedTiers[idx + 1].totalPcs - 1} pcs`
+                              : `≥ ${tier.totalPcs} pcs`;
+
+                            const ctnLabel = sortedTiers.length > 1 && idx < sortedTiers.length - 1 && sortedTiers[idx + 1].totalPcs > tier.totalPcs
+                              ? `(${(tier.totalPcs / safeQtyPerCtn).toFixed(2)} - ${((sortedTiers[idx + 1].totalPcs - 1) / safeQtyPerCtn).toFixed(2)} ctn)`
+                              : `(≥ ${(tier.totalPcs / safeQtyPerCtn).toFixed(2)} ctn)`;
+
+                            return (
+                              <TableRow key={tier.id} className="hover:bg-stone-50 text-xs">
+                                <TableCell className="font-bold text-stone-800">
+                                  {qtyLabel}
+                                  <span className="block text-[10px] text-stone-500 font-normal">{ctnLabel}</span>
+                                </TableCell>
                               <TableCell className="font-semibold text-stone-700">
                                 {currency} {tier.pricePcs.toLocaleString("id-ID")}
                                 {tier.gzCost > 0 && <span className="block text-[9px] text-stone-400">+ GZ {tier.gzCost}</span>}
@@ -1714,7 +2293,8 @@ export default function SupplierCogsCalculatorPage() {
                               </TableCell>
                             </TableRow>
                           );
-                        })}
+                        });
+                      })()}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -1754,6 +2334,14 @@ export default function SupplierCogsCalculatorPage() {
                             const stepPcs = stepCtn * (qtyPerCtn || 1);
                             
                             const stepCalc = calculateCogsAndSellingPrice({
+                              importType,
+                              beaMasukPercent,
+                              ppnPercent,
+                              pphPercent,
+                              formECost,
+                              insurancePercent,
+                              handlingCost,
+                              otherCost,
                               foreignPrice,
                               gzDeliveryCost,
                               exchangeRate,
@@ -1770,11 +2358,19 @@ export default function SupplierCogsCalculatorPage() {
                               sponsorPercent,
                             });
 
+                            const nextStepPcs = (baseMoqCtn + step + 1) * (qtyPerCtn || 1);
+                            const qtyLabel = step < 4
+                              ? `${stepPcs} - ${nextStepPcs - 1} pcs`
+                              : `≥ ${stepPcs} pcs`;
+                            const ctnLabel = step < 4
+                              ? `(${stepCtn} ctn)`
+                              : `(≥ ${stepCtn} ctn)`;
+
                             return (
                               <TableRow key={step} className="hover:bg-stone-50 text-xs">
                                 <TableCell className="font-bold text-stone-800">
-                                  {stepPcs} pcs
-                                  <span className="block text-[10px] text-stone-500 font-normal">({stepCtn} ctn)</span>
+                                  {qtyLabel}
+                                  <span className="block text-[10px] text-stone-500 font-normal">{ctnLabel}</span>
                                 </TableCell>
                                 <TableCell className="text-stone-600 font-medium">
                                   Rp {Math.round(stepCalc.seaFreightCostPcs).toLocaleString("id-ID")}
@@ -1842,6 +2438,42 @@ export default function SupplierCogsCalculatorPage() {
                     <span>Indonesian Local Freight allocation</span>
                     <span>Rp {localFreight.toLocaleString("id-ID")}</span>
                   </div>
+                  {importType === "RESMI" && (
+                    <div className="border-t border-blue-100/50 pt-2 space-y-1 text-xs text-blue-800/80">
+                      <div className="flex justify-between">
+                        <span>Form E allocation</span>
+                        <span>Rp {formECostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Insurance allocation</span>
+                        <span>Rp {insuranceCostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>CIF Price per Pcs</span>
+                        <span>Rp {cifSeaPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Bea Masuk ({beaMasukPercent}%)</span>
+                        <span>Rp {bmSeaPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>PPN ({ppnPercent}%)</span>
+                        <span>Rp {ppnSeaPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>PPh ({pphPercent}%)</span>
+                        <span>Rp {pphSeaPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Handling & Clearance allocation</span>
+                        <span>Rp {handlingCostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Biaya Lain-lain allocation</span>
+                        <span>Rp {otherCostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex justify-between border-t border-blue-200 pt-2 font-bold text-blue-950">
                     <span>TOTAL COGS / PCS</span>
                     <span>Rp {Math.round(cogsSea).toLocaleString("id-ID")}</span>
@@ -1889,6 +2521,42 @@ export default function SupplierCogsCalculatorPage() {
                     <span>Indonesian Local Freight allocation</span>
                     <span>Rp {localFreight.toLocaleString("id-ID")}</span>
                   </div>
+                  {importType === "RESMI" && (
+                    <div className="border-t border-amber-100/50 pt-2 space-y-1 text-xs text-amber-800/80">
+                      <div className="flex justify-between">
+                        <span>Form E allocation</span>
+                        <span>Rp {formECostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Insurance allocation</span>
+                        <span>Rp {insuranceCostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>CIF Price per Pcs</span>
+                        <span>Rp {cifAirPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Bea Masuk ({beaMasukPercent}%)</span>
+                        <span>Rp {bmAirPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>PPN ({ppnPercent}%)</span>
+                        <span>Rp {ppnAirPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>PPh ({pphPercent}%)</span>
+                        <span>Rp {pphAirPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Handling & Clearance allocation</span>
+                        <span>Rp {handlingCostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Biaya Lain-lain allocation</span>
+                        <span>Rp {otherCostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex justify-between border-t border-amber-200 pt-2 font-bold text-amber-950">
                     <span>TOTAL COGS / PCS</span>
                     <span>Rp {Math.round(cogsAir).toLocaleString("id-ID")}</span>
