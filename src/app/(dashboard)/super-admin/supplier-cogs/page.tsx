@@ -22,6 +22,8 @@ import {
   Tag,
   Copy,
   Loader2,
+  Image as ImageIcon,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -161,6 +163,44 @@ export default function SupplierCogsCalculatorPage() {
   const [supplierPlatform, setSupplierPlatform] = useState<string>("1688");
   const [supplierContactName, setSupplierContactName] = useState<string>("");
   const [supplierContactLink, setSupplierContactLink] = useState<string>("");
+
+  // Potential Product Image Upload States & Handlers
+  const [imageUrl, setImageUrl] = useState<string>("");
+  const [imagePublicId, setImagePublicId] = useState<string>("");
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const CLOUDINARY_CLOUD_NAME = "do9sfnf5k";
+      const CLOUDINARY_UPLOAD_PRESET = "ml_default";
+      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+      const res = await fetch(cloudinaryUrl, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Gagal upload ke Cloudinary");
+
+      const data = await res.json();
+      setImageUrl(data.secure_url);
+      setImagePublicId(data.public_id);
+      toast.success("Foto produk berhasil diunggah!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal mengunggah foto produk");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Master Currencies & Fast Currency Dialog
   const [masterCurrencies, setMasterCurrencies] = useState<any[]>([]);
@@ -326,6 +366,8 @@ export default function SupplierCogsCalculatorPage() {
     setMargin(Number(rec.margin) || 0);
     setSponsorPercent(Number(rec.sponsorPercent) * 100);
     setNotes(rec.notes ? `${rec.notes} (Salinan Mode)` : "Salinan Mode");
+    setImageUrl(rec.imageUrl || "");
+    setImagePublicId(rec.imagePublicId || "");
 
     // Set editingRecord to null so saving creates a NEW entry
     setEditingRecord(null);
@@ -513,17 +555,24 @@ export default function SupplierCogsCalculatorPage() {
 
   // --- SAVE OR UPDATE CALCULATION ---
   const handleSaveRecord = async () => {
-    if (selectedProductId === "sandbox" && !tempProductName.trim()) {
+    if (cogsStatus === "POTENTIAL" && !tempProductName.trim()) {
       toast.error("Mohon masukkan nama produk sourcing");
+      return;
+    }
+
+    if (cogsStatus === "EXISTING" && (selectedProductId === "sandbox" || !selectedProductId)) {
+      toast.error("Mohon pilih produk dari katalog");
       return;
     }
 
     setSaving(true);
     try {
       const payload = {
-        productId: selectedProductId === "sandbox" ? undefined : selectedProductId,
-        tempProductName: selectedProductId === "sandbox" ? tempProductName.trim() : undefined,
+        productId: cogsStatus === "EXISTING" ? selectedProductId : undefined,
+        tempProductName: cogsStatus === "POTENTIAL" ? tempProductName.trim() : undefined,
         status: cogsStatus,
+        imageUrl: cogsStatus === "POTENTIAL" ? (imageUrl || undefined) : undefined,
+        imagePublicId: cogsStatus === "POTENTIAL" ? (imagePublicId || undefined) : undefined,
         calculationMode,
         tiers: calculationMode === "VARIABLE" ? variableTiers : undefined,
         vendorId: selectedVendorId && selectedVendorId !== "none" ? selectedVendorId : undefined,
@@ -606,6 +655,8 @@ export default function SupplierCogsCalculatorPage() {
     setMargin(10000);
     setSponsorPercent(2);
     setNotes("");
+    setImageUrl("");
+    setImagePublicId("");
   };
 
   const handleAddNew = () => {
@@ -646,6 +697,8 @@ export default function SupplierCogsCalculatorPage() {
     setMargin(Number(rec.margin) || 0);
     setSponsorPercent(Number(rec.sponsorPercent) * 100);
     setNotes(rec.notes || "");
+    setImageUrl(rec.imageUrl || "");
+    setImagePublicId(rec.imagePublicId || "");
     setView("form");
   };
 
@@ -881,8 +934,22 @@ export default function SupplierCogsCalculatorPage() {
                       return (
                         <TableRow key={rec.id} className="hover:bg-stone-50 transition-colors">
                           <TableCell className="font-medium text-stone-850">
-                            <div>
-                              <span>{displayProdName}</span>
+                            <div className="flex items-center gap-3">
+                              {!isExisting && rec.imageUrl ? (
+                                <div className="relative w-10 h-10 border rounded bg-stone-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                  <img
+                                    src={rec.imageUrl}
+                                    alt={displayProdName || "Produk Sourcing"}
+                                    className="object-cover w-full h-full"
+                                  />
+                                </div>
+                              ) : !isExisting ? (
+                                <div className="w-10 h-10 border border-dashed rounded bg-stone-50 flex items-center justify-center text-stone-400 flex-shrink-0">
+                                  <ImageIcon className="w-4 h-4" />
+                                </div>
+                              ) : null}
+                              <div>
+                                <span>{displayProdName}</span>
                               <div className="flex flex-wrap items-center gap-1 mt-1">
                                 {isExisting ? (
                                   <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
@@ -907,7 +974,8 @@ export default function SupplierCogsCalculatorPage() {
                                 )}
                               </div>
                             </div>
-                          </TableCell>
+                          </div>
+                        </TableCell>
                           <TableCell className="text-stone-600">
                             <div className="space-y-1">
                               {rec.vendor?.companyName ? (
@@ -1100,54 +1168,21 @@ export default function SupplierCogsCalculatorPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 pt-6">
-                
-                {/* 1. SELECT PRODUCT OR SANDBOX */}
+                {/* 1. STATUS / TAG SELECTION */}
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase text-stone-600">Master Product Catalog</Label>
-                      <Select value={selectedProductId} onValueChange={(val) => {
-                        setSelectedProductId(val);
-                        if (val !== "sandbox") {
-                          setCogsStatus("EXISTING");
-                        }
-                      }}>
-                        <SelectTrigger className="bg-stone-50 border-stone-300">
-                          <SelectValue placeholder="Pilih Produk" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sandbox">⭐ [Sourcing Sandbox / Item Baru]</SelectItem>
-                          {products.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name} ({p.sku})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {selectedProductId === "sandbox" && (
-                      <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase text-stone-600">Nama Produk Sourcing</Label>
-                        <Input
-                          placeholder="Contoh: Tumbler Ceramic Type-D"
-                          value={tempProductName}
-                          onChange={(e) => setTempProductName(e.target.value)}
-                          className="bg-stone-50 border-stone-300"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* STATUS / TAG SELECTION */}
-                  <div className="space-y-2 pt-2 border-t border-stone-100">
+                  <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase text-stone-600 flex items-center gap-1.5">
                       <Tag className="w-3.5 h-3.5 text-stone-500" /> Status / Tag Produk COGS
                     </Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <button
                         type="button"
-                        onClick={() => setCogsStatus("EXISTING")}
+                        onClick={() => {
+                          setCogsStatus("EXISTING");
+                          if (selectedProductId === "sandbox") {
+                            setSelectedProductId("");
+                          }
+                        }}
                         className={`p-3 rounded-md border text-left flex flex-col gap-1 transition-all cursor-pointer ${
                           cogsStatus === "EXISTING"
                             ? "border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-600 shadow-2xs"
@@ -1168,7 +1203,10 @@ export default function SupplierCogsCalculatorPage() {
 
                       <button
                         type="button"
-                        onClick={() => setCogsStatus("POTENTIAL")}
+                        onClick={() => {
+                          setCogsStatus("POTENTIAL");
+                          setSelectedProductId("sandbox");
+                        }}
                         className={`p-3 rounded-md border text-left flex flex-col gap-1 transition-all cursor-pointer ${
                           cogsStatus === "POTENTIAL"
                             ? "border-sky-600 bg-sky-50/70 ring-1 ring-sky-600 shadow-2xs"
@@ -1188,6 +1226,84 @@ export default function SupplierCogsCalculatorPage() {
                       </button>
                     </div>
                   </div>
+
+                  {/* 2. DYNAMIC INPUTS BASED ON STATUS */}
+                  {cogsStatus === "EXISTING" ? (
+                    <div className="space-y-2 pt-2 border-t border-stone-100">
+                      <Label className="text-xs font-bold uppercase text-stone-600">Master Product Catalog</Label>
+                      <Select
+                        value={selectedProductId === "sandbox" ? "" : selectedProductId}
+                        onValueChange={setSelectedProductId}
+                      >
+                        <SelectTrigger className="bg-stone-50 border-stone-300">
+                          <SelectValue placeholder="Pilih Produk dari Katalog" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name} ({p.sku})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-stone-100">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase text-stone-600">Nama Produk Sourcing</Label>
+                        <Input
+                          placeholder="Contoh: Tumbler Ceramic Type-D"
+                          value={tempProductName}
+                          onChange={(e) => setTempProductName(e.target.value)}
+                          className="bg-stone-50 border-stone-300"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase text-stone-600">Foto Produk Potential</Label>
+                        {imageUrl ? (
+                          <div className="relative w-full h-[90px] border border-stone-200 rounded-md overflow-hidden bg-stone-50 flex items-center justify-center group">
+                            <img
+                              src={imageUrl}
+                              alt="Preview Produk"
+                              className="object-contain w-full h-full"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setImageUrl("");
+                                setImagePublicId("");
+                              }}
+                              className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="relative w-full h-[90px] border border-dashed border-stone-300 rounded-md bg-stone-50 hover:bg-stone-100/80 transition-colors flex flex-col items-center justify-center cursor-pointer">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageUpload}
+                              disabled={isUploading}
+                              className="absolute inset-0 opacity-0 cursor-pointer"
+                            />
+                            {isUploading ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                                <span className="text-[9px] text-stone-500">Mengunggah...</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-1.5 text-stone-400">
+                                <ImageIcon className="w-5 h-5" />
+                                <span className="text-[9px] text-stone-500">Upload Foto Produk</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. SELECT SUPPLIER & SERVICE VENDOR (SIDE BY SIDE) */}
