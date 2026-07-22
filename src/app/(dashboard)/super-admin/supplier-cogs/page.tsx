@@ -1467,7 +1467,7 @@ export default function SupplierCogsCalculatorPage() {
                 </div>
 
                 {/* 3. SUPPLIER PRICING DETAILS */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
+                <div className={`grid grid-cols-1 ${calculationMode === "VARIABLE" ? "md:grid-cols-2" : "md:grid-cols-3"} gap-4 border-t pt-4`}>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase text-stone-600 flex items-center gap-1.5">
                       <Coins className="w-4 h-4 text-stone-500" /> Mata Uang
@@ -1526,18 +1526,20 @@ export default function SupplierCogsCalculatorPage() {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-stone-600">Harga Beli Supplier</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
-                      <Input
-                        type="number"
-                        value={foreignPrice}
-                        onChange={(e) => setForeignPrice(Number(e.target.value))}
-                        className="pl-12 bg-stone-50 border-stone-300"
-                      />
+                  {calculationMode !== "VARIABLE" && (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-stone-600">Harga Beli Supplier</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
+                        <Input
+                          type="number"
+                          value={foreignPrice}
+                          onChange={(e) => setForeignPrice(Number(e.target.value))}
+                          className="pl-12 bg-stone-50 border-stone-300"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase text-stone-600 flex items-center justify-between">
@@ -1749,19 +1751,21 @@ export default function SupplierCogsCalculatorPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                    <div className="space-y-2">
-                      <Label className="text-xs text-stone-500 font-semibold uppercase">GZ Delivery Cost (Guangzhou)</Label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
-                        <Input
-                          type="number"
-                          value={gzDeliveryCost}
-                          onChange={(e) => setGzDeliveryCost(Number(e.target.value))}
-                          className="pl-12 bg-stone-50 border-stone-300"
-                        />
+                  <div className={`grid grid-cols-1 ${calculationMode === "VARIABLE" ? "" : "md:grid-cols-2"} gap-4 pt-1`}>
+                    {calculationMode !== "VARIABLE" && (
+                      <div className="space-y-2">
+                        <Label className="text-xs text-stone-500 font-semibold uppercase">GZ Delivery Cost (Guangzhou)</Label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
+                          <Input
+                            type="number"
+                            value={gzDeliveryCost}
+                            onChange={(e) => setGzDeliveryCost(Number(e.target.value))}
+                            className="pl-12 bg-stone-50 border-stone-300"
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label className="text-xs text-stone-500 font-semibold uppercase">Local Delivery (Warehouse IDR)</Label>
