@@ -1664,57 +1664,68 @@ export default function SupplierCogsCalculatorPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {variableTiers.map((tier) => {
-                            const computedCtn = (tier.totalPcs / (qtyPerCtn || 1)).toFixed(2);
-                            return (
-                              <TableRow key={tier.id}>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={tier.totalPcs}
-                                    onChange={(e) => handleUpdateTier(tier.id, "totalPcs", Number(e.target.value))}
-                                    className="bg-white h-8 text-xs font-semibold w-28"
-                                  />
-                                </TableCell>
-                                <TableCell className="text-xs font-bold text-stone-600">
-                                  {computedCtn} Ctn
-                                </TableCell>
-                                <TableCell>
-                                  <div className="relative">
-                                    <span className="absolute left-2.5 top-1.5 text-xs text-stone-400 font-bold">{currency}</span>
+                          {(() => {
+                            const sortedTiers = [...variableTiers].sort((a, b) => Number(a.totalPcs) - Number(b.totalPcs));
+                            return variableTiers.map((tier) => {
+                              const idx = sortedTiers.findIndex((t) => t.id === tier.id);
+                              const rangeLabel = sortedTiers.length > 1 && idx > -1 && idx < sortedTiers.length - 1 && sortedTiers[idx + 1].totalPcs > tier.totalPcs
+                                ? `${tier.totalPcs} - ${sortedTiers[idx + 1].totalPcs - 1} pcs`
+                                : `≥ ${tier.totalPcs} pcs`;
+
+                              const computedCtn = (tier.totalPcs / (qtyPerCtn || 1)).toFixed(2);
+                              return (
+                                <TableRow key={tier.id}>
+                                  <TableCell>
                                     <Input
                                       type="number"
-                                      value={tier.pricePcs}
-                                      onChange={(e) => handleUpdateTier(tier.id, "pricePcs", Number(e.target.value))}
-                                      className="bg-white h-8 text-xs font-semibold pl-12 w-40"
+                                      value={tier.totalPcs}
+                                      onChange={(e) => handleUpdateTier(tier.id, "totalPcs", Number(e.target.value))}
+                                      className="bg-white h-8 text-xs font-semibold w-28"
                                     />
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="relative">
-                                    <span className="absolute left-2.5 top-1.5 text-xs text-stone-400 font-bold">{currency}</span>
-                                    <Input
-                                      type="number"
-                                      value={tier.gzCost}
-                                      onChange={(e) => handleUpdateTier(tier.id, "gzCost", Number(e.target.value))}
-                                      className="bg-white h-8 text-xs font-semibold pl-12 w-32"
-                                    />
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleRemoveTier(tier.id)}
-                                    className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700"
-                                  >
-                                    <Trash className="h-3.5 w-3.5" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
+                                    <span className="block text-[10px] text-stone-400 font-semibold mt-1 pl-1">
+                                      Range: {rangeLabel}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-xs font-bold text-stone-600">
+                                    {computedCtn} Ctn
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="relative">
+                                      <span className="absolute left-2.5 top-1.5 text-xs text-stone-400 font-bold">{currency}</span>
+                                      <Input
+                                        type="number"
+                                        value={tier.pricePcs}
+                                        onChange={(e) => handleUpdateTier(tier.id, "pricePcs", Number(e.target.value))}
+                                        className="bg-white h-8 text-xs font-semibold pl-12 w-40"
+                                      />
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="relative">
+                                      <span className="absolute left-2.5 top-1.5 text-xs text-stone-400 font-bold">{currency}</span>
+                                      <Input
+                                        type="number"
+                                        value={tier.gzCost}
+                                        onChange={(e) => handleUpdateTier(tier.id, "gzCost", Number(e.target.value))}
+                                        className="bg-white h-8 text-xs font-semibold pl-12 w-32"
+                                      />
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleRemoveTier(tier.id)}
+                                      className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700"
+                                    >
+                                      <Trash className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            });
+                          })()}
                         </TableBody>
                       </Table>
                     </div>
@@ -1886,30 +1897,41 @@ export default function SupplierCogsCalculatorPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {variableTiers.map((tier) => {
-                          const tierCalc = calculateCogsAndSellingPrice({
-                            foreignPrice: tier.pricePcs,
-                            gzDeliveryCost: tier.gzCost,
-                            exchangeRate,
-                            qtyPcs: tier.totalPcs,
-                            qtyPerCtn,
-                            length,
-                            width,
-                            height,
-                            weight,
-                            seaFreightRate,
-                            airFreightRate,
-                            localFreight,
-                            margin,
-                            sponsorPercent,
-                          });
+                        {(() => {
+                          const sortedTiers = [...variableTiers].sort((a, b) => Number(a.totalPcs) - Number(b.totalPcs));
+                          return sortedTiers.map((tier, idx) => {
+                            const tierCalc = calculateCogsAndSellingPrice({
+                              foreignPrice: tier.pricePcs,
+                              gzDeliveryCost: tier.gzCost,
+                              exchangeRate,
+                              qtyPcs: tier.totalPcs,
+                              qtyPerCtn,
+                              length,
+                              width,
+                              height,
+                              weight,
+                              seaFreightRate,
+                              airFreightRate,
+                              localFreight,
+                              margin,
+                              sponsorPercent,
+                            });
 
-                          return (
-                            <TableRow key={tier.id} className="hover:bg-stone-50 text-xs">
-                              <TableCell className="font-bold text-stone-800">
-                                {tier.totalPcs} pcs
-                                <span className="block text-[10px] text-stone-500 font-normal">({tierCalc.totalCtn} ctn)</span>
-                              </TableCell>
+                            const safeQtyPerCtn = qtyPerCtn || 1;
+                            const qtyLabel = sortedTiers.length > 1 && idx < sortedTiers.length - 1 && sortedTiers[idx + 1].totalPcs > tier.totalPcs
+                              ? `${tier.totalPcs} - ${sortedTiers[idx + 1].totalPcs - 1} pcs`
+                              : `≥ ${tier.totalPcs} pcs`;
+
+                            const ctnLabel = sortedTiers.length > 1 && idx < sortedTiers.length - 1 && sortedTiers[idx + 1].totalPcs > tier.totalPcs
+                              ? `(${(tier.totalPcs / safeQtyPerCtn).toFixed(2)} - ${((sortedTiers[idx + 1].totalPcs - 1) / safeQtyPerCtn).toFixed(2)} ctn)`
+                              : `(≥ ${(tier.totalPcs / safeQtyPerCtn).toFixed(2)} ctn)`;
+
+                            return (
+                              <TableRow key={tier.id} className="hover:bg-stone-50 text-xs">
+                                <TableCell className="font-bold text-stone-800">
+                                  {qtyLabel}
+                                  <span className="block text-[10px] text-stone-500 font-normal">{ctnLabel}</span>
+                                </TableCell>
                               <TableCell className="font-semibold text-stone-700">
                                 {currency} {tier.pricePcs.toLocaleString("id-ID")}
                                 {tier.gzCost > 0 && <span className="block text-[9px] text-stone-400">+ GZ {tier.gzCost}</span>}
@@ -1928,7 +1950,8 @@ export default function SupplierCogsCalculatorPage() {
                               </TableCell>
                             </TableRow>
                           );
-                        })}
+                        });
+                      })()}
                       </TableBody>
                     </Table>
                   </CardContent>
