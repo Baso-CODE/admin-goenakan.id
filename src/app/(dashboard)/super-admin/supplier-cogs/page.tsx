@@ -183,6 +183,11 @@ export default function SupplierCogsCalculatorPage() {
 
       setMasterCurrencies((prev) => [...prev, newCurrency]);
       setCurrency(newCurrency.code);
+      if (newCurrency.rate) {
+        setExchangeRate(Number(newCurrency.rate));
+      } else {
+        setExchangeRate(1);
+      }
       setIsCurrencyModalOpen(false);
       toast.success("Currency berhasil ditambahkan!");
     } catch (err: any) {
@@ -435,16 +440,7 @@ export default function SupplierCogsCalculatorPage() {
     }
   }, [selectedProductId, products]);
 
-  // Sync exchange rate input when currency changes
-  useEffect(() => {
-    // If master currency has a default exchange rate, use it, or fallback to live rate
-    const foundMaster = masterCurrencies.find((c) => c.code === currency);
-    if (foundMaster && foundMaster.rate) {
-      setExchangeRate(Number(foundMaster.rate));
-    } else {
-      setExchangeRate(ratesData[currency] || (currency === "RMB" ? 2250 : currency === "USD" ? 16200 : 1));
-    }
-  }, [currency, ratesData, masterCurrencies]);
+
 
   // --- MATHEMATICAL COGS FORMULAS ---
   const calcResults = calculateCogsAndSellingPrice({
@@ -1299,6 +1295,12 @@ export default function SupplierCogsCalculatorPage() {
                           setIsCurrencyModalOpen(true);
                         } else {
                           setCurrency(val);
+                          const foundMaster = masterCurrencies.find((c) => c.code === val);
+                          if (foundMaster && foundMaster.rate) {
+                            setExchangeRate(Number(foundMaster.rate));
+                          } else {
+                            setExchangeRate(ratesData[val] || (val === "RMB" ? 2250 : val === "USD" ? 16200 : 1));
+                          }
                         }
                       }}
                       value={currency}
