@@ -1331,32 +1331,38 @@ export default function SupplierCogsCalculatorPage() {
                   </div>
                   
                   {/* MODE SWITCHER & CONVERT */}
-                  <div className="flex gap-1 bg-stone-100 p-1 rounded-md border border-stone-200 self-start md:self-auto">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleOrConvertMode("FIXED")}
-                      className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
-                        calculationMode === "FIXED"
-                          ? "bg-white text-stone-900 shadow-2xs border border-stone-200"
-                          : "text-stone-500 hover:text-stone-800"
-                      }`}
-                      title="Konversi / Alihkan ke Fixed Mode"
-                    >
-                      📏 Fixed Mode
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleOrConvertMode("VARIABLE")}
-                      className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
-                        calculationMode === "VARIABLE"
-                          ? "bg-indigo-600 text-white shadow-2xs"
-                          : "text-stone-500 hover:text-stone-800"
-                      }`}
-                      title="Konversi / Alihkan ke Variable Mode"
-                    >
-                      📊 Variable Mode
-                    </button>
-                  </div>
+                  {importType !== "RESMI" ? (
+                    <div className="flex gap-1 bg-stone-100 p-1 rounded-md border border-stone-200 self-start md:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleOrConvertMode("FIXED")}
+                        className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                          calculationMode === "FIXED"
+                            ? "bg-white text-stone-900 shadow-2xs border border-stone-200"
+                            : "text-stone-500 hover:text-stone-800"
+                        }`}
+                        title="Konversi / Alihkan ke Fixed Mode"
+                      >
+                        📏 Fixed Mode
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleOrConvertMode("VARIABLE")}
+                        className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                          calculationMode === "VARIABLE"
+                            ? "bg-indigo-600 text-white shadow-2xs"
+                            : "text-stone-500 hover:text-stone-800"
+                        }`}
+                        title="Konversi / Alihkan ke Variable Mode"
+                      >
+                        📊 Variable Mode
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 self-start md:self-auto select-none">
+                      📏 Fixed (Resmi)
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 pt-6">
@@ -1379,7 +1385,10 @@ export default function SupplierCogsCalculatorPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setImportType("RESMI")}
+                      onClick={() => {
+                        setImportType("RESMI");
+                        setCalculationMode("FIXED");
+                      }}
                       className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
                         importType === "RESMI"
                           ? "bg-white text-stone-900 shadow-xs"
