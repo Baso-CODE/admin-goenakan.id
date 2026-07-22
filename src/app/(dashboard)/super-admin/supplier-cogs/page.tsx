@@ -50,6 +50,14 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 
 function calculateCogsAndSellingPrice({
+  importType,
+  beaMasukPercent = 0,
+  ppnPercent = 11,
+  pphPercent = 2.5,
+  formECost = 0,
+  insurancePercent = 0,
+  handlingCost = 0,
+  otherCost = 0,
   foreignPrice,
   gzDeliveryCost,
   exchangeRate,
@@ -65,6 +73,14 @@ function calculateCogsAndSellingPrice({
   margin,
   sponsorPercent,
 }: {
+  importType: "BORONGAN" | "RESMI";
+  beaMasukPercent?: number;
+  ppnPercent?: number;
+  pphPercent?: number;
+  formECost?: number;
+  insurancePercent?: number;
+  handlingCost?: number;
+  otherCost?: number;
   foreignPrice: number;
   gzDeliveryCost: number;
   exchangeRate: number;
@@ -87,7 +103,7 @@ function calculateCogsAndSellingPrice({
   // Volumetric conversions
   const cbmPerCtn = (length * width * height) / 1000000;
   const totalCbm = cbmPerCtn * totalCtn;
-  const totalSeaCbmAlloc = Math.max(0.1, totalCbm); // Min 0.1 CBM
+  const totalSeaCbmAlloc = Math.max(0.1, totalCbm);
 
   // Air weight allocation (comparison of Sea CBM vs weight + 2kg packaging overhead per carton)
   const totalAirWeightAlloc = Math.max(totalSeaCbmAlloc, (weight + 2) * totalCtn);
@@ -102,9 +118,44 @@ function calculateCogsAndSellingPrice({
   // Base cost per piece
   const baseCostPcs = foreignPrice * exchangeRate;
 
-  // Total COGS
-  const cogsSea = baseCostPcs + gzDeliveryCostPcs + seaFreightCostPcs + localFreight;
-  const cogsAir = baseCostPcs + gzDeliveryCostPcs + airFreightCostPcs + localFreight;
+  let cogsSea = 0;
+  let cogsAir = 0;
+
+  if (importType === "RESMI") {
+    // Form E allocation per piece
+    const formECostPcs = (formECost * exchangeRate) / safeQtyPcs;
+
+    // Insurance allocation per piece
+    const insuranceCostPcs = (insurancePercent / 100) * baseCostPcs;
+
+    // CIF per piece
+    const cifSeaPcs = baseCostPcs + gzDeliveryCostPcs + formECostPcs + seaFreightCostPcs + insuranceCostPcs;
+    const cifAirPcs = baseCostPcs + gzDeliveryCostPcs + formECostPcs + airFreightCostPcs + insuranceCostPcs;
+
+    // Taxes
+    const bmSeaPcs = (beaMasukPercent / 100) * cifSeaPcs;
+    const bmAirPcs = (beaMasukPercent / 100) * cifAirPcs;
+
+    const ppnSeaPcs = (ppnPercent / 100) * (cifSeaPcs + bmSeaPcs);
+    const ppnAirPcs = (ppnPercent / 100) * (cifAirPcs + bmAirPcs);
+
+    const pphSeaPcs = (pphPercent / 100) * (cifSeaPcs + bmSeaPcs);
+    const pphAirPcs = (pphPercent / 100) * (cifAirPcs + bmAirPcs);
+
+    const taxSeaPcs = bmSeaPcs + ppnSeaPcs + pphSeaPcs;
+    const taxAirPcs = bmAirPcs + ppnAirPcs + pphAirPcs;
+
+    // Handling & Other flat costs allocation
+    const handlingCostPcs = handlingCost / safeQtyPcs;
+    const otherCostPcs = otherCost / safeQtyPcs;
+
+    cogsSea = cifSeaPcs + taxSeaPcs + handlingCostPcs + otherCostPcs + localFreight;
+    cogsAir = cifAirPcs + taxAirPcs + handlingCostPcs + otherCostPcs + localFreight;
+  } else {
+    // BORONGAN math
+    cogsSea = baseCostPcs + gzDeliveryCostPcs + seaFreightCostPcs + localFreight;
+    cogsAir = baseCostPcs + gzDeliveryCostPcs + airFreightCostPcs + localFreight;
+  }
 
   // Suggested Selling Prices
   const sponsorMultiplier = 1 + (sponsorPercent / 100);
@@ -277,6 +328,17 @@ export default function SupplierCogsCalculatorPage() {
     }
   };
 
+  // Import Mode: BORONGAN vs RESMI
+  const [importType, setImportType] = useState<"BORONGAN" | "RESMI">("BORONGAN");
+  const [hsCode, setHsCode] = useState<string>("");
+  const [beaMasukPercent, setBeaMasukPercent] = useState<number>(0);
+  const [ppnPercent, setPpnPercent] = useState<number>(11);
+  const [pphPercent, setPphPercent] = useState<number>(2.5);
+  const [formECost, setFormECost] = useState<number>(0);
+  const [insurancePercent, setInsurancePercent] = useState<number>(0);
+  const [handlingCost, setHandlingCost] = useState<number>(0);
+  const [otherCost, setOtherCost] = useState<number>(0);
+
   // Mode Calculation: FIXED vs VARIABLE
   const [calculationMode, setCalculationMode] = useState<"FIXED" | "VARIABLE">("FIXED");
   const [variableTiers, setVariableTiers] = useState<Array<{ id: string; totalPcs: number; pricePcs: number; gzCost: number }>>([
@@ -368,6 +430,16 @@ export default function SupplierCogsCalculatorPage() {
     setNotes(rec.notes ? `${rec.notes} (Salinan Mode)` : "Salinan Mode");
     setImageUrl(rec.imageUrl || "");
     setImagePublicId(rec.imagePublicId || "");
+
+    setImportType((rec.importType as "BORONGAN" | "RESMI") || "BORONGAN");
+    setHsCode(rec.hsCode || "");
+    setBeaMasukPercent(Number(rec.beaMasukPercent) || 0);
+    setPpnPercent(Number(rec.ppnPercent) ?? 11);
+    setPphPercent(Number(rec.pphPercent) ?? 2.5);
+    setFormECost(Number(rec.formECost) || 0);
+    setInsurancePercent(Number(rec.insurancePercent) || 0);
+    setHandlingCost(Number(rec.handlingCost) || 0);
+    setOtherCost(Number(rec.otherCost) || 0);
 
     // Set editingRecord to null so saving creates a NEW entry
     setEditingRecord(null);
@@ -541,6 +613,14 @@ export default function SupplierCogsCalculatorPage() {
 
   // --- MATHEMATICAL COGS FORMULAS ---
   const calcResults = calculateCogsAndSellingPrice({
+    importType,
+    beaMasukPercent,
+    ppnPercent,
+    pphPercent,
+    formECost,
+    insurancePercent,
+    handlingCost,
+    otherCost,
     foreignPrice,
     gzDeliveryCost,
     exchangeRate,
@@ -570,6 +650,20 @@ export default function SupplierCogsCalculatorPage() {
     sellPriceSea,
     sellPriceAir,
   } = calcResults;
+
+  const activeQtyPcs = Math.max(1, qtyPcs);
+  const formECostPcsVal = (formECost * exchangeRate) / activeQtyPcs;
+  const insuranceCostPcsVal = (insurancePercent / 100) * baseCostPcs;
+  const cifSeaPcsVal = baseCostPcs + gzDeliveryCostPcs + formECostPcsVal + seaFreightCostPcs + insuranceCostPcsVal;
+  const cifAirPcsVal = baseCostPcs + gzDeliveryCostPcs + formECostPcsVal + airFreightCostPcs + insuranceCostPcsVal;
+  const bmSeaPcsVal = (beaMasukPercent / 100) * cifSeaPcsVal;
+  const bmAirPcsVal = (beaMasukPercent / 100) * cifAirPcsVal;
+  const ppnSeaPcsVal = (ppnPercent / 100) * (cifSeaPcsVal + bmSeaPcsVal);
+  const ppnAirPcsVal = (ppnPercent / 100) * (cifAirPcsVal + bmAirPcsVal);
+  const pphSeaPcsVal = (pphPercent / 100) * (cifSeaPcsVal + bmSeaPcsVal);
+  const pphAirPcsVal = (pphPercent / 100) * (cifAirPcsVal + bmAirPcsVal);
+  const handlingCostPcsVal = handlingCost / activeQtyPcs;
+  const otherCostPcsVal = otherCost / activeQtyPcs;
 
   // --- SAVE OR UPDATE CALCULATION ---
   const handleSaveRecord = async () => {
@@ -614,6 +708,15 @@ export default function SupplierCogsCalculatorPage() {
         margin,
         sponsorPercent: sponsorPercent / 100,
         notes: notes.trim() || undefined,
+        importType,
+        hsCode: importType === "RESMI" ? (hsCode.trim() || undefined) : undefined,
+        beaMasukPercent: importType === "RESMI" ? beaMasukPercent : undefined,
+        ppnPercent: importType === "RESMI" ? ppnPercent : undefined,
+        pphPercent: importType === "RESMI" ? pphPercent : undefined,
+        formECost: importType === "RESMI" ? formECost : undefined,
+        insurancePercent: importType === "RESMI" ? insurancePercent : undefined,
+        handlingCost: importType === "RESMI" ? handlingCost : undefined,
+        otherCost: importType === "RESMI" ? otherCost : undefined,
       };
 
       const isEdit = !!editingRecord;
@@ -675,6 +778,15 @@ export default function SupplierCogsCalculatorPage() {
     setNotes("");
     setImageUrl("");
     setImagePublicId("");
+    setImportType("BORONGAN");
+    setHsCode("");
+    setBeaMasukPercent(0);
+    setPpnPercent(11);
+    setPphPercent(2.5);
+    setFormECost(0);
+    setInsurancePercent(0);
+    setHandlingCost(0);
+    setOtherCost(0);
   };
 
   const handleAddNew = () => {
@@ -717,6 +829,15 @@ export default function SupplierCogsCalculatorPage() {
     setNotes(rec.notes || "");
     setImageUrl(rec.imageUrl || "");
     setImagePublicId(rec.imagePublicId || "");
+    setImportType((rec.importType as "BORONGAN" | "RESMI") || "BORONGAN");
+    setHsCode(rec.hsCode || "");
+    setBeaMasukPercent(Number(rec.beaMasukPercent) || 0);
+    setPpnPercent(Number(rec.ppnPercent) ?? 11);
+    setPphPercent(Number(rec.pphPercent) ?? 2.5);
+    setFormECost(Number(rec.formECost) || 0);
+    setInsurancePercent(Number(rec.insurancePercent) || 0);
+    setHandlingCost(Number(rec.handlingCost) || 0);
+    setOtherCost(Number(rec.otherCost) || 0);
     setView("form");
   };
 
@@ -1257,13 +1378,11 @@ export default function SupplierCogsCalculatorPage() {
                           <SelectValue placeholder="Pilih Produk dari Katalog" />
                         </SelectTrigger>
                         <SelectContent>
-                          {products
-                            .filter((p) => p.id !== "sandbox" && p.sku !== "sandbox")
-                            .map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.name} ({p.sku})
-                              </SelectItem>
-                            ))}
+                          {products.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name} ({p.sku})
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1734,6 +1853,146 @@ export default function SupplierCogsCalculatorPage() {
                   </div>
                 )}
 
+                {/* TIPE IMPOR SELECTOR & RESMI FIELDS */}
+                <div className="border-t pt-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold uppercase text-stone-600">Tipe Impor</Label>
+                    <div className="flex bg-stone-100 p-0.5 rounded-lg border border-stone-200">
+                      <button
+                        type="button"
+                        onClick={() => setImportType("BORONGAN")}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                          importType === "BORONGAN"
+                            ? "bg-white text-stone-900 shadow-xs"
+                            : "text-stone-500 hover:text-stone-900"
+                        }`}
+                      >
+                        📦 Borongan (All-In)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setImportType("RESMI")}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                          importType === "RESMI"
+                            ? "bg-white text-stone-900 shadow-xs"
+                            : "text-stone-500 hover:text-stone-900"
+                        }`}
+                      >
+                        🏦 Resmi (Official)
+                      </button>
+                    </div>
+                  </div>
+
+                  {importType === "RESMI" && (
+                    <div className="bg-stone-50 border border-stone-200 p-4 rounded-xl space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold flex items-center justify-between">
+                            <span>Kode HS Code</span>
+                            <a
+                              href="https://eservice.insw.go.id/"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 font-bold"
+                            >
+                              Cek di INSW 🌐
+                            </a>
+                          </Label>
+                          <Input
+                            placeholder="Contoh: 9503.00.90"
+                            value={hsCode}
+                            onChange={(e) => setHsCode(e.target.value)}
+                            className="bg-white border-stone-300"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">Biaya Form E (Supplier tektokan)</Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
+                            <Input
+                              type="number"
+                              value={formECost}
+                              onChange={(e) => setFormECost(Number(e.target.value))}
+                              className="pl-12 bg-white border-stone-300"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">Bea Masuk (%)</Label>
+                          <Input
+                            type="number"
+                            value={beaMasukPercent}
+                            onChange={(e) => setBeaMasukPercent(Number(e.target.value))}
+                            className="bg-white border-stone-300"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">PPN (%)</Label>
+                          <Input
+                            type="number"
+                            value={ppnPercent}
+                            onChange={(e) => setPpnPercent(Number(e.target.value))}
+                            className="bg-white border-stone-300"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">PPh (%)</Label>
+                          <Input
+                            type="number"
+                            value={pphPercent}
+                            onChange={(e) => setPphPercent(Number(e.target.value))}
+                            className="bg-white border-stone-300"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">Asuransi (%)</Label>
+                          <Input
+                            type="number"
+                            value={insurancePercent}
+                            onChange={(e) => setInsurancePercent(Number(e.target.value))}
+                            className="bg-white border-stone-300"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">Handling & Undername Cost (IDR)</Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
+                            <Input
+                              type="number"
+                              value={handlingCost}
+                              onChange={(e) => setHandlingCost(Number(e.target.value))}
+                              className="pl-9 bg-white border-stone-300"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-stone-500 font-semibold">Biaya Lain-lain (IDR)</Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
+                            <Input
+                              type="number"
+                              value={otherCost}
+                              onChange={(e) => setOtherCost(Number(e.target.value))}
+                              className="pl-9 bg-white border-stone-300"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* 5. LOGISTICS & SHIPPING FREIGHT RATES */}
                 <div className="border-t pt-4 space-y-4">
                   <h4 className="text-xs font-bold uppercase text-stone-600 tracking-wider">Shipping & Freight Rates (Tarif Pengiriman)</h4>
@@ -1903,6 +2162,14 @@ export default function SupplierCogsCalculatorPage() {
                           const sortedTiers = [...variableTiers].sort((a, b) => Number(a.totalPcs) - Number(b.totalPcs));
                           return sortedTiers.map((tier, idx) => {
                             const tierCalc = calculateCogsAndSellingPrice({
+                              importType,
+                              beaMasukPercent,
+                              ppnPercent,
+                              pphPercent,
+                              formECost,
+                              insurancePercent,
+                              handlingCost,
+                              otherCost,
                               foreignPrice: tier.pricePcs,
                               gzDeliveryCost: tier.gzCost,
                               exchangeRate,
@@ -1993,6 +2260,14 @@ export default function SupplierCogsCalculatorPage() {
                             const stepPcs = stepCtn * (qtyPerCtn || 1);
                             
                             const stepCalc = calculateCogsAndSellingPrice({
+                              importType,
+                              beaMasukPercent,
+                              ppnPercent,
+                              pphPercent,
+                              formECost,
+                              insurancePercent,
+                              handlingCost,
+                              otherCost,
                               foreignPrice,
                               gzDeliveryCost,
                               exchangeRate,
@@ -2089,6 +2364,42 @@ export default function SupplierCogsCalculatorPage() {
                     <span>Indonesian Local Freight allocation</span>
                     <span>Rp {localFreight.toLocaleString("id-ID")}</span>
                   </div>
+                  {importType === "RESMI" && (
+                    <div className="border-t border-blue-100/50 pt-2 space-y-1 text-xs text-blue-800/80">
+                      <div className="flex justify-between">
+                        <span>Form E allocation</span>
+                        <span>Rp {formECostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Insurance allocation</span>
+                        <span>Rp {insuranceCostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>CIF Price per Pcs</span>
+                        <span>Rp {cifSeaPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Bea Masuk ({beaMasukPercent}%)</span>
+                        <span>Rp {bmSeaPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>PPN ({ppnPercent}%)</span>
+                        <span>Rp {ppnSeaPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>PPh ({pphPercent}%)</span>
+                        <span>Rp {pphSeaPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Handling & Clearance allocation</span>
+                        <span>Rp {handlingCostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Biaya Lain-lain allocation</span>
+                        <span>Rp {otherCostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex justify-between border-t border-blue-200 pt-2 font-bold text-blue-950">
                     <span>TOTAL COGS / PCS</span>
                     <span>Rp {Math.round(cogsSea).toLocaleString("id-ID")}</span>
@@ -2136,6 +2447,42 @@ export default function SupplierCogsCalculatorPage() {
                     <span>Indonesian Local Freight allocation</span>
                     <span>Rp {localFreight.toLocaleString("id-ID")}</span>
                   </div>
+                  {importType === "RESMI" && (
+                    <div className="border-t border-amber-100/50 pt-2 space-y-1 text-xs text-amber-800/80">
+                      <div className="flex justify-between">
+                        <span>Form E allocation</span>
+                        <span>Rp {formECostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Insurance allocation</span>
+                        <span>Rp {insuranceCostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>CIF Price per Pcs</span>
+                        <span>Rp {cifAirPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Bea Masuk ({beaMasukPercent}%)</span>
+                        <span>Rp {bmAirPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>PPN ({ppnPercent}%)</span>
+                        <span>Rp {ppnAirPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>PPh ({pphPercent}%)</span>
+                        <span>Rp {pphAirPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Handling & Clearance allocation</span>
+                        <span>Rp {handlingCostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Biaya Lain-lain allocation</span>
+                        <span>Rp {otherCostPcsVal.toLocaleString("id-ID")}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex justify-between border-t border-amber-200 pt-2 font-bold text-amber-950">
                     <span>TOTAL COGS / PCS</span>
                     <span>Rp {Math.round(cogsAir).toLocaleString("id-ID")}</span>
