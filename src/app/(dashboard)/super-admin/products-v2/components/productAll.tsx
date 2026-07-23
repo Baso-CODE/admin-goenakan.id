@@ -56,7 +56,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ProductSeoForm } from "./productSeoForm";
-import { ProductMockupModal } from "./ProductMockupModal";
 
 type Product = {
   id: string;
@@ -491,16 +490,6 @@ export default function ProductsAll() {
                         </TableCell>
                         <TableCell className="text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            <ProductMockupModal
-                              productName={product.name}
-                              productSku={product.sku}
-                              imageUrl={thumbnail?.url}
-                              images={product.images}
-                              isMultiFace={product.isMultiFace}
-                              mockupFrontImageId={product.mockupFrontImageId}
-                              mockupBackImageId={product.mockupBackImageId}
-                            />
-                            
                             {/* Bungkus semuanya di dalam komponen Dialog */}
                             <Dialog>
                               <DropdownMenu>
