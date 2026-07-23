@@ -26,7 +26,7 @@ import { toast } from "sonner";
 interface AddItemCategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // ✨ Mengharapkan 1 argumen data
+  //  Mengharapkan 1 argumen data
   onSuccess: (newItemCategory: any) => void;
   parentCategoryId?: string;
 }
@@ -35,7 +35,7 @@ export function AddItemCategoryModal({
   isOpen,
   onClose,
   onSuccess,
-  parentCategoryId = "", // ✨ Jangan lupa tangkap prop ini
+  parentCategoryId = "", //  Jangan lupa tangkap prop ini
 }: AddItemCategoryModalProps) {
   const { fetchApi } = useApi();
   const [loading, setLoading] = useState(false);
@@ -89,12 +89,12 @@ export function AddItemCategoryModal({
         throw new Error(err.message || "Gagal menyimpan data");
       }
 
-      // ✨ PERBAIKAN: Ambil data dari respons API
+      //  PERBAIKAN: Ambil data dari respons API
       const responseData = await res.json();
 
       toast.success("Item Category berhasil ditambahkan!");
 
-      // ✨ PERBAIKAN: Kirim data yang baru dibuat ke form utama (sesuaikan path .data dengan JSON API-mu)
+      //  PERBAIKAN: Kirim data yang baru dibuat ke form utama (sesuaikan path .data dengan JSON API-mu)
       onSuccess(responseData.data || responseData);
 
       handleClose(); // Tutup & Reset

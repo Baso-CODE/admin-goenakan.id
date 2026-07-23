@@ -13,7 +13,7 @@ export const orderSchema = z.object({
   // salesId: z.string().min(1, "Sales PIC is required"),
   clientPoNumber: z.string().optional(),
   remark: z.string().optional(),
-  currencyCode: z.string().optional(),
+  currencyCode: z.string().min(1, "Currency is required"),
   referenceQuotationId: z.string().optional(),
   referenceSampleId: z.string().optional(),
 
@@ -33,6 +33,7 @@ export const orderSchema = z.object({
         price: z.number().min(0, "Price cannot be negative"),
         customization: z.string().optional(),
         remarks: z.string().optional(),
+        selectedAttributes: z.record(z.string(), z.any()).optional(),
       }),
     )
     .min(1, "At least one product required"),

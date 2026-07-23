@@ -112,7 +112,7 @@ export default function QuotationNoteCategory() {
     if (!deleteId || status !== "authenticated") return;
 
     try {
-      // ✨ Cukup panggil fetchApi dengan method DELETE
+      //  Cukup panggil fetchApi dengan method DELETE
       const res = await fetchApi(`/quotation-notes-categories/${deleteId}`, {
         method: "DELETE",
       });

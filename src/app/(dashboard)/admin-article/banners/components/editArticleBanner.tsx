@@ -63,7 +63,7 @@ export default function EditArticleBanner() {
 
     setIsSubmitting(true);
     try {
-      // ✨ Gunakan fetchApi dengan method PATCH
+      //  Gunakan fetchApi dengan method PATCH
       const res = await fetchApi(`/articles-banners/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),

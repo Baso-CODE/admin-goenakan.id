@@ -63,9 +63,9 @@ const EditNoteCategoryPage = () => {
     }
 
     try {
-      setIsSubmitting(true); // ✨ Tetap kita gunakan sesuai kode asli Anda
+      setIsSubmitting(true); //  Tetap kita gunakan sesuai kode asli Anda
 
-      // ✨ Gunakan fetchApi dengan method PATCH
+      //  Gunakan fetchApi dengan method PATCH
       const res = await fetchApi(`/invoice-notes/categories/${slug}`, {
         method: "PATCH",
         body: JSON.stringify(formValues),
@@ -84,7 +84,7 @@ const EditNoteCategoryPage = () => {
         err instanceof Error ? err.message : "Failed to update category",
       );
     } finally {
-      setIsSubmitting(false); // ✨ Tetap kita kembalikan ke false di sini
+      setIsSubmitting(false); //  Tetap kita kembalikan ke false di sini
     }
   };
 

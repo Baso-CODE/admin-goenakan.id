@@ -38,7 +38,7 @@ export function AttributeSelector({
   value?: SelectedAttributeRow[];
   onChange: (v: SelectedAttributeRow[], full: AttributeFromServer[]) => void;
 }) {
-  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status
+  const { fetchApi, status } = useApi(); //  Ambil fetchApi dan status
 
   const [available, setAvailable] = useState<AttributeFromServer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -64,7 +64,7 @@ export function AttributeSelector({
 
       setLoading(true);
       try {
-        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        //  Gunakan fetchApi (Otomatis handle Base URL dan Token)
         const res = await fetchApi("/product-attributes/list");
 
         if (!res.ok) throw new Error();

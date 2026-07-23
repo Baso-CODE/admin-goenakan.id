@@ -10,7 +10,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-// ✨ PERBAIKAN 1: Sesuaikan nama properti dengan yang dikirim dari Backend & izinkan null
+//  PERBAIKAN 1: Sesuaikan nama properti dengan yang dikirim dari Backend & izinkan null
 export interface QuotationMetricsData {
   draft: number | null;
   sent: number | null;
@@ -23,7 +23,7 @@ interface OpsQuotationSectionProps {
   data?: QuotationMetricsData;
 }
 
-// ✨ Helper untuk format angka (memberi titik ribuan, aman dari null)
+//  Helper untuk format angka (memberi titik ribuan, aman dari null)
 const formatNumber = (val: number | null) =>
   new Intl.NumberFormat("id-ID").format(val || 0);
 
@@ -93,7 +93,7 @@ export default function OpsQuotationSection({
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            {/* ✨ PERBAIKAN 2: Gunakan nama properti yang benar (accepted) */}
+            {/*  PERBAIKAN 2: Gunakan nama properti yang benar (accepted) */}
             <div className="text-2xl font-bold text-foreground">
               {formatNumber(safeData.accepted)}
             </div>
@@ -112,7 +112,7 @@ export default function OpsQuotationSection({
             <XCircle className="h-4 w-4 text-rose-500" />
           </CardHeader>
           <CardContent>
-            {/* ✨ PERBAIKAN 3: Gunakan nama properti yang benar (rejected) */}
+            {/*  PERBAIKAN 3: Gunakan nama properti yang benar (rejected) */}
             <div className="text-2xl font-bold text-foreground">
               {formatNumber(safeData.rejected)}
             </div>
@@ -129,7 +129,7 @@ export default function OpsQuotationSection({
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2 mt-1">
-              {/* ✨ PERBAIKAN 4: Gunakan || 0 sebelum toFixed dan panggil nama properti yang benar */}
+              {/*  PERBAIKAN 4: Gunakan || 0 sebelum toFixed dan panggil nama properti yang benar */}
               <div className="text-2xl font-bold text-foreground">
                 {(safeData.avgLeadTimeDays || 0).toFixed(1)}
               </div>

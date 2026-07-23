@@ -86,7 +86,7 @@ export default function ItemNames() {
   const [exportStartDate, setExportStartDate] = useState<string>("");
   const [exportEndDate, setExportEndDate] = useState<string>("");
   const [exporting, setExporting] = useState<boolean>(false);
-  // ✨ TAMBAHKAN FETCH KATEGORI
+  //  TAMBAHKAN FETCH KATEGORI
   useEffect(() => {
     const fetchDropdownData = async () => {
       try {
@@ -345,7 +345,7 @@ export default function ItemNames() {
                   <TableRow
                     key={item.id}
                     className="hover:bg-[oklch(0.98_0.02_90)] transition-colors">
-                    {/* ✨ Menampilkan Product Category > Item Category */}
+                    {/*  Menampilkan Product Category > Item Category */}
                     <TableCell className="text-sm">
                       <div className="text-xs text-muted-foreground mb-0.5">
                         {item.itemCategory?.productCategory?.name_id ||

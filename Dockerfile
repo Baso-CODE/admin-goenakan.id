@@ -9,13 +9,18 @@ RUN apt-get update && apt-get install -y \
     make \
     g++ \
     openssl \
-    libstdc++-12-dev
+    libstdc++-12-dev && \
+    rm -rf /var/lib/apt/lists/*  # 🔥 Clear apt cache
 
 # 2. Copy dependency files
 COPY package.json bun.lock* ./
 
-# 3. Install dependencies
-RUN bun install
+# 3. Install dependencies (dengan cache clear + retry)
+RUN rm -rf ~/.bun/install/cache && \
+    bun install --frozen-lockfile || \
+    (echo "First install failed, retrying..." && \
+    rm -rf ~/.bun && \
+    bun install --no-save)
 
 # 4. Copy seluruh kode source (Termasuk folder prisma/)
 COPY . .
@@ -35,6 +40,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN bun run build
 
-# 7. Expose port & Start
+# 7. Cleanup (reduce image size)
+RUN rm -rf .next/cache
+
+# 8. Expose port & Start
 EXPOSE 3000
 CMD ["bun", "run", "start"]

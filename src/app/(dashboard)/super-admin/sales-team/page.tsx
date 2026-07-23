@@ -124,7 +124,7 @@ const Sales = () => {
         params.append("endDate", format(new Date(exportEndDate), "yyyy-MM-dd"));
       }
 
-      // 2. ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      // 2.  Gunakan fetchApi (Otomatis handle Base URL dan Token)
       const res = await fetchApi(`/sales?${params}`);
 
       if (!res.ok) {

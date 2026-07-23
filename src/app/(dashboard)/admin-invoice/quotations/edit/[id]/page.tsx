@@ -30,7 +30,7 @@ export default function EditQuotationPage() {
     try {
       setIsLoading(true);
 
-      // ✨ Gunakan fetchApi (GET otomatis)
+      //  Gunakan fetchApi (GET otomatis)
       const res = await fetchApi(`/quotations/${id}`);
 
       if (!res.ok) throw new Error("Failed to fetch quotation details");

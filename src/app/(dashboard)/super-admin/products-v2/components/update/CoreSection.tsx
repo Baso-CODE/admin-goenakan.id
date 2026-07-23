@@ -28,6 +28,12 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -42,14 +48,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
-import { CheckCheck, ChevronsUpDown, RefreshCw, X, Plus } from "lucide-react";
-import CreateCategoryModal from "../../../product-categories/components/createCategoryModal";
+import { CheckCheck, ChevronsUpDown, Plus, RefreshCw, X } from "lucide-react";
 import { AddItemCategoryModal } from "../../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../../item-names-product/components/addItemNameModal";
+import CreateCategoryModal from "../../../product-categories/components/createCategoryModal";
 import MaterialTypeForm from "../../../product-materials/components/materialTypeForm";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TagCategoryManagerModal } from "../TagCategoryManagerModal";
-
 
 const FormCoreSchema = z.object({
   name: z.string().min(1, "Nama produk wajib diisi"),
@@ -150,7 +154,7 @@ export default function FormProductCore({
   const selectedCategoryId = form.watch("categoryId");
   const selectedItemCategoryId = form.watch("itemCategoryId");
 
-  // ✨ 1. INITIALIZATION API FETCH (Tanpa Race Condition)
+  //  1. INITIALIZATION API FETCH (Tanpa Race Condition)
   useEffect(() => {
     let isMounted = true; // Keamanan agar state tidak bocor jika komponen ditutup
 
@@ -254,7 +258,7 @@ export default function FormProductCore({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, fetchApi, initialData]); // Dibatasi ketat hanya render saat data inisialisasi masuk
 
-  // ✨ 2. FUNGSI HANDLER MANUAL UNTUK DROPDOWN (Lebih stabil dari useEffect)
+  //  2. FUNGSI HANDLER MANUAL UNTUK DROPDOWN (Lebih stabil dari useEffect)
   const handleCategoryChange = async (val: string) => {
     if (val === "ADD_NEW_CATEGORY") {
       setIsCategoryModalOpen(true);
@@ -389,8 +393,9 @@ export default function FormProductCore({
       height: "Tinggi",
     };
 
-    const missingFields = Object.keys(errors)
-      .map((key) => fieldLabels[key] || key);
+    const missingFields = Object.keys(errors).map(
+      (key) => fieldLabels[key] || key,
+    );
 
     toast.error(`Mohon lengkapi field berikut: ${missingFields.join(", ")}`);
   };
@@ -398,530 +403,263 @@ export default function FormProductCore({
   return (
     <>
       <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit, onInvalid)}
-        className="space-y-8 border p-6 rounded-md bg-white shadow-sm">
-        
-        {/* Keterangan Konfigurasi Dasar */}
-        <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-md text-sm flex items-start gap-2">
-          <span className="font-semibold text-blue-905 shrink-0">Catatan:</span>
-          <span>Semua pengaturan di dalam tab ini akan memengaruhi konfigurasi produk utama/dasar (base product configuration).</span>
-        </div>
-
-        {/* SECTION 1: IDENTITAS PRODUK */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
-            Identitas Produk
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem className="md:col-span-2">
-                  <FormLabel>Nama Produk</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Contoh: Meja Kayu Jati" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="sku"
-              render={({ field }) => (
-                <FormItem className="md:col-span-1">
-                  <FormLabel>SKU</FormLabel>
-                  <div className="flex gap-2">
-                    <FormControl>
-                      <Input placeholder="Auto / Manual" {...field} />
-                    </FormControl>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={handleGenerateSku}
-                      disabled={isGeneratingSku}
-                      className="shrink-0">
-                      <RefreshCw
-                        className={`h-4 w-4 ${isGeneratingSku ? "animate-spin" : ""}`}
-                      />
-                    </Button>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+        <form
+          onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+          className="space-y-8 border p-6 rounded-md bg-white shadow-sm">
+          {/* Keterangan Konfigurasi Dasar */}
+          <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-md text-sm flex items-start gap-2">
+            <span className="font-semibold text-blue-905 shrink-0">
+              Catatan:
+            </span>
+            <span>
+              Semua pengaturan di dalam tab ini akan memengaruhi konfigurasi
+              produk utama/dasar (base product configuration).
+            </span>
           </div>
-        </div>
 
-        {/* SECTION 2: HIRARKI KATEGORI & MATERIAL */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
-            Hirarki & Material
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <FormField
-              control={form.control}
-              name="categoryId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Kategori Utama</FormLabel>
-                  <Select
-                    value={field.value || ""}
-                    onValueChange={handleCategoryChange}
-                    disabled={loadingData}>
+          {/* SECTION 1: IDENTITAS PRODUK */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
+              Identitas Produk
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Nama Produk</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih Kategori" />
-                      </SelectTrigger>
+                      <Input placeholder="Contoh: Meja Kayu Jati" {...field} />
                     </FormControl>
-                    <SelectContent className="bg-white border">
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={String(cat.id)}>
-                          {cat.name_id || cat.name} {cat.code && `(${cat.code})`}
-                        </SelectItem>
-                      ))}
-                      <div className="h-px bg-stone-200 my-1 mx-1" />
-                      <SelectItem
-                        value="ADD_NEW_CATEGORY"
-                        className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                        + Kategori Baru
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="itemCategoryId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Item Category</FormLabel>
-                  <Select
-                    value={field.value || ""}
-                    onValueChange={handleItemCategoryChange}
-                    disabled={loadingData || !selectedCategoryId}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih Sub Kategori" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-white border">
-                      {itemCategories.map((ic) => (
-                        <SelectItem key={ic.id} value={String(ic.id)}>
-                          {ic.name}
-                        </SelectItem>
-                      ))}
-                      <div className="h-px bg-stone-200 my-1 mx-1" />
-                      <SelectItem
-                        value="ADD_NEW_ITEM_CATEGORY"
-                        className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                        + Tambah Item Category Baru
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="itemNameId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Item Name</FormLabel>
-                  <Select
-                    value={field.value || ""}
-                    onValueChange={(val) => {
-                      if (val === "ADD_NEW_ITEM_NAME") {
-                        setIsItemNameModalOpen(true);
-                        return;
-                      }
-                      const oldVal = form.getValues("itemNameId");
-                      const oldItem = itemNames.find((inm) => inm.id === oldVal);
-                      const newItem = itemNames.find((inm) => inm.id === val);
-
-                      let currentName = form.getValues("name") || "";
-                      if (newItem) {
-                        if (oldItem && currentName.startsWith(oldItem.name)) {
-                          currentName = currentName.replace(oldItem.name, newItem.name);
-                        } else if (!currentName.startsWith(newItem.name)) {
-                          currentName = currentName ? `${newItem.name} ${currentName}` : newItem.name;
-                        }
-                        form.setValue("name", currentName);
-                      }
-
-                      field.onChange(val);
-                    }}
-                    disabled={loadingData}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih Nama Item" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-white border">
-                      {itemNames.map((inm) => (
-                        <SelectItem key={inm.id} value={String(inm.id)}>
-                          {inm.name}
-                        </SelectItem>
-                      ))}
-                      <div className="h-px bg-stone-200 my-1 mx-1" />
-                      <SelectItem
-                        value="ADD_NEW_ITEM_NAME"
-                        className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                        + Tambah Item Name Baru
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="materialTypeId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Material</FormLabel>
-                  <Select
-                    value={field.value || ""}
-                    onValueChange={(val) => {
-                      if (val === "ADD_NEW_MATERIAL") {
-                        setIsMaterialModalOpen(true);
-                        return;
-                      }
-                      field.onChange(val);
-                    }}
-                    disabled={loadingData}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih Material" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-white border">
-                      {materialTypes.map((mat) => (
-                        <SelectItem key={mat.id} value={String(mat.id)}>
-                          {mat.name}
-                        </SelectItem>
-                      ))}
-                      <div className="h-px bg-stone-200 my-1 mx-1" />
-                      <SelectItem
-                        value="ADD_NEW_MATERIAL"
-                        className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                        + Tambah Material Baru
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </div>
-
-        {/* SECTION 3: HARGA, STOK & TAGS */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
-            Harga, Stok & Label
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <FormField
-              control={form.control}
-              name="basePrice"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Harga Dasar (Rp)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="0"
-                      {...field}
-                      onChange={(e) =>
-                        field.onChange(parseFloat(e.target.value) || 0)
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="stock"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Stok Global
-                    {isCustomProduct && (
-                      <span className="text-[10px] text-amber-600 font-normal italic">
-                        (Diatur per Varian)
-                      </span>
-                    )}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      {...field}
-                      disabled={isCustomProduct}
-                      placeholder={
-                        isCustomProduct ? "0" : "Masukkan jumlah stok"
-                      }
-                      onChange={(e) =>
-                        field.onChange(parseInt(e.target.value) || 0)
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="isCustom"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipe Produk</FormLabel>
-                  <FormControl>
-                    <div className="flex items-center gap-3 h-10 border rounded-md px-4 bg-white">
-                      <span
-                        className={`text-sm cursor-pointer ${!field.value ? "font-bold text-primary" : "text-gray-400"}`}
-                        onClick={() => field.onChange(false)}>
-                        Standard
-                      </span>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={(checked) => {
-                          field.onChange(checked);
-                          if (checked) form.setValue("stock", 0);
-                        }}
-                      />
-                      <span
-                        className={`text-sm cursor-pointer ${field.value ? "font-bold text-primary" : "text-gray-400"}`}
-                        onClick={() => field.onChange(true)}>
-                        Custom
-                      </span>
-                    </div>
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="isMadeByOrder"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Sistem Order saat Stok Habis</FormLabel>
-                  <FormControl>
-                    <div className="flex items-center gap-3 h-10 border rounded-md px-4 bg-white">
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                      <span className="text-xs text-stone-600 truncate" title="Made by Order / Pre-Order (Bisa dipesan walaupun stok habis)">
-                        Made by Order / PO
-                      </span>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="tagIds"
-              render={({ field }) => {
-                const selectedTags = field.value || [];
-                return (
-                  <FormItem className="md:col-span-4">
-                    <div className="flex items-center justify-between">
-                      <FormLabel>Product Tags</FormLabel>
+              <FormField
+                control={form.control}
+                name="sku"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-1">
+                    <FormLabel>SKU</FormLabel>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <Input placeholder="Auto / Manual" {...field} />
+                      </FormControl>
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
-                        onClick={() => setIsTagCategoryModalOpen(true)}
-                        className="text-xs h-7 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50 px-2 flex items-center gap-1 font-medium"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        <span>Kelola Group</span>
+                        size="icon"
+                        onClick={handleGenerateSku}
+                        disabled={isGeneratingSku}
+                        className="shrink-0">
+                        <RefreshCw
+                          className={`h-4 w-4 ${isGeneratingSku ? "animate-spin" : ""}`}
+                        />
                       </Button>
                     </div>
-
-                    {/* Category Quick-Select Pills */}
-                    {Array.isArray(tagCategories) && tagCategories.length > 0 && (
-                      <div className="flex flex-wrap gap-2 items-center mb-3 mt-1.5 p-2 bg-slate-50 dark:bg-stone-900 rounded-md border border-slate-100 dark:border-stone-800">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mr-1 select-none">Tag Groups:</span>
-                        {tagCategories.map((cat) => {
-                          const catTags = cat.tags || [];
-                          const catTagIds = catTags.map((t: any) => t.id);
-                          if (catTagIds.length === 0) return null;
-                          
-                          const selectedCatTags = catTagIds.filter((id: string) => selectedTags.includes(id));
-                          const isAllSelected = selectedCatTags.length === catTagIds.length;
-                          const isPartSelected = selectedCatTags.length > 0 && !isAllSelected;
-
-                          return (
-                            <button
-                              key={cat.id}
-                              type="button"
-                              onClick={() => {
-                                if (isAllSelected) {
-                                  // Deselect all
-                                  field.onChange(selectedTags.filter((id: string) => !catTagIds.includes(id)));
-                                } else {
-                                  // Select all (union)
-                                  field.onChange(Array.from(new Set([...selectedTags, ...catTagIds])));
-                                }
-                              }}
-                              className={cn(
-                                "text-xs px-2.5 py-1 rounded-full border transition-all duration-150 font-medium select-none",
-                                isAllSelected
-                                  ? "bg-indigo-600 border-indigo-600 text-white font-semibold shadow-xs"
-                                  : isPartSelected
-                                  ? "bg-indigo-50 border-dashed border-indigo-350 text-indigo-755 font-semibold"
-                                  : "bg-white border-slate-200 text-slate-655 hover:bg-slate-100 hover:text-slate-900"
-                              )}
-                              title={`${cat.name} (${catTags.map((t: any) => t.name).join(", ")})`}
-                            >
-                              {cat.name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    <Popover
-                      open={tagSearchOpen}
-                      onOpenChange={setTagSearchOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            className={cn(
-                              "w-full justify-between h-auto min-h-10 text-left bg-white",
-                              selectedTags.length === 0 &&
-                                "text-muted-foreground",
-                            )}>
-                            <div className="flex flex-wrap gap-1.5 items-center py-1">
-                              {selectedTags.length > 0
-                                ? selectedTags.map((tagId) => {
-                                    const tagInfo = tags.find(
-                                      (t) => t.id === tagId,
-                                    );
-                                    if (!tagInfo) return null;
-                                    return (
-                                      <Badge
-                                        key={tagId}
-                                        variant="secondary"
-                                        className="flex items-center gap-1 px-2 py-1">
-                                        {tagInfo.name}
-                                        <X
-                                          className="h-3 w-3 cursor-pointer hover:text-red-500"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            field.onChange(
-                                              selectedTags.filter(
-                                                (id) => id !== tagId,
-                                              ),
-                                            );
-                                          }}
-                                        />
-                                      </Badge>
-                                    );
-                                  })
-                                : "Pilih tag produk..."}
-                            </div>
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        className="w-[--radix-popover-trigger-width] p-0"
-                        align="start">
-                        <Command>
-                          <CommandInput
-                            placeholder="Cari tag..."
-                            onValueChange={setTagSearchQuery}
-                          />
-                          <CommandList>
-                            <CommandEmpty>Tag tidak ditemukan.</CommandEmpty>
-                            <CommandGroup>
-                              {tags.map((tag) => {
-                                const isSelected = selectedTags.includes(
-                                  tag.id,
-                                );
-                                return (
-                                  <CommandItem
-                                    key={tag.id}
-                                    onSelect={() => {
-                                      field.onChange(
-                                        isSelected
-                                          ? selectedTags.filter(
-                                              (id) => id !== tag.id,
-                                            )
-                                          : [...selectedTags, tag.id],
-                                      );
-                                      setTagSearchQuery("");
-                                    }}>
-                                    <CheckCheck
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        isSelected
-                                          ? "opacity-100"
-                                          : "opacity-0",
-                                      )}
-                                    />
-                                    {tag.name}
-                                  </CommandItem>
-                                );
-                              })}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
                     <FormMessage />
                   </FormItem>
-                );
-              }}
-            />
+                )}
+              />
+            </div>
           </div>
-        </div>
 
-        {/* SECTION 4: DIMENSI & DESKRIPSI */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
-            Dimensi & Deskripsi
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {["weight", "length", "width", "height"].map((dim) => (
+          {/* SECTION 2: HIRARKI KATEGORI & MATERIAL */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
+              Hirarki & Material
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <FormField
-                key={dim}
                 control={form.control}
-                name={dim as any}
+                name="categoryId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="capitalize">
-                      {dim === "weight" ? "Berat (gr)" : dim + " (cm)"}
-                    </FormLabel>
+                    <FormLabel>Kategori Utama</FormLabel>
+                    <Select
+                      value={field.value || ""}
+                      onValueChange={handleCategoryChange}
+                      disabled={loadingData}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih Kategori" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-white border">
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={String(cat.id)}>
+                            {cat.name_id || cat.name}{" "}
+                            {cat.code && `(${cat.code})`}
+                          </SelectItem>
+                        ))}
+                        <div className="h-px bg-stone-200 my-1 mx-1" />
+                        <SelectItem
+                          value="ADD_NEW_CATEGORY"
+                          className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                          + Kategori Baru
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="itemCategoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Item Category</FormLabel>
+                    <Select
+                      value={field.value || ""}
+                      onValueChange={handleItemCategoryChange}
+                      disabled={loadingData || !selectedCategoryId}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih Sub Kategori" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-white border">
+                        {itemCategories.map((ic) => (
+                          <SelectItem key={ic.id} value={String(ic.id)}>
+                            {ic.name}
+                          </SelectItem>
+                        ))}
+                        <div className="h-px bg-stone-200 my-1 mx-1" />
+                        <SelectItem
+                          value="ADD_NEW_ITEM_CATEGORY"
+                          className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                          + Tambah Item Category Baru
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="itemNameId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Item Name</FormLabel>
+                    <Select
+                      value={field.value || ""}
+                      onValueChange={(val) => {
+                        if (val === "ADD_NEW_ITEM_NAME") {
+                          setIsItemNameModalOpen(true);
+                          return;
+                        }
+                        const oldVal = form.getValues("itemNameId");
+                        const oldItem = itemNames.find(
+                          (inm) => inm.id === oldVal,
+                        );
+                        const newItem = itemNames.find((inm) => inm.id === val);
+
+                        let currentName = form.getValues("name") || "";
+                        if (newItem) {
+                          if (oldItem && currentName.startsWith(oldItem.name)) {
+                            currentName = currentName.replace(
+                              oldItem.name,
+                              newItem.name,
+                            );
+                          } else if (!currentName.startsWith(newItem.name)) {
+                            currentName = currentName
+                              ? `${newItem.name} ${currentName}`
+                              : newItem.name;
+                          }
+                          form.setValue("name", currentName);
+                        }
+
+                        field.onChange(val);
+                      }}
+                      disabled={loadingData}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih Nama Item" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-white border">
+                        {itemNames.map((inm) => (
+                          <SelectItem key={inm.id} value={String(inm.id)}>
+                            {inm.name}
+                          </SelectItem>
+                        ))}
+                        <div className="h-px bg-stone-200 my-1 mx-1" />
+                        <SelectItem
+                          value="ADD_NEW_ITEM_NAME"
+                          className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                          + Tambah Item Name Baru
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="materialTypeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Material</FormLabel>
+                    <Select
+                      value={field.value || ""}
+                      onValueChange={(val) => {
+                        if (val === "ADD_NEW_MATERIAL") {
+                          setIsMaterialModalOpen(true);
+                          return;
+                        }
+                        field.onChange(val);
+                      }}
+                      disabled={loadingData}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih Material" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-white border">
+                        {materialTypes.map((mat) => (
+                          <SelectItem key={mat.id} value={String(mat.id)}>
+                            {mat.name}
+                          </SelectItem>
+                        ))}
+                        <div className="h-px bg-stone-200 my-1 mx-1" />
+                        <SelectItem
+                          value="ADD_NEW_MATERIAL"
+                          className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                          + Tambah Material Baru
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+
+          {/* SECTION 3: HARGA, STOK & TAGS */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
+              Harga, Stok & Label
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <FormField
+                control={form.control}
+                name="basePrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Harga Dasar (Rp)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
-                        step="any"
-                        min={0}
+                        placeholder="0"
                         {...field}
                         onChange={(e) =>
                           field.onChange(parseFloat(e.target.value) || 0)
@@ -932,89 +670,389 @@ export default function FormProductCore({
                   </FormItem>
                 )}
               />
-            ))}
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem className="col-span-2 md:col-span-4">
-                  <FormLabel>Deskripsi Produk</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      rows={4}
-                      placeholder="Jelaskan detail produk..."
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="stock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Stok Global
+                      {isCustomProduct && (
+                        <span className="text-[10px] text-amber-600 font-normal italic">
+                          (Diatur per Varian)
+                        </span>
+                      )}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        disabled={isCustomProduct}
+                        placeholder={
+                          isCustomProduct ? "0" : "Masukkan jumlah stok"
+                        }
+                        onChange={(e) =>
+                          field.onChange(parseInt(e.target.value) || 0)
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="isCustom"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipe Produk</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-3 h-10 border rounded-md px-4 bg-white">
+                        <span
+                          className={`text-sm cursor-pointer ${!field.value ? "font-bold text-primary" : "text-gray-400"}`}
+                          onClick={() => field.onChange(false)}>
+                          Standard
+                        </span>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            if (checked) form.setValue("stock", 0);
+                          }}
+                        />
+                        <span
+                          className={`text-sm cursor-pointer ${field.value ? "font-bold text-primary" : "text-gray-400"}`}
+                          onClick={() => field.onChange(true)}>
+                          Custom
+                        </span>
+                      </div>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="isMadeByOrder"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sistem Order saat Stok Habis</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-3 h-10 border rounded-md px-4 bg-white">
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                        <span
+                          className="text-xs text-stone-600 truncate"
+                          title="Made by Order / Pre-Order (Bisa dipesan walaupun stok habis)">
+                          Made by Order / PO
+                        </span>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="tagIds"
+                render={({ field }) => {
+                  const selectedTags = field.value || [];
+                  return (
+                    <FormItem className="md:col-span-4">
+                      <div className="flex items-center justify-between">
+                        <FormLabel>Product Tags</FormLabel>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsTagCategoryModalOpen(true)}
+                          className="text-xs h-7 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50 px-2 flex items-center gap-1 font-medium">
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Kelola Group</span>
+                        </Button>
+                      </div>
+
+                      {/* Category Quick-Select Pills */}
+                      {Array.isArray(tagCategories) &&
+                        tagCategories.length > 0 && (
+                          <div className="flex flex-wrap gap-2 items-center mb-3 mt-1.5 p-2 bg-slate-50 dark:bg-stone-900 rounded-md border border-slate-100 dark:border-stone-800">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mr-1 select-none">
+                              Tag Groups:
+                            </span>
+                            {tagCategories.map((cat) => {
+                              const catTags = cat.tags || [];
+                              const catTagIds = catTags.map((t: any) => t.id);
+                              if (catTagIds.length === 0) return null;
+
+                              const selectedCatTags = catTagIds.filter(
+                                (id: string) => selectedTags.includes(id),
+                              );
+                              const isAllSelected =
+                                selectedCatTags.length === catTagIds.length;
+                              const isPartSelected =
+                                selectedCatTags.length > 0 && !isAllSelected;
+
+                              return (
+                                <button
+                                  key={cat.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isAllSelected) {
+                                      // Deselect all
+                                      field.onChange(
+                                        selectedTags.filter(
+                                          (id: string) =>
+                                            !catTagIds.includes(id),
+                                        ),
+                                      );
+                                    } else {
+                                      // Select all (union)
+                                      field.onChange(
+                                        Array.from(
+                                          new Set([
+                                            ...selectedTags,
+                                            ...catTagIds,
+                                          ]),
+                                        ),
+                                      );
+                                    }
+                                  }}
+                                  className={cn(
+                                    "text-xs px-2.5 py-1 rounded-full border transition-all duration-150 font-medium select-none",
+                                    isAllSelected
+                                      ? "bg-indigo-600 border-indigo-600 text-white font-semibold shadow-xs"
+                                      : isPartSelected
+                                        ? "bg-indigo-50 border-dashed border-indigo-350 text-indigo-755 font-semibold"
+                                        : "bg-white border-slate-200 text-slate-655 hover:bg-slate-100 hover:text-slate-900",
+                                  )}
+                                  title={`${cat.name} (${catTags.map((t: any) => t.name).join(", ")})`}>
+                                  {cat.name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                      <Popover
+                        open={tagSearchOpen}
+                        onOpenChange={setTagSearchOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between h-auto min-h-10 text-left bg-white",
+                                selectedTags.length === 0 &&
+                                  "text-muted-foreground",
+                              )}>
+                              <div className="flex flex-wrap gap-1.5 items-center py-1">
+                                {selectedTags.length > 0
+                                  ? selectedTags.map((tagId) => {
+                                      const tagInfo = tags.find(
+                                        (t) => t.id === tagId,
+                                      );
+                                      if (!tagInfo) return null;
+                                      return (
+                                        <Badge
+                                          key={tagId}
+                                          variant="secondary"
+                                          className="flex items-center gap-1 px-2 py-1">
+                                          {tagInfo.name}
+                                          <X
+                                            className="h-3 w-3 cursor-pointer hover:text-red-500"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              field.onChange(
+                                                selectedTags.filter(
+                                                  (id) => id !== tagId,
+                                                ),
+                                              );
+                                            }}
+                                          />
+                                        </Badge>
+                                      );
+                                    })
+                                  : "Pilih tag produk..."}
+                              </div>
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-[--radix-popover-trigger-width] p-0"
+                          align="start">
+                          <Command>
+                            <CommandInput
+                              placeholder="Cari tag..."
+                              onValueChange={setTagSearchQuery}
+                            />
+                            <CommandList>
+                              <CommandEmpty>Tag tidak ditemukan.</CommandEmpty>
+                              <CommandGroup>
+                                {tags.map((tag) => {
+                                  const isSelected = selectedTags.includes(
+                                    tag.id,
+                                  );
+                                  return (
+                                    <CommandItem
+                                      key={tag.id}
+                                      onSelect={() => {
+                                        field.onChange(
+                                          isSelected
+                                            ? selectedTags.filter(
+                                                (id) => id !== tag.id,
+                                              )
+                                            : [...selectedTags, tag.id],
+                                        );
+                                        setTagSearchQuery("");
+                                      }}>
+                                      <CheckCheck
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          isSelected
+                                            ? "opacity-100"
+                                            : "opacity-0",
+                                        )}
+                                      />
+                                      {tag.name}
+                                    </CommandItem>
+                                  );
+                                })}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+            </div>
           </div>
-        </div>
 
-        {/* SUBMIT BUTTON */}
-        <div className="flex justify-end pt-4">
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full md:w-auto px-10 h-11">
-            {isSubmitting ? "Menyimpan Data..." : "Simpan Data Core"}
-          </Button>
-        </div>
-      </form>
-    </Form>
+          {/* SECTION 4: DIMENSI & DESKRIPSI */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
+              Dimensi & Deskripsi
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {["weight", "length", "width", "height"].map((dim) => (
+                <FormField
+                  key={dim}
+                  control={form.control}
+                  name={dim as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="capitalize">
+                        {dim === "weight" ? "Berat (gr)" : dim + " (cm)"}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="any"
+                          min={0}
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(parseFloat(e.target.value) || 0)
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ))}
 
-    {/* MODALS */}
-    <CreateCategoryModal
-      isOpen={isCategoryModalOpen}
-      onClose={() => setIsCategoryModalOpen(false)}
-      onSuccess={handleCategoryAdded}
-    />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem className="col-span-2 md:col-span-4">
+                    <FormLabel>Deskripsi Produk</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={4}
+                        placeholder="Jelaskan detail produk..."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
 
-    <AddItemCategoryModal
-      isOpen={isItemCategoryModalOpen}
-      onClose={() => setIsItemCategoryModalOpen(false)}
-      onSuccess={handleItemCategoryAdded}
-      parentCategoryId={selectedCategoryId}
-    />
+          {/* SUBMIT BUTTON */}
+          <div className="flex justify-end pt-4">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full md:w-auto px-10 h-11">
+              {isSubmitting ? "Menyimpan Data..." : "Simpan Data Core"}
+            </Button>
+          </div>
+        </form>
+      </Form>
 
-    <AddItemNameModal
-      isOpen={isItemNameModalOpen}
-      onClose={() => setIsItemNameModalOpen(false)}
-      onSuccess={handleItemNameAdded}
-      parentCategoryId={selectedCategoryId}
-      parentItemCategoryId={selectedItemCategoryId}
-      productCategories={categories}
-      itemCategories={itemCategories}
-    />
+      {/* MODALS */}
+      <CreateCategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        onSuccess={handleCategoryAdded}
+      />
 
-    <Dialog open={isMaterialModalOpen} onOpenChange={setIsMaterialModalOpen}>
-      <DialogContent className="max-w-md bg-white text-slate-900 border">
-        <DialogHeader>
-          <DialogTitle className="text-slate-900">Tambah Material Baru</DialogTitle>
-        </DialogHeader>
-        <MaterialTypeForm
-          onSubmit={handleAddMaterialSubmit}
-          isSubmitting={isSubmittingMaterial}
-        />
-      </DialogContent>
-    </Dialog>
+      <AddItemCategoryModal
+        isOpen={isItemCategoryModalOpen}
+        onClose={() => setIsItemCategoryModalOpen(false)}
+        onSuccess={handleItemCategoryAdded}
+        parentCategoryId={selectedCategoryId}
+      />
 
-    {/* Tag Category Manager Modal */}
-    <TagCategoryManagerModal
-      isOpen={isTagCategoryModalOpen}
-      onClose={() => setIsTagCategoryModalOpen(false)}
-      availableTags={tags}
-      tagCategories={tagCategories}
-      onCategoriesChange={(updated) => {
-        setTagCategories(updated);
-      }}
-      onTagCreated={(newTag) => {
-        setTags((prev) => [...prev, newTag]);
-      }}
-    />
-  </>
-);
+      <AddItemNameModal
+        isOpen={isItemNameModalOpen}
+        onClose={() => setIsItemNameModalOpen(false)}
+        onSuccess={handleItemNameAdded}
+        parentCategoryId={selectedCategoryId}
+        parentItemCategoryId={selectedItemCategoryId}
+        productCategories={categories}
+        itemCategories={itemCategories}
+      />
+
+      <Dialog open={isMaterialModalOpen} onOpenChange={setIsMaterialModalOpen}>
+        <DialogContent className="max-w-md bg-white text-slate-900 border">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900">
+              Tambah Material Baru
+            </DialogTitle>
+          </DialogHeader>
+          <MaterialTypeForm
+            onSubmit={handleAddMaterialSubmit}
+            isSubmitting={isSubmittingMaterial}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Tag Category Manager Modal */}
+      <TagCategoryManagerModal
+        isOpen={isTagCategoryModalOpen}
+        onClose={() => setIsTagCategoryModalOpen(false)}
+        availableTags={tags}
+        tagCategories={tagCategories}
+        onCategoriesChange={(updated) => {
+          setTagCategories(updated);
+        }}
+        onTagCreated={(newTag) => {
+          setTags((prev) => [...prev, newTag]);
+        }}
+      />
+    </>
+  );
 }

@@ -43,7 +43,7 @@ interface SalesCategoryPieChartsProps {
   hasComparison?: boolean;
   data?: {
     productCategories: PieData[];
-    itemCategories: Record<string, PieData[]>; // ✨ Diperbarui: Menerima tipe Object Record
+    itemCategories: Record<string, PieData[]>; //  Diperbarui: Menerima tipe Object Record
   };
 }
 
@@ -51,12 +51,12 @@ export default function SalesCategoryPieCharts({
   hasComparison = false,
   data,
 }: SalesCategoryPieChartsProps) {
-  // ✨ STATE BARU: Mengatur kategori apa yang dipilih di grafik kanan (Default: "all")
+  //  STATE BARU: Mengatur kategori apa yang dipilih di grafik kanan (Default: "all")
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   const productCategories = data?.productCategories || [];
 
-  // ✨ LOGIKA BARU: Mengambil seluruh objek itemCategories, dan daftar nama kategorinya
+  //  LOGIKA BARU: Mengambil seluruh objek itemCategories, dan daftar nama kategorinya
   const itemCategoriesObject = data?.itemCategories || { all: [] };
 
   // Daftar pilihan untuk Dropdown (contoh: ["all", "Drinkware", "Stationary", "Uncategorized"])
@@ -153,7 +153,7 @@ export default function SalesCategoryPieCharts({
                 Menampilkan sub-kategori berdasarkan produk
               </CardDescription>
             </div>
-            {/* ✨ DROPDOWN DINAMIS BERDASARKAN API */}
+            {/*  DROPDOWN DINAMIS BERDASARKAN API */}
             <div className="w-35 shrink-0">
               <Select
                 value={selectedCategory}

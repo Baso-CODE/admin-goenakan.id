@@ -462,7 +462,7 @@ function ItemRow({
                 #{tierIndex + 1}
               </span>
 
-              {/* ✨ Min Qty */}
+              {/*  Min Qty */}
               <div className="w-24 relative">
                 <Input
                   type="number"
@@ -477,7 +477,7 @@ function ItemRow({
                 </span>
               </div>
 
-              {/* ✨ Max Qty */}
+              {/*  Max Qty */}
               <div className="w-24 relative">
                 <Input
                   type="number"
@@ -492,7 +492,7 @@ function ItemRow({
                 </span>
               </div>
 
-              {/* ✨ Label */}
+              {/*  Label */}
               <div className="w-20">
                 <Input
                   placeholder="Pcs"
@@ -503,7 +503,7 @@ function ItemRow({
                 />
               </div>
 
-              {/* ✨ Unit Price */}
+              {/*  Unit Price */}
               <div className="flex-1 relative">
                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground">
                   Rp
@@ -1222,7 +1222,7 @@ export default function QuotationForm({
               <Box className="w-4 h-4" /> Items & Products
             </CardTitle>
 
-            {/* ✨ NEW: Menambahkan Legend agar user tidak bingung dengan 4 input di bagian tier */}
+            {/*  NEW: Menambahkan Legend agar user tidak bingung dengan 4 input di bagian tier */}
             <div className="hidden md:flex items-center gap-4 text-[11px] text-muted-foreground mr-auto ml-4">
               <span className="flex items-center gap-1">
                 <span className="font-semibold text-slate-600">
@@ -1251,7 +1251,7 @@ export default function QuotationForm({
                   productName: "",
                   discount: 0,
                   remarks: "",
-                  // ✨ Pastikan field nama sesuai dengan yang ada di ItemRow (minQuantity, dkk)
+                  //  Pastikan field nama sesuai dengan yang ada di ItemRow (minQuantity, dkk)
                   tiers: [
                     {
                       minQuantity: 1,

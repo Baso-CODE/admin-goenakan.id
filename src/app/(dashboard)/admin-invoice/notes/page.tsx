@@ -124,7 +124,7 @@ function CategoriesTable() {
       });
       if (debouncedSearch) params.append("search", debouncedSearch);
 
-      // ✨ 3. Panggil API tanpa fetch token manual
+      //  3. Panggil API tanpa fetch token manual
       const res = await fetchApi(`/invoice-notes/categories?${params}`);
 
       if (!res.ok) throw new Error("Failed to fetch categories");

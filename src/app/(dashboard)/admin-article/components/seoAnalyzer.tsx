@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 interface SEOProps {
   title: string;
   content: string; // Teks HTML dari Tiptap
-  focusKeywords: string; // ✨ PERUBAHAN: Sekarang pakai 's' (plural)
+  focusKeywords: string; //  PERUBAHAN: Sekarang pakai 's' (plural)
 }
 
 interface SEOCheckResult {
@@ -16,7 +16,7 @@ interface SEOCheckResult {
 }
 
 export function SEOAnalyzer({ title, content, focusKeywords }: SEOProps) {
-  // ✨ PERUBAHAN: Destructure focusKeywords
+  //  PERUBAHAN: Destructure focusKeywords
   const [results, setResults] = useState<SEOCheckResult[]>([]);
   const [overallScore, setOverallScore] = useState(0);
 
@@ -32,7 +32,7 @@ export function SEOAnalyzer({ title, content, focusKeywords }: SEOProps) {
       try {
         const checks: SEOCheckResult[] = [];
 
-        // ✨ LOGIKA MULTI-KEYWORD: Pisahkan kata kunci berdasarkan tanda koma
+        //  LOGIKA MULTI-KEYWORD: Pisahkan kata kunci berdasarkan tanda koma
         const keywordArray = focusKeywords
           .split(",")
           .map((k) => k.toLowerCase().trim())
@@ -215,7 +215,7 @@ export function SEOAnalyzer({ title, content, focusKeywords }: SEOProps) {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [title, content, focusKeywords]); // ✨ PERUBAHAN: Pastikan focusKeywords masuk ke dependency array
+  }, [title, content, focusKeywords]); //  PERUBAHAN: Pastikan focusKeywords masuk ke dependency array
 
   const getScoreIcon = (score: number) => {
     if (score >= 8) {

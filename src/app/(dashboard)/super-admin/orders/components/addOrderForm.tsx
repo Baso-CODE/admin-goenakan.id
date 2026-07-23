@@ -44,11 +44,10 @@ import {
   FlaskConical,
   Plus,
   PlusCircle,
-  Settings2,
   ShoppingBag,
   Trash2,
 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation"; // ✨ Import useSearchParams
+import { useRouter, useSearchParams } from "next/navigation"; //  Import useSearchParams
 import { useEffect, useState } from "react";
 import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -62,6 +61,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DatePickerHelper } from "@/helper/datePickerHelper";
+import { useCurrencyConvert } from "@/hooks/use-currency-convert";
 import { useApi } from "@/hooks/useApi";
 import { format } from "date-fns";
 import ClientAddForm from "../../clients/components/addClientForm";
@@ -71,7 +71,6 @@ import PurchaseChannelForm, {
 import { OrderFormValues, orderSchema } from "../order-schema";
 import { postOrder } from "../order-service";
 import {
-  Client,
   Currency,
   Product,
   PurchaseChannel,
@@ -82,6 +81,7 @@ import { SampleFollowUpSection, SampleStepItem } from "./sampleFollowUpSection";
 
 export default function AddOrderForm() {
   const { fetchApi, status } = useApi();
+  const { convert, loading: convertLoading } = useCurrencyConvert();
   const router = useRouter();
   const searchParams = useSearchParams();
   const typeParam = searchParams.get("type");
@@ -132,6 +132,7 @@ export default function AddOrderForm() {
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
+
   const [quotationRefs, setQuotationRefs] = useState<QuotationRef[]>([]);
   const [sampleOrderRefs, setSampleOrderRefs] = useState<SampleOrderRef[]>([]);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
@@ -141,14 +142,17 @@ export default function AddOrderForm() {
   const [clientOpen, setClientOpen] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [sampleOpen, setSampleOpen] = useState(false);
-
+  const [openCombobox, setOpenCombobox] = useState<Record<number, boolean>>({});
+  // 👆 ------------------- 👆
   // Watchers
   const selectedClientId = watch("clientId");
   const salesCategory = watch("salesCategory");
   const selectedCurrencyCode = watch("currencyCode");
+  const [baseCurrencyCode, setBaseCurrencyCode] = useState("IDR");
+  const [isConvertingPrices, setIsConvertingPrices] = useState(false);
+
   const [sampleSteps, setSampleSteps] = useState<SampleStepItem[]>([]);
 
-  // Load Initial Master Data (Tanpa Vendor)
   useEffect(() => {
     async function load() {
       if (status !== "authenticated") return;
@@ -256,9 +260,9 @@ export default function AddOrderForm() {
       form.reset();
       setSampleSteps([]);
       if (data.salesCategory === "SAMPLE") {
-        router.push("/orders?tab=sample");
+        router.push("/super-admin/orders?tab=sample");
       } else {
-        router.push("/orders?tab=all");
+        router.push("/super-admin/orders?tab=all");
       }
     } catch {
       toast.error("Failed to create order");
@@ -325,27 +329,93 @@ export default function AddOrderForm() {
   const currentCurrencySymbol =
     currencies.find((c) => c.code === selectedCurrencyCode)?.symbol || "Rp";
 
-  const handleClientAdded = async (newClient: Client) => {
-    try {
-      const res = await fetchApi("/clients/order");
-      if (res.ok) {
-        const clientData = await res.json();
-        setClients(clientData);
+  useEffect(() => {
+    if (
+      selectedCurrencyCode &&
+      selectedCurrencyCode !== baseCurrencyCode &&
+      fields.length > 0
+    ) {
+      const hasNonZeroPrices = fields.some((_, idx) => {
+        const price = watch(`products.${idx}.price`);
+        return price && price > 0;
+      });
 
-        const addedClient = clientData.find(
-          (c: Client) => c.id === newClient.id,
+      if (hasNonZeroPrices) {
+        console.log("✅ Setting isConvertingPrices to true");
+        setIsConvertingPrices(true);
+      }
+    }
+  }, [selectedCurrencyCode, baseCurrencyCode, fields.length]);
+
+  const convertAllPrices = async () => {
+    if (!selectedCurrencyCode) {
+      toast.error("❌ Pilih currency terlebih dahulu");
+      return;
+    }
+
+    if (!baseCurrencyCode) {
+      toast.error("❌ Base currency tidak valid");
+      return;
+    }
+
+    if (selectedCurrencyCode === baseCurrencyCode) {
+      toast.info("ℹ️ Currency sama, tidak perlu konversi");
+      setIsConvertingPrices(false);
+      return;
+    }
+
+    console.log("🔄 Starting conversion...", {
+      from: baseCurrencyCode,
+      to: selectedCurrencyCode,
+    });
+
+    try {
+      let convertedCount = 0;
+
+      for (let i = 0; i < fields.length; i++) {
+        const currentPrice = watch(`products.${i}.price`);
+
+        if (!currentPrice || currentPrice <= 0) {
+          console.log(`Product ${i}: Skipped (price: ${currentPrice})`);
+          continue;
+        }
+
+        console.log(
+          `Converting ${currentPrice} from ${baseCurrencyCode} to ${selectedCurrencyCode}`,
         );
-        if (addedClient) {
-          form.setValue("clientId", addedClient.id);
-          if (addedClient.type === "B2C") {
-            form.setValue("phone", addedClient.phone);
-          }
-          form.setValue("shippingAddress", addedClient.address);
+
+        const result = await convert(
+          baseCurrencyCode,
+          selectedCurrencyCode,
+          currentPrice,
+        );
+
+        if (result?.success) {
+          console.log(`✅ Product ${i} converted:`, result);
+          form.setValue(
+            `products.${i}.price`,
+            parseFloat(result.convertedAmount.toFixed(2)),
+          );
+          convertedCount++;
+        } else {
+          console.warn(`⚠️ Product ${i} conversion failed`, result);
         }
       }
+
+      if (convertedCount > 0) {
+        toast.success(
+          `✅ ${convertedCount} produk dikonversi ke ${selectedCurrencyCode}`,
+        );
+        setIsConvertingPrices(false);
+        setBaseCurrencyCode(selectedCurrencyCode);
+      } else {
+        toast.info("ℹ️ Tidak ada produk yang dikonversi");
+      }
     } catch (error) {
-      console.error(error);
-      toast.error("Gagal refresh data client");
+      console.error("❌ Conversion error:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Gagal konversi harga",
+      );
     }
   };
   const titleText =
@@ -362,6 +432,50 @@ export default function AddOrderForm() {
           {titleText}
         </CardTitle>
       </CardHeader>
+
+      {isConvertingPrices && (
+        <div className="mx-6 mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+          <div>
+            <p className="font-medium text-blue-900 flex items-center gap-2">
+              🔄 Konversi Harga Produk?
+            </p>
+            <p className="text-sm text-blue-700 mt-2">
+              Kamu mengubah currency dari <strong>{baseCurrencyCode}</strong> ke{" "}
+              <strong>{selectedCurrencyCode}</strong>. Klik tombol dibawah untuk
+              konversi semua harga otomatis dengan rate terkini dari
+              exchangerate.host.
+            </p>
+          </div>
+          <div className="flex gap-2 ml-4 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsConvertingPrices(false)}
+              size="sm">
+              Biarkan Manual
+            </Button>
+            <Button
+              type="button"
+              onClick={convertAllPrices}
+              disabled={convertLoading}
+              className="bg-blue-600 hover:bg-blue-700"
+              size="sm">
+              {convertLoading ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  Converting...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Konversi Semua
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <CardContent>
         <Form {...form}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -850,7 +964,7 @@ export default function AddOrderForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Purchase Channel</FormLabel>
-                    {/* ✨ MODAL TAMBAH CHANNEL */}
+                    {/*  MODAL TAMBAH CHANNEL */}
                     <Dialog
                       open={isChannelModalOpen}
                       onOpenChange={setIsChannelModalOpen}>
@@ -926,31 +1040,6 @@ export default function AddOrderForm() {
                 Internal
               </h3>
 
-              {/* <FormField
-                control={control}
-                name="salesId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>PIC Sales</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="h-10">
-                          <SelectValue placeholder="Select sales person" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {sales.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              /> */}
-
               <FormField
                 control={control}
                 name="remark"
@@ -990,6 +1079,7 @@ export default function AddOrderForm() {
                       price: 0,
                       customization: "",
                       remarks: "",
+                      selectedAttributes: {},
                     })
                   }
                   className="border-dashed border-gray-400 hover:border-gray-600 hover:bg-gray-50">
@@ -1010,139 +1100,303 @@ export default function AddOrderForm() {
               <div className="space-y-4">
                 {fields.map((field, index) => {
                   const currentProductId = watch(`products.${index}.productId`);
+                  const currentVariantId = watch(`products.${index}.variantId`);
                   const selectedProduct = products.find(
                     (p) => p.id === currentProductId,
                   );
-                  const isCustomProduct = selectedProduct?.isCustom;
 
+                  const currentSelectedAttrs =
+                    watch(`products.${index}.selectedAttributes`) || {};
                   const subtotal =
                     (watch(`products.${index}.price`) || 0) *
                     (watch(`products.${index}.quantity`) || 0);
+
+                  // 1. LOGIKA PENCOCOKAN FLEKSIBEL
+                  const handleAttributeSelect = (
+                    attributeId: string,
+                    valueId: string,
+                  ) => {
+                    const newAttrs = {
+                      ...currentSelectedAttrs,
+                      [attributeId]: valueId,
+                    };
+                    form.setValue(
+                      `products.${index}.selectedAttributes`,
+                      newAttrs,
+                    );
+
+                    if (selectedProduct?.productVariants) {
+                      const selectedValIds = Object.values(newAttrs);
+
+                      const matchedVariant = [
+                        ...selectedProduct.productVariants,
+                      ]
+                        .sort(
+                          (a, b) =>
+                            b.combinationIds.length - a.combinationIds.length,
+                        )
+                        .find(
+                          (v) =>
+                            v.combinationIds.length > 0 &&
+                            v.combinationIds.every((id) =>
+                              selectedValIds.includes(id),
+                            ),
+                        );
+
+                      if (matchedVariant) {
+                        form.setValue(
+                          `products.${index}.variantId`,
+                          matchedVariant.id,
+                        );
+                        form.setValue(
+                          `products.${index}.price`,
+                          Number(matchedVariant.price),
+                        );
+                      } else {
+                        form.setValue(`products.${index}.variantId`, "");
+                      }
+                    }
+                  };
+
+                  // 2. FUNGSI UNTUK TOMBOL "QUICK SELECT" VARIAN
+                  const handleQuickSelectVariant = (variant: any) => {
+                    const newAttrs: Record<string, string> = {
+                      ...currentSelectedAttrs,
+                    };
+
+                    // Cocokkan ID dari varian ke ID dropdown atribut
+                    selectedProduct?.availableAttributes?.forEach((attr) => {
+                      const matchedValue = attr.values.find((v) =>
+                        variant.combinationIds.includes(v.valueId),
+                      );
+                      if (matchedValue) {
+                        newAttrs[attr.attributeId] = matchedValue.valueId;
+                      }
+                    });
+
+                    // Set otomatis semua nilai form
+                    form.setValue(
+                      `products.${index}.selectedAttributes`,
+                      newAttrs,
+                    );
+                    form.setValue(`products.${index}.variantId`, variant.id);
+                    form.setValue(
+                      `products.${index}.price`,
+                      Number(variant.price),
+                    );
+                    toast.success(
+                      `Varian ${variant.variantName || "terpilih"} diaplikasikan.`,
+                    );
+                  };
 
                   return (
                     <div
                       key={field.id}
                       className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
                       <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                        <div className="md:col-span-4 space-y-3">
+                        <div className="md:col-span-4 space-y-4">
+                          {/* 1. SEARCHABLE PRODUCT DROPDOWN (COMBOBOX) */}
                           <FormField
                             control={control}
                             name={`products.${index}.productId`}
                             render={({ field }) => (
-                              <FormItem>
+                              <FormItem className="flex flex-col">
                                 <FormLabel className="md:hidden">
                                   Product
                                 </FormLabel>
-                                <Select
-                                  value={field.value}
-                                  onValueChange={(val) => {
-                                    field.onChange(val);
-                                    form.setValue(
-                                      `products.${index}.variantId`,
-                                      "",
-                                    );
-                                    const prod = products.find(
-                                      (p) => p.id === val,
-                                    );
-                                    if (prod) {
-                                      form.setValue(
-                                        `products.${index}.price`,
-                                        prod.isCustom
-                                          ? 0
-                                          : Number(prod.basePrice),
-                                      );
-                                    }
-                                  }}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-10">
-                                      <SelectValue placeholder="Select Product" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {products.map((p) => (
-                                      <SelectItem
-                                        key={p.id}
-                                        value={p.id}
-                                        textValue={p.name}>
-                                        <div className="flex items-center justify-between w-full gap-4 min-w-50">
-                                          <span className="font-medium truncate text-gray-700">
-                                            {p.name}
-                                          </span>
-                                          {p.isCustom && (
-                                            <div className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
-                                              <Settings2 className="w-3 h-3" />
-                                              <span className="text-[10px] font-bold tracking-wide">
-                                                CUSTOM
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                <Popover
+                                  open={openCombobox[index]}
+                                  onOpenChange={(val) =>
+                                    setOpenCombobox((prev) => ({
+                                      ...prev,
+                                      [index]: val,
+                                    }))
+                                  }>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        className={cn(
+                                          "w-full justify-between h-10 font-normal",
+                                          !field.value &&
+                                            "text-muted-foreground",
+                                        )}>
+                                        {field.value
+                                          ? products.find(
+                                              (p) => p.id === field.value,
+                                            )?.name
+                                          : "Search Product..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent
+                                    className="w-75 p-0"
+                                    align="start">
+                                    <Command>
+                                      <CommandInput placeholder="Search by name or SKU..." />
+                                      <CommandList>
+                                        <CommandEmpty>
+                                          Product not found.
+                                        </CommandEmpty>
+                                        <CommandGroup>
+                                          {products.map((p) => (
+                                            <CommandItem
+                                              key={p.id}
+                                              value={`${p.name} ${p.sku}`}
+                                              onSelect={() => {
+                                                field.onChange(p.id);
+                                                form.setValue(
+                                                  `products.${index}.variantId`,
+                                                  "",
+                                                );
+                                                form.setValue(
+                                                  `products.${index}.selectedAttributes`,
+                                                  {},
+                                                );
+                                                form.setValue(
+                                                  `products.${index}.price`,
+                                                  p.productVariants?.length
+                                                    ? 0
+                                                    : Number(p.basePrice),
+                                                );
+                                                setOpenCombobox((prev) => ({
+                                                  ...prev,
+                                                  [index]: false,
+                                                }));
+                                              }}>
+                                              <Check
+                                                className={cn(
+                                                  "mr-2 h-4 w-4",
+                                                  p.id === field.value
+                                                    ? "opacity-100"
+                                                    : "opacity-0",
+                                                )}
+                                              />
+                                              <div className="flex flex-col">
+                                                <span>{p.name}</span>
+                                                <span className="text-xs text-gray-500">
+                                                  SKU: {p.sku}
+                                                </span>
+                                              </div>
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
 
                           {selectedProduct && (
-                            <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                            <div className="flex items-center gap-3 text-xs text-gray-500">
                               <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">
                                 SKU:{" "}
                                 <span className="font-medium text-gray-800">
-                                  {(selectedProduct as any).sku || "-"}
+                                  {selectedProduct.sku || "-"}
                                 </span>
                               </span>
                               <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">
                                 UOM:{" "}
                                 <span className="font-medium text-gray-800">
-                                  {(selectedProduct as any).uom || "-"}
+                                  {selectedProduct.uom || "-"}
                                 </span>
                               </span>
                             </div>
                           )}
 
-                          {isCustomProduct && (
-                            <FormField
-                              control={control}
-                              name={`products.${index}.variantId`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <Select
-                                    value={field.value}
-                                    onValueChange={(val) => {
-                                      field.onChange(val);
-                                      const variant =
-                                        selectedProduct?.productVariants.find(
-                                          (v) => v.id === val,
-                                        );
-                                      if (variant)
-                                        form.setValue(
-                                          `products.${index}.price`,
-                                          Number(variant.price),
-                                        );
-                                    }}>
-                                    <FormControl>
-                                      <SelectTrigger className="h-9 text-sm bg-gray-50 border-dashed">
-                                        <SelectValue placeholder="Select Variant" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {selectedProduct?.productVariants.map(
-                                        (v) => (
-                                          <SelectItem key={v.id} value={v.id}>
-                                            {v.variantName}
-                                          </SelectItem>
-                                        ),
-                                      )}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
+                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start mt-4">
+                            {/* KIRI: FITUR PANDUAN VARIAN (QUICK SELECT) */}
+                            {selectedProduct?.productVariants &&
+                              selectedProduct.productVariants.length > 0 && (
+                                <div className="bg-blue-50/50 border border-blue-100 rounded-md p-3 space-y-2 h-full">
+                                  <p className="text-xs font-semibold text-blue-800 flex items-center gap-1">
+                                    <Bookmark className="w-3 h-3" /> Panduan
+                                    Varian Tersedia
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {selectedProduct.productVariants.map(
+                                      (variant) => (
+                                        <button
+                                          key={variant.id}
+                                          type="button"
+                                          onClick={() =>
+                                            handleQuickSelectVariant(variant)
+                                          }
+                                          className={cn(
+                                            "text-[10px] font-medium px-2 py-1 rounded border transition-colors",
+                                            currentVariantId === variant.id
+                                              ? "bg-blue-600 text-white border-blue-600"
+                                              : "bg-white text-gray-600 border-gray-300 hover:bg-blue-50",
+                                          )}>
+                                          {variant.attributesDescription ||
+                                            variant.variantName ||
+                                            `SKU: ${variant.sku}`}
+                                        </button>
+                                      ),
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-gray-400 italic">
+                                    Klik tombol di atas untuk mengisi dropdown
+                                    otomatis.
+                                  </p>
+                                </div>
                               )}
-                            />
-                          )}
+
+                            {/* KANAN: DYNAMIC ATTRIBUTE SELECTION */}
+                            {selectedProduct?.availableAttributes &&
+                              selectedProduct.availableAttributes.length >
+                                0 && (
+                                <div className="bg-gray-50 border rounded-md p-3 space-y-3 h-full">
+                                  <p className="text-xs font-semibold text-gray-600 mb-1">
+                                    Select Attributes:
+                                  </p>
+                                  {selectedProduct.availableAttributes.map(
+                                    (attr) => (
+                                      <div
+                                        key={attr.attributeId}
+                                        className="flex flex-col space-y-1">
+                                        <label className="text-xs text-gray-500">
+                                          {attr.attributeName}
+                                        </label>
+                                        <Select
+                                          value={
+                                            currentSelectedAttrs[
+                                              attr.attributeId
+                                            ] || ""
+                                          }
+                                          onValueChange={(val) =>
+                                            handleAttributeSelect(
+                                              attr.attributeId,
+                                              val,
+                                            )
+                                          }>
+                                          <SelectTrigger className="h-8 text-sm bg-white">
+                                            <SelectValue
+                                              placeholder={`Select ${attr.attributeName}`}
+                                            />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {attr.values.map((val) => (
+                                              <SelectItem
+                                                key={val.valueId}
+                                                value={val.valueId}>
+                                                {val.value}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    ),
+                                  )}
+                                </div>
+                              )}
+                          </div>
+                          {/* ========================================== */}
                         </div>
 
                         <div className="md:col-span-2">
@@ -1164,9 +1418,11 @@ export default function AddOrderForm() {
                                         const val = e.target.valueAsNumber;
                                         field.onChange(isNaN(val) ? 0 : val);
 
+                                        // Logika Price Tier
                                         if (
                                           selectedProduct &&
-                                          !selectedProduct.isCustom &&
+                                          !selectedProduct.productVariants
+                                            ?.length &&
                                           selectedProduct.priceTiers?.length > 0
                                         ) {
                                           const tiers = [
@@ -1213,11 +1469,12 @@ export default function AddOrderForm() {
                                 <FormControl>
                                   <div className="relative">
                                     <span className="absolute left-3 top-2.5 text-xs text-gray-500 font-medium">
-                                      {currentCurrencySymbol}
+                                      {currentCurrencySymbol || "Rp"}
                                     </span>
                                     <Input
                                       type="number"
                                       min={0}
+                                      step="any"
                                       {...field}
                                       onChange={(e) => {
                                         const val = e.target.valueAsNumber;
@@ -1238,7 +1495,7 @@ export default function AddOrderForm() {
                             Subtotal
                           </span>
                           <span className="font-semibold text-gray-900 font-mono">
-                            {currentCurrencySymbol}{" "}
+                            {currentCurrencySymbol || "Rp"}{" "}
                             {subtotal.toLocaleString("id-ID", {
                               minimumFractionDigits: 0,
                             })}
@@ -1259,6 +1516,7 @@ export default function AddOrderForm() {
                         </div>
                       </div>
 
+                      {/* Additional Details (Customization & Remarks) */}
                       <div className="bg-gray-50/50 p-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4 rounded-b-lg">
                         <FormField
                           control={control}
@@ -1272,9 +1530,6 @@ export default function AddOrderForm() {
                                     {...field}
                                     className="text-sm border-gray-200 pl-8 bg-white"
                                   />
-                                  <span className="absolute left-2.5 top-2.5 text-gray-400">
-                                    <Settings2 className="w-4 h-4" />
-                                  </span>
                                 </div>
                               </FormControl>
                               <FormMessage />
@@ -1293,23 +1548,6 @@ export default function AddOrderForm() {
                                     {...field}
                                     className="text-sm border-gray-200 pl-8 bg-white"
                                   />
-                                  <span className="absolute left-2.5 top-2.5 text-gray-400">
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      width="16"
-                                      height="16"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round">
-                                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                      <polyline points="14 2 14 8 20 8" />
-                                      <line x1="16" y1="13" x2="8" y2="13" />
-                                      <line x1="16" y1="17" x2="8" y2="17" />
-                                    </svg>
-                                  </span>
                                 </div>
                               </FormControl>
                               <FormMessage />

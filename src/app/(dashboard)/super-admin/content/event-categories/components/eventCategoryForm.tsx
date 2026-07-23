@@ -269,13 +269,13 @@ export default function EventCategoryForm({
                   name="isActive"
                   render={({ field }) => (
                     <FormItem>
-                      {/* ✨ LABEL BAYANGAN: Memastikan strukturnya sejajar 100% dengan Display Order */}
+                      {/*  LABEL BAYANGAN: Memastikan strukturnya sejajar 100% dengan Display Order */}
                       <FormLabel className="flex items-center gap-2 opacity-0 select-none pointer-events-none">
                         <ListOrdered className="h-4 w-4" />
                         Status
                       </FormLabel>
 
-                      {/* ✨ KOTAK H-10: Memastikan tingginya sama persis dengan kotak Input */}
+                      {/*  KOTAK H-10: Memastikan tingginya sama persis dengan kotak Input */}
                       <div
                         className="flex flex-row items-center gap-3 px-3 h-10 border rounded-md bg-stone-50 hover:bg-stone-100 transition-colors shadow-sm cursor-pointer"
                         onClick={() => field.onChange(!field.value)}>
@@ -291,7 +291,7 @@ export default function EventCategoryForm({
                         </span>
                       </div>
 
-                      {/* ✨ DESKRIPSI: Dipindah ke bawah agar sama seperti Ordered Times */}
+                      {/*  DESKRIPSI: Dipindah ke bawah agar sama seperti Ordered Times */}
                       <FormDescription className="text-[10px]">
                         Visible on the website.
                       </FormDescription>

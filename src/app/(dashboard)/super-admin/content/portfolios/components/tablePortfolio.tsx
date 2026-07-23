@@ -39,7 +39,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-// ✨ UPDATE TIPE DATA SESUAI SCHEMA BARU
+//  UPDATE TIPE DATA SESUAI SCHEMA BARU
 type Portfolio = {
   id: string;
   title: string;
@@ -220,11 +220,11 @@ export default function PortfolioTable() {
                   <TableHead className="min-w-40">Project & Category</TableHead>
                   <TableHead>Client Name</TableHead>
                   <TableHead className="text-center">Items Ordered</TableHead>
-                  {/* ✨ KOLOM BARU */}
+                  {/*  KOLOM BARU */}
                   <TableHead className="whitespace-nowrap">
                     Project Date
                   </TableHead>
-                  {/* ✨ KOLOM BARU */}
+                  {/*  KOLOM BARU */}
                   <TableHead>Status</TableHead>
                   <TableHead className="whitespace-nowrap">Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -235,7 +235,7 @@ export default function PortfolioTable() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      {/* ✨ colSpan jadi 9 */}
+                      {/*  colSpan jadi 9 */}
                       <TableCell colSpan={9}>
                         <Skeleton className="h-12 w-full" />
                       </TableCell>

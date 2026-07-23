@@ -28,7 +28,7 @@ const EditItemVendor = () => {
 
       try {
         setIsLoading(true);
-        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        //  Gunakan fetchApi (Otomatis handle Base URL dan Token)
         const res = await fetchApi(`/vendor-items/${id}`);
 
         if (!res.ok) {

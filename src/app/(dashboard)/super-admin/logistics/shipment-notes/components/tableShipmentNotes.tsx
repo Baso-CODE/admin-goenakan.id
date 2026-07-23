@@ -76,7 +76,7 @@ export default function ShipmentNoteCategory() {
 
     setIsLoading(true);
     try {
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      //  Gunakan fetchApi (Otomatis handle Base URL dan Token)
       const res = await fetchApi("/shipment-notes-categories");
 
       if (!res.ok) {

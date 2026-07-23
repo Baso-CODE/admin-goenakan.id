@@ -1,22 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Edit,
-  Image as ImageIcon,
-  Plus,
-  PlusCircle,
-  Trash2,
-} from "lucide-react";
+import { Edit, Image as ImageIcon, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-  FormProvider,
-  useFieldArray,
-  useForm,
-  useFormContext,
-} from "react-hook-form";
-import { z } from "zod";
+import { FormProvider, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -103,14 +92,18 @@ export default function FormUpdateVariants({
   const handleDeleteAll = () => {
     if (!confirm("Apakah Anda yakin ingin menghapus semua varian?")) return;
     const currentVariants = form.getValues("variants") || [];
-    const updated = currentVariants.map((v: any) => {
-      if (v.id) {
-        return { ...v, _isDeleted: true };
-      }
-      return null;
-    }).filter(Boolean);
+    const updated = currentVariants
+      .map((v: any) => {
+        if (v.id) {
+          return { ...v, _isDeleted: true };
+        }
+        return null;
+      })
+      .filter(Boolean);
     form.setValue("variants", updated as any);
-    toast.success("Semua varian ditandai untuk dihapus. Klik 'Save' di bagian bawah untuk menyimpan perubahan.");
+    toast.success(
+      "Semua varian ditandai untuk dihapus. Klik 'Save' di bagian bawah untuk menyimpan perubahan.",
+    );
   };
 
   const handleApplyGlobalStock = () => {
@@ -136,7 +129,9 @@ export default function FormUpdateVariants({
           id: v.id,
           variantName: (v.variantName ?? "")
             .split(" • ")
-            .map((part: string) => (part.includes("|") ? part.split("|")[0] : part))
+            .map((part: string) =>
+              part.includes("|") ? part.split("|")[0] : part,
+            )
             .join(" • "),
           description: v.description ?? "",
           sku: v.sku ?? "",
@@ -151,7 +146,7 @@ export default function FormUpdateVariants({
             v.attributeValueIds ||
             (v.attributeValues?.map((av: any) => av.attributeValueId) ?? []),
 
-          // ✨ TAMBAHAN BARU: Prefill Price Tiers
+          //  TAMBAHAN BARU: Prefill Price Tiers
           priceTiers:
             v.priceTiers?.map((pt: any) => ({
               id: pt.id,
@@ -262,7 +257,9 @@ export default function FormUpdateVariants({
 
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 border rounded-xl bg-stone-50">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-stone-700">Global Stock Adjuster:</span>
+              <span className="text-sm font-semibold text-stone-700">
+                Global Stock Adjuster:
+              </span>
               <Input
                 type="number"
                 min="0"
@@ -271,7 +268,10 @@ export default function FormUpdateVariants({
                 onChange={(e) => setGlobalStock(e.target.value)}
                 className="w-28 bg-white"
               />
-              <Button type="button" variant="outline" onClick={handleApplyGlobalStock}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleApplyGlobalStock}>
                 Apply to All
               </Button>
             </div>
@@ -279,8 +279,7 @@ export default function FormUpdateVariants({
               type="button"
               variant="destructive"
               onClick={handleDeleteAll}
-              className="space-x-2"
-            >
+              className="space-x-2">
               <Trash2 className="h-4 w-4" />
               <span>Delete All Variants</span>
             </Button>
@@ -399,8 +398,6 @@ export default function FormUpdateVariants({
                       )}
                     />
                   </div>
-
-
 
                   <FormField
                     control={form.control}

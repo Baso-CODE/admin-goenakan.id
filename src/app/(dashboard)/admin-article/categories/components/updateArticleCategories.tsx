@@ -60,7 +60,7 @@ export default function EditArticleCategory() {
 
     setIsSubmitting(true);
     try {
-      // ✨ Gunakan fetchApi dengan method PATCH
+      //  Gunakan fetchApi dengan method PATCH
       const res = await fetchApi(`/article-categories/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),

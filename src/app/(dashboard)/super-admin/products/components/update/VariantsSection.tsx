@@ -43,7 +43,7 @@ const ImageSchema = z.object({
   fileIndex: z.number().nullable().optional(),
 });
 
-// ✨ TAMBAHAN BARU: Skema untuk Price Tier
+//  TAMBAHAN BARU: Skema untuk Price Tier
 const PriceTierSchema = z.object({
   id: z.string().optional(),
   minQuantity: z.coerce.number().min(1, "Minimal qty 1"),
@@ -71,7 +71,7 @@ const VariantSchema = z.object({
       _isDeleted: z.boolean().optional(),
       attributeValueIds: z.array(z.string()).optional(),
       images: z.array(ImageSchema).optional(),
-      // ✨ TAMBAHAN BARU: Field Price Tiers untuk Variant
+      //  TAMBAHAN BARU: Field Price Tiers untuk Variant
       priceTiers: z.array(PriceTierSchema).optional(),
     }),
   ),
@@ -244,7 +244,9 @@ export default function FormUpdateVariants({
           id: v.id,
           variantName: (v.variantName ?? "")
             .split(" • ")
-            .map((part: string) => (part.includes("|") ? part.split("|")[0] : part))
+            .map((part: string) =>
+              part.includes("|") ? part.split("|")[0] : part,
+            )
             .join(" • "),
           description: v.description ?? "",
           sku: v.sku ?? "",
@@ -258,7 +260,7 @@ export default function FormUpdateVariants({
           attributeValueIds:
             v.attributeValues?.map((av: any) => av.attributeValueId) ?? [],
 
-          // ✨ TAMBAHAN BARU: Prefill Price Tiers
+          //  TAMBAHAN BARU: Prefill Price Tiers
           priceTiers:
             v.priceTiers?.map((pt: any) => ({
               id: pt.id,
@@ -482,7 +484,7 @@ export default function FormUpdateVariants({
                     />
                   </div>
 
-                  {/* ✨ RENDER SUB-COMPONENT PRICE TIERS DI SINI */}
+                  {/*  RENDER SUB-COMPONENT PRICE TIERS DI SINI */}
                   <NestedVariantPriceTiers nestIndex={index} />
 
                   {/* DIMENSI & BERAT */}

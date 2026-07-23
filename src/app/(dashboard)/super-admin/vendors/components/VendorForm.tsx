@@ -56,11 +56,11 @@ import {
   Plus,
 } from "lucide-react";
 
+import AddressField from "../../clients/components/addressField";
 import ContactPlatformForm from "../../contact-platforms/components/FormContactPlatform";
 import VendorCategoryForm from "../../vendor-categories/components/formCategoryVendor";
 import VendorItemForm from "../../vendor-items/components/formItemVendor";
 import { useVendorFormFilter } from "../hooks/useVendorFormFilter";
-import VendorAddressField from "./VendorAddressField";
 
 // === ZOD SCHEMA ===
 const baseVendorSchema = {
@@ -450,8 +450,47 @@ export default function VendorForm({
                 />
               </div>
 
-              <div className="col-span-1 md:col-span-2">
-                <VendorAddressField form={form} />
+              <div className="col-span-1 md:col-span-2 space-y-4 border p-4 rounded-lg bg-slate-50/50">
+                <FormLabel className="text-base font-semibold">
+                  Area & Lokasi Vendor
+                </FormLabel>
+
+                <AddressField
+                  value={{
+                    country: form.watch("country") || "",
+                    province: form.watch("province") || "",
+                    city: form.watch("city") || "",
+                    district: form.watch("district") || "",
+                    subDistrict: form.watch("subDistrict") || "",
+                    postalCode: form.watch("postalCode") || "",
+                  }}
+                  onChange={(updated) => {
+                    if (updated.country !== undefined)
+                      form.setValue("country", updated.country, {
+                        shouldValidate: true,
+                      });
+                    if (updated.province !== undefined)
+                      form.setValue("province", updated.province, {
+                        shouldValidate: true,
+                      });
+                    if (updated.city !== undefined)
+                      form.setValue("city", updated.city, {
+                        shouldValidate: true,
+                      });
+                    if (updated.district !== undefined)
+                      form.setValue("district", updated.district, {
+                        shouldValidate: true,
+                      });
+                    if (updated.subDistrict !== undefined)
+                      form.setValue("subDistrict", updated.subDistrict, {
+                        shouldValidate: true,
+                      });
+                    if (updated.postalCode !== undefined)
+                      form.setValue("postalCode", updated.postalCode, {
+                        shouldValidate: true,
+                      });
+                  }}
+                />
               </div>
 
               <div className="col-span-1 md:col-span-2">

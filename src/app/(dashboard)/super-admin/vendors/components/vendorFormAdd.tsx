@@ -55,6 +55,7 @@ import {
   Plus,
 } from "lucide-react";
 import { toast } from "sonner";
+import AddressField from "../../clients/components/addressField";
 import ContactPlatformForm, {
   ContactPlatformFormValues,
 } from "../../contact-platforms/components/FormContactPlatform";
@@ -65,7 +66,6 @@ import VendorItemForm, {
   VendorItemFormValues,
 } from "../../vendor-items/components/formItemVendor";
 import { useVendorFormFilter } from "../hooks/useVendorFormFilter";
-import VendorAddressField from "./VendorAddressField";
 
 const baseVendorSchema = {
   companyName: z.string().min(2, "Company name required"),
@@ -111,6 +111,7 @@ export default function AddVendorForm({
   // State Data Master
   const [contactPlatforms, setContactPlatforms] = useState<any[]>([]);
   const [vendorCategories, setVendorCategories] = useState<any[]>([]);
+  const [productCategories, setProductCategories] = useState<any[]>([]);
   const [vendorItems, setVendorItems] = useState<
     { id: string; name: string; categoryId: string }[]
   >([]);
@@ -157,11 +158,13 @@ export default function AddVendorForm({
       if (status !== "authenticated") return;
 
       try {
-        const [platformsRes, catsRes, itemsRes] = await Promise.all([
-          fetchApi("/contact-platforms/active"),
-          fetchApi("/vendor-categories/active"),
-          fetchApi("/vendor-items/active"),
-        ]);
+        const [platformsRes, catsRes, prodCatsRes, itemsRes] =
+          await Promise.all([
+            fetchApi("/contact-platforms/active"),
+            fetchApi("/vendor-categories/active"),
+            fetchApi("/product-categories/list"),
+            fetchApi("/vendor-items/active"),
+          ]);
 
         // Parsing data secara aman jika response OK
         if (platformsRes.ok) {
@@ -172,6 +175,11 @@ export default function AddVendorForm({
         if (catsRes.ok) {
           const catsData = await catsRes.json();
           setVendorCategories(catsData);
+        }
+
+        if (prodCatsRes.ok) {
+          const prodCatsData = await prodCatsRes.json();
+          setProductCategories(prodCatsData);
         }
 
         if (itemsRes.ok) {
@@ -274,6 +282,26 @@ export default function AddVendorForm({
     onSubmit(payload);
   };
 
+  const selectedType = form.watch("type");
+  const selectedCategoryId = form.watch("categoryId");
+  const getAvailableItems = () => {
+    if (selectedType === "PRODUCT") {
+      const selectedProductCat = productCategories.find(
+        (cat) => cat.id === selectedCategoryId,
+      );
+      if (!selectedProductCat || !selectedProductCat.itemCategories) return [];
+
+      return selectedProductCat.itemCategories.map((itemCat: any) => ({
+        id: itemCat.id,
+        name: itemCat.name,
+      }));
+    } else {
+      return filteredItems;
+    }
+  };
+
+  const availableItems = getAvailableItems();
+
   return (
     <Card>
       {isLoading && (
@@ -330,7 +358,7 @@ export default function AddVendorForm({
                     <Dialog
                       open={isPlatformModalOpen}
                       onOpenChange={setIsPlatformModalOpen}>
-                      <DialogContent className="sm:max-w-2xl">
+                      <DialogContent className="">
                         <DialogHeader>
                           <DialogTitle>Tambah Platform Baru</DialogTitle>
                         </DialogHeader>
@@ -348,7 +376,7 @@ export default function AddVendorForm({
                           field.onChange(val);
                         }
                       }}>
-                      <FormControl>
+                      <FormControl className="w-full">
                         <SelectTrigger>
                           <SelectValue placeholder="Select Platform" />
                         </SelectTrigger>
@@ -406,8 +434,47 @@ export default function AddVendorForm({
                 />
               </div>
 
-              <div className="col-span-1 md:col-span-2">
-                <VendorAddressField form={form} />
+              <div className="col-span-1 md:col-span-2 space-y-4 border p-4 rounded-lg bg-slate-50/50">
+                <FormLabel className="text-base font-semibold">
+                  Area & Lokasi Vendor
+                </FormLabel>
+
+                <AddressField
+                  value={{
+                    country: form.watch("country") || "",
+                    province: form.watch("province") || "",
+                    city: form.watch("city") || "",
+                    district: form.watch("district") || "",
+                    subDistrict: form.watch("subDistrict") || "",
+                    postalCode: form.watch("postalCode") || "",
+                  }}
+                  onChange={(updated) => {
+                    if (updated.country !== undefined)
+                      form.setValue("country", updated.country, {
+                        shouldValidate: true,
+                      });
+                    if (updated.province !== undefined)
+                      form.setValue("province", updated.province, {
+                        shouldValidate: true,
+                      });
+                    if (updated.city !== undefined)
+                      form.setValue("city", updated.city, {
+                        shouldValidate: true,
+                      });
+                    if (updated.district !== undefined)
+                      form.setValue("district", updated.district, {
+                        shouldValidate: true,
+                      });
+                    if (updated.subDistrict !== undefined)
+                      form.setValue("subDistrict", updated.subDistrict, {
+                        shouldValidate: true,
+                      });
+                    if (updated.postalCode !== undefined)
+                      form.setValue("postalCode", updated.postalCode, {
+                        shouldValidate: true,
+                      });
+                  }}
+                />
               </div>
 
               <div className="col-span-1 md:col-span-2">
@@ -460,60 +527,78 @@ export default function AddVendorForm({
               <FormField
                 control={form.control}
                 name="categoryId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Dialog
-                      open={isCategoryModalOpen}
-                      onOpenChange={setIsCategoryModalOpen}>
-                      <DialogContent className="sm:max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle>Tambah Kategori Vendor Baru</DialogTitle>
-                        </DialogHeader>
-                        <VendorCategoryForm onSubmit={handleAddCategoryFast} />
-                      </DialogContent>
-                    </Dialog>
+                render={({ field }) => {
+                  const currentCategories =
+                    selectedType === "PRODUCT"
+                      ? productCategories.map((c) => ({
+                          id: c.id,
+                          name: c.name,
+                        }))
+                      : filteredCategories;
 
-                    <Select
-                      value={field.value}
-                      disabled={!form.watch("type") || loadingCategories}
-                      onValueChange={(val) => {
-                        if (val === "add_new_category") {
-                          setIsCategoryModalOpen(true);
-                        } else {
-                          field.onChange(val);
+                  return (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Dialog
+                        open={isCategoryModalOpen}
+                        onOpenChange={setIsCategoryModalOpen}>
+                        <DialogContent className="sm:max-w-2xl">
+                          <DialogHeader>
+                            <DialogTitle>
+                              Tambah Kategori Vendor Baru
+                            </DialogTitle>
+                          </DialogHeader>
+                          <VendorCategoryForm
+                            onSubmit={handleAddCategoryFast}
+                          />
+                        </DialogContent>
+                      </Dialog>
+
+                      <Select
+                        value={field.value}
+                        disabled={
+                          !selectedType ||
+                          (selectedType === "SERVICE" && loadingCategories)
                         }
-                      }}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {filteredCategories.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-
-                        {form.watch("type") && (
-                          <>
-                            <div className="h-px bg-stone-200 my-1 mx-2" />
-                            <SelectItem
-                              value="add_new_category"
-                              className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer">
-                              <div className="flex items-center gap-2 text-sm">
-                                <Plus className="w-4 h-4" />
-                                Buat Kategori Baru...
-                              </div>
+                        onValueChange={(val) => {
+                          if (val === "add_new_category") {
+                            setIsCategoryModalOpen(true);
+                          } else {
+                            field.onChange(val);
+                            form.setValue("itemIds", []);
+                          }
+                        }}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {currentCategories.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
                             </SelectItem>
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                          ))}
+
+                          {selectedType === "SERVICE" && (
+                            <>
+                              <div className="h-px bg-stone-200 my-1 mx-2" />
+                              <SelectItem
+                                value="add_new_category"
+                                className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer">
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Plus className="w-4 h-4" />
+                                  Buat Kategori Baru...
+                                </div>
+                              </SelectItem>
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
 
               {/* === VENDOR ITEMS === */}
@@ -572,7 +657,7 @@ export default function AddVendorForm({
                           <CommandList>
                             <CommandEmpty>Item tidak ditemukan.</CommandEmpty>
                             <CommandGroup>
-                              {filteredItems.map((item) => {
+                              {availableItems.map((item: any) => {
                                 const isSelected = (field.value ?? []).includes(
                                   item.id,
                                 );

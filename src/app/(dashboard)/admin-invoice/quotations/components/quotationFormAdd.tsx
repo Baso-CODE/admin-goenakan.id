@@ -805,7 +805,7 @@ export default function QuotationAddForm({
                   )}
                 />
 
-                {/* ✨ TAMBAHAN: Currency Code */}
+                {/*  TAMBAHAN: Currency Code */}
                 <FormField
                   control={form.control}
                   name="currencyCode"
@@ -842,7 +842,7 @@ export default function QuotationAddForm({
                     </FormItem>
                   )}
                 />
-                {/* ✨ TAMBAHAN: Payment Terms */}
+                {/*  TAMBAHAN: Payment Terms */}
                 <FormField
                   control={form.control}
                   name="paymentTerms"
@@ -1080,13 +1080,13 @@ export default function QuotationAddForm({
               <div className="hidden md:flex items-center gap-4 text-[11px] text-muted-foreground mr-auto ml-4">
                 <span className="flex items-center gap-1">
                   <span className="font-semibold text-slate-600">
-                    ✨ Min/Max Qty
+                    Min/Max Qty
                   </span>
                   = Rentang Jumlah
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="font-semibold text-slate-600">✨ Label</span>{" "}
-                  = Satuan (Pcs/Unit)
+                  <span className="font-semibold text-slate-600"> Label</span> =
+                  Satuan (Pcs/Unit)
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="font-semibold text-slate-600">Rp</span> =

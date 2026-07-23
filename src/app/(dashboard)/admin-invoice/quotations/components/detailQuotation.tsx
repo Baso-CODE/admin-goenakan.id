@@ -113,7 +113,7 @@ type QuotationDetail = {
 };
 
 export default function QuotationDetail() {
-  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status
+  const { fetchApi, status } = useApi(); //  Ambil fetchApi dan status
   const { id } = useParams();
   const router = useRouter();
   const [data, setData] = useState<QuotationDetail | null>(null);
@@ -155,7 +155,7 @@ export default function QuotationDetail() {
 
     setIsDeleting(true);
     try {
-      // ✨ Gunakan fetchApi dengan method DELETE
+      //  Gunakan fetchApi dengan method DELETE
       const res = await fetchApi(`/quotations/${id}`, {
         method: "DELETE",
       });

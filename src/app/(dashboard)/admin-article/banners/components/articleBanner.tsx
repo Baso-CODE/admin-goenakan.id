@@ -100,7 +100,7 @@ const ArticleBanners = () => {
 
     setIsDeleting(true);
     try {
-      // ✨ 4. Gunakan fetchApi untuk DELETE
+      //  4. Gunakan fetchApi untuk DELETE
       const res = await fetchApi(`/articles-banners/${deleteId}`, {
         method: "DELETE",
       });
@@ -121,7 +121,7 @@ const ArticleBanners = () => {
     }
   };
 
-  // ✨ 5. Trigger fetch saat depedensi berubah
+  //  5. Trigger fetch saat depedensi berubah
   useEffect(() => {
     fetchBanners();
   }, [fetchBanners]);

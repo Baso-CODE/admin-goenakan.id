@@ -161,7 +161,7 @@ export default function ProductTags() {
 
     setIsDeleting(true);
     try {
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      //  Gunakan fetchApi (Otomatis handle Base URL dan Token)
       const res = await fetchApi(`/product-tags/${deleteId}`, {
         method: "DELETE",
       });

@@ -78,7 +78,7 @@ type Product = {
 
 type Category = {
   id: string;
-  // ✨ 2. Update tipe Kategori utama
+  //  2. Update tipe Kategori utama
   name?: string;
   name_id?: string;
   name_en?: string;

@@ -11,7 +11,7 @@ import {
   UserCheck,
 } from "lucide-react";
 
-// ✨ PERBAIKAN 1: Tambahkan `| null` pada setiap tipe data karena Backend bisa mengirimkan null
+//  PERBAIKAN 1: Tambahkan `| null` pada setiap tipe data karena Backend bisa mengirimkan null
 export interface SampleMetricsData {
   totalSample: number | null;
   totalCost: number | null;
@@ -25,7 +25,7 @@ interface OpsSampleSectionProps {
   data?: SampleMetricsData;
 }
 
-// ✨ Helper untuk format angka dan uang (Sudah aman karena pakai val || 0)
+//  Helper untuk format angka dan uang (Sudah aman karena pakai val || 0)
 const formatNumber = (val: number | null) =>
   new Intl.NumberFormat("id-ID").format(val || 0);
 const formatCurrency = (val: number | null) =>
@@ -118,7 +118,7 @@ export default function OpsSampleSection({ data }: OpsSampleSectionProps) {
             <Percent className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            {/* ✨ PERBAIKAN 2: Gunakan ( ... || 0) sebelum toFixed */}
+            {/*  PERBAIKAN 2: Gunakan ( ... || 0) sebelum toFixed */}
             <div className="text-2xl font-bold text-foreground">
               {(safeData.conversionRate || 0).toFixed(1)}%
             </div>
@@ -149,7 +149,7 @@ export default function OpsSampleSection({ data }: OpsSampleSectionProps) {
             <ActivitySquare className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            {/* ✨ PERBAIKAN 3: Gunakan ( ... || 0) sebelum toFixed */}
+            {/*  PERBAIKAN 3: Gunakan ( ... || 0) sebelum toFixed */}
             <div className="text-2xl font-bold text-foreground">
               {(safeData.avgConversionRate || 0).toFixed(1)}%
             </div>
