@@ -26,6 +26,8 @@ export default function AddVendorPage() {
         body: JSON.stringify({
           companyName: data.companyName,
           picName: data.picName,
+          type: data.type,
+          categoryId: data.categoryId,
           country: data.country,
           province: data.province,
           city: data.city,

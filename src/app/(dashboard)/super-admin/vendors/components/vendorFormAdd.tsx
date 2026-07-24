@@ -702,8 +702,8 @@ export default function AddVendorForm({
                     {/* BADGE LIST */}
                     <div className="flex flex-wrap gap-2 mt-2">
                       {(field.value ?? []).map((selectedId) => {
-                        const item = vendorItems.find(
-                          (i) => i.id === selectedId,
+                        const item = availableItems.find(
+                          (i: any) => i.id === selectedId,
                         );
 
                         return (
