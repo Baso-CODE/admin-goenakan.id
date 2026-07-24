@@ -47,7 +47,6 @@ import {
   FileText,
   Loader2,
   PlusCircle,
-  Settings2,
   Trash2,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -116,7 +115,7 @@ export default function EditOrderForm() {
   const [sampleSteps, setSampleSteps] = useState<SampleStepItem[]>([]);
   const [initialFollowUps, setInitialFollowUps] = useState<any[]>([]);
   const [orderStatus, setOrderStatus] = useState<string>("PENDING");
-
+  const [openCombobox, setOpenCombobox] = useState<Record<number, boolean>>({});
   // Popover open states
   const [clientOpen, setClientOpen] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
@@ -208,14 +207,36 @@ export default function EditOrderForm() {
           purchaseChannelId: orderData.purchaseChannelId || "",
           phone: phoneValue,
           shippingAddress: orderData.shippingAddress || "",
-          products: orderData.products.map((item: any) => ({
-            productId: item.productId,
-            variantId: item.variantId || "",
-            quantity: item.quantity,
-            price: item.price,
-            customization: item.customization || "",
-            remarks: item.remarks || "",
-          })),
+          products: orderData.products.map((item: any) => {
+            let initialAttrs: Record<string, string> = {};
+            const prod = p.find((x: any) => x.id === item.productId);
+
+            if (prod && item.variantId && prod.productVariants) {
+              const variant = prod.productVariants.find(
+                (v: any) => v.id === item.variantId,
+              );
+              if (variant && prod.availableAttributes) {
+                prod.availableAttributes.forEach((attr: any) => {
+                  const matchedValue = attr.values.find((v: any) =>
+                    variant.combinationIds.includes(v.valueId),
+                  );
+                  if (matchedValue) {
+                    initialAttrs[attr.attributeId] = matchedValue.valueId;
+                  }
+                });
+              }
+            }
+
+            return {
+              productId: item.productId,
+              variantId: item.variantId || "",
+              quantity: item.quantity,
+              price: item.price,
+              customization: item.customization || "",
+              remarks: item.remarks || "",
+              selectedAttributes: initialAttrs,
+            };
+          }),
         });
       } catch (e) {
         toast.error("Gagal memuat data order");
@@ -768,6 +789,7 @@ export default function EditOrderForm() {
                         price: 0,
                         customization: "",
                         remarks: "",
+                        selectedAttributes: {},
                       })
                     }
                     className="border-dashed border-gray-400 hover:border-gray-600 hover:bg-gray-50">
@@ -789,141 +811,308 @@ export default function EditOrderForm() {
               <div className="space-y-4">
                 {fields.map((field, index) => {
                   const currentProductId = watch(`products.${index}.productId`);
+                  const currentVariantId = watch(`products.${index}.variantId`);
                   const selectedProduct = products.find(
                     (p) => p.id === currentProductId,
                   );
-                  const isCustomProduct = selectedProduct?.isCustom;
+                  const currentSelectedAttrs =
+                    watch(`products.${index}.selectedAttributes`) || {};
+
                   const subtotal =
                     (watch(`products.${index}.price`) || 0) *
                     (watch(`products.${index}.quantity`) || 0);
+
+                  // 1. LOGIKA PENCOCOKAN FLEKSIBEL
+                  const handleAttributeSelect = (
+                    attributeId: string,
+                    valueId: string,
+                  ) => {
+                    const newAttrs = {
+                      ...currentSelectedAttrs,
+                      [attributeId]: valueId,
+                    };
+                    form.setValue(
+                      `products.${index}.selectedAttributes`,
+                      newAttrs,
+                    );
+
+                    if (selectedProduct?.productVariants) {
+                      const selectedValIds = Object.values(newAttrs);
+                      const matchedVariant = [
+                        ...selectedProduct.productVariants,
+                      ]
+                        .sort(
+                          (a, b) =>
+                            b.combinationIds.length - a.combinationIds.length,
+                        )
+                        .find(
+                          (v) =>
+                            v.combinationIds.length > 0 &&
+                            v.combinationIds.every((id) =>
+                              selectedValIds.includes(id),
+                            ),
+                        );
+
+                      if (matchedVariant) {
+                        form.setValue(
+                          `products.${index}.variantId`,
+                          matchedVariant.id,
+                        );
+                        form.setValue(
+                          `products.${index}.price`,
+                          Number(matchedVariant.price),
+                        );
+                      } else {
+                        form.setValue(`products.${index}.variantId`, "");
+                      }
+                    }
+                  };
+
+                  // 2. FUNGSI UNTUK TOMBOL "QUICK SELECT" VARIAN
+                  const handleQuickSelectVariant = (variant: any) => {
+                    const newAttrs: Record<string, string> = {
+                      ...currentSelectedAttrs,
+                    };
+
+                    selectedProduct?.availableAttributes?.forEach((attr) => {
+                      const matchedValue = attr.values.find((v) =>
+                        variant.combinationIds.includes(v.valueId),
+                      );
+                      if (matchedValue) {
+                        newAttrs[attr.attributeId] = matchedValue.valueId;
+                      }
+                    });
+
+                    form.setValue(
+                      `products.${index}.selectedAttributes`,
+                      newAttrs,
+                    );
+                    form.setValue(`products.${index}.variantId`, variant.id);
+                    form.setValue(
+                      `products.${index}.price`,
+                      Number(variant.price),
+                    );
+                    toast.success(
+                      `Varian ${variant.variantName || "terpilih"} diaplikasikan.`,
+                    );
+                  };
 
                   return (
                     <div
                       key={field.id}
                       className={cn(
-                        "border rounded-lg bg-white shadow-sm transition-shadow duration-200",
+                        "border rounded-lg bg-white shadow-sm transition-all duration-200",
                         !isPending
                           ? "opacity-60 pointer-events-none"
                           : "hover:shadow-md",
                       )}>
                       <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                        <div className="md:col-span-4 space-y-3">
+                        <div className="md:col-span-4 space-y-4">
+                          {/* 1. SEARCHABLE PRODUCT DROPDOWN */}
                           <FormField
                             control={control}
                             name={`products.${index}.productId`}
                             render={({ field }) => (
-                              <FormItem>
+                              <FormItem className="flex flex-col">
                                 <FormLabel className="md:hidden">
                                   Product
                                 </FormLabel>
-                                <Select
-                                  value={field.value}
-                                  onValueChange={(val) => {
-                                    field.onChange(val);
-                                    form.setValue(
-                                      `products.${index}.variantId`,
-                                      "",
-                                    );
-                                    const prod = products.find(
-                                      (p) => p.id === val,
-                                    );
-                                    if (prod) {
-                                      form.setValue(
-                                        `products.${index}.price`,
-                                        prod.isCustom ? 0 : prod.basePrice,
-                                      );
-                                    }
-                                  }}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-10">
-                                      <SelectValue placeholder="Select Product" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {products.map((p) => (
-                                      <SelectItem key={p.id} value={p.id}>
-                                        <div className="flex items-center justify-between w-full gap-4 min-w-50">
-                                          <span className="font-medium truncate text-gray-700">
-                                            {p.name}
-                                          </span>
-                                          {p.isCustom && (
-                                            <div className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
-                                              <Settings2 className="w-3 h-3" />
-                                              <span className="text-[10px] font-bold tracking-wide">
-                                                CUSTOM
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                <Popover
+                                  open={openCombobox[index]}
+                                  onOpenChange={(val) =>
+                                    setOpenCombobox((prev) => ({
+                                      ...prev,
+                                      [index]: val,
+                                    }))
+                                  }>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        className={cn(
+                                          "w-full justify-between h-10 font-normal",
+                                          !field.value &&
+                                            "text-muted-foreground",
+                                        )}>
+                                        {field.value
+                                          ? products.find(
+                                              (p) => p.id === field.value,
+                                            )?.name
+                                          : "Search Product..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent
+                                    className="w-75 p-0"
+                                    align="start">
+                                    <Command>
+                                      <CommandInput placeholder="Search by name or SKU..." />
+                                      <CommandList>
+                                        <CommandEmpty>
+                                          Product not found.
+                                        </CommandEmpty>
+                                        <CommandGroup>
+                                          {products.map((p) => (
+                                            <CommandItem
+                                              key={p.id}
+                                              value={`${p.name} ${p.sku}`}
+                                              onSelect={() => {
+                                                field.onChange(p.id);
+                                                form.setValue(
+                                                  `products.${index}.variantId`,
+                                                  "",
+                                                );
+                                                form.setValue(
+                                                  `products.${index}.selectedAttributes`,
+                                                  {},
+                                                );
+                                                form.setValue(
+                                                  `products.${index}.price`,
+                                                  p.productVariants?.length
+                                                    ? 0
+                                                    : Number(p.basePrice),
+                                                );
+                                                setOpenCombobox((prev) => ({
+                                                  ...prev,
+                                                  [index]: false,
+                                                }));
+                                              }}>
+                                              <Check
+                                                className={cn(
+                                                  "mr-2 h-4 w-4",
+                                                  p.id === field.value
+                                                    ? "opacity-100"
+                                                    : "opacity-0",
+                                                )}
+                                              />
+                                              <div className="flex flex-col">
+                                                <span>{p.name}</span>
+                                                <span className="text-xs text-gray-500">
+                                                  SKU: {p.sku}
+                                                </span>
+                                              </div>
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
 
-                          {/* PERBAIKAN 1: Menambahkan info SKU & UOM di bawah dropdown produk */}
+                          {/* INFO SKU & UOM */}
                           {selectedProduct && (
-                            <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                            <div className="flex items-center gap-3 text-xs text-gray-500">
                               <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">
                                 SKU:{" "}
                                 <span className="font-medium text-gray-800">
-                                  {(selectedProduct as any).sku || "-"}
+                                  {selectedProduct.sku || "-"}
                                 </span>
                               </span>
                               <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">
                                 UOM:{" "}
                                 <span className="font-medium text-gray-800">
-                                  {(selectedProduct as any).uom || "-"}
+                                  {selectedProduct.uom || "-"}
                                 </span>
                               </span>
                             </div>
                           )}
 
-                          {isCustomProduct && (
-                            <FormField
-                              control={control}
-                              name={`products.${index}.variantId`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <Select
-                                    value={field.value}
-                                    onValueChange={(val) => {
-                                      field.onChange(val);
-                                      const variant =
-                                        selectedProduct?.productVariants.find(
-                                          (v) => v.id === val,
-                                        );
-                                      if (variant)
-                                        form.setValue(
-                                          `products.${index}.price`,
-                                          Number(variant.price),
-                                        );
-                                    }}>
-                                    <FormControl>
-                                      <SelectTrigger className="h-9 text-sm bg-gray-50 border-dashed">
-                                        <SelectValue placeholder="Select Variant" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {selectedProduct?.productVariants.map(
-                                        (v) => (
-                                          <SelectItem key={v.id} value={v.id}>
-                                            {v.variantName}
-                                          </SelectItem>
-                                        ),
-                                      )}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
+                          {/* ATTRIBUTES & VARIANTS SECTION */}
+                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start mt-4">
+                            {/* KIRI: PANDUAN VARIAN (QUICK SELECT) */}
+                            {selectedProduct?.productVariants &&
+                              selectedProduct.productVariants.length > 0 && (
+                                <div className="bg-blue-50/50 border border-blue-100 rounded-md p-3 space-y-2 h-full">
+                                  <p className="text-xs font-semibold text-blue-800 flex items-center gap-1">
+                                    <Bookmark className="w-3 h-3" /> Panduan
+                                    Varian
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {selectedProduct.productVariants.map(
+                                      (variant) => (
+                                        <button
+                                          key={variant.id}
+                                          type="button"
+                                          onClick={() =>
+                                            handleQuickSelectVariant(variant)
+                                          }
+                                          className={cn(
+                                            "text-[10px] font-medium px-2 py-1 rounded border transition-colors",
+                                            currentVariantId === variant.id
+                                              ? "bg-blue-600 text-white border-blue-600"
+                                              : "bg-white text-gray-600 border-gray-300 hover:bg-blue-50",
+                                          )}>
+                                          {variant.attributesDescription ||
+                                            variant.variantName ||
+                                            `SKU: ${variant.sku}`}
+                                        </button>
+                                      ),
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-gray-400 italic">
+                                    Klik untuk mengisi dropdown otomatis.
+                                  </p>
+                                </div>
                               )}
-                            />
-                          )}
+
+                            {/* KANAN: DYNAMIC ATTRIBUTE SELECTION */}
+                            {selectedProduct?.availableAttributes &&
+                              selectedProduct.availableAttributes.length >
+                                0 && (
+                                <div className="bg-gray-50 border rounded-md p-3 space-y-3 h-full">
+                                  <p className="text-xs font-semibold text-gray-600 mb-1">
+                                    Pilih Atribut:
+                                  </p>
+                                  {selectedProduct.availableAttributes.map(
+                                    (attr) => (
+                                      <div
+                                        key={attr.attributeId}
+                                        className="flex flex-col space-y-1">
+                                        <label className="text-xs text-gray-500">
+                                          {attr.attributeName}
+                                        </label>
+                                        <Select
+                                          value={
+                                            currentSelectedAttrs[
+                                              attr.attributeId
+                                            ] || ""
+                                          }
+                                          onValueChange={(val) =>
+                                            handleAttributeSelect(
+                                              attr.attributeId,
+                                              val,
+                                            )
+                                          }>
+                                          <SelectTrigger className="h-8 text-sm bg-white">
+                                            <SelectValue
+                                              placeholder={`Pilih ${attr.attributeName}`}
+                                            />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {attr.values.map((val) => (
+                                              <SelectItem
+                                                key={val.valueId}
+                                                value={val.valueId}>
+                                                {val.value}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    ),
+                                  )}
+                                </div>
+                              )}
+                          </div>
                         </div>
 
+                        {/* QUANTITY */}
                         <div className="md:col-span-2">
                           <FormField
                             control={control}
@@ -942,9 +1131,12 @@ export default function EditOrderForm() {
                                       onChange={(e) => {
                                         const val = e.target.valueAsNumber;
                                         field.onChange(isNaN(val) ? 0 : val);
+
+                                        // Logika Price Tier
                                         if (
                                           selectedProduct &&
-                                          !selectedProduct.isCustom &&
+                                          !selectedProduct.productVariants
+                                            ?.length &&
                                           selectedProduct.priceTiers?.length > 0
                                         ) {
                                           const tiers = [
@@ -960,13 +1152,14 @@ export default function EditOrderForm() {
                                             `products.${index}.price`,
                                             applicableTier
                                               ? Number(applicableTier.price)
-                                              : selectedProduct.basePrice,
+                                              : Number(
+                                                  selectedProduct.basePrice,
+                                                ),
                                           );
                                         }
                                       }}
                                       className="text-center h-10"
                                     />
-                                    {/* PERBAIKAN 2: Mengubah hardcode 'pcs' menjadi UOM dinamis */}
                                     <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium pointer-events-none">
                                       {selectedProduct?.uom || ""}
                                     </span>
@@ -978,6 +1171,7 @@ export default function EditOrderForm() {
                           />
                         </div>
 
+                        {/* UNIT PRICE */}
                         <div className="md:col-span-3">
                           <FormField
                             control={control}
@@ -990,11 +1184,12 @@ export default function EditOrderForm() {
                                 <FormControl>
                                   <div className="relative">
                                     <span className="absolute left-3 top-2.5 text-xs text-gray-500 font-medium">
-                                      {currentCurrencySymbol}
+                                      {currentCurrencySymbol || "Rp"}
                                     </span>
                                     <Input
                                       type="number"
                                       min={0}
+                                      step="any"
                                       {...field}
                                       onChange={(e) => {
                                         const val = e.target.valueAsNumber;
@@ -1010,18 +1205,20 @@ export default function EditOrderForm() {
                           />
                         </div>
 
+                        {/* SUBTOTAL */}
                         <div className="md:col-span-2 flex flex-col justify-center items-end h-10 pt-8 md:pt-0">
                           <span className="md:hidden text-xs text-gray-500 mb-1">
                             Subtotal
                           </span>
                           <span className="font-semibold text-gray-900 font-mono">
-                            {currentCurrencySymbol}{" "}
+                            {currentCurrencySymbol || "Rp"}{" "}
                             {subtotal.toLocaleString("id-ID", {
                               minimumFractionDigits: 0,
                             })}
                           </span>
                         </div>
 
+                        {/* ACTION / DELETE */}
                         <div className="md:col-span-1 flex justify-center pt-8 md:pt-0">
                           {fields.length > 1 && isPending && (
                             <Button
@@ -1036,6 +1233,7 @@ export default function EditOrderForm() {
                         </div>
                       </div>
 
+                      {/* ADDITIONAL DETAILS */}
                       <div className="bg-gray-50/50 p-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4 rounded-b-lg">
                         <FormField
                           control={control}
@@ -1043,16 +1241,11 @@ export default function EditOrderForm() {
                           render={({ field }) => (
                             <FormItem>
                               <FormControl>
-                                <div className="relative">
-                                  <Input
-                                    placeholder="Add Customization details..."
-                                    {...field}
-                                    className="text-sm border-gray-200 pl-8 bg-white"
-                                  />
-                                  <span className="absolute left-2.5 top-2.5 text-gray-400">
-                                    <Settings2 className="w-4 h-4" />
-                                  </span>
-                                </div>
+                                <Input
+                                  placeholder="Add Customization details..."
+                                  {...field}
+                                  className="text-sm bg-white"
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -1064,30 +1257,11 @@ export default function EditOrderForm() {
                           render={({ field }) => (
                             <FormItem>
                               <FormControl>
-                                <div className="relative">
-                                  <Input
-                                    placeholder="Internal remarks (optional)..."
-                                    {...field}
-                                    className="text-sm border-gray-200 pl-8 bg-white"
-                                  />
-                                  <span className="absolute left-2.5 top-2.5 text-gray-400">
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      width="16"
-                                      height="16"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round">
-                                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                      <polyline points="14 2 14 8 20 8" />
-                                      <line x1="16" y1="13" x2="8" y2="13" />
-                                      <line x1="16" y1="17" x2="8" y2="17" />
-                                    </svg>
-                                  </span>
-                                </div>
+                                <Input
+                                  placeholder="Internal remarks (optional)..."
+                                  {...field}
+                                  className="text-sm bg-white"
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
