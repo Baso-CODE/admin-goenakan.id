@@ -592,7 +592,7 @@ export default function SupplierCogsCalculatorPage() {
         setTempProductName("");
         
         // Auto-link catalog product base price to supplier pricing in IDR
-        if (cogsStatus === "EXISTING") {
+        if (cogsStatus === "EXISTING" || (cogsStatus === "POTENTIAL" && potentialProductType === "EXISTING")) {
           setForeignPrice(Number(prod.basePrice) || 0);
           setCurrency("IDR");
           setExchangeRate(1);
@@ -610,7 +610,7 @@ export default function SupplierCogsCalculatorPage() {
         }
       }
     }
-  }, [selectedProductId, products, cogsStatus]);
+  }, [selectedProductId, products, cogsStatus, potentialProductType]);
 
 
 
