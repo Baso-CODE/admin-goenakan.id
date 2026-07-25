@@ -28,6 +28,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import FastCurrencyForm from "@/app/(dashboard)/admin-invoice/currency/components/formCurrencyFast";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -202,6 +203,7 @@ export default function SupplierCogsCalculatorPage() {
   const itemsPerPage = 10;
   const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
 
   // Rates State
   const [fetchingRates, setFetchingRates] = useState(false);
@@ -546,6 +548,7 @@ export default function SupplierCogsCalculatorPage() {
   }, []);
 
   const loadHistory = async () => {
+    setLoadingHistory(true);
     try {
       const res = await fetchApi("/supplier-cogs");
       if (res.ok) {
@@ -554,6 +557,8 @@ export default function SupplierCogsCalculatorPage() {
       }
     } catch (e) {
       console.error("Gagal memuat history COGS", e);
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -1264,7 +1269,8 @@ export default function SupplierCogsCalculatorPage() {
       ) : view === "list" ? (
         
         /* === 1. LIST VIEW === */
-        <Card className="bg-white border border-stone-200 shadow-sm">
+        <>
+          <Card className="bg-white border border-stone-200 shadow-sm">
           <CardHeader className="border-b pb-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
@@ -1464,7 +1470,45 @@ export default function SupplierCogsCalculatorPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedRecords.length === 0 ? (
+                  {loadingHistory ? (
+                    Array.from({ length: 5 }).map((_, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="text-center">
+                          <Skeleton className="h-4 w-4 mx-auto rounded" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-32" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Skeleton className="h-4 w-12 mx-auto" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Skeleton className="h-4 w-16 mx-auto" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Skeleton className="h-4 w-16 mx-auto" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Skeleton className="h-4 w-24 mx-auto" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Skeleton className="h-4 w-24 mx-auto" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Skeleton className="h-4 w-20 mx-auto" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Skeleton className="h-4 w-16 mx-auto" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Skeleton className="h-4 w-16 mx-auto" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-8 w-24 ml-auto" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : paginatedRecords.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={11} className="text-center text-stone-400 py-8 text-sm">
                         {searchQuery || historyStatusFilter !== "ALL" || historyModeFilter !== "ALL" ? "Tidak ditemukan catatan harga yang cocok." : "Belum ada catatan harga supplier yang disimpan."}
@@ -1793,39 +1837,36 @@ export default function SupplierCogsCalculatorPage() {
             </div>
 
             {/* PAGINATION FOOTER */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-stone-100 pt-4 mt-4">
-                <span className="text-xs text-stone-500">
-                  Menampilkan Halaman <strong>{currentPage}</strong> dari <strong>{totalPages}</strong> (Total <strong>{filteredRecords.length}</strong> data)
-                </span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    className="h-8 border-stone-200 text-xs flex items-center gap-1"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Sebelumnya
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    className="h-8 border-stone-200 text-xs flex items-center gap-1"
-                  >
-                    Selanjutnya
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
+            {/* Pagination moved to Card sibling level */}
 
           </CardContent>
         </Card>
 
+        {/* === Pagination === */}
+        {totalPages > 1 && (
+          <div className="flex justify-between items-center p-4 border-t text-sm text-muted-foreground">
+            <p>
+              Page {currentPage} of {totalPages}
+            </p>
+            <div className="space-x-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
+                Previous
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+        </>
       ) : (
 
         /* === 2. FORM & SIMULATOR VIEW === */

@@ -219,6 +219,11 @@ export default function SidebarRole({ ...props }) {
             url: "/super-admin/supplier-cogs",
             icon: Calculator,
           },
+          {
+            title: "Master Pricing",
+            url: "/super-admin/master-pricing",
+            icon: FileText,
+          },
         ],
       },
     ],

@@ -1,20 +1,22 @@
 "use client";
 
 import { apiUrl } from "@/helper/apiurl";
-import { signOut, useSession } from "next-auth/react";
+import { signOut, useSession, getSession } from "next-auth/react";
 import { useCallback } from "react";
 import { toast } from "sonner";
 
 export function useApi() {
-  const { data: session, status } = useSession();
-  const token = session?.user?.accessToken;
+  const { status } = useSession();
 
   const fetchApi = useCallback(
     async (endpoint: string, options: RequestInit = {}) => {
+      const currentSession = await getSession();
+      const currentToken = currentSession?.user?.accessToken;
+
       const headers = new Headers(options.headers || {});
 
-      if (token) {
-        headers.set("Authorization", `Bearer ${token}`);
+      if (currentToken) {
+        headers.set("Authorization", `Bearer ${currentToken}`);
       }
 
       if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
@@ -36,7 +38,7 @@ export function useApi() {
 
       return res;
     },
-    [token],
+    [],
   );
 
   return { fetchApi, status };
