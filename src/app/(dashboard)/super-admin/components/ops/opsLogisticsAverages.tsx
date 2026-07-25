@@ -33,7 +33,7 @@ export default function OpsLogisticsAverages({
           <Timer className="h-4 w-4 text-slate-400" />
         </CardHeader>
         <CardContent>
-          {/* ✨ PERBAIKAN 3: Lindungi dari nilai null dari Backend (|| 0) sebelum toFixed */}
+          {/*  PERBAIKAN 3: Lindungi dari nilai null dari Backend (|| 0) sebelum toFixed */}
           <div className="text-2xl font-bold text-slate-800">
             {(safeData.avgProductionDays || 0).toFixed(1)} Hari
           </div>

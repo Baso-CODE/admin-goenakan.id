@@ -30,7 +30,7 @@ export default function EditDepartment() {
       try {
         setIsLoading(true);
 
-        // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+        //  Gunakan fetchApi (Otomatis handle Base URL dan Token)
         const res = await fetchApi(`/departments/${slug}`);
 
         if (!res.ok) {
@@ -66,7 +66,7 @@ export default function EditDepartment() {
     try {
       setIsSubmitting(true);
 
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
+      //  Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
       const res = await fetchApi(`/departments/${slug}`, {
         method: "PATCH",
         body: JSON.stringify(formValues),

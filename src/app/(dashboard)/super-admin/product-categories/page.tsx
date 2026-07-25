@@ -84,7 +84,7 @@ const ProductCategoriesPage = () => {
         params.append("search", debouncedSearch.trim());
       }
 
-      // 2. ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      // 2.  Gunakan fetchApi (Otomatis handle Base URL dan Token)
       const res = await fetchApi(`/product-categories?${params}`);
 
       if (!res.ok) {
@@ -114,7 +114,7 @@ const ProductCategoriesPage = () => {
 
     setIsDeleting(true);
     try {
-      // ✨ Gunakan fetchApi (Otomatis handle Base URL dan Token)
+      //  Gunakan fetchApi (Otomatis handle Base URL dan Token)
       const res = await fetchApi(`/product-categories/${deleteId}`, {
         method: "DELETE",
       });
@@ -288,7 +288,7 @@ const ProductCategoriesPage = () => {
               <TableRow>
                 <TableHead className="w-[15%]">Category Name (ID)</TableHead>
                 <TableHead className="w-[15%]">Category Name (EN)</TableHead>
-                {/* ✨ BARU: Kolom Code */}
+                {/*  BARU: Kolom Code */}
                 <TableHead className="w-[10%]">Code</TableHead>
                 <TableHead className="w-[20%]">Slug</TableHead>
                 <TableHead className="w-[20%]">Created</TableHead>
@@ -307,7 +307,7 @@ const ProductCategoriesPage = () => {
                     <TableCell>
                       <Skeleton className="h-4 w-3/4" />
                     </TableCell>
-                    {/* ✨ Skeleton untuk kolom Code */}
+                    {/*  Skeleton untuk kolom Code */}
                     <TableCell>
                       <Skeleton className="h-4 w-1/2" />
                     </TableCell>
@@ -329,7 +329,7 @@ const ProductCategoriesPage = () => {
                 /* Error State */
                 <TableRow>
                   <TableCell
-                    colSpan={6} // ✨ UPDATE: Ubah ke 6
+                    colSpan={6} //  UPDATE: Ubah ke 6
                     className="text-center text-red-500 py-6">
                     Error: {"Failed to load categories."}
                   </TableCell>
@@ -348,7 +348,7 @@ const ProductCategoriesPage = () => {
                       {data.name_en || "-"}
                     </TableCell>
 
-                    {/* ✨ BARU: Menampilkan Code dengan badge style */}
+                    {/*  BARU: Menampilkan Code dengan badge style */}
                     <TableCell>
                       <span className="px-2 py-1 rounded bg-primary/10 text-primary font-bold text-xs">
                         {data.code || "-"}
@@ -384,7 +384,7 @@ const ProductCategoriesPage = () => {
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={6} // ✨ UPDATE: Ubah ke 6
+                    colSpan={6} //  UPDATE: Ubah ke 6
                     className="text-center py-6 text-muted-foreground">
                     No categories found.
                   </TableCell>

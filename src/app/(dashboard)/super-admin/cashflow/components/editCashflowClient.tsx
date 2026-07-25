@@ -35,24 +35,31 @@ import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 
+// === TYPES ===
+export type Currency = { code: string; symbol: string; name: string };
+type VendorItem = { id: string; name: string };
+type Vendor = {
+  id: string;
+  companyName: string;
+  items: VendorItem[];
+};
+
 // === UTILS ===
-const formatCurrency = (amount: number) => {
+// Format dinamis menyesuaikan currency code
+const formatCurrency = (amount: number, currencyCode: string = "IDR") => {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
-    currency: "IDR",
+    currency: currencyCode,
     minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(amount);
 };
 
-// === SCHEMA VALIDATION ===
-// === HELPER AGAR TIDAK REPETITIF ===
-// Terima apa saja (any), ubah jadi number. Kalau gagal/kosong jadi 0.
+// === HELPER SCHEMAS ===
 const anyToNumber = z.any().transform((val) => {
   const parsed = Number(val);
   return isNaN(parsed) ? 0 : parsed;
 });
-
-// Terima apa saja (any), ubah jadi number. Default 1 (untuk Qty/Rate).
 const anyToNumberDefaultOne = z.any().transform((val) => {
   const parsed = Number(val);
   return isNaN(parsed) || parsed === 0 ? 1 : parsed;
@@ -65,17 +72,11 @@ const cashflowSchema = z.object({
     z.object({
       description: z.string().min(1, "Description required"),
       productId: z.string().optional(),
-
-      // PAKAI z.any() AGAR TYPESCRIPT TIDAK PROTES INPUT STRING
       unitPrice: anyToNumber,
       quantity: anyToNumberDefaultOne,
-
       currency: z.string().optional(),
-
-      // Exchange rate: Terima any, return number (default 1)
       exchangeRate: anyToNumberDefaultOne,
-
-      total: z.number(), // Calculated field
+      total: z.number(),
     }),
   ),
   costItems: z.array(
@@ -83,14 +84,10 @@ const cashflowSchema = z.object({
       isManual: z.boolean().default(false).optional(),
       description: z.string().min(1, "Description required"),
       vendorId: z.string().optional(),
-
-      // PAKAI HELPER YANG SAMA
       costPerUnit: anyToNumber,
       quantity: anyToNumberDefaultOne,
-
       currency: z.string().optional(),
       exchangeRate: anyToNumberDefaultOne,
-
       total: z.number(),
     }),
   ),
@@ -98,31 +95,20 @@ const cashflowSchema = z.object({
 
 type CashflowFormValues = z.infer<typeof cashflowSchema>;
 
-type VendorItem = { id: string; name: string };
-type Vendor = {
-  id: string;
-  companyName: string;
-  items: VendorItem[];
-};
-type Currency = { code: string; symbol: string };
-
 export default function EditCashflowClient() {
-  const { fetchApi, status } = useApi(); // ✨ Ambil fetchApi dan status
+  const { fetchApi, status } = useApi();
   const params = useParams();
   const router = useRouter();
   const orderId = params.orderId as string;
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [isConvertingRate, setIsConvertingRate] = useState(false);
 
-  // Hardcoded Currency (Bisa fetch dari API jika perlu)
-  const currencies: Currency[] = [
-    { code: "IDR", symbol: "Rp" },
-    { code: "USD", symbol: "$" },
-    { code: "CNY", symbol: "¥" },
-    { code: "SGD", symbol: "S$" },
-  ];
+  // Master Data
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [baseCurrency, setBaseCurrency] = useState<string>("IDR");
 
   // === FORM SETUP ===
   const form = useForm<CashflowFormValues>({
@@ -136,15 +122,8 @@ export default function EditCashflowClient() {
 
   const { control, handleSubmit, watch, setValue, getValues, reset } = form;
 
-  const revenueFields = useFieldArray({
-    control,
-    name: "revenueItems",
-  });
-
-  const costFields = useFieldArray({
-    control,
-    name: "costItems",
-  });
+  const revenueFields = useFieldArray({ control, name: "revenueItems" });
+  const costFields = useFieldArray({ control, name: "costItems" });
 
   // === CALCULATIONS STATE ===
   const [summary, setSummary] = useState({
@@ -153,13 +132,11 @@ export default function EditCashflowClient() {
     profit: 0,
   });
 
-  // Watch Changes for Realtime Calculation
   const revenues = watch("revenueItems");
   const costs = watch("costItems");
 
   useEffect(() => {
     const totalRev = revenues.reduce((acc, item) => {
-      // Rumus: Unit Price * Qty * Rate
       const val =
         (Number(item.unitPrice) || 0) *
         (Number(item.quantity) || 0) *
@@ -190,22 +167,33 @@ export default function EditCashflowClient() {
     try {
       setLoading(true);
 
-      const res = await fetchApi(`/cashflows/${orderId}`);
+      // Fetch master currencies dan data cashflow secara parallel
+      const [currencyRes, cashflowRes] = await Promise.all([
+        fetchApi("/currencies"),
+        fetchApi(`/cashflows/${orderId}`),
+      ]);
 
-      if (!res.ok) throw new Error("Failed to load cashflow data");
+      if (currencyRes.ok) {
+        const currData = await currencyRes.json();
+        setCurrencies(currData.data || currData || []);
+      }
 
-      const detailData = await res.json();
+      if (!cashflowRes.ok) throw new Error("Failed to load cashflow data");
+
+      const detailData = await cashflowRes.json();
       setVendors(detailData.availableVendors || []);
 
-      // Populate Form
+      const bCurrency = detailData.summary?.baseCurrencyId || "IDR";
+      setBaseCurrency(bCurrency);
+
       reset({
-        poNumber: detailData.summary.poNumber,
+        poNumber: detailData.summary.orderNumber || detailData.summary.poNumber,
         revenueItems: detailData.revenues.map((r: any) => ({
           description: r.description,
           productId: r.productId || "",
           unitPrice: Number(r.unitPrice),
           quantity: Number(r.quantity),
-          currency: r.currency || "IDR",
+          currency: r.currencyCode || r.currency || bCurrency,
           exchangeRate: Number(r.exchangeRate) || 1,
           total: Number(r.total),
         })),
@@ -215,14 +203,14 @@ export default function EditCashflowClient() {
           vendorId: c.vendorId || "",
           costPerUnit: Number(c.costPerUnit),
           quantity: Number(c.quantity),
-          currency: c.currency || "IDR",
+          currency: c.currencyCode || c.currency || bCurrency,
           exchangeRate: Number(c.exchangeRate) || 1,
           total: Number(c.total),
         })),
       });
     } catch (error) {
       console.error(error);
-      toast.error("Gagal memuat data");
+      toast.error("Gagal memuat data master atau cashflow");
     } finally {
       setLoading(false);
     }
@@ -231,6 +219,53 @@ export default function EditCashflowClient() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // === FUNGSI AUTO CONVERT RATE ===
+  const handleCurrencyChange = async (
+    index: number,
+    newCurrency: string,
+    type: "cost" | "revenue",
+  ) => {
+    setValue(`${type}Items.${index}.currency` as any, newCurrency);
+
+    if (newCurrency === baseCurrency) {
+      setValue(`${type}Items.${index}.exchangeRate` as any, 1);
+      return;
+    }
+
+    // 3. Panggil API Konversi
+    try {
+      setIsConvertingRate(true);
+      const res = await fetchApi("/currencies/convert/rate", {
+        method: "POST",
+        body: JSON.stringify({
+          fromCurrency: newCurrency,
+          toCurrency: baseCurrency,
+          amount: 1,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal mengkonversi kurs");
+      }
+
+      const data = await res.json();
+      const rate = data.rate || data.data?.rate;
+
+      setValue(`${type}Items.${index}.exchangeRate` as any, rate);
+      toast.success(
+        `Kurs ${newCurrency} ke ${baseCurrency} diperbarui (${rate})`,
+      );
+    } catch (error: any) {
+      console.error(error);
+      toast.error(
+        error.message || "Gagal mendapatkan kurs otomatis, mohon isi manual.",
+      );
+    } finally {
+      setIsConvertingRate(false);
+    }
+  };
 
   // === SUBMIT HANDLER ===
   const onSubmit = async (data: CashflowFormValues) => {
@@ -254,7 +289,6 @@ export default function EditCashflowClient() {
         })),
       };
 
-      // ✨ Gunakan fetchApi dengan method POST
       const res = await fetchApi(`/cashflows/${orderId}`, {
         method: "POST",
         body: JSON.stringify(cleanData),
@@ -285,7 +319,7 @@ export default function EditCashflowClient() {
   }
 
   return (
-    <div className="space-y-6 w-full  mx-auto pb-20">
+    <div className="space-y-6 w-full mx-auto pb-20">
       {/* Header & Navigation */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
@@ -295,11 +329,14 @@ export default function EditCashflowClient() {
           <h1 className="text-2xl font-bold tracking-tight">Update Cashflow</h1>
           <div className="flex items-center gap-2 text-muted-foreground text-sm">
             <Banknote className="h-4 w-4" />
-            <span>PO Number: </span>
+            <span>SO/SN: </span>
             <Badge
               variant="outline"
               className="font-mono text-primary border-primary/30 bg-primary/5">
               {getValues("poNumber")}
+            </Badge>
+            <Badge variant="secondary" className="ml-2 bg-slate-200">
+              Base Curr: {baseCurrency}
             </Badge>
           </div>
         </div>
@@ -321,7 +358,8 @@ export default function EditCashflowClient() {
                     <Badge
                       variant="secondary"
                       className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200">
-                      Total: {formatCurrency(summary.totalRevenue)}
+                      Total:{" "}
+                      {formatCurrency(summary.totalRevenue, baseCurrency)}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -349,10 +387,13 @@ export default function EditCashflowClient() {
                           />
                         </div>
 
-                        {/* Unit Price (IDR) */}
+                        {/* Unit Price Dinamis */}
                         <div className="w-full md:w-32">
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                            Unit Price (IDR)
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block uppercase">
+                            Unit Price (
+                            {watch(`revenueItems.${index}.currency`) ||
+                              baseCurrency}
+                            )
                           </label>
                           <FormField
                             control={control}
@@ -390,7 +431,10 @@ export default function EditCashflowClient() {
                           <span className="text-sm font-semibold text-emerald-700">
                             {formatCurrency(
                               (watch(`revenueItems.${index}.unitPrice`) || 0) *
-                                (watch(`revenueItems.${index}.quantity`) || 0),
+                                (watch(`revenueItems.${index}.quantity`) || 0) *
+                                (watch(`revenueItems.${index}.exchangeRate`) ||
+                                  1),
+                              baseCurrency,
                             )}
                           </span>
                         </div>
@@ -420,7 +464,7 @@ export default function EditCashflowClient() {
                           productId: "",
                           unitPrice: 0,
                           quantity: 1,
-                          currency: "IDR",
+                          currency: baseCurrency,
                           exchangeRate: 1,
                           total: 0,
                         })
@@ -443,7 +487,7 @@ export default function EditCashflowClient() {
                     <Badge
                       variant="secondary"
                       className="bg-red-100 text-red-700 hover:bg-red-200">
-                      Total: {formatCurrency(summary.totalCost)}
+                      Total: {formatCurrency(summary.totalCost, baseCurrency)}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -451,6 +495,8 @@ export default function EditCashflowClient() {
                   <div className="p-4 space-y-5">
                     {costFields.fields.map((field, index) => {
                       const isManual = watch(`costItems.${index}.isManual`);
+                      const rowCurrency =
+                        watch(`costItems.${index}.currency`) || baseCurrency;
 
                       return (
                         <div
@@ -476,7 +522,7 @@ export default function EditCashflowClient() {
                             </div>
                           </div>
 
-                          {/* 🔥 BARIS 2: VENDOR & DESKRIPSI (FULL WIDTH) */}
+                          {/* 🔥 BARIS 2: VENDOR & DESKRIPSI */}
                           <div className="w-full">
                             {!isManual ? (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -585,29 +631,29 @@ export default function EditCashflowClient() {
                             )}
                           </div>
 
-                          {/* 🔥 BARIS 3: FINANCIALS SEJAJAR (Dibungkus card putih) */}
+                          {/* 🔥 BARIS 3: FINANCIALS SEJAJAR */}
                           <div className="grid grid-cols-2 lg:grid-cols-12 gap-4 items-end bg-white p-3.5 rounded-lg border border-gray-100 shadow-sm mt-1">
-                            {/* Curr */}
+                            {/* Master Currency Dropdown */}
                             <div className="col-span-1 lg:col-span-2 space-y-1.5">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                                Curr
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                Curr{" "}
+                                {isConvertingRate && (
+                                  <Loader2 className="w-2 h-2 animate-spin text-primary" />
+                                )}
                               </label>
                               <FormField
                                 control={control}
                                 name={`costItems.${index}.currency`}
                                 render={({ field }) => (
                                   <Select
-                                    onValueChange={(val) => {
-                                      field.onChange(val);
-                                      if (val === "IDR")
-                                        setValue(
-                                          `costItems.${index}.exchangeRate`,
-                                          1,
-                                        );
-                                    }}
+                                    onValueChange={(val) =>
+                                      handleCurrencyChange(index, val, "cost")
+                                    }
                                     value={field.value}>
                                     <FormControl>
-                                      <SelectTrigger className="h-9 text-sm bg-white">
+                                      <SelectTrigger
+                                        className="h-9 text-sm bg-white"
+                                        disabled={isConvertingRate}>
                                         <SelectValue />
                                       </SelectTrigger>
                                     </FormControl>
@@ -641,10 +687,10 @@ export default function EditCashflowClient() {
                               />
                             </div>
 
-                            {/* Rate */}
+                            {/* Rate Otomatis/Manual */}
                             <div className="col-span-1 lg:col-span-2 space-y-1.5">
                               <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                                Rate (IDR)
+                                Rate ({baseCurrency})
                               </label>
                               <FormField
                                 control={control}
@@ -655,8 +701,8 @@ export default function EditCashflowClient() {
                                     {...field}
                                     className="h-9 text-sm text-right bg-gray-50"
                                     disabled={
-                                      watch(`costItems.${index}.currency`) ===
-                                      "IDR"
+                                      rowCurrency === baseCurrency ||
+                                      isConvertingRate
                                     }
                                   />
                                 )}
@@ -685,7 +731,7 @@ export default function EditCashflowClient() {
                             <div className="col-span-2 lg:col-span-3 flex justify-end items-center gap-4 h-9">
                               <div className="flex flex-col items-end leading-none justify-center">
                                 <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">
-                                  Total IDR
+                                  Total {baseCurrency}
                                 </span>
                                 <span className="text-[15px] font-bold text-red-600 leading-none">
                                   {formatCurrency(
@@ -696,6 +742,7 @@ export default function EditCashflowClient() {
                                       (watch(
                                         `costItems.${index}.exchangeRate`,
                                       ) || 1),
+                                    baseCurrency,
                                   )}
                                 </span>
                               </div>
@@ -732,7 +779,7 @@ export default function EditCashflowClient() {
                           vendorId: "",
                           costPerUnit: 0,
                           quantity: 1,
-                          currency: "IDR",
+                          currency: baseCurrency,
                           exchangeRate: 1,
                           total: 0,
                         })
@@ -753,20 +800,20 @@ export default function EditCashflowClient() {
                   <CardHeader className="pb-2">
                     <CardTitle className="text-xl flex items-center gap-2">
                       <Calculator className="h-5 w-5 text-blue-400" />
-                      Profit Analysis
+                      Profit Analysis ({baseCurrency})
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4 pt-4">
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-slate-400">Total Revenue</span>
                       <span className="font-semibold text-emerald-400">
-                        {formatCurrency(summary.totalRevenue)}
+                        {formatCurrency(summary.totalRevenue, baseCurrency)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-slate-400">Total Cost</span>
                       <span className="font-semibold text-red-400">
-                        ({formatCurrency(summary.totalCost)})
+                        ({formatCurrency(summary.totalCost, baseCurrency)})
                       </span>
                     </div>
                     <Separator className="bg-slate-700 my-2" />
@@ -780,14 +827,14 @@ export default function EditCashflowClient() {
                             ? "text-emerald-400"
                             : "text-red-400",
                         )}>
-                        {formatCurrency(summary.profit)}
+                        {formatCurrency(summary.profit, baseCurrency)}
                       </span>
                     </div>
 
                     {/* Margin Calc */}
                     {summary.totalRevenue > 0 && (
                       <div className="text-right text-xs text-slate-500">
-                        Margin:
+                        Margin:{" "}
                         {(
                           (summary.profit / summary.totalRevenue) *
                           100
@@ -799,14 +846,13 @@ export default function EditCashflowClient() {
                     <Button
                       className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
                       size="lg"
-                      // Tambahkan parameter kedua untuk melihat error di console
                       onClick={form.handleSubmit(onSubmit, (errors) => {
                         toast.error(
                           "Cek kembali isian form, ada yang belum lengkap/valid.",
                         );
                       })}
-                      disabled={submitting}>
-                      {submitting ? (
+                      disabled={submitting || isConvertingRate}>
+                      {submitting || isConvertingRate ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
                         <Save className="mr-2 h-4 w-4" />
@@ -825,18 +871,17 @@ export default function EditCashflowClient() {
                   </CardHeader>
                   <CardContent className="text-xs text-blue-700 space-y-2">
                     <p>
-                      1. <strong>Revenue</strong> otomatis diambil dari order,
-                      tapi bisa Anda sesuaikan jika ada biaya tambahan yang
-                      ditagihkan.
+                      1. <strong>Mata Uang Utama:</strong> Halaman ini
+                      disesuaikan dengan mata uang awal Order ({baseCurrency}).
                     </p>
                     <p>
-                      2. Untuk <strong>Cost Luar Negeri</strong>, pilih mata
-                      uang (misal USD), isi harga asli, lalu isi Rate sesuai
-                      kurs saat bayar.
+                      2. Jika Anda memilih mata uang pengeluaran yang berbeda
+                      (misal USD), sistem akan mengontak server untuk mengambil{" "}
+                      <strong>kurs terkini</strong>.
                     </p>
                     <p>
-                      3. Pastikan memilih <strong>Vendor</strong> yang benar
-                      untuk setiap pengeluaran agar report per vendor akurat.
+                      3. Anda tetap bisa mengubah nilai <strong>Rate</strong>{" "}
+                      tersebut secara manual jika diperlukan.
                     </p>
                   </CardContent>
                 </Card>

@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge"; // 👈 Tambahan import Badge
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,7 @@ import {
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/utils/formatCurrency";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import {
@@ -39,13 +41,15 @@ import UtangPiutangCard from "./utangPiutangCard";
 // === TYPES ===
 type CashflowItem = {
   orderId: string;
-  poNumber: string;
+  orderNumber: string;
   dateOrder: string;
   clientName: string;
   totalRevenue: number;
   totalCost: number;
   profitOrLoss: number;
   hasCashflowData: boolean;
+  salesCategory: string;
+  currencyCode: string;
 };
 
 type Meta = {
@@ -53,15 +57,6 @@ type Meta = {
   take: number;
   total: number;
   totalPage: number;
-};
-
-// === UTILS ===
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-  }).format(amount);
 };
 
 export default function CashflowClient() {
@@ -141,8 +136,7 @@ export default function CashflowClient() {
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search PO Number..."
-                // Menggunakan h-10 agar tinggi nyaman disentuh & sejajar
+                placeholder="Search SO/SN..." // 👈 Ubah placeholder
                 className="pl-9 h-10 text-sm bg-white shadow-sm border-gray-200 focus-visible:ring-1"
                 value={search}
                 onChange={(e) => {
@@ -230,20 +224,19 @@ export default function CashflowClient() {
               </div>
             </div>
           </div>
-
-          {/* Optional: Add clear filter or export button here if needed later */}
         </div>
       </Card>
 
       {/* 4. Table Data */}
       <Card className="shadow-sm border-t-0">
         <CardContent className="p-0">
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="w-32">Date</TableHead>
-                  <TableHead className="w-40">PO Number</TableHead>
+                  <TableHead className="w-40">SO / SN</TableHead>{" "}
+                  {/* 👈 Header diubah */}
                   <TableHead className="w-48">Client</TableHead>
                   <TableHead className="text-right w-36 text-emerald-600">
                     Revenue
@@ -263,7 +256,7 @@ export default function CashflowClient() {
                         <Skeleton className="h-4 w-24" />
                       </TableCell>
                       <TableCell>
-                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-6 w-20 rounded-full" />
                       </TableCell>
                       <TableCell>
                         <Skeleton className="h-4 w-32" />
@@ -303,22 +296,34 @@ export default function CashflowClient() {
                           })}
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono text-sm font-medium text-primary">
-                        {item.poNumber}
+
+                      {/* 👈 Render Badge berdasarkan kategori SAMPLE (Ungu) atau SALES (Hijau) */}
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "font-mono text-[11px] font-semibold tracking-wider",
+                            item.salesCategory === "SAMPLE"
+                              ? "text-purple-700 bg-purple-50 border-purple-200"
+                              : "text-emerald-700 bg-emerald-50 border-emerald-200",
+                          )}>
+                          {item.orderNumber || "-"}
+                        </Badge>
                       </TableCell>
+
                       <TableCell className="text-sm font-medium text-gray-700 truncate max-w-50">
                         {item.clientName}
                       </TableCell>
 
-                      {/* Revenue */}
+                      {/* 👈 Revenue menyesuaikan Currency Code */}
                       <TableCell className="text-right text-sm font-medium text-emerald-700">
-                        {formatCurrency(item.totalRevenue)}
+                        {formatCurrency(item.totalRevenue, item.currencyCode)}
                       </TableCell>
 
-                      {/* Cost */}
+                      {/* 👈 Cost menyesuaikan Currency Code */}
                       <TableCell className="text-right text-sm font-medium text-red-700">
                         {item.totalCost > 0 ? (
-                          formatCurrency(item.totalCost)
+                          formatCurrency(item.totalCost, item.currencyCode)
                         ) : (
                           <span className="text-gray-400 italic text-[10px]">
                             --
@@ -326,7 +331,7 @@ export default function CashflowClient() {
                         )}
                       </TableCell>
 
-                      {/* Profit / Loss */}
+                      {/* 👈 Profit / Loss menyesuaikan Currency Code */}
                       <TableCell className="text-right text-sm">
                         <div
                           className={cn(
@@ -343,7 +348,7 @@ export default function CashflowClient() {
                           {item.profitOrLoss < 0 && (
                             <TrendingDown className="h-3 w-3" />
                           )}
-                          {formatCurrency(item.profitOrLoss)}
+                          {formatCurrency(item.profitOrLoss, item.currencyCode)}
                         </div>
                       </TableCell>
 

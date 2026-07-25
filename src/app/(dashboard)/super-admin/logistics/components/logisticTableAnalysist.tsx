@@ -151,7 +151,7 @@ export default function LogisticTableAnalysist() {
           <div className="relative w-full md:w-72">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Cari Order / Client..." // ✨ UPDATE: Placeholder disesuaikan
+              placeholder="Cari Order / Client..." //  UPDATE: Placeholder disesuaikan
               className="pl-9"
               value={search}
               onChange={(e) => {
@@ -307,7 +307,7 @@ export default function LogisticTableAnalysist() {
                         <div className="flex items-center gap-2">
                           <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                           {item.orderNumber}{" "}
-                          {/* ✨ UPDATE: merender item.orderNumber */}
+                          {/*  UPDATE: merender item.orderNumber */}
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">

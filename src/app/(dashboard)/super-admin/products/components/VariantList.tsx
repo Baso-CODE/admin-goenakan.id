@@ -332,7 +332,7 @@ export function VariantList({
                   </div>
                 </div>
 
-                {/* ✨ PRICE TIERS UNTUK VARIAN */}
+                {/*  PRICE TIERS UNTUK VARIAN */}
                 <div className="pt-4 border-t border-gray-100 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

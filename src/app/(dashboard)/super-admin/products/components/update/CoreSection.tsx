@@ -122,7 +122,7 @@ export default function FormProductCore({
 
   const isCustomProduct = form.watch("isCustom");
 
-  // ✨ 1. INITIALIZATION API FETCH (Tanpa Race Condition)
+  //  1. INITIALIZATION API FETCH (Tanpa Race Condition)
   useEffect(() => {
     let isMounted = true; // Keamanan agar state tidak bocor jika komponen ditutup
 
@@ -218,7 +218,7 @@ export default function FormProductCore({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, fetchApi, initialData]); // Dibatasi ketat hanya render saat data inisialisasi masuk
 
-  // ✨ 2. FUNGSI HANDLER MANUAL UNTUK DROPDOWN (Lebih stabil dari useEffect)
+  //  2. FUNGSI HANDLER MANUAL UNTUK DROPDOWN (Lebih stabil dari useEffect)
   const handleCategoryChange = async (val: string) => {
     form.setValue("categoryId", val);
     form.setValue("itemCategoryId", ""); // Kosongkan anak
@@ -300,8 +300,9 @@ export default function FormProductCore({
       height: "Tinggi",
     };
 
-    const missingFields = Object.keys(errors)
-      .map((key) => fieldLabels[key] || key);
+    const missingFields = Object.keys(errors).map(
+      (key) => fieldLabels[key] || key,
+    );
 
     toast.error(`Mohon lengkapi field berikut: ${missingFields.join(", ")}`);
   };
@@ -433,15 +434,22 @@ export default function FormProductCore({
                     value={field.value || ""}
                     onValueChange={(val) => {
                       const oldVal = form.getValues("itemNameId");
-                      const oldItem = itemNames.find((inm) => inm.id === oldVal);
+                      const oldItem = itemNames.find(
+                        (inm) => inm.id === oldVal,
+                      );
                       const newItem = itemNames.find((inm) => inm.id === val);
 
                       let currentName = form.getValues("name") || "";
                       if (newItem) {
                         if (oldItem && currentName.startsWith(oldItem.name)) {
-                          currentName = currentName.replace(oldItem.name, newItem.name);
+                          currentName = currentName.replace(
+                            oldItem.name,
+                            newItem.name,
+                          );
                         } else if (!currentName.startsWith(newItem.name)) {
-                          currentName = currentName ? `${newItem.name} ${currentName}` : newItem.name;
+                          currentName = currentName
+                            ? `${newItem.name} ${currentName}`
+                            : newItem.name;
                         }
                         form.setValue("name", currentName);
                       }

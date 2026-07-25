@@ -12,6 +12,7 @@ interface FinancialSummaryCardProps {
   remainingToInvoice: number;
   paymentProgress: number;
   onGenerateInvoice: () => void;
+  currencyCode: string;
 }
 
 export function FinancialSummaryCard({
@@ -21,6 +22,7 @@ export function FinancialSummaryCard({
   remainingToInvoice,
   paymentProgress,
   onGenerateInvoice,
+  currencyCode,
 }: FinancialSummaryCardProps) {
   return (
     <Card className="border-blue-100 shadow-sm">
@@ -75,7 +77,7 @@ export function FinancialSummaryCard({
                 {label}
               </p>
               <p className={`text-xl font-bold ${color}`}>
-                {formatCurrency(value)}
+                {formatCurrency(value, currencyCode)}{" "}
               </p>
             </div>
           ))}

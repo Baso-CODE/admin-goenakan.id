@@ -195,7 +195,7 @@ export default function PopupBannerForm({
                                   type="button"
                                   onClick={() => {
                                     field.onChange(undefined);
-                                    // ✨ Pastikan Anda memanggil fungsi untuk mereset state preview Anda di sini
+                                    //  Pastikan Anda memanggil fungsi untuk mereset state preview Anda di sini
                                     // contoh: setDesktopPreview(null);
                                   }}
                                   className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
@@ -270,7 +270,7 @@ export default function PopupBannerForm({
                                   type="button"
                                   onClick={() => {
                                     field.onChange(undefined);
-                                    // ✨ Pastikan Anda memanggil fungsi untuk mereset state preview Anda di sini
+                                    //  Pastikan Anda memanggil fungsi untuk mereset state preview Anda di sini
                                     // contoh: setMobilePreview(null);
                                   }}
                                   className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">

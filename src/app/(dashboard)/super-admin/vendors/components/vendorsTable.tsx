@@ -1,6 +1,12 @@
 "use client";
 
-import { ConfirmDeleteDialog } from "@/app/(dashboard)/components/confirmDeleteDialog";
+import { format } from "date-fns";
+import * as LucideIcons from "lucide-react";
+import { Search } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,22 +34,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+import { ConfirmDeleteDialog } from "@/app/(dashboard)/components/confirmDeleteDialog";
 import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
+import { countries } from "@/lib/countries";
 import { formatDate } from "@/utils/formatDate";
-import { format } from "date-fns";
-import * as LucideIcons from "lucide-react";
-import { Search } from "lucide-react";
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
 
 type Vendor = {
   id: string;
   companyName: string;
   picName: string;
   country: string;
+  city?: string;
+  type?: string;
   isActive: boolean;
   createdAt: string;
   contacts?: {
@@ -75,9 +80,11 @@ const VendorsTable = () => {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [page, setPage] = useState(1);
 
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [typeFilter, setTypeFilter] = useState<string>("ALL");
+
+  const [page, setPage] = useState(1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -101,8 +108,7 @@ const VendorsTable = () => {
 
       if (debouncedSearch.trim())
         params.append("search", debouncedSearch.trim());
-
-      // Tambahkan filter tanggal ke API tabel jika ada
+      if (typeFilter !== "ALL") params.append("type", typeFilter); // Menyelipkan parameter type
       if (startDate)
         params.append("startDate", format(startDate, "yyyy-MM-dd"));
       if (endDate) params.append("endDate", format(endDate, "yyyy-MM-dd"));
@@ -127,6 +133,7 @@ const VendorsTable = () => {
     page,
     debouncedSearch,
     statusFilter,
+    typeFilter, // Trigger fetch ulang saat tipe diubah
     startDate,
     endDate,
     status,
@@ -141,6 +148,7 @@ const VendorsTable = () => {
       if (startDate) exportFilters.startDate = format(startDate, "yyyy-MM-dd");
       if (endDate) exportFilters.endDate = format(endDate, "yyyy-MM-dd");
       if (statusFilter !== "ALL") exportFilters.isActive = statusFilter;
+      if (typeFilter !== "ALL") exportFilters.type = typeFilter;
       if (debouncedSearch.trim()) exportFilters.search = debouncedSearch.trim();
 
       const queryString = new URLSearchParams(exportFilters).toString();
@@ -183,7 +191,6 @@ const VendorsTable = () => {
       }
 
       toast.success("Vendor berhasil dihapus");
-
       setPage(1);
       fetchVendors();
     } catch (error: any) {
@@ -194,6 +201,7 @@ const VendorsTable = () => {
       setDeleteId(null);
     }
   };
+
   return (
     <div className="space-y-4 overflow-x-hidden w-full mx-auto">
       <Card>
@@ -224,7 +232,6 @@ const VendorsTable = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Baris Filter Terpadu */}
           <div className="flex flex-wrap items-end gap-3">
             {/* Search */}
             <div className="flex flex-col gap-1.5">
@@ -235,7 +242,7 @@ const VendorsTable = () => {
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Search vendor..."
+                  placeholder="Search vendor atau kota..."
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
@@ -244,6 +251,28 @@ const VendorsTable = () => {
                   className="pl-8 w-60 h-10"
                 />
               </div>
+            </div>
+
+            {/* TAMBAHAN: Type Filter */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-muted-foreground font-semibold uppercase px-1">
+                Type
+              </label>
+              <Select
+                value={typeFilter}
+                onValueChange={(val) => {
+                  setTypeFilter(val);
+                  setPage(1);
+                }}>
+                <SelectTrigger className="w-32 h-10">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Types</SelectItem>
+                  <SelectItem value="PRODUCT">Product</SelectItem>
+                  <SelectItem value="SERVICE">Service</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Status Filter */}
@@ -257,7 +286,7 @@ const VendorsTable = () => {
                   setStatusFilter(val);
                   setPage(1);
                 }}>
-                <SelectTrigger className="w-36 h-10">
+                <SelectTrigger className="w-32 h-10">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -298,7 +327,11 @@ const VendorsTable = () => {
             </div>
 
             {/* Clear Filter Button */}
-            {(startDate || endDate || statusFilter !== "ALL" || search) && (
+            {(startDate ||
+              endDate ||
+              statusFilter !== "ALL" ||
+              typeFilter !== "ALL" ||
+              search) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -306,6 +339,7 @@ const VendorsTable = () => {
                   setStartDate(undefined);
                   setEndDate(undefined);
                   setStatusFilter("ALL");
+                  setTypeFilter("ALL");
                   setSearch("");
                   setPage(1);
                 }}
@@ -323,46 +357,55 @@ const VendorsTable = () => {
             <Table className="min-w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-50">Company Name</TableHead>
+                  <TableHead className="w-48">Company Name</TableHead>
+                  <TableHead>Type</TableHead> {/* Kolom Type */}
                   <TableHead>PIC Name</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Country</TableHead>
+                  <TableHead>City</TableHead> {/* Kolom City */}
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead className="w-40 text-right">Actions</TableHead>
+                  <TableHead className="w-32 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
+                      {/* Karena sekarang ada 9 kolom, kita buat 9 skeleton */}
                       <TableCell>
-                        <Skeleton className="h-4 w-45" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-37.5" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-30" />
+                        <Skeleton className="h-4 w-32" />
                       </TableCell>
                       <TableCell>
                         <Skeleton className="h-4 w-20" />
                       </TableCell>
                       <TableCell>
-                        <Skeleton className="h-4 w-15" />
+                        <Skeleton className="h-4 w-28" />
                       </TableCell>
                       <TableCell>
-                        <Skeleton className="h-4 w-25" />
+                        <Skeleton className="h-4 w-24" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-20" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-20" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-16" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-24" />
                       </TableCell>
                       <TableCell className="text-right">
-                        <Skeleton className="h-8 w-30" />
+                        <Skeleton className="h-8 w-8 ml-auto" />
                       </TableCell>
                     </TableRow>
                   ))
                 ) : error ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={9}
                       className="text-center text-red-500 py-6">
                       {error}
                     </TableCell>
@@ -373,7 +416,20 @@ const VendorsTable = () => {
                       <TableCell className="font-medium">
                         {vendor.companyName}
                       </TableCell>
+
+                      {/* Tipe Vendor */}
+                      <TableCell>
+                        {vendor.type ? (
+                          <Badge variant="outline" className="capitalize">
+                            {vendor.type.toLowerCase()}
+                          </Badge>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+
                       <TableCell>{vendor.picName}</TableCell>
+
                       <TableCell>
                         <div className="flex gap-2 flex-wrap">
                           {vendor.contacts?.map((c) => {
@@ -392,7 +448,29 @@ const VendorsTable = () => {
                           })}
                         </div>
                       </TableCell>
-                      <TableCell>{vendor.country}</TableCell>
+
+                      {/* Negara & Emoji Bendera */}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="text-lg leading-none"
+                            title={vendor.country}>
+                            {countries.find((c) => c.name === vendor.country)
+                              ?.flag || "🌍"}
+                          </span>
+                          <span className="truncate max-w-25">
+                            {vendor.country || "-"}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      {/* Kota */}
+                      <TableCell>
+                        <span className="truncate max-w-30 inline-block">
+                          {vendor.city || "-"}
+                        </span>
+                      </TableCell>
+
                       <TableCell>
                         {vendor.isActive ? (
                           <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
@@ -425,7 +503,6 @@ const VendorsTable = () => {
                                 Detail
                               </Link>
                             </DropdownMenuItem>
-
                             <DropdownMenuItem asChild>
                               <Link
                                 href={`/super-admin/vendors/edit/${vendor.id}`}
@@ -434,7 +511,6 @@ const VendorsTable = () => {
                                 Edit
                               </Link>
                             </DropdownMenuItem>
-
                             <DropdownMenuItem
                               className="text-red-600 focus:text-red-600 cursor-pointer"
                               onClick={() => setDeleteId(vendor.id)}>
@@ -449,7 +525,7 @@ const VendorsTable = () => {
                 ) : (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={9} // Disesuaikan menjadi 9 kolom
                       className="text-center py-6 text-muted-foreground">
                       No vendors found.
                     </TableCell>

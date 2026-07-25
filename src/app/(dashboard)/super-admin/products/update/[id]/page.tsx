@@ -483,7 +483,9 @@ export default function EditProductPage() {
 
       combination.forEach((val) => {
         attributeMap[val.attributeId] = val.id;
-        const valText = val.value.includes("|") ? val.value.split("|")[0] : val.value;
+        const valText = val.value.includes("|")
+          ? val.value.split("|")[0]
+          : val.value;
         nameParts.push(valText);
       });
 
@@ -604,7 +606,7 @@ export default function EditProductPage() {
 
       toast.success("Price tiers updated successfully");
 
-      // ✨ Refresh data menggunakan fetchApi
+      //  Refresh data menggunakan fetchApi
       const updatedProductRes = await fetchApi(`/products/${id}`);
 
       if (updatedProductRes.ok) {

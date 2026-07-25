@@ -19,7 +19,7 @@ import {
 import { ArrowUpDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
-// ✨ UPDATE: Interface untuk tabel region
+//  UPDATE: Interface untuk tabel region
 interface RegionData {
   id: string | number;
   region: string;

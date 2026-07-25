@@ -18,7 +18,7 @@ import {
   YAxis,
 } from "recharts";
 
-// ✨ UPDATE 1: Interface untuk props data
+//  UPDATE 1: Interface untuk props data
 interface SalesOrderStackedBarProps {
   data?: any[];
 }
@@ -38,7 +38,7 @@ export default function SalesOrderStackedBar({
 }: SalesOrderStackedBarProps) {
   const chartData = Array.isArray(data) ? data : [];
 
-  // ✨ UPDATE 2: Mengambil nama-nama kategori secara dinamis dari data API
+  //  UPDATE 2: Mengambil nama-nama kategori secara dinamis dari data API
   // Kita menyingkirkan key standar (month, revenue, order, profit) agar yang tersisa hanyalah nama kategori produk
   const categoryKeys = Array.from(
     new Set(
@@ -110,7 +110,7 @@ export default function SalesOrderStackedBar({
                   wrapperStyle={{ paddingTop: "20px" }}
                 />
 
-                {/* ✨ UPDATE 3: Render Bar secara dinamis berdasarkan kategori yang ditemukan */}
+                {/*  UPDATE 3: Render Bar secara dinamis berdasarkan kategori yang ditemukan */}
                 {categoryKeys.map((categoryName, index) => (
                   <Bar
                     key={categoryName}

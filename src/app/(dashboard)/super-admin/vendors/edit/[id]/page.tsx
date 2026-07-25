@@ -13,6 +13,7 @@ export default function EditVendorPage() {
   const router = useRouter();
 
   const [vendorData, setVendorData] = useState<VendorFormValues | undefined>();
+  console.log("ini adalah data vendor data", vendorData);
 
   const [existingItems, setExistingItems] = useState<
     { id: string; name: string }[]
@@ -42,9 +43,8 @@ export default function EditVendorPage() {
           })) || [];
         setExistingItems(itemsList);
 
-        const firstItem = data.items?.[0];
-        const existingCategoryId = firstItem?.category?.id || "";
-        const existingType = firstItem?.category?.type || "";
+        const existingCategoryId = data.categoryId || "";
+        const existingType = data.type || "";
 
         setVendorData({
           companyName: data.companyName ?? "",

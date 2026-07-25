@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/useApi";
 import FormUpdateAttributes from "../../components/update/AttributesSection";
 import FormProductCore, {
@@ -14,8 +15,6 @@ import FormUpdateProductMedia from "../../components/update/VariantMediaSection"
 import FormUpdateVariants, {
   VariantFormValues,
 } from "../../components/update/VariantsSection";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
 
 const CLOUDINARY_CLOUD_NAME = "do9sfnf5k";
 const CLOUDINARY_UPLOAD_PRESET = "ml_default";
@@ -271,7 +270,9 @@ export default function EditProductPage() {
         if (!prev) return prev;
 
         const newImages = prev.images.map((img: any) =>
-          img.id === mediaId ? { ...img, mockupAreas: updatedMockupAreas } : img,
+          img.id === mediaId
+            ? { ...img, mockupAreas: updatedMockupAreas }
+            : img,
         );
 
         return {
@@ -305,7 +306,9 @@ export default function EditProductPage() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to update mockup settings");
+        throw new Error(
+          errorData.message || "Failed to update mockup settings",
+        );
       }
 
       const updatedProduct = await res.json();
@@ -320,7 +323,9 @@ export default function EditProductPage() {
     } catch (err) {
       console.error("Error updating mockup settings:", err);
       toast.error(
-        err instanceof Error ? err.message : "Gagal menyimpan pengaturan mockup",
+        err instanceof Error
+          ? err.message
+          : "Gagal menyimpan pengaturan mockup",
       );
     } finally {
       setIsSubmitting(false);
@@ -396,7 +401,7 @@ export default function EditProductPage() {
       const updatedProduct = await res.json();
       setProductData(updatedProduct);
       toast.success("Gambar berhasil diunggah!");
-      
+
       const newImage = updatedProduct.images[updatedProduct.images.length - 1];
       return newImage;
     } catch (err) {
@@ -532,11 +537,13 @@ export default function EditProductPage() {
 
   const generateCrossProduct = (selections: any[], fullList: any[]) => {
     const variantGeneratingSelections = selections.filter(
-      (sel) => sel.isVariantGenerator !== false
+      (sel) => sel.isVariantGenerator !== false,
     );
     if (variantGeneratingSelections.length === 0) return [];
     const activeAttributes = fullList
-      .filter((attr) => variantGeneratingSelections.some((sel) => sel.attributeId === attr.id))
+      .filter((attr) =>
+        variantGeneratingSelections.some((sel) => sel.attributeId === attr.id),
+      )
       .map((attr) => ({
         ...attr,
         // Filter values hanya yang dipilih
@@ -576,7 +583,9 @@ export default function EditProductPage() {
 
       combination.forEach((val) => {
         attributeMap[val.attributeId] = val.id;
-        const valText = val.value.includes("|") ? val.value.split("|")[0] : val.value;
+        const valText = val.value.includes("|")
+          ? val.value.split("|")[0]
+          : val.value;
         nameParts.push(valText);
       });
 
@@ -631,7 +640,9 @@ export default function EditProductPage() {
         // Fallback: Cocokkan berdasarkan nama (case-insensitive, normalize separators)
         const normalizeName = (name: string) =>
           name?.toLowerCase().replace(/[\s•·\-\/]/g, "") || "";
-        return normalizeName(v.variantName) === normalizeName(newComb.variantName);
+        return (
+          normalizeName(v.variantName) === normalizeName(newComb.variantName)
+        );
       });
 
       if (existingMatch) {
@@ -707,7 +718,7 @@ export default function EditProductPage() {
 
       toast.success("Price tiers updated successfully");
 
-      // ✨ Refresh data menggunakan fetchApi
+      //  Refresh data menggunakan fetchApi
       const updatedProductRes = await fetchApi(`/products/${id}`);
 
       if (updatedProductRes.ok) {
@@ -733,13 +744,32 @@ export default function EditProductPage() {
 
       <Tabs defaultValue="identity" className="w-full space-y-6">
         <TabsList className="grid w-full grid-cols-4 p-1 bg-stone-100 dark:bg-stone-800 rounded-lg">
-          <TabsTrigger value="identity" className="font-semibold text-xs sm:text-sm">1. Informasi Utama</TabsTrigger>
-          <TabsTrigger value="media" className="font-semibold text-xs sm:text-sm">2. Media & Visual</TabsTrigger>
-          <TabsTrigger value="pricing" className="font-semibold text-xs sm:text-sm">3. Harga & Tiers</TabsTrigger>
-          <TabsTrigger value="customization" disabled={!productData?.isCustom} className="font-semibold text-xs sm:text-sm">4. Kustomisasi & Varian</TabsTrigger>
+          <TabsTrigger
+            value="identity"
+            className="font-semibold text-xs sm:text-sm">
+            1. Informasi Utama
+          </TabsTrigger>
+          <TabsTrigger
+            value="media"
+            className="font-semibold text-xs sm:text-sm">
+            2. Media & Visual
+          </TabsTrigger>
+          <TabsTrigger
+            value="pricing"
+            className="font-semibold text-xs sm:text-sm">
+            3. Harga & Tiers
+          </TabsTrigger>
+          <TabsTrigger
+            value="customization"
+            disabled={!productData?.isCustom}
+            className="font-semibold text-xs sm:text-sm">
+            4. Kustomisasi & Varian
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="identity" className="space-y-6 animate-fade-in focus-visible:outline-none">
+        <TabsContent
+          value="identity"
+          className="space-y-6 animate-fade-in focus-visible:outline-none">
           <FormProductCore
             initialData={productData}
             onSubmit={handleUpdateProduct}
@@ -747,7 +777,9 @@ export default function EditProductPage() {
           />
         </TabsContent>
 
-        <TabsContent value="media" className="space-y-6 animate-fade-in focus-visible:outline-none">
+        <TabsContent
+          value="media"
+          className="space-y-6 animate-fade-in focus-visible:outline-none">
           <FormUpdateProductMedia
             productId={id as string}
             initialData={productData}
@@ -761,7 +793,9 @@ export default function EditProductPage() {
           />
         </TabsContent>
 
-        <TabsContent value="pricing" className="space-y-6 animate-fade-in focus-visible:outline-none">
+        <TabsContent
+          value="pricing"
+          className="space-y-6 animate-fade-in focus-visible:outline-none">
           <FormUpdatePriceTiers
             initialData={productData}
             isSubmitting={isSubmitting}
@@ -769,7 +803,9 @@ export default function EditProductPage() {
           />
         </TabsContent>
 
-        <TabsContent value="customization" className="space-y-6 animate-fade-in focus-visible:outline-none">
+        <TabsContent
+          value="customization"
+          className="space-y-6 animate-fade-in focus-visible:outline-none">
           <FormUpdateAttributes
             initialData={productData}
             isSubmitting={isSubmitting}

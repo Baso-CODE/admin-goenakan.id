@@ -72,7 +72,7 @@ export default function EditNoteTemplatePage() {
     try {
       setIsSubmitting(true);
 
-      // ✨ Gunakan fetchApi dengan method PATCH
+      //  Gunakan fetchApi dengan method PATCH
       const res = await fetchApi(`/invoice-notes/templates/${id}`, {
         method: "PATCH",
         body: JSON.stringify(formValues),
