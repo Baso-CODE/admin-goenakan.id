@@ -1943,7 +1943,7 @@ export default function SupplierCogsCalculatorPage() {
                             <TableHead className="text-xs font-bold text-stone-700">Total Pcs</TableHead>
                             <TableHead className="text-xs font-bold text-stone-700">Total Ctn</TableHead>
                             <TableHead className="text-xs font-bold text-stone-700">Harga / Pcs ({currency})</TableHead>
-                            <TableHead className="text-xs font-bold text-stone-700">GZ Cost ({currency})</TableHead>
+                            <TableHead className="text-xs font-bold text-stone-700">Origin Cost ({currency})</TableHead>
                             <TableHead className="text-xs font-bold text-right text-stone-700">Aksi</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -2178,7 +2178,7 @@ export default function SupplierCogsCalculatorPage() {
                     {calculationMode !== "VARIABLE" && (
                       <div className="space-y-2">
                         <Label className="text-xs text-stone-500 font-semibold uppercase">
-                          {importType === "RESMI" ? "Local Trucking Negara Asal (Valas)" : "GZ Delivery Cost (Guangzhou)"}
+                          {importType === "RESMI" ? "Local Trucking Negara Asal (Valas)" : "Origin Delivery Cost"}
                         </Label>
                         <div className="relative">
                           <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
@@ -2347,7 +2347,7 @@ export default function SupplierCogsCalculatorPage() {
                                 </TableCell>
                               <TableCell className="font-semibold text-stone-700">
                                 {currency} {tier.pricePcs.toLocaleString("id-ID")}
-                                {tier.gzCost > 0 && <span className="block text-[9px] text-stone-400">+ GZ {tier.gzCost}</span>}
+                                {tier.gzCost > 0 && <span className="block text-[9px] text-stone-400">+ Origin {tier.gzCost}</span>}
                               </TableCell>
                               <TableCell className="font-semibold text-blue-900">
                                 Rp {Math.round(tierCalc.cogsSea).toLocaleString("id-ID")}
@@ -2497,7 +2497,7 @@ export default function SupplierCogsCalculatorPage() {
                     <span>Rp {baseCostPcs.toLocaleString("id-ID")}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Guangzhou Delivery allocation</span>
+                    <span>Origin Delivery allocation</span>
                     <span>Rp {gzDeliveryCostPcs.toLocaleString("id-ID")}</span>
                   </div>
                   <div className="flex justify-between">
@@ -2580,7 +2580,7 @@ export default function SupplierCogsCalculatorPage() {
                     <span>Rp {baseCostPcs.toLocaleString("id-ID")}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Guangzhou Delivery allocation</span>
+                    <span>Origin Delivery allocation</span>
                     <span>Rp {gzDeliveryCostPcs.toLocaleString("id-ID")}</span>
                   </div>
                   <div className="flex justify-between">
