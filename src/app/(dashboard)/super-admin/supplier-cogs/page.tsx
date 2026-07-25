@@ -1475,13 +1475,13 @@ export default function SupplierCogsCalculatorPage() {
 
                   {/* 2. DYNAMIC INPUTS BASED ON STATUS */}
                   {cogsStatus === "EXISTING" ? (
-                    <div className="space-y-2 pt-2 border-t border-stone-100">
+                    <div className="space-y-2 pt-2 border-t border-stone-100 min-w-0">
                       <Label className="text-xs font-bold uppercase text-stone-600">Master Product Catalog</Label>
                       <Select
                         value={selectedProductId === "sandbox" ? "" : selectedProductId}
                         onValueChange={setSelectedProductId}
                       >
-                        <SelectTrigger className="bg-stone-50 border-stone-300">
+                        <SelectTrigger className="bg-stone-50 border-stone-300 w-full max-w-full overflow-hidden">
                           <SelectValue placeholder="Pilih Produk dari Katalog" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1540,13 +1540,13 @@ export default function SupplierCogsCalculatorPage() {
                             />
                           </div>
                         ) : (
-                          <div className="space-y-2">
+                          <div className="space-y-2 min-w-0">
                             <Label className="text-xs font-bold uppercase text-stone-600">Master Product Catalog</Label>
                             <Select
                               value={selectedProductId === "sandbox" ? "" : selectedProductId}
                               onValueChange={setSelectedProductId}
                             >
-                              <SelectTrigger className="bg-stone-50 border-stone-300">
+                              <SelectTrigger className="bg-stone-50 border-stone-300 w-full max-w-full overflow-hidden">
                                 <SelectValue placeholder="Pilih Produk dari Katalog" />
                               </SelectTrigger>
                               <SelectContent>
@@ -1611,12 +1611,12 @@ export default function SupplierCogsCalculatorPage() {
                 {/* 2. SELECT SUPPLIER & SERVICE VENDOR (SIDE BY SIDE) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Product Vendor */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-0">
                     <Label className="text-xs font-bold uppercase text-stone-600">
                       Supplier / Vendor Product
                     </Label>
                     <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
-                      <SelectTrigger className="bg-stone-50 border-stone-300">
+                      <SelectTrigger className="bg-stone-50 border-stone-300 w-full max-w-full overflow-hidden">
                         <SelectValue placeholder="Pilih Supplier Product" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1636,12 +1636,12 @@ export default function SupplierCogsCalculatorPage() {
                   </div>
 
                   {/* Service Vendor */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-0">
                     <Label className="text-xs font-bold uppercase text-stone-600">
                       Vendor Ekspedisi / Service (Opsional)
                     </Label>
                     <Select value={selectedServiceVendorId} onValueChange={setSelectedServiceVendorId}>
-                      <SelectTrigger className="bg-stone-50 border-stone-300">
+                      <SelectTrigger className="bg-stone-50 border-stone-300 w-full max-w-full overflow-hidden">
                         <SelectValue placeholder="Pilih Vendor Service (Opsional)" />
                       </SelectTrigger>
                       <SelectContent>
