@@ -15,12 +15,8 @@ RUN apt-get update && apt-get install -y \
 # 2. Copy dependency files
 COPY package.json bun.lock* ./
 
-# 3. Install dependencies (dengan cache clear + retry)
-RUN rm -rf ~/.bun/install/cache && \
-    bun install --frozen-lockfile || \
-    (echo "First install failed, retrying..." && \
-    rm -rf ~/.bun && \
-    bun install --no-save)
+# 3. Install dependencies using npm to bypass Bun tarball extraction bugs on overlayfs
+RUN npm install --no-audit --no-fund
 
 # 4. Copy seluruh kode source (Termasuk folder prisma/)
 COPY . .
