@@ -48,6 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 
 function calculateCogsAndSellingPrice({
   importType,
@@ -109,7 +110,9 @@ function calculateCogsAndSellingPrice({
   const totalAirWeightAlloc = Math.max(totalSeaCbmAlloc, (weight + 2) * totalCtn);
 
   // Freight costs per piece
-  const seaFreightCostPcs = (totalSeaCbmAlloc * seaFreightRate) / safeQtyPcs;
+  const seaFreightCostPcs = importType === "RESMI"
+    ? (seaFreightRate / safeQtyPcs)
+    : ((totalSeaCbmAlloc * seaFreightRate) / safeQtyPcs);
   const airFreightCostPcs = (totalAirWeightAlloc * airFreightRate) / safeQtyPcs;
 
   // Guangzhou delivery cost per piece
@@ -197,6 +200,8 @@ export default function SupplierCogsCalculatorPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [historyModeFilter, setHistoryModeFilter] = useState<"ALL" | "FIXED" | "VARIABLE">("ALL");
   const itemsPerPage = 10;
+  const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
+  const [showComparison, setShowComparison] = useState(false);
 
   // Rates State
   const [fetchingRates, setFetchingRates] = useState(false);
@@ -758,6 +763,7 @@ export default function SupplierCogsCalculatorPage() {
   };
 
   const resetForm = () => {
+    setSelectedRecordIds([]);
     setEditingRecord(null);
     setSelectedProductId("sandbox");
     setTempProductName("");
@@ -930,7 +936,332 @@ export default function SupplierCogsCalculatorPage() {
       </div>
 
       {/* VIEW SWITCHER */}
-      {view === "list" ? (
+      {showComparison ? (
+        /* === 3. COMPARISON VIEW === */
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex items-center justify-between">
+            <Button
+              onClick={() => setShowComparison(false)}
+              variant="outline"
+              className="text-stone-700 border-stone-200 hover:bg-stone-100 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer h-9 bg-white"
+            >
+              <ArrowLeft className="w-4 h-4" /> Kembali ke Daftar Riwayat
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setSelectedRecordIds([]);
+                setShowComparison(false);
+              }}
+              className="text-xs font-bold uppercase tracking-wider h-9 cursor-pointer"
+            >
+              Bersihkan Pilihan
+            </Button>
+          </div>
+
+          <Card className="bg-white border border-stone-200 shadow-sm overflow-hidden">
+            <CardHeader className="bg-stone-50 border-b border-stone-200">
+              <CardTitle className="text-md font-bold uppercase text-stone-700 flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5 text-indigo-600" />
+                Perbandingan Sourcing Supplier (Side-by-Side)
+              </CardTitle>
+              <CardDescription>Bandingkan parameter harga, ekspedisi, pajak, dan HPP dari berbagai supplier secara mendetail.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="min-w-max border-collapse">
+                <TableHeader className="bg-stone-100">
+                  <TableRow>
+                    <TableHead className="font-bold text-xs uppercase text-stone-700 w-[240px] sticky left-0 bg-stone-100 z-10 border-r border-stone-200">Parameter Perbandingan</TableHead>
+                    {records.filter(r => selectedRecordIds.includes(r.id)).map((rec) => {
+                      const displayProdName = rec.product ? rec.product.name : rec.tempProductName;
+                      return (
+                        <TableHead key={rec.id} className="font-bold text-xs uppercase text-stone-700 min-w-[280px] border-r border-stone-200 text-center">
+                          <div className="space-y-1 py-2">
+                            <p className="text-stone-900 font-bold truncate max-w-[260px]">{displayProdName}</p>
+                            <p className="text-[10px] text-stone-500 font-semibold normal-case">
+                              {rec.vendor?.companyName ? rec.vendor.companyName : (rec.supplierContactName || "Tanpa Supplier")}
+                            </p>
+                            <div className="flex justify-center gap-1">
+                              <Badge className="bg-stone-200 text-stone-800 text-[8px] font-bold py-0.2">
+                                {rec.importType}
+                              </Badge>
+                              <Badge className="bg-indigo-50 text-indigo-700 text-[8px] font-bold py-0.2">
+                                {rec.calculationMode}
+                              </Badge>
+                            </div>
+                          </div>
+                        </TableHead>
+                      );
+                    })}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(() => {
+                    const selectedRecs = records.filter(r => selectedRecordIds.includes(r.id));
+                    
+                    // Precompute calculations for each selected record
+                    const computedRecs = selectedRecs.map(rec => {
+                      const safeQtyPerCtn = rec.qtyPerCtn || 1;
+                      const safeMoqCtn = rec.moqCtn || 1;
+                      const safeQtyPcs = safeMoqCtn * safeQtyPerCtn;
+                      const isVariable = rec.calculationMode === "VARIABLE";
+
+                      // 1. Qty Target
+                      const qtyTarget = isVariable 
+                        ? (rec.tiers && Array.isArray(rec.tiers) && rec.tiers.length > 0
+                            ? `${Math.min(...rec.tiers.map((t: any) => t.totalPcs))} - ${Math.max(...rec.tiers.map((t: any) => t.totalPcs))} pcs`
+                            : "Variable")
+                        : `${safeQtyPcs} pcs`;
+
+                      // 2. Calculations
+                      let hppSeaText = "";
+                      let hppAirText = "";
+                      let sellSeaText = "";
+                      let sellAirText = "";
+                      let rawCogsSea = 0;
+                      let rawCogsAir = 0;
+
+                      if (isVariable) {
+                        if (rec.tiers && Array.isArray(rec.tiers) && rec.tiers.length > 0) {
+                          const cogsList = rec.tiers.map((tier: any) => {
+                            const tierQtyPcs = Number(tier.totalPcs) || 1;
+                            const res = calculateCogsAndSellingPrice({
+                              importType: rec.importType as "BORONGAN" | "RESMI",
+                              beaMasukPercent: Number(rec.beaMasukPercent) || 0,
+                              ppnPercent: Number(rec.ppnPercent) || 0,
+                              pphPercent: Number(rec.pphPercent) || 0,
+                              formECost: Number(rec.formECost) || 0,
+                              insurancePercent: Number(rec.insurancePercent) || 0,
+                              handlingCost: Number(rec.handlingCost) || 0,
+                              otherCost: Number(rec.otherCost) || 0,
+                              foreignPrice: Number(tier.pricePcs) || 0,
+                              gzDeliveryCost: Number(tier.gzCost) || Number(rec.gzDeliveryCost) || 0,
+                              exchangeRate: Number(rec.exchangeRate) || 0,
+                              qtyPcs: tierQtyPcs,
+                              qtyPerCtn: safeQtyPerCtn,
+                              length: Number(rec.length) || 0,
+                              width: Number(rec.width) || 0,
+                              height: Number(rec.height) || 0,
+                              weight: Number(rec.weight) || 0,
+                              seaFreightRate: Number(rec.seaFreightRate) || 0,
+                              airFreightRate: Number(rec.airFreightRate) || 0,
+                              localFreight: Number(rec.localFreight) || 0,
+                              margin: Number(rec.margin) || 0,
+                              sponsorPercent: Number(rec.sponsorPercent) * 100 || 0,
+                            });
+                            return {
+                              cogsSea: res.cogsSea,
+                              cogsAir: res.cogsAir,
+                              sellSea: res.sellPriceSea,
+                              sellAir: res.sellPriceAir,
+                            };
+                          });
+
+                          const minCogsSea = Math.min(...cogsList.map((c: any) => c.cogsSea));
+                          const maxCogsSea = Math.max(...cogsList.map((c: any) => c.cogsSea));
+                          const minCogsAir = Math.min(...cogsList.map((c: any) => c.cogsAir));
+                          const maxCogsAir = Math.max(...cogsList.map((c: any) => c.cogsAir));
+
+                          const minSellSea = Math.min(...cogsList.map((c: any) => c.sellSea));
+                          const maxSellSea = Math.max(...cogsList.map((c: any) => c.sellSea));
+                          const minSellAir = Math.min(...cogsList.map((c: any) => c.sellAir));
+                          const maxSellAir = Math.max(...cogsList.map((c: any) => c.sellAir));
+
+                          hppSeaText = minCogsSea === maxCogsSea
+                            ? `Rp ${Math.round(minCogsSea).toLocaleString("id-ID")}`
+                            : `Rp ${Math.round(minCogsSea).toLocaleString("id-ID")} - Rp ${Math.round(maxCogsSea).toLocaleString("id-ID")}`;
+
+                          hppAirText = minCogsAir === maxCogsAir
+                            ? `Rp ${Math.round(minCogsAir).toLocaleString("id-ID")}`
+                            : `Rp ${Math.round(minCogsAir).toLocaleString("id-ID")} - Rp ${Math.round(maxCogsAir).toLocaleString("id-ID")}`;
+
+                          sellSeaText = minSellSea === maxSellSea
+                            ? `Rp ${minSellSea.toLocaleString("id-ID")}`
+                            : `Rp ${minSellSea.toLocaleString("id-ID")} - Rp ${maxSellSea.toLocaleString("id-ID")}`;
+
+                          sellAirText = minSellAir === maxSellAir
+                            ? `Rp ${minSellAir.toLocaleString("id-ID")}`
+                            : `Rp ${minSellAir.toLocaleString("id-ID")} - Rp ${maxSellAir.toLocaleString("id-ID")}`;
+
+                          rawCogsSea = minCogsSea;
+                          rawCogsAir = minCogsAir;
+                        } else {
+                          hppSeaText = "N/A";
+                          hppAirText = "N/A";
+                          sellSeaText = "N/A";
+                          sellAirText = "N/A";
+                        }
+                      } else {
+                        const res = calculateCogsAndSellingPrice({
+                          importType: rec.importType as "BORONGAN" | "RESMI",
+                          beaMasukPercent: Number(rec.beaMasukPercent) || 0,
+                          ppnPercent: Number(rec.ppnPercent) || 0,
+                          pphPercent: Number(rec.pphPercent) || 0,
+                          formECost: Number(rec.formECost) || 0,
+                          insurancePercent: Number(rec.insurancePercent) || 0,
+                          handlingCost: Number(rec.handlingCost) || 0,
+                          otherCost: Number(rec.otherCost) || 0,
+                          foreignPrice: Number(rec.foreignPrice) || 0,
+                          gzDeliveryCost: Number(rec.gzDeliveryCost) || 0,
+                          exchangeRate: Number(rec.exchangeRate) || 0,
+                          qtyPcs: safeQtyPcs,
+                          qtyPerCtn: safeQtyPerCtn,
+                          length: Number(rec.length) || 0,
+                          width: Number(rec.width) || 0,
+                          height: Number(rec.height) || 0,
+                          weight: Number(rec.weight) || 0,
+                          seaFreightRate: Number(rec.seaFreightRate) || 0,
+                          airFreightRate: Number(rec.airFreightRate) || 0,
+                          localFreight: Number(rec.localFreight) || 0,
+                          margin: Number(rec.margin) || 0,
+                          sponsorPercent: Number(rec.sponsorPercent) * 100 || 0,
+                        });
+                        hppSeaText = `Rp ${Math.round(res.cogsSea).toLocaleString("id-ID")}`;
+                        hppAirText = `Rp ${Math.round(res.cogsAir).toLocaleString("id-ID")}`;
+                        sellSeaText = `Rp ${res.sellPriceSea.toLocaleString("id-ID")}`;
+                        sellAirText = `Rp ${res.sellPriceAir.toLocaleString("id-ID")}`;
+                        rawCogsSea = res.cogsSea;
+                        rawCogsAir = res.cogsAir;
+                      }
+
+                      return {
+                        rec,
+                        qtyTarget,
+                        isVariable,
+                        hppSeaText,
+                        hppAirText,
+                        sellSeaText,
+                        sellAirText,
+                        rawCogsSea,
+                        rawCogsAir,
+                      };
+                    });
+
+                    const validSeaRates = computedRecs.map(c => c.rawCogsSea).filter(v => v > 0);
+                    const minSeaRate = validSeaRates.length > 0 ? Math.min(...validSeaRates) : 0;
+
+                    const validAirRates = computedRecs.map(c => c.rawCogsAir).filter(v => v > 0);
+                    const minAirRate = validAirRates.length > 0 ? Math.min(...validAirRates) : 0;
+
+                    // List of parameters/rows to render
+                    const renderRow = (label: string, getValue: (c: typeof computedRecs[0]) => React.ReactNode, bgClass = "") => (
+                      <TableRow className={`${bgClass} hover:bg-stone-50/50`}>
+                        <TableCell className="font-bold text-xs text-stone-700 sticky left-0 bg-white border-r border-stone-200 w-[240px] shadow-xs">
+                          {label}
+                        </TableCell>
+                        {computedRecs.map((c) => (
+                          <TableCell key={c.rec.id} className="text-xs text-center border-r border-stone-200 font-medium">
+                            {getValue(c)}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    );
+
+                    return (
+                      <>
+                        {/* Section Header */}
+                        <TableRow className="bg-stone-50">
+                          <TableCell colSpan={selectedRecs.length + 1} className="font-extrabold text-[10px] text-indigo-950 uppercase tracking-widest px-4 py-2 border-y border-stone-200">
+                            1. PRODUCT & SUPPLIER INFO
+                          </TableCell>
+                        </TableRow>
+                        {renderRow("Produk", (c) => c.rec.product ? c.rec.product.name : c.rec.tempProductName)}
+                        {renderRow("Supplier / Sourcing", (c) => c.rec.vendor?.companyName ? c.rec.vendor.companyName : (c.rec.supplierContactName || "-"))}
+                        {renderRow("Sourcing Platform", (c) => c.rec.supplierPlatform || "-")}
+                        {renderRow("Sourcing Link", (c) => c.rec.supplierContactLink ? (
+                          c.rec.supplierContactLink.startsWith("http") ? (
+                            <a href={c.rec.supplierContactLink} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline font-semibold">
+                              Buka Link ↗
+                            </a>
+                          ) : c.rec.supplierContactLink
+                        ) : "-")}
+                        {renderRow("Logistik Ekspedisi", (c) => c.rec.serviceVendor ? c.rec.serviceVendor.companyName : "-")}
+
+                        {/* Section Header */}
+                        <TableRow className="bg-stone-50">
+                          <TableCell colSpan={selectedRecs.length + 1} className="font-extrabold text-[10px] text-indigo-950 uppercase tracking-widest px-4 py-2 border-y border-stone-200">
+                            2. BASE COST DETAILS (EX WORK)
+                          </TableCell>
+                        </TableRow>
+                        {renderRow("Ex Work (Foreign)", (c) => c.isVariable ? "Variable Tiers" : `${c.rec.currencyCode} ${Number(c.rec.foreignPrice).toLocaleString("id-ID")}`)}
+                        {renderRow("Exchange Rate (Kurs)", (c) => `Rp ${Number(c.rec.exchangeRate).toLocaleString("id-ID")}`)}
+                        {renderRow("Ex Work (IDR Equivalent)", (c) => c.isVariable ? "Variable" : `Rp ${Math.round(Number(c.rec.foreignPrice) * Number(c.rec.exchangeRate)).toLocaleString("id-ID")}`)}
+                        {renderRow("Qty Target / MOQ", (c) => c.qtyTarget)}
+
+                        {/* Section Header */}
+                        <TableRow className="bg-stone-50">
+                          <TableCell colSpan={selectedRecs.length + 1} className="font-extrabold text-[10px] text-indigo-950 uppercase tracking-widest px-4 py-2 border-y border-stone-200">
+                            3. LOGISTICS & FREIGHT RATES
+                          </TableCell>
+                        </TableRow>
+                        {renderRow("Origin Delivery (Foreign)", (c) => `${c.rec.currencyCode} ${Number(c.rec.gzDeliveryCost).toLocaleString("id-ID")}`)}
+                        {renderRow("Sea Freight Rate", (c) => c.rec.importType === "RESMI" ? `Rp ${Number(c.rec.seaFreightRate).toLocaleString("id-ID")} / Shipment` : `Rp ${Number(c.rec.seaFreightRate).toLocaleString("id-ID")} / CBM`)}
+                        {renderRow("Air Freight Rate", (c) => `Rp ${Number(c.rec.airFreightRate).toLocaleString("id-ID")} / KG`)}
+                        {renderRow("Local Delivery (IDR)", (c) => `Rp ${Number(c.rec.localFreight).toLocaleString("id-ID")}`)}
+
+                        {/* Section Header */}
+                        <TableRow className="bg-stone-50">
+                          <TableCell colSpan={selectedRecs.length + 1} className="font-extrabold text-[10px] text-indigo-950 uppercase tracking-widest px-4 py-2 border-y border-stone-200">
+                            4. TAXES & FORM E (FOR RESMI TYPE)
+                          </TableCell>
+                        </TableRow>
+                        {renderRow("Import Type", (c) => c.rec.importType)}
+                        {renderRow("HS Code", (c) => c.rec.hsCode || "-")}
+                        {renderRow("Bea Masuk", (c) => c.rec.importType === "RESMI" ? `${c.rec.beaMasukPercent}%` : "-")}
+                        {renderRow("PPN / PPH", (c) => c.rec.importType === "RESMI" ? `PPN ${c.rec.ppnPercent}% / PPH ${c.rec.pphPercent}%` : "-")}
+                        {renderRow("Form E / Insurance", (c) => c.rec.importType === "RESMI" ? `Form E: Rp ${Number(c.rec.formECost).toLocaleString("id-ID")} / Ins: ${c.rec.insurancePercent}%` : "-")}
+                        {renderRow("Handling / Other Cost", (c) => c.rec.importType === "RESMI" ? `Hand: Rp ${Number(c.rec.handlingCost).toLocaleString("id-ID")} / Other: Rp ${Number(c.rec.otherCost).toLocaleString("id-ID")}` : "-")}
+
+                        {/* Section Header */}
+                        <TableRow className="bg-stone-50">
+                          <TableCell colSpan={selectedRecs.length + 1} className="font-extrabold text-[10px] text-indigo-950 uppercase tracking-widest px-4 py-2 border-y border-stone-200">
+                            5. FINAL HPP & SELLING PRICE COMPARISON
+                          </TableCell>
+                        </TableRow>
+                        {renderRow("HPP Sea (Laut) 🚢", (c) => {
+                          const isCheapest = minSeaRate > 0 && c.rawCogsSea === minSeaRate;
+                          return (
+                            <div className="flex flex-col items-center justify-center py-1">
+                              {isCheapest && (
+                                <Badge className="bg-emerald-500 hover:bg-emerald-500 text-white font-extrabold text-[8px] uppercase tracking-wider px-1.5 py-0.2 mb-1 animate-pulse border-none">
+                                  🏆 Cheapest
+                                </Badge>
+                              )}
+                              <span className={isCheapest ? "text-emerald-700 font-extrabold text-sm" : "text-blue-900 font-bold"}>
+                                {c.hppSeaText}
+                              </span>
+                            </div>
+                          );
+                        }, "bg-blue-50/10 border-r border-stone-200")}
+                        {renderRow("HPP Air (Udara) ✈️", (c) => {
+                          const isCheapest = minAirRate > 0 && c.rawCogsAir === minAirRate;
+                          return (
+                            <div className="flex flex-col items-center justify-center py-1">
+                              {isCheapest && (
+                                <Badge className="bg-emerald-500 hover:bg-emerald-500 text-white font-extrabold text-[8px] uppercase tracking-wider px-1.5 py-0.2 mb-1 animate-pulse border-none">
+                                  🏆 Cheapest
+                                </Badge>
+                              )}
+                              <span className={isCheapest ? "text-emerald-700 font-extrabold text-sm" : "text-amber-900 font-bold"}>
+                                {c.hppAirText}
+                              </span>
+                            </div>
+                          );
+                        }, "bg-amber-50/10 border-r border-stone-200")}
+                        {renderRow("Harga Jual Sea (Suggested) 🚢", (c) => c.sellSeaText, "bg-emerald-50/20 text-emerald-800 font-extrabold border-r border-stone-200")}
+                        {renderRow("Harga Jual Air (Suggested) ✈️", (c) => c.sellAirText, "bg-orange-50/20 text-orange-800 font-extrabold border-r border-stone-200")}
+                        {renderRow("Target Profit Margin (Rp)", (c) => `Rp ${Number(c.rec.margin).toLocaleString("id-ID")}`)}
+                        {renderRow("Sponsor Percent Fee", (c) => `${(Number(c.rec.sponsorPercent) * 100).toFixed(0)}%`)}
+                        {renderRow("Catatan / Notes", (c) => c.rec.notes || "-", "max-w-[300px]")}
+                      </>
+                    );
+                  })()}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      ) : view === "list" ? (
         
         /* === 1. LIST VIEW === */
         <Card className="bg-white border border-stone-200 shadow-sm">
@@ -1098,38 +1429,192 @@ export default function SupplierCogsCalculatorPage() {
               <Table>
                 <TableHeader className="bg-stone-50">
                   <TableRow>
+                    <TableHead className="w-[40px] py-3">
+                      <Checkbox
+                        checked={
+                          paginatedRecords.length > 0 &&
+                          paginatedRecords.every((r) => selectedRecordIds.includes(r.id))
+                        }
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            const newIds = [...selectedRecordIds];
+                            paginatedRecords.forEach((r) => {
+                              if (!newIds.includes(r.id)) newIds.push(r.id);
+                            });
+                            setSelectedRecordIds(newIds);
+                          } else {
+                            const newIds = selectedRecordIds.filter(
+                              (id) => !paginatedRecords.some((r) => r.id === id)
+                            );
+                            setSelectedRecordIds(newIds);
+                          }
+                        }}
+                      />
+                    </TableHead>
                     <TableHead className="font-bold text-xs uppercase text-stone-600">Produk</TableHead>
-                    <TableHead className="font-bold text-xs uppercase text-stone-600">Supplier</TableHead>
-                    <TableHead className="font-bold text-xs uppercase text-stone-600">Harga Asli</TableHead>
+                    <TableHead className="font-bold text-xs uppercase text-stone-600">Qty Target</TableHead>
+                    <TableHead className="font-bold text-xs uppercase text-stone-600">Ex Work</TableHead>
                     <TableHead className="font-bold text-xs uppercase text-stone-600">Kurs (IDR)</TableHead>
-                    <TableHead className="font-bold text-xs uppercase text-stone-600">Total Harga (IDR)</TableHead>
-                    <TableHead className="font-bold text-xs uppercase text-stone-600">Kemasan Ctn</TableHead>
-                    <TableHead className="font-bold text-xs uppercase text-stone-600">Tanggal Quote</TableHead>
+                    <TableHead className="font-bold text-xs uppercase text-stone-600">HPP</TableHead>
+                    <TableHead className="font-bold text-xs uppercase text-stone-600">Est. Harga Jual</TableHead>
+                    <TableHead className="font-bold text-xs uppercase text-stone-600">Supplier</TableHead>
+                    <TableHead className="font-bold text-xs uppercase text-stone-600">Last Update</TableHead>
+                    <TableHead className="font-bold text-xs uppercase text-stone-600">Last Update By</TableHead>
                     <TableHead className="font-bold text-xs text-right uppercase text-stone-600">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedRecords.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-stone-400 py-8 text-sm">
+                      <TableCell colSpan={11} className="text-center text-stone-400 py-8 text-sm">
                         {searchQuery || historyStatusFilter !== "ALL" || historyModeFilter !== "ALL" ? "Tidak ditemukan catatan harga yang cocok." : "Belum ada catatan harga supplier yang disimpan."}
                       </TableCell>
                     </TableRow>
                   ) : (
                     paginatedRecords.map((rec) => {
-                      const baseVal = Number(rec.foreignPrice) * Number(rec.exchangeRate);
                       const displayProdName = rec.product ? rec.product.name : rec.tempProductName;
-                      const formattedDate = new Date(rec.createdAt).toLocaleDateString("id-ID", {
+                      
+                      const formattedDate = new Date(rec.updatedAt).toLocaleDateString("id-ID", {
                         day: "numeric",
                         month: "short",
                         year: "numeric",
+                      }) + " " + new Date(rec.updatedAt).toLocaleTimeString("id-ID", {
+                        hour: "2-digit",
+                        minute: "2-digit"
                       });
 
                       const isExisting = rec.status === "EXISTING" || (!rec.status && rec.productId);
                       const isVariable = rec.calculationMode === "VARIABLE";
 
+                      const safeQtyPerCtn = rec.qtyPerCtn || 1;
+                      const safeMoqCtn = rec.moqCtn || 1;
+                      const safeQtyPcs = safeMoqCtn * safeQtyPerCtn;
+
+                      // 1. Qty Target
+                      const qtyTarget = isVariable 
+                        ? (rec.tiers && Array.isArray(rec.tiers) && rec.tiers.length > 0
+                            ? `${Math.min(...rec.tiers.map((t: any) => t.totalPcs))} - ${Math.max(...rec.tiers.map((t: any) => t.totalPcs))} pcs`
+                            : "Variable")
+                        : `${safeQtyPcs} pcs`;
+
+                      // 2. Calculations
+                      let hppSeaText = "";
+                      let hppAirText = "";
+                      let sellSeaText = "";
+                      let sellAirText = "";
+
+                      if (isVariable) {
+                        if (rec.tiers && Array.isArray(rec.tiers) && rec.tiers.length > 0) {
+                          const cogsList = rec.tiers.map((tier: any) => {
+                            const tierQtyPcs = Number(tier.totalPcs) || 1;
+                            const res = calculateCogsAndSellingPrice({
+                              importType: rec.importType as "BORONGAN" | "RESMI",
+                              beaMasukPercent: Number(rec.beaMasukPercent) || 0,
+                              ppnPercent: Number(rec.ppnPercent) || 0,
+                              pphPercent: Number(rec.pphPercent) || 0,
+                              formECost: Number(rec.formECost) || 0,
+                              insurancePercent: Number(rec.insurancePercent) || 0,
+                              handlingCost: Number(rec.handlingCost) || 0,
+                              otherCost: Number(rec.otherCost) || 0,
+                              foreignPrice: Number(tier.pricePcs) || 0,
+                              gzDeliveryCost: Number(tier.gzCost) || Number(rec.gzDeliveryCost) || 0,
+                              exchangeRate: Number(rec.exchangeRate) || 0,
+                              qtyPcs: tierQtyPcs,
+                              qtyPerCtn: safeQtyPerCtn,
+                              length: Number(rec.length) || 0,
+                              width: Number(rec.width) || 0,
+                              height: Number(rec.height) || 0,
+                              weight: Number(rec.weight) || 0,
+                              seaFreightRate: Number(rec.seaFreightRate) || 0,
+                              airFreightRate: Number(rec.airFreightRate) || 0,
+                              localFreight: Number(rec.localFreight) || 0,
+                              margin: Number(rec.margin) || 0,
+                              sponsorPercent: Number(rec.sponsorPercent) * 100 || 0,
+                            });
+                            return {
+                              cogsSea: res.cogsSea,
+                              cogsAir: res.cogsAir,
+                              sellSea: res.sellPriceSea,
+                              sellAir: res.sellPriceAir,
+                            };
+                          });
+
+                          const minCogsSea = Math.min(...cogsList.map((c: any) => c.cogsSea));
+                          const maxCogsSea = Math.max(...cogsList.map((c: any) => c.cogsSea));
+                          const minCogsAir = Math.min(...cogsList.map((c: any) => c.cogsAir));
+                          const maxCogsAir = Math.max(...cogsList.map((c: any) => c.cogsAir));
+
+                          const minSellSea = Math.min(...cogsList.map((c: any) => c.sellSea));
+                          const maxSellSea = Math.max(...cogsList.map((c: any) => c.sellSea));
+                          const minSellAir = Math.min(...cogsList.map((c: any) => c.sellAir));
+                          const maxSellAir = Math.max(...cogsList.map((c: any) => c.sellAir));
+
+                          hppSeaText = minCogsSea === maxCogsSea
+                            ? `Rp ${Math.round(minCogsSea).toLocaleString("id-ID")}`
+                            : `Rp ${Math.round(minCogsSea).toLocaleString("id-ID")} - Rp ${Math.round(maxCogsSea).toLocaleString("id-ID")}`;
+
+                          hppAirText = minCogsAir === maxCogsAir
+                            ? `Rp ${Math.round(minCogsAir).toLocaleString("id-ID")}`
+                            : `Rp ${Math.round(minCogsAir).toLocaleString("id-ID")} - Rp ${Math.round(maxCogsAir).toLocaleString("id-ID")}`;
+
+                          sellSeaText = minSellSea === maxSellSea
+                            ? `Rp ${minSellSea.toLocaleString("id-ID")}`
+                            : `Rp ${minSellSea.toLocaleString("id-ID")} - Rp ${maxSellSea.toLocaleString("id-ID")}`;
+
+                          sellAirText = minSellAir === maxSellAir
+                            ? `Rp ${minSellAir.toLocaleString("id-ID")}`
+                            : `Rp ${minSellAir.toLocaleString("id-ID")} - Rp ${maxSellAir.toLocaleString("id-ID")}`;
+                        } else {
+                          hppSeaText = "N/A";
+                          hppAirText = "N/A";
+                          sellSeaText = "N/A";
+                          sellAirText = "N/A";
+                        }
+                      } else {
+                        const res = calculateCogsAndSellingPrice({
+                          importType: rec.importType as "BORONGAN" | "RESMI",
+                          beaMasukPercent: Number(rec.beaMasukPercent) || 0,
+                          ppnPercent: Number(rec.ppnPercent) || 0,
+                          pphPercent: Number(rec.pphPercent) || 0,
+                          formECost: Number(rec.formECost) || 0,
+                          insurancePercent: Number(rec.insurancePercent) || 0,
+                          handlingCost: Number(rec.handlingCost) || 0,
+                          otherCost: Number(rec.otherCost) || 0,
+                          foreignPrice: Number(rec.foreignPrice) || 0,
+                          gzDeliveryCost: Number(rec.gzDeliveryCost) || 0,
+                          exchangeRate: Number(rec.exchangeRate) || 0,
+                          qtyPcs: safeQtyPcs,
+                          qtyPerCtn: safeQtyPerCtn,
+                          length: Number(rec.length) || 0,
+                          width: Number(rec.width) || 0,
+                          height: Number(rec.height) || 0,
+                          weight: Number(rec.weight) || 0,
+                          seaFreightRate: Number(rec.seaFreightRate) || 0,
+                          airFreightRate: Number(rec.airFreightRate) || 0,
+                          localFreight: Number(rec.localFreight) || 0,
+                          margin: Number(rec.margin) || 0,
+                          sponsorPercent: Number(rec.sponsorPercent) * 100 || 0,
+                        });
+                        hppSeaText = `Rp ${Math.round(res.cogsSea).toLocaleString("id-ID")}`;
+                        hppAirText = `Rp ${Math.round(res.cogsAir).toLocaleString("id-ID")}`;
+                        sellSeaText = `Rp ${res.sellPriceSea.toLocaleString("id-ID")}`;
+                        sellAirText = `Rp ${res.sellPriceAir.toLocaleString("id-ID")}`;
+                      }
+
                       return (
                         <TableRow key={rec.id} className="hover:bg-stone-50 transition-colors">
+                          <TableCell className="w-[40px] py-3">
+                            <Checkbox
+                              checked={selectedRecordIds.includes(rec.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedRecordIds([...selectedRecordIds, rec.id]);
+                                } else {
+                                  setSelectedRecordIds(selectedRecordIds.filter((id) => id !== rec.id));
+                                }
+                              }}
+                            />
+                          </TableCell>
                           <TableCell className="font-medium text-stone-850">
                             <div className="flex items-center gap-3">
                               {!isExisting && rec.imageUrl ? (
@@ -1147,41 +1632,74 @@ export default function SupplierCogsCalculatorPage() {
                               ) : null}
                               <div>
                                 <span>{displayProdName}</span>
-                              <div className="flex flex-wrap items-center gap-1 mt-1">
-                                {isExisting ? (
-                                  <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
-                                    Existing
-                                  </Badge>
-                                ) : (
-                                  <Badge className="bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
-                                    Potential
-                                  </Badge>
-                                )}
-                                {isVariable ? (
-                                  <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
-                                    📊 Variable
-                                  </Badge>
-                                ) : (
-                                  <Badge className="bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-100 text-[9px] px-1.5 py-0.2 font-bold uppercase">
-                                    📏 Fixed
-                                  </Badge>
-                                )}
-                                {rec.importType === "RESMI" ? (
-                                  <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
-                                    🏦 Resmi
-                                  </Badge>
-                                ) : (
-                                  <Badge className="bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
-                                    📦 Borongan
-                                  </Badge>
-                                )}
-                                {!rec.productId && (
-                                  <Badge className="bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-100 text-[9px] px-1.5 py-0.2">Draft</Badge>
-                                )}
+                                <div className="flex flex-wrap items-center gap-1 mt-1">
+                                  {isExisting ? (
+                                    <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                      Existing
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                      Potential
+                                    </Badge>
+                                  )}
+                                  {isVariable ? (
+                                    <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                      📊 Variable
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-100 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                      📏 Fixed
+                                    </Badge>
+                                  )}
+                                  {rec.importType === "RESMI" ? (
+                                    <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                      🏦 Resmi
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-50 text-[9px] px-1.5 py-0.2 font-bold uppercase">
+                                      📦 Borongan
+                                    </Badge>
+                                  )}
+                                  {!rec.productId && (
+                                    <Badge className="bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-100 text-[9px] px-1.5 py-0.2">Draft</Badge>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </TableCell>
+                          </TableCell>
+                          <TableCell className="font-semibold text-stone-700">
+                            {qtyTarget}
+                          </TableCell>
+                          <TableCell className="font-semibold text-stone-700">
+                            {isVariable ? (
+                              <span className="text-stone-400">Variable</span>
+                            ) : (
+                              `${rec.currencyCode} ${Number(rec.foreignPrice).toLocaleString("id-ID")}`
+                            )}
+                          </TableCell>
+                          <TableCell className="text-stone-500 font-semibold text-xs">
+                            Rp {Number(rec.exchangeRate).toLocaleString("id-ID")}
+                          </TableCell>
+                          <TableCell className="font-semibold">
+                            <div className="space-y-0.5 text-xs">
+                              <div className="flex items-center gap-1 text-blue-900 font-bold" title="HPP Sea / Laut">
+                                <span className="text-[11px]">🚢</span> {hppSeaText}
+                              </div>
+                              <div className="flex items-center gap-1 text-amber-900 font-bold" title="HPP Air / Udara">
+                                <span className="text-[11px]">✈️</span> {hppAirText}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-semibold">
+                            <div className="space-y-0.5 text-xs">
+                              <div className="flex items-center gap-1 text-emerald-700 font-bold" title="Suggested Selling Price Sea / Laut">
+                                <span className="text-[11px]">🚢</span> {sellSeaText}
+                              </div>
+                              <div className="flex items-center gap-1 text-orange-750 font-bold" title="Suggested Selling Price Air / Udara">
+                                <span className="text-[11px]">✈️</span> {sellAirText}
+                              </div>
+                            </div>
+                          </TableCell>
                           <TableCell className="text-stone-600">
                             <div className="space-y-1">
                               {rec.vendor?.companyName ? (
@@ -1229,15 +1747,12 @@ export default function SupplierCogsCalculatorPage() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="font-semibold text-stone-700">
-                            {rec.currencyCode} {Number(rec.foreignPrice).toLocaleString("id-ID")}
-                          </TableCell>
-                          <TableCell className="text-stone-500">Rp {Number(rec.exchangeRate).toLocaleString("id-ID")}</TableCell>
-                          <TableCell className="font-bold text-stone-800">Rp {baseVal.toLocaleString("id-ID")}</TableCell>
                           <TableCell className="text-stone-500 text-xs">
-                            {rec.qtyPerCtn} pcs/Ctn ({rec.length}x{rec.width}x{rec.height}cm, {rec.weight}kg)
+                            {formattedDate}
                           </TableCell>
-                          <TableCell className="text-stone-500 text-xs">{formattedDate}</TableCell>
+                          <TableCell className="text-stone-500 text-xs">
+                            Super Admin
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <Button
@@ -2135,7 +2650,7 @@ export default function SupplierCogsCalculatorPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label className="text-xs font-bold uppercase text-stone-600">
-                        {importType === "RESMI" ? "Forwarder SEA Freight (Rp / CBM)" : "SEA Freight Rate (Rp / CBM)"}
+                        {importType === "RESMI" ? "Forwarder SEA Freight (Rp / Shipment)" : "SEA Freight Rate (Rp / CBM)"}
                       </Label>
                       <div className="relative">
                         <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
@@ -2653,6 +3168,30 @@ export default function SupplierCogsCalculatorPage() {
 
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Floating comparison bar */}
+      {selectedRecordIds.length >= 2 && !showComparison && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-900/95 text-white py-3 px-5 rounded-full shadow-2xl flex items-center gap-4 z-50 border border-stone-800 backdrop-blur-xs animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <span className="text-xs font-bold tracking-wide uppercase">
+            {selectedRecordIds.length} Catatan Sourcing Dipilih
+          </span>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowComparison(true)}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-full text-xs font-bold uppercase tracking-wider py-1.5 px-4 h-8 flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Bandingkan
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setSelectedRecordIds([])}
+              className="text-stone-400 hover:text-white text-xs font-bold uppercase tracking-wider h-8 rounded-full cursor-pointer hover:bg-stone-800"
+            >
+              Batal
+            </Button>
           </div>
         </div>
       )}
