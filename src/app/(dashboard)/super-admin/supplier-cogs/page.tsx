@@ -208,6 +208,7 @@ export default function SupplierCogsCalculatorPage() {
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
   const [selectedServiceVendorId, setSelectedServiceVendorId] = useState<string>("");
   const [cogsStatus, setCogsStatus] = useState<"EXISTING" | "POTENTIAL">("POTENTIAL");
+  const [potentialProductType, setPotentialProductType] = useState<"NEW" | "EXISTING">("NEW");
   const [historyStatusFilter, setHistoryStatusFilter] = useState<"ALL" | "EXISTING" | "POTENTIAL">("ALL");
   const [historyTypeFilter, setHistoryTypeFilter] = useState<"ALL" | "BORONGAN" | "RESMI">("ALL");
 
@@ -409,6 +410,7 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedVendorId(rec.vendorId || "");
     setSelectedServiceVendorId(rec.serviceVendorId || "");
     setCogsStatus(rec.status || (rec.productId ? "EXISTING" : "POTENTIAL"));
+    setPotentialProductType(rec.productId && rec.productId !== "sandbox" ? "EXISTING" : "NEW");
     setSupplierPlatform(rec.supplierPlatform || "1688");
     setSupplierContactName(rec.supplierContactName || "");
     setSupplierContactLink(rec.supplierContactLink || "");
@@ -668,9 +670,15 @@ export default function SupplierCogsCalculatorPage() {
 
   // --- SAVE OR UPDATE CALCULATION ---
   const handleSaveRecord = async () => {
-    if (cogsStatus === "POTENTIAL" && !tempProductName.trim()) {
-      toast.error("Mohon masukkan nama produk sourcing");
-      return;
+    if (cogsStatus === "POTENTIAL") {
+      if (potentialProductType === "NEW" && !tempProductName.trim()) {
+        toast.error("Mohon masukkan nama produk sourcing");
+        return;
+      }
+      if (potentialProductType === "EXISTING" && (selectedProductId === "sandbox" || !selectedProductId)) {
+        toast.error("Mohon pilih produk dari katalog");
+        return;
+      }
     }
 
     if (cogsStatus === "EXISTING" && (selectedProductId === "sandbox" || !selectedProductId)) {
@@ -681,8 +689,12 @@ export default function SupplierCogsCalculatorPage() {
     setSaving(true);
     try {
       const payload = {
-        productId: cogsStatus === "EXISTING" ? selectedProductId : undefined,
-        tempProductName: cogsStatus === "POTENTIAL" ? tempProductName.trim() : undefined,
+        productId: cogsStatus === "EXISTING" 
+          ? selectedProductId 
+          : (potentialProductType === "EXISTING" && selectedProductId !== "sandbox" ? selectedProductId : undefined),
+        tempProductName: cogsStatus === "POTENTIAL" && potentialProductType === "NEW" 
+          ? tempProductName.trim() 
+          : undefined,
         status: cogsStatus,
         imageUrl: cogsStatus === "POTENTIAL" ? (imageUrl || undefined) : undefined,
         imagePublicId: cogsStatus === "POTENTIAL" ? (imagePublicId || undefined) : undefined,
@@ -752,6 +764,7 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedVendorId("");
     setSelectedServiceVendorId("");
     setCogsStatus("POTENTIAL");
+    setPotentialProductType("NEW");
     setSupplierPlatform("1688");
     setSupplierContactName("");
     setSupplierContactLink("");
@@ -804,6 +817,7 @@ export default function SupplierCogsCalculatorPage() {
     setSelectedVendorId(rec.vendorId || "");
     setSelectedServiceVendorId(rec.serviceVendorId || "");
     setCogsStatus(rec.status || (rec.productId ? "EXISTING" : "POTENTIAL"));
+    setPotentialProductType(rec.productId && rec.productId !== "sandbox" ? "EXISTING" : "NEW");
     
     setSupplierPlatform(rec.supplierPlatform || "1688");
     setSupplierContactName(rec.supplierContactName || "");
@@ -1480,16 +1494,71 @@ export default function SupplierCogsCalculatorPage() {
                       </Select>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-stone-100">
-                      <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase text-stone-600">Nama Produk Sourcing</Label>
-                        <Input
-                          placeholder="Contoh: Tumbler Ceramic Type-D"
-                          value={tempProductName}
-                          onChange={(e) => setTempProductName(e.target.value)}
-                          className="bg-stone-50 border-stone-300"
-                        />
+                    <div className="space-y-4 pt-2 border-t border-stone-100">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPotentialProductType("NEW");
+                            setSelectedProductId("sandbox");
+                          }}
+                          className={`px-3 py-1.5 rounded text-xs font-semibold cursor-pointer transition-all duration-150 ${
+                            potentialProductType === "NEW"
+                              ? "bg-sky-600 text-white shadow-xs"
+                              : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                          }`}
+                        >
+                          Produk Baru (Ketik Nama)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPotentialProductType("EXISTING");
+                            if (selectedProductId === "sandbox") {
+                              setSelectedProductId("");
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded text-xs font-semibold cursor-pointer transition-all duration-150 ${
+                            potentialProductType === "EXISTING"
+                              ? "bg-sky-600 text-white shadow-xs"
+                              : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                          }`}
+                        >
+                          Pilih dari Katalog
+                        </button>
                       </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {potentialProductType === "NEW" ? (
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold uppercase text-stone-600">Nama Produk Sourcing</Label>
+                            <Input
+                              placeholder="Contoh: Tumbler Ceramic Type-D"
+                              value={tempProductName}
+                              onChange={(e) => setTempProductName(e.target.value)}
+                              className="bg-stone-50 border-stone-300"
+                            />
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold uppercase text-stone-600">Master Product Catalog</Label>
+                            <Select
+                              value={selectedProductId === "sandbox" ? "" : selectedProductId}
+                              onValueChange={setSelectedProductId}
+                            >
+                              <SelectTrigger className="bg-stone-50 border-stone-300">
+                                <SelectValue placeholder="Pilih Produk dari Katalog" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {products.map((p) => (
+                                  <SelectItem key={p.id} value={p.id}>
+                                    {p.name} ({p.sku})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
 
                       <div className="space-y-2">
                         <Label className="text-xs font-bold uppercase text-stone-600">Foto Produk Potential</Label>
@@ -1535,8 +1604,9 @@ export default function SupplierCogsCalculatorPage() {
                         )}
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+              </div>
 
                 {/* 2. SELECT SUPPLIER & SERVICE VENDOR (SIDE BY SIDE) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
