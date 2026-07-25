@@ -3,12 +3,14 @@ FROM oven/bun:latest
 
 WORKDIR /app
 
-# 1. Install Library C++ (Wajib untuk Argon2/NextAuth)
+# 1. Install Library C++ & Node.js/npm (Wajib untuk Argon2/NextAuth & NPM install fallback)
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
     openssl \
+    nodejs \
+    npm \
     libstdc++-12-dev && \
     rm -rf /var/lib/apt/lists/*  # 🔥 Clear apt cache
 
