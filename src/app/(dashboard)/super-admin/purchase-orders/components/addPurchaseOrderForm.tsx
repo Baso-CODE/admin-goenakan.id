@@ -77,6 +77,8 @@ const purchaseOrderSchema = z.object({
       z.object({
         itemName: z.string().min(1, "Item name is required"),
         productId: z.string().optional(),
+        variantId: z.string().optional(),
+        selectedAttributes: z.record(z.string(), z.string()).optional(),
         orderId: z.string().optional(),
         quantityOrder: z.number().min(1),
         quantityStock: z.number().min(0),
@@ -114,6 +116,8 @@ export default function AddPurchaseOrderForm() {
         {
           itemName: "",
           productId: "",
+          variantId: "",
+          selectedAttributes: {},
           orderId: "",
           quantityOrder: 1,
           quantityStock: 0,
@@ -141,6 +145,10 @@ export default function AddPurchaseOrderForm() {
   const [loadingData, setLoadingData] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [vendorOpen, setVendorOpen] = useState(false);
+  const [openCombobox, setOpenCombobox] = useState<Record<number, boolean>>({});
+  const [openOrderCombobox, setOpenOrderCombobox] = useState<
+    Record<number, boolean>
+  >({});
 
   // Load Master Data
   useEffect(() => {
@@ -149,10 +157,10 @@ export default function AddPurchaseOrderForm() {
       try {
         setLoadingData(true);
         const [resV, resCur, resP, resO] = await Promise.all([
-          fetchApi("/vendors/order/add"), // Endpoint list vendor kamu
+          fetchApi("/vendors/order/add"),
           fetchApi("/currencies"),
           fetchApi("/products/order"),
-          fetchApi("/orders/all?take=100"), // Ambil daftar SO terbaru
+          fetchApi("/orders/all?take=100"),
         ]);
 
         const [v, curData, p, oData] = await Promise.all([
@@ -186,7 +194,6 @@ export default function AddPurchaseOrderForm() {
     try {
       setSubmitting(true);
 
-      // Bersihkan string kosong pada referensi agar tidak memicu error UUID prisma
       const payload = {
         ...data,
         items: data.items.map((item) => ({
@@ -204,7 +211,7 @@ export default function AddPurchaseOrderForm() {
       if (!res.ok) throw new Error("Gagal membuat Purchase Order");
 
       toast.success("Purchase Order berhasil dibuat!");
-      router.push("/super-admin/purchase-orders"); // Arahkan kembali ke tabel PO
+      router.push("/super-admin/purchase-orders");
     } catch (e) {
       toast.error("Gagal menyimpan data.");
       console.error(e);
@@ -264,13 +271,10 @@ export default function AddPurchaseOrderForm() {
                       <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
-                          // Ubah string "YYYY-MM-DD" dari form state menjadi object Date untuk Calendar
                           selected={
                             field.value ? new Date(field.value) : undefined
                           }
                           onSelect={(date) => {
-                            // Saat tanggal dipilih, ubah kembali object Date menjadi string "YYYY-MM-DD"
-                            // agar sesuai dengan schema Zod dan format database kamu
                             field.onChange(
                               date ? format(date, "yyyy-MM-dd") : "",
                             );
@@ -500,6 +504,8 @@ export default function AddPurchaseOrderForm() {
                     append({
                       itemName: "",
                       productId: "",
+                      variantId: "", // ✨ UPDATE
+                      selectedAttributes: {}, // ✨ UPDATE
                       orderId: "",
                       quantityOrder: 1,
                       quantityStock: 0,
@@ -517,7 +523,7 @@ export default function AddPurchaseOrderForm() {
               {/* Table Header (Hidden di Mobile) */}
               {fields.length > 0 && (
                 <div className="hidden lg:grid lg:grid-cols-12 gap-3 px-4 py-3 bg-slate-700 rounded-t-lg font-medium text-sm text-slate-50">
-                  <div className="col-span-3">Item Name / Service</div>
+                  <div className="col-span-3">Item Name & Product</div>
                   <div className="col-span-2">Reference SO/SN</div>
                   <div className="col-span-3 text-center">
                     Qty (Order | Stock | Buy)
@@ -531,15 +537,70 @@ export default function AddPurchaseOrderForm() {
               <div className="space-y-4">
                 {fields.map((field, index) => {
                   const subtotal =
-                    (watch(`items.${index}.quantityOrder`) || 0) *
+                    (watch(`items.${index}.quantityPurchase`) || 0) *
                     (watch(`items.${index}.unitPrice`) || 0);
+
+                  // Data Produk yang dipilih
+                  const currentProductId = watch(`items.${index}.productId`);
+                  const selectedProduct = products.find(
+                    (p) => p.id === currentProductId,
+                  );
+                  const currentSelectedAttrs =
+                    watch(`items.${index}.selectedAttributes`) || {};
+
+                  // Logika Pencocokan Varian (Sama seperti Sales Order)
+                  const handleAttributeSelect = (
+                    attributeId: string,
+                    valueId: string,
+                  ) => {
+                    const newAttrs = {
+                      ...currentSelectedAttrs,
+                      [attributeId]: valueId,
+                    };
+                    form.setValue(
+                      `items.${index}.selectedAttributes`,
+                      newAttrs,
+                    );
+
+                    if (selectedProduct?.productVariants) {
+                      const selectedValIds = Object.values(newAttrs);
+
+                      const matchedVariant = [
+                        ...selectedProduct.productVariants,
+                      ]
+                        .sort(
+                          (a, b) =>
+                            b.combinationIds.length - a.combinationIds.length,
+                        )
+                        .find(
+                          (v) =>
+                            v.combinationIds.length > 0 &&
+                            v.combinationIds.every((id) =>
+                              selectedValIds.includes(id),
+                            ),
+                        );
+
+                      if (matchedVariant) {
+                        form.setValue(
+                          `items.${index}.variantId`,
+                          matchedVariant.id,
+                        );
+                        form.setValue(
+                          `items.${index}.unitPrice`,
+                          Number(matchedVariant.price),
+                        );
+                      } else {
+                        form.setValue(`items.${index}.variantId`, "");
+                      }
+                    }
+                  };
 
                   return (
                     <div
                       key={field.id}
-                      className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow p-4 lg:p-0">
-                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start lg:p-4">
-                        {/* 1. Item Name & Product Relation */}
+                      className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start p-4 lg:p-4">
+                        {/* 1. Item Name & Product Relation (COMBOBOX) */}
                         <div className="lg:col-span-3 space-y-3">
                           <FormField
                             control={control}
@@ -560,47 +621,129 @@ export default function AddPurchaseOrderForm() {
                               </FormItem>
                             )}
                           />
+
                           <FormField
                             control={control}
                             name={`items.${index}.productId`}
                             render={({ field }) => (
-                              <FormItem>
-                                <Select
-                                  value={field.value}
-                                  onValueChange={(val) => {
-                                    field.onChange(val);
-                                    const prod = products.find(
-                                      (p) => p.id === val,
-                                    );
-                                    if (prod) {
-                                      // Auto fill nama item & stock
-                                      form.setValue(
-                                        `items.${index}.itemName`,
-                                        prod.name,
-                                      );
-                                      form.setValue(
-                                        `items.${index}.quantityStock`,
-                                        prod.stock || 0,
-                                      );
-                                      recalculateQtyPurchase(index);
-                                    }
-                                  }}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-9 text-xs bg-slate-50 border-dashed">
-                                      <SelectValue placeholder="Or link to Master Product..." />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {products.map((p) => (
-                                      <SelectItem key={p.id} value={p.id}>
-                                        {p.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                              <FormItem className="flex flex-col">
+                                <Popover
+                                  open={openCombobox[index]}
+                                  onOpenChange={(val) =>
+                                    setOpenCombobox((prev) => ({
+                                      ...prev,
+                                      [index]: val,
+                                    }))
+                                  }>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        className={cn(
+                                          "w-full justify-between h-9 text-xs font-normal bg-slate-50 border-dashed",
+                                          !field.value &&
+                                            "text-muted-foreground",
+                                        )}>
+                                        {field.value
+                                          ? products.find(
+                                              (p) => p.id === field.value,
+                                            )?.name
+                                          : "Link to Master Product..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent
+                                    className="w-75 p-0"
+                                    align="start">
+                                    <Command>
+                                      <CommandInput placeholder="Search by name or SKU..." />
+                                      <CommandList>
+                                        <CommandEmpty>
+                                          Product not found.
+                                        </CommandEmpty>
+                                        <CommandGroup>
+                                          {products.map((p) => (
+                                            <CommandItem
+                                              key={p.id}
+                                              value={`${p.name} ${p.sku}`}
+                                              onSelect={() => {
+                                                field.onChange(p.id);
+
+                                                // Reset varian
+                                                form.setValue(
+                                                  `items.${index}.variantId`,
+                                                  "",
+                                                );
+                                                form.setValue(
+                                                  `items.${index}.selectedAttributes`,
+                                                  {},
+                                                );
+
+                                                // Auto fill nama, stock, uom, price
+                                                form.setValue(
+                                                  `items.${index}.itemName`,
+                                                  p.name,
+                                                );
+                                                form.setValue(
+                                                  `items.${index}.quantityStock`,
+                                                  p.stock || 0,
+                                                );
+                                                form.setValue(
+                                                  `items.${index}.uom`,
+                                                  p.uom || "pcs",
+                                                );
+                                                form.setValue(
+                                                  `items.${index}.unitPrice`,
+                                                  p.productVariants?.length
+                                                    ? 0
+                                                    : Number(p.basePrice),
+                                                );
+                                                recalculateQtyPurchase(index);
+
+                                                setOpenCombobox((prev) => ({
+                                                  ...prev,
+                                                  [index]: false,
+                                                }));
+                                              }}>
+                                              <Check
+                                                className={cn(
+                                                  "mr-2 h-4 w-4",
+                                                  p.id === field.value
+                                                    ? "opacity-100"
+                                                    : "opacity-0",
+                                                )}
+                                              />
+                                              <div className="flex flex-col">
+                                                <span>{p.name}</span>
+                                                <span className="text-[10px] text-gray-500">
+                                                  SKU: {p.sku}
+                                                </span>
+                                              </div>
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
+                                <FormMessage />
                               </FormItem>
                             )}
                           />
+
+                          {/* Info SKU & UOM */}
+                          {selectedProduct && (
+                            <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-1">
+                              <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                SKU:{" "}
+                                <span className="font-medium text-slate-700">
+                                  {selectedProduct.sku || "-"}
+                                </span>
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {/* 2. Order Reference (SO/SN) */}
@@ -609,31 +752,102 @@ export default function AddPurchaseOrderForm() {
                             control={control}
                             name={`items.${index}.orderId`}
                             render={({ field }) => (
-                              <FormItem>
+                              <FormItem className="flex flex-col">
                                 <FormLabel className="lg:hidden">
                                   Reference SO
                                 </FormLabel>
-                                <Select
-                                  value={field.value}
-                                  onValueChange={field.onChange}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-10">
-                                      <SelectValue placeholder="Link to SO..." />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem
-                                      value="none"
-                                      className="text-muted-foreground italic">
-                                      -- No Reference --
-                                    </SelectItem>
-                                    {orders.map((o) => (
-                                      <SelectItem key={o.id} value={o.id}>
-                                        {o.orderNumber}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                <Popover
+                                  open={openOrderCombobox[index]}
+                                  onOpenChange={(val) =>
+                                    setOpenOrderCombobox((prev) => ({
+                                      ...prev,
+                                      [index]: val,
+                                    }))
+                                  }>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        className={cn(
+                                          "w-full justify-between h-10 font-normal bg-white",
+                                          !field.value &&
+                                            "text-muted-foreground",
+                                        )}>
+                                        {field.value && field.value !== "none"
+                                          ? orders.find(
+                                              (o) => o.id === field.value,
+                                            )?.orderNumber
+                                          : "Link to SO..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent
+                                    className="w-full p-0"
+                                    align="start">
+                                    <Command>
+                                      <CommandInput placeholder="Search SO number..." />
+                                      <CommandList>
+                                        <CommandEmpty>
+                                          No order found.
+                                        </CommandEmpty>
+                                        <CommandGroup>
+                                          {/* Opsi Kosong (No Reference) */}
+                                          <CommandItem
+                                            value="none"
+                                            onSelect={() => {
+                                              field.onChange("");
+                                              setOpenOrderCombobox((prev) => ({
+                                                ...prev,
+                                                [index]: false,
+                                              }));
+                                            }}>
+                                            <Check
+                                              className={cn(
+                                                "mr-2 h-4 w-4",
+                                                !field.value ||
+                                                  field.value === "none"
+                                                  ? "opacity-100"
+                                                  : "opacity-0",
+                                              )}
+                                            />
+                                            <span className="text-muted-foreground italic">
+                                              -- No Reference --
+                                            </span>
+                                          </CommandItem>
+
+                                          {/* Daftar Referensi Order */}
+                                          {orders.map((o) => (
+                                            <CommandItem
+                                              key={o.id}
+                                              value={o.orderNumber}
+                                              onSelect={() => {
+                                                field.onChange(o.id);
+                                                setOpenOrderCombobox(
+                                                  (prev) => ({
+                                                    ...prev,
+                                                    [index]: false,
+                                                  }),
+                                                );
+                                              }}>
+                                              <Check
+                                                className={cn(
+                                                  "mr-2 h-4 w-4",
+                                                  o.id === field.value
+                                                    ? "opacity-100"
+                                                    : "opacity-0",
+                                                )}
+                                              />
+                                              {o.orderNumber}
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
+                                <FormMessage />
                               </FormItem>
                             )}
                           />
@@ -727,20 +941,17 @@ export default function AddPurchaseOrderForm() {
                                 </FormLabel>
                                 <FormControl>
                                   <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-xs text-slate-500">
+                                    <span className="absolute left-3 top-2.5 text-xs text-slate-500 font-medium">
                                       {currentCurrencySymbol}
                                     </span>
                                     <Input
-                                      type="text"
-                                      inputMode="decimal"
+                                      type="number"
                                       min={0}
+                                      step="any"
                                       {...field}
-                                      value={field.value || ""}
                                       onChange={(e) => {
-                                        const val = e.target.value
-                                          .replace(",", ".")
-                                          .replace(/[^\d.]/g, "");
-                                        field.onChange(parseFloat(val) || 0);
+                                        const val = e.target.valueAsNumber;
+                                        field.onChange(isNaN(val) ? 0 : val);
                                       }}
                                       className="pl-9 h-10 text-right font-mono"
                                       placeholder="0.00"
@@ -801,6 +1012,58 @@ export default function AddPurchaseOrderForm() {
                         </div>
                       </div>
 
+                      {selectedProduct?.availableAttributes &&
+                        selectedProduct.availableAttributes.length > 0 && (
+                          <div className="px-4 pb-4">
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                              <p className="text-xs font-semibold text-slate-700 mb-3">
+                                Pilih Varian Produk:
+                              </p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                {selectedProduct.availableAttributes.map(
+                                  (attr) => (
+                                    <div
+                                      key={attr.attributeId}
+                                      className="flex flex-col space-y-1.5">
+                                      <label className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                                        {attr.attributeName}
+                                      </label>
+                                      <Select
+                                        value={
+                                          currentSelectedAttrs[
+                                            attr.attributeId
+                                          ] || ""
+                                        }
+                                        onValueChange={(val) =>
+                                          handleAttributeSelect(
+                                            attr.attributeId,
+                                            val,
+                                          )
+                                        }>
+                                        <SelectTrigger className="h-9 text-sm bg-white border-slate-300 w-full">
+                                          <SelectValue
+                                            className="w-full"
+                                            placeholder={`Pilih ${attr.attributeName}`}
+                                          />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {attr.values.map((val) => (
+                                            <SelectItem
+                                              key={val.valueId}
+                                              value={val.valueId}>
+                                              {val.value}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                       {/* Remarks (Baris Bawah per Item) */}
                       <div className="bg-slate-50/50 p-3 lg:px-4 lg:py-3 border-t">
                         <FormField
@@ -829,7 +1092,6 @@ export default function AddPurchaseOrderForm() {
                 })}
               </div>
             </div>
-
             <div className="flex justify-end pt-4">
               <Button
                 type="submit"
