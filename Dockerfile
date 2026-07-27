@@ -1,23 +1,30 @@
-# Gunakan image Bun resmi versi stabil
 FROM oven/bun:1.1.38 AS base
 
 WORKDIR /app
 
+# 1. Install dependencies dasar, C++, dan Node.js 20+ resmi agar Prisma tidak protes
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
     openssl \
-    build-essential && \
+    build-essential \
+    curl \
+    gnupg && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
+# 2. Copy dependency files
 COPY package.json bun.lock* ./
 
+# 3. Install dependencies dan trust argon2
 RUN bun install --frozen-lockfile && bun pm trust argon2
 
+# 4. Copy seluruh kode source 
 COPY . .
 
-# 5. Generate Prisma Client (Solusi error Prisma)
+# 5. Generate Prisma Client
 RUN bunx prisma generate
 
 # 6. Build Next.js
@@ -30,7 +37,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN bun run build
 
-# 7. Cleanup (reduce image size)
+# 7. Cleanup
 RUN rm -rf .next/cache
 
 # 8. Expose port & Start
