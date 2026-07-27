@@ -1056,7 +1056,6 @@ export default function AddOrderForm() {
               />
             </div>
             {/* === SECTION 5: PRODUCTS === */}
-            {/* === SECTION 5: PRODUCTS === */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold text-xl text-gray-800">

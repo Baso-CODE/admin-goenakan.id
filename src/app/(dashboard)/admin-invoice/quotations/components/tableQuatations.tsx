@@ -1,8 +1,16 @@
 "use client";
 
+import { ConfirmDeleteDialog } from "@/app/(dashboard)/components/confirmDeleteDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -25,8 +33,19 @@ import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
-import { Eye, FileText, Plus, Search, User, UserCheck } from "lucide-react";
+import {
+  Eye,
+  FileText,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  User,
+  UserCheck,
+} from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -142,6 +161,7 @@ const renderFollowUpProgress = (
 
 export default function QuotationsTable() {
   const { fetchApi, status } = useApi();
+  const router = useRouter();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
@@ -149,6 +169,10 @@ export default function QuotationsTable() {
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+
+  // ✨ State untuk delete dialog
+  const [deleteTarget, setDeleteTarget] = useState<Quotation | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchQuotations = useCallback(async () => {
     if (status === "loading" || status === "unauthenticated") return;
@@ -174,6 +198,28 @@ export default function QuotationsTable() {
   useEffect(() => {
     fetchQuotations();
   }, [fetchQuotations]);
+
+  // ✨ Handler delete
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetchApi(`/quotations/${deleteTarget.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Gagal menghapus quotation");
+      toast.success(
+        `Quotation ${deleteTarget.quotationNumber} berhasil dihapus`,
+      );
+      setDeleteTarget(null);
+      fetchQuotations();
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal menghapus quotation");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-6 w-full mx-auto pb-10">
@@ -247,7 +293,6 @@ export default function QuotationsTable() {
         <CardContent className="p-0">
           <div className="rounded-md border overflow-x-auto">
             <Table className="min-w-600">
-              {/* Lebar disesuaikan agar kolom audit muat */}
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="w-28">Tanggal</TableHead>
@@ -432,17 +477,50 @@ export default function QuotationsTable() {
                         )}
                       </TableCell>
 
-                      {/* --- Sticky Action --- */}
+                      {/* ✨ --- Sticky Action: Dropdown 3 titik --- */}
                       <TableCell className="text-center sticky right-0 bg-white border-l shadow-md">
-                        <Link
-                          href={`/admin-invoice/quotations/detail/${quo.id}`}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-gray-500 hover:text-blue-600 hover:bg-blue-50">
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                        </Link>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-gray-500 hover:text-gray-800 hover:bg-gray-100">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem
+                              onClick={() =>
+                                router.push(
+                                  `/admin-invoice/quotations/detail/${quo.id}`,
+                                )
+                              }
+                              className="cursor-pointer gap-2">
+                              <Eye className="h-3.5 w-3.5 text-blue-500" />
+                              <span>Detail</span>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={() =>
+                                router.push(
+                                  `/admin-invoice/quotations/edit/${quo.id}`,
+                                )
+                              }
+                              className="cursor-pointer gap-2">
+                              <Pencil className="h-3.5 w-3.5 text-amber-500" />
+                              <span>Edit</span>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+
+                            <DropdownMenuItem
+                              onClick={() => setDeleteTarget(quo)}
+                              className="cursor-pointer gap-2 text-red-600 focus:text-red-600 focus:bg-red-50">
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span>Hapus</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
@@ -457,8 +535,8 @@ export default function QuotationsTable() {
       {meta && (
         <div className="flex items-center justify-between px-2 pt-4">
           <div className="text-xs text-muted-foreground">
-            Halaman <strong>{meta.page}</strong> dari
-            <strong>{meta.totalPage}</strong> • Total
+            Halaman <strong>{meta.page}</strong> dari{" "}
+            <strong>{meta.totalPage}</strong> • Total{" "}
             <strong>{meta.total}</strong> Data
           </div>
           <div className="flex gap-2">
@@ -481,6 +559,17 @@ export default function QuotationsTable() {
           </div>
         </div>
       )}
+
+      {/* ✨ Confirm Delete Dialog */}
+      <ConfirmDeleteDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        isLoading={isDeleting}
+        title="Hapus Quotation?"
+        description={`Quotation ${deleteTarget?.quotationNumber} akan dihapus permanen.`}
+        warningMessage="Semua data item dan notes terkait juga akan ikut terhapus."
+      />
     </div>
   );
 }

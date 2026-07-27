@@ -6,7 +6,9 @@ import {
   Banknote,
   Box,
   CalendarIcon,
+  Check,
   ChevronDown,
+  ChevronsUpDown,
   ImageIcon,
   Layers,
   Loader2,
@@ -29,6 +31,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Dialog,
   DialogContent,
@@ -68,10 +78,17 @@ import {
 } from "./helper/quotationNotesSection";
 import { ClientData, NoteCategory, ProductData } from "./quotationForm";
 
-type SalesData = { id: string; name: string };
-type Currency = { code: string; name: string; symbol: string };
+export type Currency = { code: string; name: string; symbol: string };
 
-const QUOTATION_STATUSES = ["DRAFT", "SENT", "FOLLOW_UP"] as const;
+const QUOTATION_STATUSES = [
+  "DRAFT",
+  "SENT",
+  "FOLLOW_UP",
+  "ACCEPTED",
+  "REJECTED",
+  "EXPIRED",
+  "CANCELLED",
+] as const;
 
 const quotationSchema = z.object({
   date: z.date(),
@@ -96,6 +113,7 @@ const quotationSchema = z.object({
         productId: z.string().optional(),
         variantId: z.string().optional(),
         productName: z.string().min(1, "Product name is required"),
+        selectedAttributes: z.record(z.string(), z.string()).optional(),
         description: z.string().optional(),
         discount: z.coerce.number().min(0).default(0),
         remarks: z.string().optional(),
@@ -117,7 +135,7 @@ const quotationSchema = z.object({
 export type AddQuotationFormValues = z.infer<typeof quotationSchema>;
 
 // ============================================================
-// SUB-COMPONENT: ItemRow (Tetap sama seperti yang Anda buat)
+// SUB-COMPONENT: ItemRow Add Quotation
 // ============================================================
 function ItemRow({
   index,
@@ -140,11 +158,16 @@ function ItemRow({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [openCombobox, setOpenCombobox] = useState(false);
+
   const isManualProduct = form.watch(`items.${index}.isManualProduct`);
   const selectedProductId = form.watch(`items.${index}.productId`);
   const selectedProduct = products.find((p: any) => p.id === selectedProductId);
-  const isCustomProduct = selectedProduct?.isCustom;
-  const productVariants = selectedProduct?.productVariants || [];
+
+  const currentVariantId = form.watch(`items.${index}.variantId`);
+  const currentSelectedAttrs =
+    form.watch(`items.${index}.selectedAttributes`) || {};
+
   const {
     fields: tierFields,
     append: appendTier,
@@ -164,15 +187,56 @@ function ItemRow({
     }
   }, [imageFile]);
 
+  const handleAttributeSelect = (attributeId: string, valueId: string) => {
+    const newAttrs = {
+      ...currentSelectedAttrs,
+      [attributeId]: valueId,
+    };
+    form.setValue(`items.${index}.selectedAttributes`, newAttrs);
+
+    if (selectedProduct?.productVariants) {
+      const selectedValIds = Object.values(newAttrs);
+
+      const matchedVariant = [...selectedProduct.productVariants]
+        .sort((a, b) => b.combinationIds.length - a.combinationIds.length)
+        .find(
+          (v: any) =>
+            v.combinationIds.length > 0 &&
+            v.combinationIds.every((id: string) => selectedValIds.includes(id)),
+        );
+
+      if (matchedVariant) {
+        form.setValue(`items.${index}.variantId`, matchedVariant.id);
+        form.setValue(`items.${index}.unitPrice`, Number(matchedVariant.price));
+      } else {
+        form.setValue(`items.${index}.variantId`, undefined);
+        form.setValue(
+          `items.${index}.unitPrice`,
+          Number(selectedProduct.basePrice),
+        );
+      }
+    }
+  };
+
   return (
     <div className="border rounded-lg bg-white shadow-sm transition-all duration-200">
+      {/* --- BARIS UTAMA (GRID) --- */}
       <div className="grid grid-cols-12 gap-3 items-start p-3">
+        {/* Toggle Manual/DB */}
         <div className="col-span-1 flex flex-col items-center gap-1 mt-1.5">
           <Switch
             checked={!!isManualProduct}
-            onCheckedChange={(v) =>
-              form.setValue(`items.${index}.isManualProduct`, v)
-            }
+            onCheckedChange={(v) => {
+              form.setValue(`items.${index}.isManualProduct`, v);
+              // Reset nilai saat switch diubah
+              if (v) {
+                form.setValue(`items.${index}.productId`, "");
+                form.setValue(`items.${index}.variantId`, undefined);
+                form.setValue(`items.${index}.selectedAttributes`, {});
+              } else {
+                form.setValue(`items.${index}.productName`, "");
+              }
+            }}
             className="scale-75"
           />
           <span className="text-[10px] uppercase font-bold text-muted-foreground">
@@ -180,75 +244,117 @@ function ItemRow({
           </span>
         </div>
 
+        {/* Input Produk */}
         <div className="col-span-4 flex flex-col gap-2">
           {isManualProduct ? (
             <Input
-              placeholder="Nama barang/jasa..."
+              placeholder="Nama barang/jasa manual..."
+              className="h-10"
               {...form.register(`items.${index}.productName`)}
             />
           ) : (
-            <>
-              <Select
-                value={selectedProductId || ""}
-                onValueChange={(v) => {
-                  const p = products.find((x: any) => x.id === v);
-                  if (p) {
-                    form.setValue(`items.${index}.productId`, p.id);
-                    form.setValue(`items.${index}.productName`, p.name);
-                    form.setValue(`items.${index}.variantId`, undefined);
-                    form.setValue(`items.${index}.unitPrice`, p.basePrice);
-                    if (p.description) {
-                      form.setValue(
-                        `items.${index}.description`,
-                        p.description,
-                      );
-                      setExpanded(true);
-                    }
-                  }
-                }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih Produk..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((p: any) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-1">
+              <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className={cn(
+                      "w-full justify-between h-10 font-normal bg-white",
+                      !selectedProductId && "text-muted-foreground",
+                    )}>
+                    {selectedProductId
+                      ? selectedProduct?.name || "Produk Tidak Ditemukan"
+                      : "Cari Produk di Database..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-(--radix-popover-trigger-width) p-0"
+                  align="start">
+                  <Command>
+                    <CommandInput placeholder="Cari nama atau SKU produk..." />
+                    <CommandList>
+                      <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
+                      <CommandGroup>
+                        {products.map((p: any) => (
+                          <CommandItem
+                            key={p.id}
+                            value={`${p.name} ${p.sku || ""}`}
+                            onSelect={() => {
+                              form.setValue(`items.${index}.productId`, p.id);
+                              form.setValue(
+                                `items.${index}.productName`,
+                                p.name,
+                              );
 
-              {isCustomProduct && (
-                <div className="relative pl-4 mt-0.5 before:content-[''] before:absolute before:left-1.5 before:top-0 before:w-px before:h-4 before:bg-blue-300 before:border-l before:border-blue-300">
-                  <div className="absolute left-1.5 top-4 w-2.5 h-px bg-blue-300"></div>
-                  <Select
-                    value={form.watch(`items.${index}.variantId`) || ""}
-                    onValueChange={(vid) => {
-                      form.setValue(`items.${index}.variantId`, vid);
-                      const variant = productVariants.find(
-                        (v: any) => v.id === vid,
-                      );
-                      if (variant && variant.price) {
-                        form.setValue(
-                          `items.${index}.unitPrice`,
-                          Number(variant.price),
-                        );
-                      }
-                    }}>
-                    <SelectTrigger className="h-8 bg-slate-50 border-slate-200 text-xs shadow-none">
-                      <SelectValue placeholder="Pilih Spesifikasi Variant..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {productVariants.map((v: any) => (
-                        <SelectItem key={v.id} value={v.id}>
-                          {v.variantName} {v.price ? `- Rp ${v.price}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                              // Reset Varian
+                              form.setValue(
+                                `items.${index}.variantId`,
+                                undefined,
+                              );
+                              form.setValue(
+                                `items.${index}.selectedAttributes`,
+                                {},
+                              );
+
+                              form.setValue(
+                                `items.${index}.unitPrice`,
+                                p.productVariants?.length
+                                  ? 0
+                                  : Number(p.basePrice),
+                              );
+
+                              // Set Deskripsi jika ada
+                              if (p.description) {
+                                form.setValue(
+                                  `items.${index}.description`,
+                                  p.description,
+                                );
+                                setExpanded(true); // Buka panel bawah otomatis
+                              }
+
+                              setOpenCombobox(false);
+                            }}>
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4 shrink-0",
+                                p.id === selectedProductId
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span>{p.name}</span>
+                              <span className="text-[10px] text-gray-500">
+                                SKU: {p.sku || "-"}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              {selectedProduct && (
+                <div className="flex items-center gap-2 text-[10px] text-slate-500 pl-1">
+                  <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                    SKU:{" "}
+                    <span className="font-medium text-slate-700">
+                      {selectedProduct.sku || "-"}
+                    </span>
+                  </span>
+                  <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                    UOM:{" "}
+                    <span className="font-medium text-slate-700">
+                      {selectedProduct.uom || "-"}
+                    </span>
+                  </span>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
 
@@ -258,7 +364,7 @@ function ItemRow({
             <Input
               type="number"
               placeholder="0"
-              className="pr-10"
+              className="pr-10 h-10 text-center"
               {...form.register(`items.${index}.quantity`)}
             />
             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
@@ -273,6 +379,7 @@ function ItemRow({
             <Input
               type="number"
               placeholder="0"
+              className="h-10 text-right pr-2"
               {...form.register(`items.${index}.unitPrice`)}
             />
           </div>
@@ -287,13 +394,14 @@ function ItemRow({
             <Input
               type="number"
               placeholder="0"
-              className="pl-9"
+              className="pl-9 h-10 text-right pr-2"
               {...form.register(`items.${index}.discount`)}
             />
           </div>
         </div>
 
-        <div className="col-span-1 flex items-center justify-end gap-1 mt-1">
+        {/* Actions */}
+        <div className="col-span-1 flex items-center justify-end gap-1 mt-1.5">
           <Button
             type="button"
             variant="ghost"
@@ -318,6 +426,50 @@ function ItemRow({
           </Button>
         </div>
       </div>
+
+      {/* --- AREA FULL-WIDTH: PILIHAN ATRIBUT/VARIAN --- */}
+      {!isManualProduct &&
+        selectedProduct?.availableAttributes &&
+        selectedProduct.availableAttributes.length > 0 && (
+          <div className="px-3 pb-3">
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <p className="text-xs font-semibold text-slate-700 mb-2">
+                Pilih Varian Produk:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {selectedProduct.availableAttributes.map((attr: any) => (
+                  <div
+                    key={attr.attributeId}
+                    className="flex flex-col space-y-1">
+                    <label className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                      {attr.attributeName}
+                    </label>
+                    <Select
+                      value={currentSelectedAttrs[attr.attributeId] || ""}
+                      onValueChange={(val) =>
+                        handleAttributeSelect(attr.attributeId, val)
+                      }>
+                      <SelectTrigger className="h-8 text-xs bg-white border-slate-300 w-full shadow-none">
+                        <SelectValue
+                          placeholder={`Pilih ${attr.attributeName}`}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {attr.values.map((val: any) => (
+                          <SelectItem key={val.valueId} value={val.valueId}>
+                            {val.value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+      {/* --- AREA TIERS --- */}
       <div className="p-3 bg-slate-50/50 border-t">
         <div className="flex items-center justify-between mb-2 px-1">
           <span className="text-[11px] font-semibold text-slate-500 uppercase flex items-center gap-1.5">
@@ -403,6 +555,8 @@ function ItemRow({
           ))}
         </div>
       </div>
+
+      {/* --- AREA EXPANDED (DESKRIPSI, GAMBAR DLL) --- */}
       {expanded && (
         <div className="border-t bg-gray-50/50 px-4 pb-4 pt-3 rounded-b-lg space-y-4">
           <div>
@@ -565,6 +719,7 @@ export default function QuotationAddForm({
   const [itemImages, setItemImages] = useState<Record<number, File | null>>({});
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [isClientAddModalOpen, setIsClientAddModalOpen] = useState(false);
+  const [openClientCombobox, setOpenClientCombobox] = useState(false);
 
   const form = useForm<AddQuotationFormValues>({
     resolver: zodResolver(quotationSchema) as Resolver<AddQuotationFormValues>,
@@ -637,7 +792,6 @@ export default function QuotationAddForm({
 
   useEffect(() => {
     fetchMaster();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
   const handleImageChange = (index: number, file: File | null) => {
@@ -887,44 +1041,86 @@ export default function QuotationAddForm({
                       control={form.control}
                       name="clientId"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex flex-col">
                           <FormLabel>Pilih Client dari Database *</FormLabel>
-                          <Select
-                            onValueChange={(val) => {
-                              field.onChange(val);
-                              const client = clients.find((c) => c.id === val);
-                              if (client) {
-                                setSelectedClient(client);
-                                form.setValue("picId", "");
-                              }
-                            }}
-                            value={field.value ?? ""}
-                            disabled={loadingMaster}>
-                            <FormControl>
-                              <SelectTrigger className="bg-white h-11 border-blue-200">
-                                <SelectValue
-                                  placeholder={
-                                    loadingMaster
+                          <Popover
+                            open={openClientCombobox}
+                            onOpenChange={setOpenClientCombobox}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  disabled={loadingMaster}
+                                  className={cn(
+                                    "w-full justify-between bg-white h-11 border-blue-200 font-normal",
+                                    !field.value && "text-muted-foreground",
+                                  )}>
+                                  {field.value
+                                    ? (() => {
+                                        const c = clients.find(
+                                          (client) => client.id === field.value,
+                                        );
+                                        return c
+                                          ? `${c.name} (${c.type})`
+                                          : "Pilih Client...";
+                                      })()
+                                    : loadingMaster
                                       ? "Memuat data client..."
-                                      : "Ketik & Cari Client di Database..."
-                                  }
-                                />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {clients.map((c) => (
-                                <SelectItem key={c.id} value={c.id}>
-                                  {c.name} ({c.type}){" "}
-                                  {c.status ? `- ${c.status}` : ""}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                                      : "Ketik & Cari Client di Database..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-(--radix-popover-trigger-width) p-0"
+                              align="start">
+                              <Command>
+                                <CommandInput placeholder="Cari nama client, tipe, atau kode..." />
+                                <CommandList>
+                                  <CommandEmpty>
+                                    Client tidak ditemukan.
+                                  </CommandEmpty>
+                                  <CommandGroup>
+                                    {clients.map((c) => (
+                                      <CommandItem
+                                        key={c.id}
+                                        value={`${c.name} ${c.type} ${c.custCode || ""}`}
+                                        onSelect={() => {
+                                          field.onChange(c.id);
+                                          setSelectedClient(c);
+                                          form.setValue("picId", "");
+                                          setOpenClientCombobox(false);
+                                        }}>
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4 shrink-0",
+                                            c.id === field.value
+                                              ? "opacity-100"
+                                              : "opacity-0",
+                                          )}
+                                        />
+                                        <div className="flex flex-col">
+                                          <span>
+                                            {c.name} ({c.type})
+                                          </span>
+                                          {c.status && (
+                                            <span className="text-[10px] text-muted-foreground">
+                                              Status: {c.status}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
                     {selectedClient && (
                       <div className="rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 animate-in fade-in slide-in-from-top-1 overflow-hidden">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
