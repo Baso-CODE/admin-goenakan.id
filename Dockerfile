@@ -18,8 +18,8 @@ RUN apt-get update && apt-get install -y \
 # 2. Copy dependency files
 COPY package.json bun.lock* ./
 
-# 3. Install dependencies dan trust argon2
-RUN bun install --frozen-lockfile && bun pm trust argon2
+# 3. Install dependencies (ditambah --ignore-scripts agar tidak error saat build argon2)
+RUN bun install --frozen-lockfile --ignore-scripts
 
 # 4. Copy seluruh kode source 
 COPY . .
