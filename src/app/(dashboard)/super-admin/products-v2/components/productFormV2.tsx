@@ -30,6 +30,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ColorValueInput } from "@/components/ui/color-value-input";
 import {
   Popover,
   PopoverContent,
@@ -51,7 +53,7 @@ import { AddItemCategoryModal } from "../../item-categories-product/components/a
 import { AddItemNameModal } from "../../item-names-product/components/addItemNameModal";
 import CreateCategoryModal from "../../product-categories/components/createCategoryModal";
 import MaterialTypeForm from "../../product-materials/components/materialTypeForm";
-import { AttributeSelector } from "./AttributeSelector";
+import { AttributeSelector, ModelShapeValueInput } from "./AttributeSelector";
 import { PriceTiers } from "./PriceTiers";
 import { ProductFormValues } from "./product.schema";
 import { UploadImages } from "./upload-images";
@@ -61,6 +63,7 @@ import { ProductMockupModal } from "./ProductMockupModal";
 import { MockupAreaSelector } from "./MockupAreaSelector";
 import { TagCategoryManagerModal } from "./TagCategoryManagerModal";
 import { toast } from "sonner";
+import { parseColorValue } from "@/utils/colorConverter";
 
 export default function ProductFormV2({
   onSubmit,
@@ -79,6 +82,10 @@ export default function ProductFormV2({
   const [tempAttributeSelections, setTempAttributeSelections] = useState<any[]>([]);
   const [tempFullAttrs, setTempFullAttrs] = useState<any[]>([]);
   const [globalStock, setGlobalStock] = useState<string>("");
+  const [inlineInputAttrId, setInlineInputAttrId] = useState<string | null>(null);
+  const [inlineInputGroupId, setInlineInputGroupId] = useState<string | null>(null);
+  const [inlineInputValue, setInlineInputValue] = useState<string>("");
+  const [inlineInputPrice, setInlineInputPrice] = useState<string>("");
 
   const [mockupSides, setMockupSides] = useState<any[]>([]);
   const handleAddMockupSide = () => {
@@ -1312,7 +1319,308 @@ export default function ProductFormV2({
         </Form>
       </CardContent>
 
-      {/* MODALS */}
+           {/* CHECKLIST GROUPED FILTER MODAL */}
+      <Dialog open={state.isGenModalOpen} onOpenChange={state.isGenModalOpen ? () => setters.setIsGenModalOpen(false) : setters.setIsGenModalOpen}>
+        <DialogContent className="max-w-3xl bg-white border shadow-2xl rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-extrabold text-slate-900">
+              Atur Filter Kombinasi Varian
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-500 mt-1.5">
+              Pilih kombinasi atribut yang valid untuk masing-masing item utama di bawah ini.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[60vh] overflow-y-auto space-y-6 pr-2 py-4">
+            {(() => {
+              const variantGeneratingSelections = state.attributeSelections.filter((a: any) => a.isVariantGenerator !== false);
+              const primarySelection = variantGeneratingSelections[0];
+              const otherSelections = variantGeneratingSelections.slice(1);
+              const primaryAttr = state.attributesList.find((a: any) => a.id === primarySelection?.attributeId);
+
+              if (!primarySelection || !primaryAttr) return null;
+
+              return primarySelection.valueIds.map((primValId: string) => {
+                const primVal = primaryAttr.values.find((v: any) => v.id === primValId);
+                if (!primVal) return null;
+
+                const primValLabel = primVal.value.split("|")[0];
+
+                return (
+                  <div key={primValId} className="border rounded-xl p-5 bg-stone-50/50 space-y-4">
+                    <div className="flex justify-between items-center border-b pb-2">
+                      <h4 className="font-bold text-slate-900 flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-indigo-650"></span>
+                        {primaryAttr.name}: {primValLabel}
+                      </h4>
+                      <div className="space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          onClick={() => {
+                            setters.setActiveGroupFilters((prev: any) => {
+                              const next = { ...prev };
+                              next[primValId] = {};
+                              otherSelections.forEach((sel: any) => {
+                                next[primValId][sel.attributeId] = [...sel.valueIds];
+                              });
+                              return next;
+                            });
+                          }}
+                          className="text-[10px] h-6 px-2 font-bold"
+                        >
+                          Pilih Semua
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          onClick={() => {
+                            setters.setActiveGroupFilters((prev: any) => {
+                              const next = { ...prev };
+                              next[primValId] = {};
+                              otherSelections.forEach((sel: any) => {
+                                next[primValId][sel.attributeId] = [];
+                              });
+                              return next;
+                            });
+                          }}
+                          className="text-[10px] h-6 px-2 font-bold text-red-650 hover:bg-red-50"
+                        >
+                          Kosongkan
+                        </Button>
+                      </div>
+                    </div>
+
+                    {otherSelections.length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">Tidak ada sub-atribut untuk difilter.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {otherSelections.map((sel: any) => {
+                          const attr = state.attributesList.find((a: any) => a.id === sel.attributeId);
+                          if (!attr) return null;
+
+                          const activeList = state.activeGroupFilters[primValId]?.[sel.attributeId] || [];
+
+                          return (
+                            <div key={sel.attributeId} className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{attr.name}</span>
+                                {!(inlineInputAttrId === sel.attributeId && inlineInputGroupId === primValId) && (
+                                  <Button
+                                    type="button"
+                                    variant="link"
+                                    size="sm"
+                                    className="text-[10px] p-0 h-auto font-bold text-primary hover:text-primary/90"
+                                    onClick={() => {
+                                      setInlineInputAttrId(sel.attributeId);
+                                      setInlineInputGroupId(primValId);
+                                      setInlineInputValue("");
+                                      setInlineInputPrice("");
+                                    }}
+                                  >
+                                    + Tambah Nilai
+                                  </Button>
+                                )}
+                              </div>
+
+                              {inlineInputAttrId === sel.attributeId && inlineInputGroupId === primValId && (
+                                <div className="p-3 border border-stone-200 bg-stone-50/50 rounded-xl space-y-3 w-full max-w-sm">
+                                  <span className="text-[10px] font-bold text-stone-700 uppercase tracking-wider block">
+                                    Tambah Nilai untuk {attr.name}
+                                  </span>
+                                  {attr.type === "COLOR" ? (
+                                    <ColorValueInput
+                                      value={inlineInputValue}
+                                      onChange={(val) => setInlineInputValue(val)}
+                                    />
+                                  ) : attr.type === "MODEL_SHAPE" ? (
+                                    <ModelShapeValueInput
+                                      value={inlineInputValue}
+                                      onChange={(val) => setInlineInputValue(val)}
+                                    />
+                                  ) : (
+                                    <Input
+                                      type="text"
+                                      placeholder="Masukkan nilai baru..."
+                                      value={inlineInputValue}
+                                      onChange={(e: any) => setInlineInputValue(e.target.value)}
+                                      className="h-8 text-xs bg-white text-slate-800"
+                                      autoFocus
+                                    />
+                                  )}
+
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                      Penyesuaian Harga (Opsional)
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Contoh: 5000 atau -2000"
+                                      value={inlineInputPrice}
+                                      onChange={(e: any) => setInlineInputPrice(e.target.value)}
+                                      className="h-8 text-xs bg-white text-slate-800"
+                                    />
+                                  </div>
+
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 px-3 text-xs text-stone-500 font-bold border-stone-250 bg-white"
+                                      onClick={() => {
+                                        setInlineInputAttrId(null);
+                                        setInlineInputGroupId(null);
+                                        setInlineInputValue("");
+                                        setInlineInputPrice("");
+                                      }}
+                                    >
+                                      Batal
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      className="h-7 px-3 text-xs bg-primary hover:bg-primary/90 text-white font-bold"
+                                      onClick={async () => {
+                                        if (!inlineInputValue.trim()) return;
+                                        await handlers.handleAddAttributeValueInline(
+                                          sel.attributeId,
+                                          inlineInputValue,
+                                          primValId,
+                                          inlineInputPrice
+                                        );
+                                        setInlineInputAttrId(null);
+                                        setInlineInputGroupId(null);
+                                        setInlineInputValue("");
+                                        setInlineInputPrice("");
+                                      }}
+                                    >
+                                      Simpan
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="flex flex-wrap gap-2">
+                                {attr.values
+                                  .filter((v: any) => sel.valueIds.includes(v.id))
+                                  .map((v: any) => {
+                                    const isChecked = activeList.includes(v.id);
+                                    
+                                    const isColorType = attr.type === "COLOR";
+                                    const isModelShape = attr.type === "MODEL_SHAPE";
+
+                                    const priceMod = sel.priceModifiers?.[v.id];
+                                    const priceModLabel = priceMod && Number(priceMod) !== 0
+                                      ? ` (${Number(priceMod) > 0 ? "+" : ""}Rp ${Number(priceMod).toLocaleString("id-ID")})`
+                                      : "";
+
+                                    let contentNode = null;
+
+                                    if (isColorType) {
+                                      const parsed = parseColorValue(v.value);
+                                      const isCustomColor = parsed.name.toLowerCase().includes("custom") || parsed.name.toLowerCase().includes("kustom");
+                                      contentNode = (
+                                        <span className="truncate flex items-center gap-1.5 flex-1 font-medium text-xs text-slate-700">
+                                          <span
+                                            className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0 shadow-inner"
+                                            style={{
+                                              background: isCustomColor
+                                                ? "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)"
+                                                : parsed.hex,
+                                            }}
+                                          />
+                                          <span className="truncate">{parsed.name || parsed.hex}{priceModLabel}</span>
+                                          {!isCustomColor && (
+                                            <span className="text-[9px] text-slate-450 font-mono shrink-0">
+                                              CMYK({parsed.cmyk.c},{parsed.cmyk.m},{parsed.cmyk.y},{parsed.cmyk.k})
+                                            </span>
+                                          )}
+                                        </span>
+                                      );
+                                    } else if (isModelShape) {
+                                      const p = v.value.split("|");
+                                      const mName = p[0] || "";
+                                      const mUrl = p[1] || "";
+                                      contentNode = (
+                                        <span className="truncate flex items-center gap-1.5 flex-1 font-medium text-xs text-slate-700">
+                                          {mUrl && (
+                                            <img
+                                              src={mUrl}
+                                              alt={mName}
+                                              className="w-4 h-4 object-cover rounded-sm border shrink-0 bg-slate-50"
+                                            />
+                                          )}
+                                          <span className="truncate">{mName}{priceModLabel}</span>
+                                        </span>
+                                      );
+                                    } else {
+                                      const label = v.value.split("|")[0];
+                                      contentNode = <span className="truncate font-medium text-xs text-slate-700">{label}{priceModLabel}</span>;
+                                    }
+
+                                    return (
+                                      <label
+                                        key={v.id}
+                                        className={`flex items-center space-x-2 border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer select-none transition-all ${
+                                          isChecked
+                                            ? "border-indigo-650 bg-indigo-50/50 text-indigo-750"
+                                            : "border-stone-200 bg-white hover:bg-stone-50 text-stone-600"
+                                        }`}
+                                      >
+                                        <Checkbox
+                                          checked={isChecked}
+                                          onCheckedChange={(checked) => {
+                                            setters.setActiveGroupFilters((prev: any) => {
+                                              const next = { ...prev };
+                                              const currentList = next[primValId]?.[sel.attributeId] || [];
+                                              if (checked) {
+                                                next[primValId][sel.attributeId] = [...currentList, v.id];
+                                              } else {
+                                                next[primValId][sel.attributeId] = currentList.filter((id: string) => id !== v.id);
+                                              }
+                                              return next;
+                                            });
+                                          }}
+                                          className="h-3.5 w-3.5 border-stone-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        {contentNode}
+                                      </label>
+                                    );
+                                  })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+          </div>
+
+          <DialogFooter className="mt-6 gap-2">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setters.setIsGenModalOpen(false)}
+              className="font-bold text-xs uppercase"
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={handlers.handleConfirmVariantGeneration}
+              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs uppercase"
+            >
+              Generate Varian Terpilih
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <CreateCategoryModal
         isOpen={state.isCategoryModalOpen}
         onClose={() => setters.setIsCategoryModalOpen(false)}

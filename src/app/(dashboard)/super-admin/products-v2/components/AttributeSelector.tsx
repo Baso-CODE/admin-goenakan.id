@@ -1645,12 +1645,12 @@ function LocalSubValuesEditor({
 
 // ===================== MODEL / SHAPE ATTRIBUTE VALUE IMAGE UPLOADER ===================== //
 
-interface ModelShapeValueInputProps {
+export interface ModelShapeValueInputProps {
   value: string;
   onChange: (val: string) => void;
 }
 
-function ModelShapeValueInput({ value, onChange }: ModelShapeValueInputProps) {
+export function ModelShapeValueInput({ value, onChange }: ModelShapeValueInputProps) {
   const parts = value ? value.split("|") : [];
   const name = parts[0] || "";
   const imageUrl = parts[1] || "";
