@@ -1,13 +1,14 @@
+# Gunakan image Bun resmi versi stabil
 FROM oven/bun:1.1.38 AS base
 
 WORKDIR /app
 
+# 1. Install Library C++ (Diperbarui: Menghapus paket libstdc++-12-dev yang tidak ditemukan)
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
-    openssl \
-    libstdc++-12-dev && \
+    openssl && \
     rm -rf /var/lib/apt/lists/*
 
 # 2. Copy dependency files
