@@ -3,21 +3,18 @@ FROM oven/bun:1.1.38 AS base
 
 WORKDIR /app
 
-# 1. Install Library C++ (Diperbarui: Menghapus paket libstdc++-12-dev yang tidak ditemukan)
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
-    openssl && \
+    openssl \
+    build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# 2. Copy dependency files
 COPY package.json bun.lock* ./
 
-# 3. Install dependencies dengan mode yang lebih aman dan toleran
-RUN bun install --frozen-lockfile --ignore-scripts || bun install --no-save
+RUN bun install --frozen-lockfile && bun pm trust argon2
 
-# 4. Copy seluruh kode source (Termasuk folder prisma/)
 COPY . .
 
 # 5. Generate Prisma Client (Solusi error Prisma)
