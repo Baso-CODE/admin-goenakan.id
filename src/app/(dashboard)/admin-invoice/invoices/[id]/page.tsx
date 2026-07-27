@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApi } from "@/hooks/useApi";
+import { formatCurrency } from "@/utils/formatCurrency";
 
 // === TYPES UPDATE ===
 type InvoiceDetail = {
@@ -60,8 +61,10 @@ type InvoiceDetail = {
   totalPreviousPaid?: number;
 
   order: {
-    poNumber: string;
+    orderNumber: string;
     totalAmount?: number;
+    currencyCode?: string;
+    salesCategory?: string;
     invoices?: {
       id: number;
       invoiceNumber: string | null;
@@ -70,16 +73,11 @@ type InvoiceDetail = {
       totalAmount: number;
       paidAt: string | null;
     }[];
-    sales: {
-      name: string;
-      phone: string;
-      signatureUrl: string | null;
-      bankAccounts: {
-        bankName: string;
-        accountNumber: string;
-        accountHolderName: string;
-      }[];
-    };
+    createdBy?: {
+      name: string | null;
+      phone: string | null;
+      image: string | null;
+    } | null;
   };
   client: {
     type: "B2B" | "B2C";
@@ -119,16 +117,6 @@ type InvoiceDetail = {
   }[];
 };
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-  })
-    .format(amount)
-    .replace("Rp", "Rp");
-};
-
 const renderCustomization = (customization: any) => {
   return null;
 };
@@ -147,7 +135,6 @@ export default function InvoiceDetailPage() {
   const router = useRouter();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  // const [isDownloading, setIsDownloading] = useState(false);
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("BANK_TRANSFER");
@@ -245,6 +232,9 @@ export default function InvoiceDetailPage() {
   const createdDate = new Date(invoice.createdAt);
   const displayInvoiceNo = invoice.invoiceNumber || `INV/${invoice.id}`;
 
+  // ✨ UPDATE: Ambil mata uang dari relasi order (default IDR jika kosong)
+  const currency = invoice.order?.currencyCode || "IDR";
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "PAID":
@@ -258,8 +248,11 @@ export default function InvoiceDetailPage() {
     }
   };
 
-  const salesData = invoice.order.sales;
-
+  const salesData = {
+    name: invoice.order?.createdBy?.name || "Admin / Sales",
+    phone: invoice.order?.createdBy?.phone || "-",
+    signatureUrl: invoice.order?.createdBy?.image || null,
+  };
   const calculatedOrderTotal = invoice.items.reduce(
     (acc, item) => acc + Number(item.price) * item.quantity,
     0,
@@ -293,7 +286,7 @@ export default function InvoiceDetailPage() {
                 <Link
                   href={`/super-admin/orders/detail/${invoice.orderId}`}
                   className="flex items-center gap-1 text-blue-600 hover:underline font-medium">
-                  Lihat Order #{invoice.order.poNumber}
+                  Lihat Order #{invoice.order.orderNumber}
                   <ExternalLink className="h-3 w-3" />
                 </Link>
               </div>
@@ -449,7 +442,8 @@ export default function InvoiceDetailPage() {
                     <td className="align-top text-left py-0.5">
                       <div className="flex">
                         <span className="w-3 mr-1">:</span>
-                        <div className="flex-1">IDR</div>
+                        {/* ✨ UPDATE: Menggunakan variabel dinamis */}
+                        <div className="flex-1">{currency}</div>
                       </div>
                     </td>
                   </tr>
@@ -536,12 +530,16 @@ export default function InvoiceDetailPage() {
                     </>
                   )}
                   <tr>
-                    <td className="font-medium align-top py-0.5">PO No.</td>
+                    <td className="font-medium align-top py-0.5">
+                      {invoice?.order?.salesCategory === "SAMPLE"
+                        ? "Sample Order No."
+                        : "Sales Order No."}
+                    </td>
                     <td className="align-top py-0.5">
                       <div className="flex">
                         <span className="w-3 mr-1">:</span>
-                        <div className="flex-1">
-                          {invoice?.order?.poNumber || "-"}
+                        <div className="flex-1 font-mono font-medium">
+                          {invoice?.order?.orderNumber || "-"}
                         </div>
                       </div>
                     </td>
@@ -610,11 +608,15 @@ export default function InvoiceDetailPage() {
                       <td className="border border-[#94a3b8] py-2">
                         {item.quantity}
                       </td>
+                      {/* ✨ UPDATE: Format currency menyertakan kode mata uang */}
                       <td className="border border-[#94a3b8] py-2 text-right px-2">
-                        {formatCurrency(Number(item.price))}
+                        {formatCurrency(Number(item.price), currency)}
                       </td>
                       <td className="border border-[#94a3b8] py-2 text-right px-2 font-medium">
-                        {formatCurrency(Number(item.price) * item.quantity)}
+                        {formatCurrency(
+                          Number(item.price) * item.quantity,
+                          currency,
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -626,7 +628,7 @@ export default function InvoiceDetailPage() {
                       Total Amount Due
                     </td>
                     <td className="border border-[#94a3b8] py-2 text-right px-2 font-bold text-gray-900">
-                      {formatCurrency(calculatedOrderTotal)}
+                      {formatCurrency(calculatedOrderTotal, currency)}
                     </td>
                   </tr>
                 </tbody>
@@ -645,7 +647,7 @@ export default function InvoiceDetailPage() {
                     <span className="font-semibold">
                       Total Purchase Order Value:
                     </span>
-                    <span>{formatCurrency(orderTotal)}</span>
+                    <span>{formatCurrency(orderTotal, currency)}</span>
                   </div>
                 </div>
 
@@ -676,9 +678,11 @@ export default function InvoiceDetailPage() {
                         <div className="flex items-start">
                           <span className="w-4 mr-2">-</span>
                           <div className="flex-1">
-                            <span className="font-semibold">Down Payment:</span>
+                            <span className="font-semibold">
+                              Down Payment:{" "}
+                            </span>
                             <span className="font-bold">
-                              {formatCurrency(invoice.totalAmount)}
+                              {formatCurrency(invoice.totalAmount, currency)}
                             </span>
                             <span className="italic text-gray-600">
                               (Due: Immediately)
@@ -694,6 +698,7 @@ export default function InvoiceDetailPage() {
                             <span>
                               {formatCurrency(
                                 remainingAfterThis > 0 ? remainingAfterThis : 0,
+                                currency,
                               )}
                             </span>
                             <span className="italic text-gray-600">
@@ -722,7 +727,9 @@ export default function InvoiceDetailPage() {
                                   : "Previous Payment"}
                                 :
                               </span>
-                              <span>{formatCurrency(prev.totalAmount)}</span>
+                              <span>
+                                {formatCurrency(prev.totalAmount, currency)}
+                              </span>
                               <span className="italic text-gray-600">
                                 {prev.paidAt
                                   ? ` (Paid on ${format(new Date(prev.paidAt), "dd MMM yyyy", { locale: idLocale })})`
@@ -738,7 +745,7 @@ export default function InvoiceDetailPage() {
                               Balance Payment:
                             </span>
                             <span className="font-bold">
-                              {formatCurrency(invoice.totalAmount)}
+                              {formatCurrency(invoice.totalAmount, currency)}
                             </span>
                             <span className="italic text-gray-600">
                               (Due: Immediately)
@@ -751,7 +758,7 @@ export default function InvoiceDetailPage() {
                             <span className="font-semibold">
                               Remaining Balance:
                             </span>
-                            <span>Rp 0,-</span>
+                            <span>{formatCurrency(0, currency)}</span>
                             <span className="italic text-gray-600">
                               (Fully Paid upon this settlement)
                             </span>
@@ -775,7 +782,9 @@ export default function InvoiceDetailPage() {
                               <span className="w-4 mr-2">-</span>
                               <div className="flex-1">
                                 <span className="font-semibold">{label}: </span>
-                                <span>{formatCurrency(prev.totalAmount)}</span>
+                                <span>
+                                  {formatCurrency(prev.totalAmount, currency)}
+                                </span>
                                 <span className="italic text-gray-600">
                                   {prev.paidAt
                                     ? ` (Paid on ${format(new Date(prev.paidAt), "dd MMM yyyy", { locale: idLocale })})`
@@ -797,7 +806,7 @@ export default function InvoiceDetailPage() {
                               :
                             </span>
                             <span className="font-bold">
-                              {formatCurrency(invoice.totalAmount)}
+                              {formatCurrency(invoice.totalAmount, currency)}
                             </span>
                             <span className="italic text-gray-600">
                               (Due: Immediately)
@@ -814,8 +823,8 @@ export default function InvoiceDetailPage() {
                             </span>
                             <span>
                               {isFinal
-                                ? "Rp 0,-"
-                                : formatCurrency(remainingAfterThis)}
+                                ? formatCurrency(0, currency)
+                                : formatCurrency(remainingAfterThis, currency)}
                             </span>
                             <span className="italic text-gray-600">
                               {isFinal
