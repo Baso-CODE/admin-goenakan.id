@@ -1,9 +1,9 @@
-# Gunakan image Bun resmi berbasis Debian Bookworm (memiliki versi GLIBC yang lebih baru)
-FROM oven/bun:1.1-debian AS base
+# Gunakan image Bun versi terbaru yang mendukung lockfile versi modern
+FROM oven/bun:latest AS base
 
 WORKDIR /app
 
-# 1. Install Library C++, Python, dan Make (Wajib untuk kompilasi ulang argon2)
+# 1. Install Library C++, Python, dan Make (Wajib untuk kompilasi argon2 & modul native)
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y \
 COPY package.json bun.lock* ./
 
 # 3. Install dependencies 
-# Catatan: Kita tidak memakai --ignore-scripts agar argon2 bisa dikompilasi ulang (rebuild) otomatis
-RUN bun install --frozen-lockfile
+# Menggunakan 'bun install' biasa (tanpa --frozen-lockfile) agar aman jika ada perbedaan versi lockfile
+RUN bun install
 
 # 4. Copy seluruh kode source 
 COPY . .
