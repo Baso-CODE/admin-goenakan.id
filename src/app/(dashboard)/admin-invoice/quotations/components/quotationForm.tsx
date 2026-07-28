@@ -298,7 +298,7 @@ function NotesSection({
 }
 
 // ============================================================
-// SUB-COMPONENT: ItemRow untuk Edit Quotation (Disamakan dengan Add Form)
+// SUB-COMPONENT: ItemRow untuk Edit Quotation (Final Fix)
 // ============================================================
 function ItemRow({
   index,
@@ -340,6 +340,43 @@ function ItemRow({
     name: `items.${index}.tiers`,
   });
 
+  // ✨ FUNGSI UTAMA: Hanya menghitung ulang harga berdasarkan Qty saat user mengetik secara manual
+  const handleQuantityChange = (newQtyValue: string) => {
+    const qty = Number(newQtyValue) || 0;
+    form.setValue(`items.${index}.quantity`, qty);
+
+    if (!isManualProduct && selectedProduct) {
+      let newPrice = 0;
+
+      if (selectedProduct.priceTiers && selectedProduct.priceTiers.length > 0) {
+        const sortedTiers = [...selectedProduct.priceTiers].sort(
+          (a, b) => b.minQuantity - a.minQuantity,
+        );
+
+        const matchedTier = sortedTiers.find((tier) => qty >= tier.minQuantity);
+
+        if (matchedTier) {
+          newPrice = Number(matchedTier.price);
+        } else {
+          newPrice = Number(selectedProduct.basePrice);
+        }
+      } else if (currentVariantId && selectedProduct.productVariants) {
+        const matchedVariant = selectedProduct.productVariants.find(
+          (v) => v.id === currentVariantId,
+        );
+        newPrice = matchedVariant
+          ? Number(matchedVariant.price)
+          : Number(selectedProduct.basePrice);
+      } else {
+        newPrice = Number(selectedProduct.basePrice);
+      }
+
+      form.setValue(`items.${index}.unitPrice`, newPrice, {
+        shouldValidate: true,
+      });
+    }
+  };
+
   useEffect(() => {
     if (imageFile) {
       const url = URL.createObjectURL(imageFile);
@@ -350,6 +387,7 @@ function ItemRow({
     }
   }, [imageFile]);
 
+  // ✨ Mengubah unitPrice hanya ketika user mengubah atribut/varian produk
   const handleAttributeSelect = (attributeId: string, valueId: string) => {
     const newAttrs = {
       ...currentSelectedAttrs,
@@ -370,12 +408,21 @@ function ItemRow({
 
       if (matchedVariant) {
         form.setValue(`items.${index}.variantId`, matchedVariant.id);
-        form.setValue(`items.${index}.unitPrice`, Number(matchedVariant.price));
+        form.setValue(
+          `items.${index}.unitPrice`,
+          Number(matchedVariant.price),
+          {
+            shouldValidate: true,
+          },
+        );
       } else {
         form.setValue(`items.${index}.variantId`, undefined);
         form.setValue(
           `items.${index}.unitPrice`,
           Number(selectedProduct.basePrice),
+          {
+            shouldValidate: true,
+          },
         );
       }
     }
@@ -391,7 +438,6 @@ function ItemRow({
             checked={!!isManualProduct}
             onCheckedChange={(v) => {
               form.setValue(`items.${index}.isManualProduct`, v);
-              // Reset nilai saat switch diubah
               if (v) {
                 form.setValue(`items.${index}.productId`, "");
                 form.setValue(`items.${index}.variantId`, undefined);
@@ -450,8 +496,6 @@ function ItemRow({
                                 `items.${index}.productName`,
                                 p.name,
                               );
-
-                              // Reset Varian
                               form.setValue(
                                 `items.${index}.variantId`,
                                 undefined,
@@ -460,23 +504,19 @@ function ItemRow({
                                 `items.${index}.selectedAttributes`,
                                 {},
                               );
-
                               form.setValue(
                                 `items.${index}.unitPrice`,
                                 p.productVariants?.length
                                   ? 0
                                   : Number(p.basePrice),
                               );
-
-                              // Set Deskripsi jika ada
                               if (p.description) {
                                 form.setValue(
                                   `items.${index}.description`,
                                   p.description,
                                 );
-                                setExpanded(true); // Buka panel bawah otomatis
+                                setExpanded(true);
                               }
-
                               setOpenCombobox(false);
                             }}>
                             <Check
@@ -521,14 +561,16 @@ function ItemRow({
           )}
         </div>
 
-        {/* Qty */}
+        {/* Qty (Menggunakan onChange manual agar aman saat loading data) */}
         <div className="col-span-2">
           <div className="relative">
             <Input
               type="number"
               placeholder="0"
               className="pr-10 h-10 text-center"
-              {...form.register(`items.${index}.quantity`)}
+              {...form.register(`items.${index}.quantity`, {
+                onChange: (e: any) => handleQuantityChange(e.target.value),
+              })}
             />
             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
               Qty

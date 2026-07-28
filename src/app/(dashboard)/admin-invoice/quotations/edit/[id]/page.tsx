@@ -35,6 +35,7 @@ export default function EditQuotationPage() {
       if (!res.ok) throw new Error("Failed to fetch quotation details");
 
       const data = await res.json();
+      console.log("data", data);
 
       const formattedData: any = {
         date: new Date(data.date),
@@ -55,22 +56,27 @@ export default function EditQuotationPage() {
           isManualProduct: !item.productId,
           productId: item.productId || "",
           variantId: item.variantId || "",
-          selectedAttributes: item.selectedAttributes || {},
+
+          selectedAttributes: item.customization?.selectedAttributes || {},
+
           productName: item.productName,
           description: item.description || "",
-          quantity: Number(item.quantity || 0),
-          unitPrice: Number(item.unitPrice || 0),
+
+          quantity: Number(item.quantity ?? 1),
+          unitPrice: Number(item.unitPrice ?? 0),
+
           discount: Number(item.discount || 0),
           remarks: item.remarks || "",
+
           tiers:
             item.tiers && item.tiers.length > 0
               ? item.tiers.map((t: any) => ({
-                  minQuantity: Number(t.minQuantity),
+                  minQuantity: Number(t.minQuantity || 1),
                   maxQuantity: t.maxQuantity
                     ? Number(t.maxQuantity)
                     : undefined,
                   quantityLabel: t.quantityLabel || "",
-                  unitPrice: Number(t.unitPrice),
+                  unitPrice: Number(t.unitPrice || 0),
                 }))
               : [
                   {
@@ -97,9 +103,9 @@ export default function EditQuotationPage() {
     fetchQuotation();
   }, [fetchQuotation]);
 
-  // ============================
+  // ==========================================
   // UPDATE DATA
-  // ============================
+  // ==========================================
   const handleUpdate = async (data: QuotationFormValues) => {
     if (status !== "authenticated") {
       toast.error("Sesi berakhir, silakan login kembali.");

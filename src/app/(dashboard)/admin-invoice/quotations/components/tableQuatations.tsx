@@ -70,9 +70,9 @@ type Quotation = {
     b2c?: { name: string; prefix: string | null };
   };
   pic?: { name: string; position: string | null } | null;
-  user?: { name: string } | null; // Created By
-  updatedBy?: { name: string } | null; // Updated By
-  approvedBy?: { name: string } | null; // Approved By
+  user?: { name: string } | null;
+  updatedBy?: { name: string } | null;
+  approvedBy?: { name: string } | null;
   followUps: { name: string; date: string }[];
 };
 
@@ -477,7 +477,6 @@ export default function QuotationsTable() {
                         )}
                       </TableCell>
 
-                      {/* ✨ --- Sticky Action: Dropdown 3 titik --- */}
                       <TableCell className="text-center sticky right-0 bg-white border-l shadow-md">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -560,7 +559,6 @@ export default function QuotationsTable() {
         </div>
       )}
 
-      {/* ✨ Confirm Delete Dialog */}
       <ConfirmDeleteDialog
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
