@@ -27,10 +27,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useApi } from "@/hooks/useApi";
-import { ArrowRight, Info, PlusCircle, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowRight, Info, PlusCircle, Trash2, Plus, RefreshCw } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Product, VendorPriceRecord } from "../page";
+import FastCurrencyForm from "@/app/(dashboard)/admin-invoice/currency/components/formCurrencyFast";
 
 interface ManagePriceModalProps {
   isOpen: boolean;
@@ -161,20 +162,120 @@ export function ManagePriceModal({
   onSuccess,
 }: ManagePriceModalProps) {
   const { fetchApi } = useApi();
-
+ 
   const [selectedQuoteId, setSelectedQuoteId] = useState<string>("NONE");
   const [freightMode, setFreightMode] = useState<"SEA" | "AIR" | "CUSTOM">("CUSTOM");
   const [basePrice, setBasePrice] = useState<number>(0);
+  const [rawBasePrice, setRawBasePrice] = useState<number>(0);
+  const [currencyCode, setCurrencyCode] = useState<string>("IDR");
+  const [foreignPrice, setForeignPrice] = useState<number>(0);
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [additionalFee, setAdditionalFee] = useState<number>(0);
   const [tiers, setTiers] = useState<EditableTier[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Master Currencies & Fast Currency Dialog
+  const [masterCurrencies, setMasterCurrencies] = useState<any[]>([]);
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState<boolean>(false);
+  const [fetchingRates, setFetchingRates] = useState(false);
+  const [ratesData, setRatesData] = useState<any>({ RMB: 2250, CNY: 2250, USD: 16200 });
+
+  // Fetch currencies on mount
+  useEffect(() => {
+    const fetchCurrencies = async () => {
+      try {
+        const res = await fetchApi("/currencies");
+        if (res.ok) {
+          const data = await res.json();
+          const currList = Array.isArray(data) ? data : (data.data || []);
+          setMasterCurrencies(currList);
+        }
+      } catch (err) {
+        console.error("Failed to fetch currencies", err);
+      }
+    };
+    if (isOpen) {
+      fetchCurrencies();
+    }
+  }, [isOpen, fetchApi]);
+
+  // Fetch exchange rate automatically via API
+  const fetchExchangeRates = useCallback(async (base: string) => {
+    if (base === "IDR") return;
+    setFetchingRates(true);
+    try {
+      const apiBase = base === "RMB" ? "CNY" : base;
+      const res = await fetch(`https://open.er-api.com/v6/latest/${apiBase}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.rates) {
+          const rateVal = data.rates.IDR;
+          setRatesData((prev: any) => ({
+            ...prev,
+            [base]: rateVal || prev[base],
+          }));
+          setExchangeRate(rateVal);
+          toast.success(`Kurs ${base} berhasil diperbarui: Rp ${rateVal.toLocaleString("id-ID")}`);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Gagal mengambil kurs terbaru.");
+    } finally {
+      setFetchingRates(false);
+    }
+  }, []);
+
+  const handleAddCurrencyFast = async (data: any) => {
+    try {
+      const res = await fetchApi("/currencies", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal membuat currency");
+      }
+
+      const responseData = await res.json();
+      const newCurrency = responseData.data || responseData;
+
+      setMasterCurrencies((prev) => [...prev, newCurrency]);
+      setCurrencyCode(newCurrency.code);
+      if (newCurrency.rate) {
+        setExchangeRate(Number(newCurrency.rate));
+      } else {
+        setExchangeRate(1);
+      }
+      setIsCurrencyModalOpen(false);
+      toast.success("Currency berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat membuat currency.");
+    }
+  };
+ 
   // Initialize from product current active prices
   useEffect(() => {
     if (product) {
-      setBasePrice(Number(product.basePrice) || 0);
+      const initialCurrency = product.currencyCode || "IDR";
+      setCurrencyCode(initialCurrency);
+      setForeignPrice(Number(product.foreignPrice) || 0);
+      setExchangeRate(Number(product.exchangeRate) || 1);
+      setAdditionalFee(Number(product.additionalFee) || 0);
+      
+      const pBase = Number(product.basePrice) || 0;
+      const pFee = Number(product.additionalFee) || 0;
+      
+      if (product.currencyCode === "IDR" || !product.currencyCode) {
+        setRawBasePrice(pBase - pFee);
+      } else {
+        setRawBasePrice(0);
+      }
+ 
       setSelectedQuoteId(product.activeVendorPriceRecordId || "NONE");
       setFreightMode((product.activePriceFreightMode as "SEA" | "AIR" | "CUSTOM") || "CUSTOM");
-
+ 
       if (product.priceTiers && product.priceTiers.length > 0) {
         setTiers(
           product.priceTiers.map((t) => ({
@@ -187,8 +288,24 @@ export function ManagePriceModal({
       } else {
         setTiers([]);
       }
+
+      // Auto-fetch exchange rate on open if it's a foreign currency
+      if (initialCurrency !== "IDR") {
+        fetchExchangeRates(initialCurrency);
+      }
     }
-  }, [product]);
+  }, [product, fetchExchangeRates]);
+ 
+  // Automatically calculate base price in CUSTOM mode when valas inputs change
+  useEffect(() => {
+    if (freightMode === "CUSTOM") {
+      if (currencyCode === "IDR") {
+        setBasePrice(rawBasePrice + additionalFee);
+      } else {
+        setBasePrice((foreignPrice * exchangeRate) + additionalFee);
+      }
+    }
+  }, [currencyCode, rawBasePrice, foreignPrice, exchangeRate, additionalFee, freightMode]);
 
   // Handle quote reference loading and calculation pre-filling
   const applyQuoteReference = (quoteId: string, mode: "SEA" | "AIR" | "CUSTOM") => {
@@ -350,6 +467,10 @@ export function ManagePriceModal({
 
       const payload = {
         basePrice: Number(basePrice) || 0,
+        foreignPrice: currencyCode === "IDR" ? null : Number(foreignPrice) || 0,
+        currencyCode: currencyCode,
+        exchangeRate: currencyCode === "IDR" ? 1 : Number(exchangeRate) || 1,
+        additionalFee: Number(additionalFee) || 0,
         activeVendorPriceRecordId: selectedQuoteId === "NONE" ? null : selectedQuoteId,
         activePriceFreightMode: freightMode,
         priceTiers: tiers.map((t) => ({
@@ -456,20 +577,171 @@ export function ManagePriceModal({
               2. Harga & Wholesale Tiers
             </h4>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="basePrice" className="text-xs font-semibold text-stone-600">
-                  Harga Dasar Produk (Rp)
-                </Label>
-                <Input
-                  id="basePrice"
-                  type="number"
-                  value={basePrice}
-                  onChange={(e) => setBasePrice(parseFloat(e.target.value) || 0)}
-                  disabled={freightMode !== "CUSTOM"}
-                  className="bg-white border-stone-200 mt-1.5 font-bold text-stone-900"
-                />
-              </div>
+            <div className="space-y-4">
+              {/* Currency and Pricing Input Settings */}
+              {freightMode === "CUSTOM" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-stone-50/60 p-4 rounded-lg border border-stone-200">
+                  <div className="space-y-1">
+                    <Label htmlFor="currencyCode" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                      Mata Uang
+                    </Label>
+                    
+                    <Dialog
+                      open={isCurrencyModalOpen}
+                      onOpenChange={setIsCurrencyModalOpen}
+                    >
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Tambah Currency Baru</DialogTitle>
+                        </DialogHeader>
+                        <FastCurrencyForm onSubmit={handleAddCurrencyFast} />
+                      </DialogContent>
+                    </Dialog>
+
+                    <Select
+                      value={currencyCode}
+                      onValueChange={(val) => {
+                        if (val === "add_new_currency") {
+                          setIsCurrencyModalOpen(true);
+                        } else {
+                          setCurrencyCode(val);
+                          if (val !== "IDR") {
+                            fetchExchangeRates(val);
+                          } else {
+                            setExchangeRate(1);
+                          }
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="bg-white border-stone-200 mt-1">
+                        <SelectValue placeholder="Pilih Mata Uang" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="IDR">IDR (Rupiah)</SelectItem>
+                        {masterCurrencies.filter((c) => c.code !== "IDR").map((cur) => (
+                          <SelectItem key={cur.code} value={cur.code}>
+                            {cur.code} ({cur.symbol || "$"}) - {cur.name || cur.code}
+                          </SelectItem>
+                        ))}
+                        
+                        <div className="h-px bg-stone-200 my-1 mx-2" />
+                        <SelectItem
+                          value="add_new_currency"
+                          textValue="Buat Currency Baru"
+                          className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Buat Currency Baru...
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {currencyCode === "IDR" ? (
+                    <div className="space-y-1">
+                      <Label htmlFor="rawBasePrice" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                        Harga Dasar IDR (Rp)
+                      </Label>
+                      <Input
+                        id="rawBasePrice"
+                        type="number"
+                        min="0"
+                        value={rawBasePrice || ""}
+                        onChange={(e) => setRawBasePrice(parseFloat(e.target.value) || 0)}
+                        className="bg-white border-stone-200 mt-1 font-semibold"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-1">
+                        <Label htmlFor="foreignPrice" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                          Harga Valas ({currencyCode})
+                        </Label>
+                        <Input
+                          id="foreignPrice"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={foreignPrice || ""}
+                          onChange={(e) => setForeignPrice(parseFloat(e.target.value) || 0)}
+                          className="bg-white border-stone-200 mt-1 font-semibold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="exchangeRate" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                            Kurs / Exchange Rate (Rp)
+                          </Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 hover:bg-stone-100"
+                            onClick={() => fetchExchangeRates(currencyCode)}
+                            disabled={fetchingRates || currencyCode === "IDR"}
+                          >
+                            <RefreshCw className={`h-3 w-3 text-stone-500 ${fetchingRates ? "animate-spin" : ""}`} />
+                          </Button>
+                        </div>
+                        <Input
+                          id="exchangeRate"
+                          type="number"
+                          min="0"
+                          value={exchangeRate || ""}
+                          disabled={currencyCode === "IDR"}
+                          onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 0)}
+                          className="bg-white border-stone-200 mt-1 font-semibold"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="space-y-1">
+                    <Label htmlFor="additionalFee" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                      Biaya Tambahan / Additional Fee (Rp)
+                    </Label>
+                    <Input
+                      id="additionalFee"
+                      type="number"
+                      min="0"
+                      value={additionalFee || ""}
+                      onChange={(e) => setAdditionalFee(parseFloat(e.target.value) || 0)}
+                      className="bg-white border-stone-200 mt-1 font-semibold"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 bg-indigo-50 border border-indigo-100 p-3 rounded-md flex justify-between items-center mt-2">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
+                        Total Harga Dasar Terhitung (IDR)
+                      </span>
+                      <span className="text-xs text-indigo-700/80 font-medium mt-0.5">
+                        {currencyCode !== "IDR" ? `(${foreignPrice} ${currencyCode} x Rp ${exchangeRate.toLocaleString('id-ID')}) + Rp ${additionalFee.toLocaleString('id-ID')}` : `Rp ${rawBasePrice.toLocaleString('id-ID')} + Rp ${additionalFee.toLocaleString('id-ID')}`}
+                      </span>
+                    </div>
+                    <span className="text-lg font-black text-indigo-950">
+                      Rp {basePrice.toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="basePrice" className="text-xs font-semibold text-stone-600">
+                      Harga Dasar Produk (Rp)
+                    </Label>
+                    <Input
+                      id="basePrice"
+                      type="number"
+                      value={basePrice}
+                      disabled
+                      className="bg-stone-50 border-stone-200 mt-1.5 font-bold text-stone-500"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Editable Wholesale Tiers Grid */}
