@@ -403,10 +403,14 @@ export default function EditProductPage() {
     }
   };
 
-  const handleAddImage = async (file: File): Promise<any> => {
+  const handleAddImage = async (fileOrUrl: File | string): Promise<any> => {
     try {
       const formData = new FormData();
-      formData.append("image", file);
+      if (fileOrUrl instanceof File) {
+        formData.append("image", fileOrUrl);
+      } else {
+        formData.append("url", fileOrUrl);
+      }
 
       const res = await fetchApi(`/products/${id}/image`, {
         method: "POST",
@@ -420,9 +424,10 @@ export default function EditProductPage() {
 
       const updatedProduct = await res.json();
       setProductData(updatedProduct);
-      toast.success("Gambar berhasil diunggah!");
+      toast.success("Gambar berhasil ditambahkan!");
 
-      const newImage = updatedProduct.images[updatedProduct.images.length - 1];
+      const oldImageIds = new Set((productData?.images || []).map((img: any) => img.id));
+      const newImage = updatedProduct.images.find((img: any) => !oldImageIds.has(img.id)) || updatedProduct.images[updatedProduct.images.length - 1];
       return newImage;
     } catch (err) {
       console.error("Error adding image:", err);
@@ -520,7 +525,7 @@ export default function EditProductPage() {
       }
 
       const updatedProduct = await res.json();
-      // setProductData(updatedProduct);
+      setProductData(updatedProduct);
       toast.success("Gambar berhasil dihapus!");
     } catch (err) {
       console.error("Error deleting image:", err);
@@ -960,7 +965,10 @@ export default function EditProductPage() {
           className="space-y-6 animate-fade-in focus-visible:outline-none">
           <FormUpdateProductMedia
             productId={id as string}
-            initialData={productData}
+            initialData={productData ? {
+              ...productData,
+              images: (productData.images || []).filter((img: any) => !img.attributeValueId)
+            } : undefined}
             isSubmitting={isSubmitting}
             onAddImage={handleAddImage}
             onDeleteImage={handleDeleteImage}
@@ -996,6 +1004,7 @@ export default function EditProductPage() {
             onUpdateMockupSettings={handleUpdateMockupSettings}
             onUpdateMediaMetadata={handleUpdateMediaMetadata}
             onAddImage={handleAddImage}
+            onRefresh={fetchProductData}
           />
           <FormUpdateVariants
             initialData={productData}
@@ -1122,7 +1131,7 @@ export default function EditProductPage() {
                                       value={inlineInputValue}
                                       onChange={(val) => setInlineInputValue(val)}
                                     />
-                                  ) : attr.type === "MODEL_SHAPE" ? (
+                                  ) : (attr.type === "MODEL_SHAPE" || attr.type === "SIZE") ? (
                                     <ModelShapeValueInput
                                       value={inlineInputValue}
                                       onChange={(val) => setInlineInputValue(val)}
@@ -1196,7 +1205,7 @@ export default function EditProductPage() {
                                     const isChecked = activeList.includes(v.id);
                                     
                                     const isColorType = attr.type === "COLOR";
-                                    const isModelShape = attr.type === "MODEL_SHAPE";
+                                    const isModelShape = attr.type === "MODEL_SHAPE" || attr.type === "SIZE";
 
                                     const priceMod = sel.priceModifiers?.[v.id];
                                     const priceModLabel = priceMod && Number(priceMod) !== 0

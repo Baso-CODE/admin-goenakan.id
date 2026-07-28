@@ -180,7 +180,7 @@ export default function ProductFormV2({
     if (!selectedMockupImage) return;
     setMockupSides((prev) =>
       prev.map((item) =>
-        item.imageId === selectedMockupImage.imageId
+        item.id === selectedMockupImage.id
           ? { ...item, mockupAreas: mockupAreasState }
           : item
       )
@@ -190,7 +190,7 @@ export default function ProductFormV2({
   };
 
   const getProductAttributeValues = () => {
-    const list: { id: string; value: string; attributeName: string; attributeType: string }[] = [];
+    const list: { id: string; value: string; rawValue: string; attributeName: string; attributeType: string }[] = [];
     
     tempFullAttrs.forEach((attr) => {
       const selection = tempAttributeSelections.find((sel) => sel.attributeId === attr.id);
@@ -200,6 +200,7 @@ export default function ProductFormV2({
           list.push({
             id: val.id,
             value: val.value.includes("|") ? val.value.split("|")[0] : val.value,
+            rawValue: val.value,
             attributeName: attr.name,
             attributeType: attr.type || "TEXT",
           });
@@ -959,7 +960,12 @@ export default function ProductFormV2({
                                         <div key={item.id} className="border border-stone-200 dark:border-stone-800 rounded-lg p-3 bg-white dark:bg-stone-900/60 flex flex-col gap-3 relative shadow-xs">
                                           <div className="pr-12">
                                             <h4 className="text-xs font-bold text-indigo-650 dark:text-indigo-400 truncate mb-0.5">
-                                              {item.name || "Posisi Mockup Baru"}
+                                              {(() => {
+                                                const sizeOpt = fullAttributeValuesList.find(o => o.id === item.attributeValueId);
+                                                const sizeName = sizeOpt ? sizeOpt.value : "";
+                                                const printPositionName = item.name || "Posisi Mockup Baru";
+                                                return sizeName ? `${sizeName} - ${printPositionName}` : printPositionName;
+                                              })()}
                                             </h4>
                                           </div>
 
@@ -1085,25 +1091,44 @@ export default function ProductFormV2({
 
                                               <div className="space-y-1">
                                                 <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                                                  Hubungkan Ukuran
+                                                  Hubungkan Ukuran / Model
                                                 </label>
                                                 <Select
                                                   value={item.attributeValueId || "none"}
                                                   onValueChange={(val) => {
                                                     const targetVal = val === "none" ? null : val;
                                                     setMockupSides((prev) =>
-                                                      prev.map((m) => m.id === item.id ? { ...m, attributeValueId: targetVal } : m)
+                                                      prev.map((m) => {
+                                                        if (m.id === item.id) {
+                                                          const updated = { ...m, attributeValueId: targetVal };
+                                                          if (targetVal) {
+                                                            const targetOpt = fullAttributeValuesList.find(o => o.id === targetVal);
+                                                            if (targetOpt) {
+                                                              const parts = targetOpt.rawValue.split("|");
+                                                              const imageUrl = parts[1];
+                                                              if (imageUrl) {
+                                                                updated.url = imageUrl;
+                                                                if (!updated.imageId) {
+                                                                  updated.imageId = `size-default-${targetVal}`;
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                          return updated;
+                                                        }
+                                                        return m;
+                                                      })
                                                     );
                                                   }}
                                                 >
                                                   <SelectTrigger className="w-full h-8 text-xs">
-                                                    <SelectValue placeholder="Semua Ukuran" />
+                                                    <SelectValue placeholder="Semua Ukuran / Model" />
                                                   </SelectTrigger>
                                                   <SelectContent>
-                                                    <SelectItem value="none" className="text-xs">Semua Ukuran</SelectItem>
-                                                    {fullAttributeValuesList.filter(v => v.attributeType === "SIZE").map((val) => (
+                                                    <SelectItem value="none" className="text-xs">Semua Ukuran / Model</SelectItem>
+                                                    {fullAttributeValuesList.filter(v => v.attributeType === "SIZE" || v.attributeType === "MODEL_SHAPE").map((val) => (
                                                       <SelectItem key={val.id} value={val.id} className="text-xs">
-                                                        {val.value}
+                                                        {val.attributeName}: {val.value}
                                                       </SelectItem>
                                                     ))}
                                                   </SelectContent>
@@ -1435,7 +1460,7 @@ export default function ProductFormV2({
                                       value={inlineInputValue}
                                       onChange={(val) => setInlineInputValue(val)}
                                     />
-                                  ) : attr.type === "MODEL_SHAPE" ? (
+                                  ) : (attr.type === "MODEL_SHAPE" || attr.type === "SIZE") ? (
                                     <ModelShapeValueInput
                                       value={inlineInputValue}
                                       onChange={(val) => setInlineInputValue(val)}
@@ -1509,7 +1534,7 @@ export default function ProductFormV2({
                                     const isChecked = activeList.includes(v.id);
                                     
                                     const isColorType = attr.type === "COLOR";
-                                    const isModelShape = attr.type === "MODEL_SHAPE";
+                                    const isModelShape = attr.type === "MODEL_SHAPE" || attr.type === "SIZE";
 
                                     const priceMod = sel.priceModifiers?.[v.id];
                                     const priceModLabel = priceMod && Number(priceMod) !== 0
