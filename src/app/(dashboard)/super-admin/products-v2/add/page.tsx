@@ -48,7 +48,23 @@ export default function AddProductPage() {
         });
       }
 
+      // Extract size default mockup images (which have URLs instead of local files)
+      const sizeDefaultSides = (data.mockupSides || []).filter((m: any) => m.imageId && m.imageId.startsWith("size-default-"));
+      
+      // Stage 1: Add default size mockup images to imagesMetadata so the server creates ProductImage rows for them
+      const extraImagesMetadata = sizeDefaultSides.map((side: any) => ({
+        url: side.url,
+        isFeatured: false,
+        altText: side.name || "Default Size Mockup"
+      }));
+
+      const cleanImagesMetadata = [
+        ...extraImagesMetadata,
+        ...(data.imagesMetadata || [])
+      ];
+
       const { mockupSides, ...cleanData } = data as any;
+      cleanData.imagesMetadata = cleanImagesMetadata;
       const productDataJson = JSON.stringify(cleanData);
       formData.append("data", productDataJson);
 
@@ -68,8 +84,18 @@ export default function AddProductPage() {
         for (const side of mockupSides) {
           if (!side.imageId) continue;
 
-          const fileIndex = parseInt(side.imageId.replace("index-", ""));
-          const createdImage = result.images[fileIndex];
+          let createdImage = null;
+          if (side.imageId.startsWith("size-default-")) {
+            const defaultIndex = sizeDefaultSides.findIndex((m: any) => m.id === side.id);
+            if (defaultIndex !== -1) {
+              createdImage = result.images[defaultIndex];
+            }
+          } else if (side.imageId.startsWith("index-")) {
+            const fileIndex = parseInt(side.imageId.replace("index-", ""));
+            // The file images are placed after the size-default images in the DB insert
+            createdImage = result.images[sizeDefaultSides.length + fileIndex];
+          }
+
           if (!createdImage) continue;
 
           // 1. Update image mockup metadata

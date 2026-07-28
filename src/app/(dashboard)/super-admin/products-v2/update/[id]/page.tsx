@@ -3,6 +3,19 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { ColorValueInput } from "@/components/ui/color-value-input";
+import { parseColorValue } from "@/utils/colorConverter";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/useApi";
@@ -15,6 +28,7 @@ import FormUpdateProductMedia from "../../components/update/VariantMediaSection"
 import FormUpdateVariants, {
   VariantFormValues,
 } from "../../components/update/VariantsSection";
+import { ModelShapeValueInput } from "../../components/AttributeSelector";
 
 const CLOUDINARY_CLOUD_NAME = "do9sfnf5k";
 const CLOUDINARY_UPLOAD_PRESET = "ml_default";
@@ -28,6 +42,12 @@ export default function EditProductPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentSelections, setCurrentSelections] = useState<any[]>([]);
   const [currentFullList, setCurrentFullList] = useState<any[]>([]);
+  const [isGenModalOpen, setIsGenModalOpen] = useState<boolean>(false);
+  const [activeGroupFilters, setActiveGroupFilters] = useState<Record<string, Record<string, string[]>>>({});
+  const [inlineInputAttrId, setInlineInputAttrId] = useState<string | null>(null);
+  const [inlineInputGroupId, setInlineInputGroupId] = useState<string | null>(null);
+  const [inlineInputValue, setInlineInputValue] = useState<string>("");
+  const [inlineInputPrice, setInlineInputPrice] = useState<string>("");
 
   const fetchProductData = async () => {
     if (!id || status === "loading") return;
@@ -383,10 +403,14 @@ export default function EditProductPage() {
     }
   };
 
-  const handleAddImage = async (file: File): Promise<any> => {
+  const handleAddImage = async (fileOrUrl: File | string): Promise<any> => {
     try {
       const formData = new FormData();
-      formData.append("image", file);
+      if (fileOrUrl instanceof File) {
+        formData.append("image", fileOrUrl);
+      } else {
+        formData.append("url", fileOrUrl);
+      }
 
       const res = await fetchApi(`/products/${id}/image`, {
         method: "POST",
@@ -400,9 +424,10 @@ export default function EditProductPage() {
 
       const updatedProduct = await res.json();
       setProductData(updatedProduct);
-      toast.success("Gambar berhasil diunggah!");
+      toast.success("Gambar berhasil ditambahkan!");
 
-      const newImage = updatedProduct.images[updatedProduct.images.length - 1];
+      const oldImageIds = new Set((productData?.images || []).map((img: any) => img.id));
+      const newImage = updatedProduct.images.find((img: any) => !oldImageIds.has(img.id)) || updatedProduct.images[updatedProduct.images.length - 1];
       return newImage;
     } catch (err) {
       console.error("Error adding image:", err);
@@ -500,7 +525,7 @@ export default function EditProductPage() {
       }
 
       const updatedProduct = await res.json();
-      // setProductData(updatedProduct);
+      setProductData(updatedProduct);
       toast.success("Gambar berhasil dihapus!");
     } catch (err) {
       console.error("Error deleting image:", err);
@@ -599,13 +624,101 @@ export default function EditProductPage() {
   };
 
   const handleGenerateVariants = () => {
-    const newCombinations = generateCrossProduct(
-      currentSelections,
-      currentFullList,
+    const variantGeneratingSelections = currentSelections.filter(
+      (sel) => sel.isVariantGenerator !== false
     );
+    if (variantGeneratingSelections.length === 0) return;
+
+    const primarySelection = variantGeneratingSelections[0];
+    if (!primarySelection.valueIds.length) {
+      return toast.error("Harap isi nilai untuk atribut utama.");
+    }
+
+    const initialFilters: Record<string, Record<string, string[]>> = {};
+    primarySelection.valueIds.forEach((primValId: string) => {
+      initialFilters[primValId] = {};
+      variantGeneratingSelections.slice(1).forEach((sel) => {
+        initialFilters[primValId][sel.attributeId] = [...sel.valueIds];
+      });
+    });
+
+    setActiveGroupFilters(initialFilters);
+    setIsGenModalOpen(true);
+  };
+
+  const handleConfirmVariantGeneration = () => {
+    const variantGeneratingSelections = currentSelections.filter(
+      (sel) => sel.isVariantGenerator !== false
+    );
+    const primarySelection = variantGeneratingSelections[0];
+    const otherSelections = variantGeneratingSelections.slice(1);
+
+    const cartesianProduct = (a: any[]): any[] => {
+      return a.reduce((co, b) => co.flatMap((d: any) => b.map((e: any) => [d, e].flat())));
+    };
+
+    const finalCombos: { attributeMap: Record<string, string>; variantName: string }[] = [];
+
+    primarySelection.valueIds.forEach((primValId: string) => {
+      const activeGroups = otherSelections.map((sel) => activeGroupFilters[primValId]?.[sel.attributeId] || []);
+
+      let primCombos: string[][] = [];
+      if (activeGroups.length === 0) {
+        primCombos = [[primValId]];
+      } else if (activeGroups.some((g) => g.length === 0)) {
+        return; // skip
+      } else {
+        const product = cartesianProduct(activeGroups);
+        primCombos = product.map((p) => [primValId, ...(Array.isArray(p) ? p : [p])]);
+      }
+
+      // Filter based on parentValueId
+      const filteredPrimCombos = primCombos.filter((combo) => {
+        for (const valueId of combo) {
+          let foundAttr: any = null;
+          for (const attr of currentFullList) {
+            const val = attr.values.find((v: any) => v.id === valueId);
+            if (val) {
+              foundAttr = attr;
+              break;
+            }
+          }
+
+          if (foundAttr && foundAttr.parentValueId) {
+            if (!combo.includes(foundAttr.parentValueId)) {
+              return false;
+            }
+          }
+        }
+        return true;
+      });
+
+      filteredPrimCombos.forEach((combo) => {
+        const attributeMap: Record<string, string> = {};
+        const nameParts: string[] = [];
+
+        combo.forEach((valueId) => {
+          let foundAttr: any = null;
+          for (const attr of currentFullList) {
+            const val = attr.values.find((v: any) => v.id === valueId);
+            if (val) {
+              foundAttr = attr;
+              const valText = val.value.includes("|") ? val.value.split("|")[0] : val.value;
+              nameParts.push(valText);
+              attributeMap[attr.id] = val.id;
+              break;
+            }
+          }
+        });
+
+        finalCombos.push({
+          attributeMap,
+          variantName: nameParts.join(" • "),
+        });
+      });
+    });
 
     const existingVariants = productData?.productVariants || [];
-
     const newVariantsState: any[] = [];
     const usedExistingVariantIds = new Set();
 
@@ -622,7 +735,7 @@ export default function EditProductPage() {
       return "";
     };
 
-    for (const newComb of newCombinations) {
+    for (const newComb of finalCombos) {
       const valueIdsInCombo = Object.values(newComb.attributeMap) as string[];
       const newCombAttributeIds = Object.values(newComb.attributeMap)
         .sort()
@@ -631,13 +744,11 @@ export default function EditProductPage() {
       const existingMatch = existingVariants.find((v: any) => {
         if (v._isDeleted) return false;
 
-        // Cek apakah signature atributnya cocok
         const existingSignature = getVariantSignature(v);
         if (existingSignature && existingSignature !== "") {
           return existingSignature === newCombAttributeIds;
         }
 
-        // Fallback: Cocokkan berdasarkan nama (case-insensitive, normalize separators)
         const normalizeName = (name: string) =>
           name?.toLowerCase().replace(/[\s•·\-\/]/g, "") || "";
         return (
@@ -653,7 +764,6 @@ export default function EditProductPage() {
         });
         usedExistingVariantIds.add(existingMatch.id);
       } else {
-        // B. Variant BARU DIBUAT
         let modifierSum = 0;
         currentSelections.forEach((selection: any) => {
           if (selection.isVariantGenerator !== false) {
@@ -677,7 +787,6 @@ export default function EditProductPage() {
           price: basePrice + modifierSum,
           images: [],
           _isDeleted: false,
-
           attributeValueIds: valueIdsInCombo,
         });
       }
@@ -698,8 +807,82 @@ export default function EditProductPage() {
     }));
 
     toast.info(
-      `Generated ${newCombinations.length} variants. Check form below.`,
+      `Generated ${finalCombos.length} variants. Check form below.`,
     );
+    setIsGenModalOpen(false);
+  };
+
+  const handleAddAttributeValueInline = async (attributeId: string, newValueName: string, primValId: string, priceModifier?: string) => {
+    const attr = currentFullList.find((a) => a.id === attributeId);
+    if (!attr) return toast.error("Attribute not found.");
+
+    const formattedValues = attr.values.map((v: any) => ({
+      id: v.id,
+      value: v.value,
+      position: v.position || 0,
+    }));
+
+    const nextPosition = formattedValues.length;
+    formattedValues.push({
+      value: newValueName.trim(),
+      position: nextPosition,
+    });
+
+    try {
+      const res = await fetchApi(`/product-attributes/${attributeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: attr.name,
+          type: attr.type || "TEXT",
+          values: formattedValues,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to add value.");
+      }
+
+      const updatedAttr = await res.json();
+      
+      const nextFullList = currentFullList.map((a) => (a.id === attributeId ? updatedAttr : a));
+      setCurrentFullList(nextFullList);
+
+      const newValueObj = updatedAttr.values.find((v: any) => v.value === newValueName.trim());
+      if (newValueObj) {
+        const nextSelections = currentSelections.map((sel) => {
+          if (sel.attributeId === attributeId) {
+            const nextModifiers = { ...sel.priceModifiers };
+            if (priceModifier && priceModifier.trim() !== "") {
+              nextModifiers[newValueObj.id] = Number(priceModifier) || 0;
+            }
+            return {
+              ...sel,
+              valueIds: [...sel.valueIds, newValueObj.id],
+              priceModifiers: nextModifiers,
+            };
+          }
+          return sel;
+        });
+        setCurrentSelections(nextSelections);
+
+        setActiveGroupFilters((prev) => {
+          const nextFilters = { ...prev };
+          if (nextFilters[primValId]) {
+            if (!nextFilters[primValId][attributeId]) {
+              nextFilters[primValId][attributeId] = [];
+            }
+            nextFilters[primValId][attributeId] = [...nextFilters[primValId][attributeId], newValueObj.id];
+          }
+          return nextFilters;
+        });
+
+        toast.success(`Berhasil menambahkan nilai "${newValueName}"`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menambahkan nilai atribut.");
+    }
   };
 
   // HANDLER BARU: Update Price Tiers
@@ -782,7 +965,10 @@ export default function EditProductPage() {
           className="space-y-6 animate-fade-in focus-visible:outline-none">
           <FormUpdateProductMedia
             productId={id as string}
-            initialData={productData}
+            initialData={productData ? {
+              ...productData,
+              images: (productData.images || []).filter((img: any) => !img.attributeValueId)
+            } : undefined}
             isSubmitting={isSubmitting}
             onAddImage={handleAddImage}
             onDeleteImage={handleDeleteImage}
@@ -818,6 +1004,7 @@ export default function EditProductPage() {
             onUpdateMockupSettings={handleUpdateMockupSettings}
             onUpdateMediaMetadata={handleUpdateMediaMetadata}
             onAddImage={handleAddImage}
+            onRefresh={fetchProductData}
           />
           <FormUpdateVariants
             initialData={productData}
@@ -827,6 +1014,308 @@ export default function EditProductPage() {
           />
         </TabsContent>
       </Tabs>
+
+      {/* CHECKLIST GROUPED FILTER MODAL */}
+      <Dialog open={isGenModalOpen} onOpenChange={isGenModalOpen ? () => setIsGenModalOpen(false) : setIsGenModalOpen}>
+        <DialogContent className="max-w-3xl bg-white border shadow-2xl rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-extrabold text-slate-900">
+              Atur Filter Kombinasi Varian
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-500 mt-1.5">
+              Pilih kombinasi atribut yang valid untuk masing-masing item utama di bawah ini.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[60vh] overflow-y-auto space-y-6 pr-2 py-4">
+            {(() => {
+              const variantGeneratingSelections = currentSelections.filter((sel) => sel.isVariantGenerator !== false);
+              const primarySelection = variantGeneratingSelections[0];
+              const otherSelections = variantGeneratingSelections.slice(1);
+              const primaryAttr = currentFullList.find((a) => a.id === primarySelection?.attributeId);
+
+              if (!primarySelection || !primaryAttr) return null;
+
+              return primarySelection.valueIds.map((primValId: string) => {
+                const primVal = primaryAttr.values.find((v: any) => v.id === primValId);
+                if (!primVal) return null;
+
+                const primValLabel = primVal.value.split("|")[0];
+
+                return (
+                  <div key={primValId} className="border rounded-xl p-5 bg-stone-50/50 space-y-4">
+                    <div className="flex justify-between items-center border-b pb-2">
+                      <h4 className="font-bold text-slate-900 flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-indigo-650"></span>
+                        {primaryAttr.name}: {primValLabel}
+                      </h4>
+                      <div className="space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          onClick={() => {
+                            setActiveGroupFilters((prev: any) => {
+                              const next = { ...prev };
+                              next[primValId] = {};
+                              otherSelections.forEach((sel: any) => {
+                                next[primValId][sel.attributeId] = [...sel.valueIds];
+                              });
+                              return next;
+                            });
+                          }}
+                          className="text-[10px] h-6 px-2 font-bold"
+                        >
+                          Pilih Semua
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          onClick={() => {
+                            setActiveGroupFilters((prev: any) => {
+                              const next = { ...prev };
+                              next[primValId] = {};
+                              otherSelections.forEach((sel: any) => {
+                                next[primValId][sel.attributeId] = [];
+                              });
+                              return next;
+                            });
+                          }}
+                          className="text-[10px] h-6 px-2 font-bold text-red-650 hover:bg-red-50"
+                        >
+                          Kosongkan
+                        </Button>
+                      </div>
+                    </div>
+
+                    {otherSelections.length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">Tidak ada sub-atribut untuk difilter.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {otherSelections.map((sel: any) => {
+                          const attr = currentFullList.find((a: any) => a.id === sel.attributeId);
+                          if (!attr) return null;
+
+                          const activeList = activeGroupFilters[primValId]?.[sel.attributeId] || [];
+
+                          return (
+                            <div key={sel.attributeId} className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{attr.name}</span>
+                                {!(inlineInputAttrId === sel.attributeId && inlineInputGroupId === primValId) && (
+                                  <Button
+                                    type="button"
+                                    variant="link"
+                                    size="sm"
+                                    className="text-[10px] p-0 h-auto font-bold text-primary hover:text-primary/90"
+                                    onClick={() => {
+                                      setInlineInputAttrId(sel.attributeId);
+                                      setInlineInputGroupId(primValId);
+                                      setInlineInputValue("");
+                                      setInlineInputPrice("");
+                                    }}
+                                  >
+                                    + Tambah Nilai
+                                  </Button>
+                                )}
+                              </div>
+
+                              {inlineInputAttrId === sel.attributeId && inlineInputGroupId === primValId && (
+                                <div className="p-3 border border-stone-200 bg-stone-50/50 rounded-xl space-y-3 w-full max-w-sm">
+                                  <span className="text-[10px] font-bold text-stone-700 uppercase tracking-wider block">
+                                    Tambah Nilai untuk {attr.name}
+                                  </span>
+                                  {attr.type === "COLOR" ? (
+                                    <ColorValueInput
+                                      value={inlineInputValue}
+                                      onChange={(val) => setInlineInputValue(val)}
+                                    />
+                                  ) : (attr.type === "MODEL_SHAPE" || attr.type === "SIZE") ? (
+                                    <ModelShapeValueInput
+                                      value={inlineInputValue}
+                                      onChange={(val) => setInlineInputValue(val)}
+                                    />
+                                  ) : (
+                                    <Input
+                                      type="text"
+                                      placeholder="Masukkan nilai baru..."
+                                      value={inlineInputValue}
+                                      onChange={(e: any) => setInlineInputValue(e.target.value)}
+                                      className="h-8 text-xs bg-white text-slate-800"
+                                      autoFocus
+                                    />
+                                  )}
+
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                      Penyesuaian Harga (Opsional)
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Contoh: 5000 atau -2000"
+                                      value={inlineInputPrice}
+                                      onChange={(e: any) => setInlineInputPrice(e.target.value)}
+                                      className="h-8 text-xs bg-white text-slate-800"
+                                    />
+                                  </div>
+
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 px-3 text-xs text-stone-500 font-bold border-stone-250 bg-white"
+                                      onClick={() => {
+                                        setInlineInputAttrId(null);
+                                        setInlineInputGroupId(null);
+                                        setInlineInputValue("");
+                                        setInlineInputPrice("");
+                                      }}
+                                    >
+                                      Batal
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      className="h-7 px-3 text-xs bg-primary hover:bg-primary/90 text-white font-bold"
+                                      onClick={async () => {
+                                        if (!inlineInputValue.trim()) return;
+                                        await handleAddAttributeValueInline(
+                                          sel.attributeId,
+                                          inlineInputValue,
+                                          primValId,
+                                          inlineInputPrice
+                                        );
+                                        setInlineInputAttrId(null);
+                                        setInlineInputGroupId(null);
+                                        setInlineInputValue("");
+                                        setInlineInputPrice("");
+                                      }}
+                                    >
+                                      Simpan
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="flex flex-wrap gap-2">
+                                {attr.values
+                                  .filter((v: any) => sel.valueIds.includes(v.id))
+                                  .map((v: any) => {
+                                    const isChecked = activeList.includes(v.id);
+                                    
+                                    const isColorType = attr.type === "COLOR";
+                                    const isModelShape = attr.type === "MODEL_SHAPE" || attr.type === "SIZE";
+
+                                    const priceMod = sel.priceModifiers?.[v.id];
+                                    const priceModLabel = priceMod && Number(priceMod) !== 0
+                                      ? ` (${Number(priceMod) > 0 ? "+" : ""}Rp ${Number(priceMod).toLocaleString("id-ID")})`
+                                      : "";
+
+                                    let contentNode = null;
+
+                                    if (isColorType) {
+                                      const parsed = parseColorValue(v.value);
+                                      const isCustomColor = parsed.name.toLowerCase().includes("custom") || parsed.name.toLowerCase().includes("kustom");
+                                      contentNode = (
+                                        <span className="truncate flex items-center gap-1.5 flex-1 font-medium text-xs text-slate-700">
+                                          <span
+                                            className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0 shadow-inner"
+                                            style={{
+                                              background: isCustomColor
+                                                ? "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)"
+                                                : parsed.hex,
+                                            }}
+                                          />
+                                          <span className="truncate">{parsed.name || parsed.hex}{priceModLabel}</span>
+                                          {!isCustomColor && (
+                                            <span className="text-[9px] text-slate-450 font-mono shrink-0">
+                                              CMYK({parsed.cmyk.c},{parsed.cmyk.m},{parsed.cmyk.y},{parsed.cmyk.k})
+                                            </span>
+                                          )}
+                                        </span>
+                                      );
+                                    } else if (isModelShape) {
+                                      const p = v.value.split("|");
+                                      const mName = p[0] || "";
+                                      const mUrl = p[1] || "";
+                                      contentNode = (
+                                        <span className="truncate flex items-center gap-1.5 flex-1 font-medium text-xs text-slate-700">
+                                          {mUrl && (
+                                            <img
+                                              src={mUrl}
+                                              alt={mName}
+                                              className="w-4 h-4 object-cover rounded-sm border shrink-0 bg-slate-50"
+                                            />
+                                          )}
+                                          <span className="truncate">{mName}{priceModLabel}</span>
+                                        </span>
+                                      );
+                                    } else {
+                                      const label = v.value.split("|")[0];
+                                      contentNode = <span className="truncate font-medium text-xs text-slate-700">{label}{priceModLabel}</span>;
+                                    }
+
+                                    return (
+                                      <label
+                                        key={v.id}
+                                        className={`flex items-center space-x-2 border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer select-none transition-all ${
+                                          isChecked
+                                            ? "border-indigo-650 bg-indigo-50/50 text-indigo-750"
+                                            : "border-stone-200 bg-white hover:bg-stone-50 text-stone-600"
+                                        }`}
+                                      >
+                                        <Checkbox
+                                          checked={isChecked}
+                                          onCheckedChange={(checked) => {
+                                            setActiveGroupFilters((prev: any) => {
+                                              const next = { ...prev };
+                                              const currentList = next[primValId]?.[sel.attributeId] || [];
+                                              if (checked) {
+                                                next[primValId][sel.attributeId] = [...currentList, v.id];
+                                              } else {
+                                                next[primValId][sel.attributeId] = currentList.filter((id: string) => id !== v.id);
+                                              }
+                                              return next;
+                                            });
+                                          }}
+                                          className="h-3.5 w-3.5 border-stone-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        {contentNode}
+                                      </label>
+                                    );
+                                  })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+          </div>
+
+          <DialogFooter className="mt-6 gap-2">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setIsGenModalOpen(false)}
+              className="font-bold text-xs uppercase"
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmVariantGeneration}
+              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs uppercase"
+            >
+              Generate Varian Terpilih
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

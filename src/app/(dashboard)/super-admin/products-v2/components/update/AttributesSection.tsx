@@ -27,6 +27,7 @@ export default function FormUpdateAttributes({
   onUpdateMockupSettings,
   onUpdateMediaMetadata,
   onAddImage,
+  onRefresh,
 }: {
   initialData: any;
   isSubmitting: boolean;
@@ -42,7 +43,8 @@ export default function FormUpdateAttributes({
     mockupBackImageId: string | null;
   }) => Promise<void>;
   onUpdateMediaMetadata?: (mediaId: string, updates: any) => Promise<void>;
-  onAddImage?: (file: File) => Promise<any>;
+  onAddImage?: (fileOrUrl: File | string) => Promise<any>;
+  onRefresh?: () => Promise<void>;
 }) {
   const [attributeSelections, setAttributeSelections] = useState<
     SelectedAttributeRow[]
@@ -71,7 +73,7 @@ export default function FormUpdateAttributes({
   }
 
   const getProductAttributeValues = () => {
-    const list: { id: string; value: string; attributeName: string; attributeType: string }[] = [];
+    const list: { id: string; value: string; rawValue: string; attributeName: string; attributeType: string }[] = [];
     
     attributesFullList.forEach((attr) => {
       const selection = attributeSelections.find((sel) => sel.attributeId === attr.id);
@@ -81,6 +83,7 @@ export default function FormUpdateAttributes({
           list.push({
             id: val.id,
             value: val.value.includes("|") ? val.value.split("|")[0] : val.value,
+            rawValue: val.value,
             attributeName: attr.name,
             attributeType: attr.type || "TEXT",
           });
@@ -94,6 +97,7 @@ export default function FormUpdateAttributes({
           list.push({
             id: item.attributeValue.id,
             value: item.attributeValue.value.includes("|") ? item.attributeValue.value.split("|")[0] : item.attributeValue.value,
+            rawValue: item.attributeValue.value,
             attributeName: item.attributeValue.attribute?.name || "",
             attributeType: item.attributeValue.attribute?.type || "TEXT",
           });
@@ -121,22 +125,52 @@ export default function FormUpdateAttributes({
 
   const handleRemoveMockupSide = async (id: string, imageId: string | null) => {
     try {
-      if (imageId && onUpdateMediaMetadata) {
-        await onUpdateMediaMetadata(imageId, {
-          mockupSideName: null,
-          attributeValueId: null,
-          printSideValueId: null,
-          printPositionValueId: null,
-        });
+      if (imageId) {
+        if (onUpdateMediaMockups) {
+          await onUpdateMediaMockups(imageId, []);
+        }
+        if (onUpdateMediaMetadata) {
+          await onUpdateMediaMetadata(imageId, {
+            mockupSideName: null,
+            attributeValueId: null,
+            printSideValueId: null,
+            printPositionValueId: null,
+          });
+        }
+        let frontCleared = false;
+        let backCleared = false;
+        let nextFront = mockupFrontImageId;
+        let nextBack = mockupBackImageId;
+        if (mockupFrontImageId === imageId) {
+          setMockupFrontImageId(null);
+          nextFront = null;
+          frontCleared = true;
+        }
+        if (mockupBackImageId === imageId) {
+          setMockupBackImageId(null);
+          nextBack = null;
+          backCleared = true;
+        }
+        if ((frontCleared || backCleared) && onUpdateMockupSettings) {
+          await onUpdateMockupSettings({
+            isMultiFace,
+            mockupFrontImageId: nextFront,
+            mockupBackImageId: isMultiFace ? nextBack : null,
+          });
+        }
       }
+      toast.success("Mockup berhasil dihapus");
     } catch (err) {
       console.error("Failed to unlink image metadata on delete", err);
+      toast.error("Gagal menghapus mockup di server");
+      return;
     }
     setMockupSides((prev) => prev.filter((m) => m.id !== id));
   };
 
   useEffect(() => {
     if (initialData?.images && !isInitialized) {
+      const fullAttributeValuesList = getProductAttributeValues();
       const initialMockupSides = initialData.images
         .filter((img: any) => img.mockupSideName || img.attributeValueId || img.printSideValueId || img.printPositionValueId || (img.mockupAreas && img.mockupAreas.length > 0))
         .map((img: any) => ({
@@ -149,8 +183,34 @@ export default function FormUpdateAttributes({
           printPositionValueId: img.printPositionValueId || null,
           url: img.url,
         }));
-      setMockupSides(initialMockupSides);
+
+      const sortedMockupSides = [...initialMockupSides].sort((a, b) => {
+        const indexA = fullAttributeValuesList.findIndex(v => v.id === a.attributeValueId);
+        const indexB = fullAttributeValuesList.findIndex(v => v.id === b.attributeValueId);
+        const valA = indexA === -1 ? 9999 : indexA;
+        const valB = indexB === -1 ? 9999 : indexB;
+        if (valA !== valB) return valA - valB;
+        return a.name.localeCompare(b.name);
+      });
+
+      setMockupSides(sortedMockupSides);
       setIsInitialized(true);
+    }
+  }, [initialData?.images, isInitialized]);
+
+  useEffect(() => {
+    if (isInitialized && initialData?.images) {
+      const dbImageIds = new Set(initialData.images.map((img: any) => img.id));
+      setMockupSides((prev) =>
+        prev.filter(
+          (m) =>
+            !m.imageId ||
+            m.imageId.startsWith("new-") ||
+            m.imageId.startsWith("slot-") ||
+            m.imageId.startsWith("size-default-") ||
+            dbImageIds.has(m.imageId)
+        )
+      );
     }
   }, [initialData?.images, isInitialized]);
 
@@ -315,48 +375,32 @@ export default function FormUpdateAttributes({
     setIsMockupModalOpen(true);
   };
 
-  const handleSaveMockupAreas = async () => {
-    if (!selectedMockupImage || !onUpdateMediaMockups) return;
-    try {
-      await onUpdateMediaMockups(selectedMockupImage.id, mockupAreasState);
-      
-      // Update local state to match
-      setMockupSides((prev) =>
-        prev.map((item) =>
-          item.imageId === selectedMockupImage.id
-            ? { ...item, mockupAreas: mockupAreasState }
-            : item
-        )
-      );
-      
-      setIsMockupModalOpen(false);
-      setSelectedMockupImage(null);
-    } catch (err) {
-      console.error("Gagal menyimpan area mockup:", err);
-    }
-  };
+  const handleSaveMockupAreas = () => {
+    if (!selectedMockupImage) return;
 
-  const handleClearSlot = async (id: string) => {
-    const item = mockupSides.find((m) => m.id === id);
-    if (!item) return;
-    if (item.imageId && !item.id.startsWith("slot-")) {
-      try {
-        if (onUpdateMediaMockups) {
-          await onUpdateMediaMockups(item.imageId, []);
-        }
-        if (onUpdateMediaMetadata) {
-          await onUpdateMediaMetadata(item.imageId, {
-            mockupSideName: null,
-            attributeValueId: null,
-            printSideValueId: null,
-            printPositionValueId: null,
-          });
-        }
-      } catch (err) {
-        toast.error("Gagal mereset slot di server");
+    // Validate that physical size is input for each area
+    for (const area of mockupAreasState) {
+      if (!area.physicalWidth || area.physicalWidth <= 0 || !area.physicalHeight || area.physicalHeight <= 0) {
+        toast.error(`Silakan isi ukuran fisik lebar & tinggi area cetak untuk "${area.label || "Mockup Zone"}"`);
         return;
       }
     }
+    
+    // Update local state to match
+    setMockupSides((prev) =>
+      prev.map((item) =>
+        item.id === selectedMockupImage.id
+          ? { ...item, mockupAreas: mockupAreasState }
+          : item
+      )
+    );
+    
+    setIsMockupModalOpen(false);
+    setSelectedMockupImage(null);
+    toast.success("Area mockup berhasil diupdate");
+  };
+
+  const handleClearSlot = (id: string) => {
     setMockupSides((prev) =>
       prev.map((m) =>
         m.id === id
@@ -379,7 +423,7 @@ export default function FormUpdateAttributes({
     toast.success("Konfigurasi area mockup berhasil disalin!");
   };
 
-  const handlePasteMockupConfig = async (id: string) => {
+  const handlePasteMockupConfig = (id: string) => {
     if (!copiedMockupAreas) return;
     const targetItem = mockupSides.find((m) => m.id === id);
     if (!targetItem || !targetItem.imageId) {
@@ -392,34 +436,15 @@ export default function FormUpdateAttributes({
       id: `area-${Date.now()}-${Math.random()}`,
     }));
 
-    try {
-      if (onUpdateMediaMockups) {
-        await onUpdateMediaMockups(targetItem.imageId, pastedAreas);
-        setMockupSides((prev) =>
-          prev.map((item) =>
-            item.id === id ? { ...item, mockupAreas: pastedAreas } : item
-          )
-        );
-        toast.success("Konfigurasi area mockup berhasil ditempel!");
-      }
-    } catch (err) {
-      toast.error("Gagal menempel konfigurasi area mockup");
-    }
+    setMockupSides((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, mockupAreas: pastedAreas } : item
+      )
+    );
+    toast.success("Konfigurasi area mockup berhasil ditempel!");
   };
 
-  const handleSaveName = async (item: any, newName: string) => {
-    if (!item.imageId) return;
-    try {
-      if (onUpdateMediaMetadata) {
-        await onUpdateMediaMetadata(item.imageId, { mockupSideName: newName || null });
-        toast.success("Nama posisi berhasil disimpan!");
-      }
-    } catch (err) {
-      toast.error("Gagal menyimpan nama posisi");
-    }
-  };
-
-  const handleImageSelect = async (id: string, newImageId: string) => {
+  const handleImageSelect = (id: string, newImageId: string) => {
     const prevItem = mockupSides.find((m) => m.id === id);
     if (!prevItem) return;
     const oldImageId = prevItem.imageId;
@@ -434,40 +459,151 @@ export default function FormUpdateAttributes({
         item.id === id
           ? {
               ...item,
-              id: newImageId,
               imageId: newImageId,
               url: selectedImg.url,
+              mockupAreas: selectedImg.mockupAreas || item.mockupAreas || [],
             }
           : item
       )
     );
-    
+    toast.success("Gambar mockup berhasil diubah!");
+  };
+
+  const [isSavingMockups, setIsSavingMockups] = useState(false);
+
+  const handleSaveMockups = async () => {
+    // Validation
+    const fullAttributeValuesList = getProductAttributeValues();
+    for (const side of mockupSides) {
+      const sizeOpt = fullAttributeValuesList.find(o => o.id === side.attributeValueId);
+      const sizeName = sizeOpt ? sizeOpt.value : "";
+      const printPositionName = side.name || "Posisi Mockup";
+      const fullName = sizeName ? `${sizeName} - ${printPositionName}` : printPositionName;
+
+      if (!side.imageId && !side.url) {
+        toast.error(`Silakan pilih atau hubungkan gambar mockup untuk "${fullName}"`);
+        return;
+      }
+      if (!side.attributeValueId) {
+        toast.error(`Silakan hubungkan ukuran/kapasitas untuk "${fullName}"`);
+        return;
+      }
+      if (!side.printPositionValueId) {
+        toast.error(`Silakan pilih posisi cetak untuk "${fullName}"`);
+        return;
+      }
+      if (!side.mockupAreas || side.mockupAreas.length === 0) {
+        toast.error(`Silakan atur area mockup (klik tombol "Atur Area") untuk "${fullName}"`);
+        return;
+      }
+    }
+
+    setIsSavingMockups(true);
     try {
-      if (onUpdateMediaMetadata) {
-        await onUpdateMediaMetadata(newImageId, { 
-          mockupSideName: prevItem.name || null,
-          attributeValueId: prevItem.attributeValueId || null,
-          printSideValueId: prevItem.printSideValueId || null,
-          printPositionValueId: prevItem.printPositionValueId || null
-        });
-      }
-      if (prevItem.mockupAreas && prevItem.mockupAreas.length > 0 && onUpdateMediaMockups) {
-        await onUpdateMediaMockups(newImageId, prevItem.mockupAreas);
-      }
-      
-      if (oldImageId && !oldImageId.startsWith("temp-")) {
-        if (onUpdateMediaMetadata) {
-          await onUpdateMediaMetadata(oldImageId, { mockupSideName: null, attributeValueId: null, printSideValueId: null, printPositionValueId: null });
-        }
+      // 1. Identify which images need to be unlinked/cleared.
+      const activeImageIds = new Set(mockupSides.map((m) => m.imageId).filter(Boolean));
+      const imagesToUnlink = (initialData?.images || []).filter(
+        (img: any) =>
+          (img.mockupSideName || img.attributeValueId || img.printSideValueId || img.printPositionValueId || (img.mockupAreas && img.mockupAreas.length > 0)) &&
+          !activeImageIds.has(img.id)
+      );
+
+      // 2. Perform unlinking for cleared/deleted mockups
+      for (const img of imagesToUnlink) {
         if (onUpdateMediaMockups) {
-          await onUpdateMediaMockups(oldImageId, []);
+          await onUpdateMediaMockups(img.id, []);
+        }
+        if (onUpdateMediaMetadata) {
+          await onUpdateMediaMetadata(img.id, {
+            mockupSideName: null,
+            attributeValueId: null,
+            printSideValueId: null,
+            printPositionValueId: null,
+          });
         }
       }
-      
-      toast.success("Gambar mockup berhasil diubah!");
+
+      // 3. Save updates for active mockup sides
+      for (const side of mockupSides) {
+        let currentImageId = side.imageId;
+        const isNewImagePlaceholder = currentImageId && currentImageId.startsWith("size-default-");
+        
+        // If imageId is a size-default URL placeholder, register it first
+        if (isNewImagePlaceholder && onAddImage) {
+          try {
+            const uploadedImg = await onAddImage(side.url);
+            if (uploadedImg && uploadedImg.id) {
+              currentImageId = uploadedImg.id;
+            }
+          } catch (err) {
+            console.error("Failed to register size default image during save", err);
+            toast.error(`Gagal mendaftarkan gambar default untuk ukuran ${side.name}`);
+            continue;
+          }
+        }
+
+        if (!currentImageId) continue;
+        
+        // Check if this side has changed compared to its initial state in initialData.images
+        const initialImg = initialData?.images?.find((img: any) => img.id === currentImageId);
+
+        if (initialImg) {
+          const hasMetadataChanged = 
+            (side.name || null) !== (initialImg.mockupSideName || null) ||
+            (side.attributeValueId || null) !== (initialImg.attributeValueId || null) ||
+            (side.printPositionValueId || null) !== (initialImg.printPositionValueId || null);
+
+          const initialAreas = initialImg.mockupAreas || [];
+          const currentAreas = side.mockupAreas || [];
+          const hasAreasChanged = JSON.stringify(initialAreas) !== JSON.stringify(currentAreas);
+
+          if (!hasMetadataChanged && !hasAreasChanged) {
+            // Nothing changed for this existing side, skip saving
+            continue;
+          }
+
+          // Save metadata only if changed
+          if (hasMetadataChanged && onUpdateMediaMetadata) {
+            await onUpdateMediaMetadata(currentImageId, {
+              mockupSideName: side.name || null,
+              attributeValueId: side.attributeValueId || null,
+              printSideValueId: side.printSideValueId || null,
+              printPositionValueId: side.printPositionValueId || null,
+            });
+          }
+
+          // Save mockup areas only if changed
+          if (hasAreasChanged && onUpdateMediaMockups) {
+            await onUpdateMediaMockups(currentImageId, currentAreas);
+          }
+        } else {
+          // This is a newly registered image/side (not in initialData.images yet), save everything
+          if (onUpdateMediaMetadata) {
+            await onUpdateMediaMetadata(currentImageId, {
+              mockupSideName: side.name || null,
+              attributeValueId: side.attributeValueId || null,
+              printSideValueId: side.printSideValueId || null,
+              printPositionValueId: side.printPositionValueId || null,
+            });
+          }
+          
+          if (onUpdateMediaMockups) {
+            await onUpdateMediaMockups(currentImageId, side.mockupAreas || []);
+          }
+        }
+      }
+
+      toast.success("Pengaturan mockup berhasil disimpan!");
+      if (onRefresh) {
+        await onRefresh();
+      } else {
+        window.location.reload();
+      }
     } catch (err) {
-      console.error(err);
-      toast.error("Gagal memperbarui gambar mockup di server.");
+      console.error("Gagal menyimpan pengaturan mockup:", err);
+      toast.error("Gagal menyimpan pengaturan mockup");
+    } finally {
+      setIsSavingMockups(false);
     }
   };
 
@@ -544,7 +680,12 @@ export default function FormUpdateAttributes({
                             <div key={item.id} className="border border-stone-200 dark:border-stone-800 rounded-lg p-3 bg-white dark:bg-stone-900/60 flex flex-col gap-3 relative shadow-xs">
                               <div className="pr-12">
                                 <h4 className="text-xs font-bold text-indigo-655 dark:text-indigo-400 truncate mb-0.5">
-                                  {item.name || "Posisi Mockup Baru"}
+                                  {(() => {
+                                    const sizeOpt = fullAttributeValuesList.find(o => o.id === item.attributeValueId);
+                                    const sizeName = sizeOpt ? sizeOpt.value : "";
+                                    const printPositionName = item.name || "Posisi Mockup Baru";
+                                    return sizeName ? `${sizeName} - ${printPositionName}` : printPositionName;
+                                  })()}
                                 </h4>
                               </div>
 
@@ -664,7 +805,6 @@ export default function FormUpdateAttributes({
                                           )
                                         );
                                       }}
-                                      onBlur={() => handleSaveName(item, item.name)}
                                       className="h-8 text-xs bg-white text-slate-800"
                                       disabled={!item.imageId}
                                     />
@@ -672,37 +812,60 @@ export default function FormUpdateAttributes({
 
                                   <div className="space-y-1">
                                     <Label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                                      Hubungkan Ukuran
+                                      Hubungkan Ukuran / Model
                                     </Label>
                                     <Select
-                                      value={item.attributeValueId || "none"}
-                                      onValueChange={async (val) => {
-                                        const targetVal = val === "none" ? null : val;
-                                        setMockupSides((prev) =>
-                                          prev.map((m) => m.id === item.id ? { ...m, attributeValueId: targetVal } : m)
-                                        );
-                                        if (item.imageId && onUpdateMediaMetadata) {
-                                          try {
-                                            await onUpdateMediaMetadata(item.imageId, { attributeValueId: targetVal });
-                                            toast.success("Ukuran mockup berhasil disinkronkan!");
-                                          } catch (err) {
-                                            toast.error("Gagal menyinkronkan ukuran");
-                                          }
-                                        }
-                                      }}
-                                    >
-                                      <SelectTrigger className="w-full h-8 text-xs">
-                                        <SelectValue placeholder="Semua Ukuran" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="none" className="text-xs">Semua Ukuran</SelectItem>
-                                        {fullAttributeValuesList.filter(v => v.attributeType === "SIZE").map((val) => (
-                                          <SelectItem key={val.id} value={val.id} className="text-xs">
-                                            {val.value}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
+                                       value={item.attributeValueId || "none"}
+                                       onValueChange={(val) => {
+                                         const targetVal = val === "none" ? null : val;
+                                         
+                                         let resolvedImageId = item.imageId;
+                                         let resolvedUrl = item.url;
+                                         
+                                         if (targetVal) {
+                                           const targetOpt = fullAttributeValuesList.find(o => o.id === targetVal);
+                                           if (targetOpt) {
+                                             const parts = targetOpt.rawValue.split("|");
+                                             const imageUrl = parts[1];
+                                             if (imageUrl) {
+                                               const existingImg = (availableImages || []).find((img: any) => img.url === imageUrl);
+                                               if (existingImg) {
+                                                 resolvedImageId = existingImg.id;
+                                                 resolvedUrl = existingImg.url;
+                                               } else {
+                                                 resolvedImageId = `size-default-${targetVal}`;
+                                                 resolvedUrl = imageUrl;
+                                               }
+                                             }
+                                           }
+                                         }
+
+                                         setMockupSides((prev) =>
+                                            prev.map((m) =>
+                                              m.id === item.id
+                                                ? {
+                                                    ...m,
+                                                    imageId: resolvedImageId,
+                                                    url: resolvedUrl,
+                                                    attributeValueId: targetVal,
+                                                  }
+                                                : m
+                                            )
+                                          );
+                                       }}
+                                     >
+                                       <SelectTrigger className="w-full h-8 text-xs">
+                                         <SelectValue placeholder="Semua Ukuran / Model" />
+                                       </SelectTrigger>
+                                       <SelectContent>
+                                         <SelectItem value="none" className="text-xs">Semua Ukuran / Model</SelectItem>
+                                         {fullAttributeValuesList.filter(v => v.attributeType === "SIZE" || v.attributeType === "MODEL_SHAPE").map((val) => (
+                                           <SelectItem key={val.id} value={val.id} className="text-xs">
+                                             {val.attributeName}: {val.value}
+                                           </SelectItem>
+                                         ))}
+                                       </SelectContent>
+                                     </Select>
                                   </div>
 
                                   <div className="space-y-1">
@@ -712,32 +875,21 @@ export default function FormUpdateAttributes({
                                     <Select
                                       value={item.printPositionValueId || "none"}
                                       disabled={!item.imageId}
-                                      onValueChange={async (val) => {
-                                        const targetVal = val === "none" ? null : val;
-                                        const targetOpt = fullAttributeValuesList.find(o => o.id === targetVal);
-                                        setMockupSides((prev) =>
-                                          prev.map((m) =>
-                                            m.id === item.id
-                                              ? {
-                                                  ...m,
-                                                  printPositionValueId: targetVal,
-                                                  name: targetOpt ? targetOpt.value : m.name
-                                                }
-                                              : m
-                                          )
-                                        );
-                                        if (item.imageId && onUpdateMediaMetadata) {
-                                          try {
-                                            await onUpdateMediaMetadata(item.imageId, {
-                                              printPositionValueId: targetVal,
-                                              mockupSideName: targetOpt ? targetOpt.value : item.name || null
-                                            });
-                                            toast.success("Posisi cetak mockup berhasil disinkronkan!");
-                                          } catch (err) {
-                                            toast.error("Gagal menyinkronkan posisi cetak");
-                                          }
-                                        }
-                                      }}
+                                      onValueChange={(val) => {
+                                         const targetVal = val === "none" ? null : val;
+                                         const targetOpt = fullAttributeValuesList.find(o => o.id === targetVal);
+                                         setMockupSides((prev) =>
+                                           prev.map((m) =>
+                                             m.id === item.id
+                                               ? {
+                                                   ...m,
+                                                   printPositionValueId: targetVal,
+                                                   name: targetOpt ? targetOpt.value : m.name
+                                                 }
+                                               : m
+                                           )
+                                         );
+                                       }}
                                     >
                                       <SelectTrigger className="w-full h-8 text-[11px]">
                                         <SelectValue placeholder="Bebas" />
@@ -800,11 +952,27 @@ export default function FormUpdateAttributes({
                       </div>
                     )}
 
-                    <div className="flex justify-end pt-4">
+                    <div className="flex justify-between items-center pt-4 border-t border-stone-105 dark:border-stone-805">
+                      <Button
+                        type="button"
+                        onClick={handleSaveMockups}
+                        disabled={isSavingMockups}
+                        className="text-xs font-semibold h-8 bg-primary hover:bg-primary/90 text-white shadow-xs"
+                      >
+                        {isSavingMockups ? (
+                          <>
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            <span>Menyimpan...</span>
+                          </>
+                        ) : (
+                          <span>Simpan Area Custom & Hubungan Gambar</span>
+                        )}
+                      </Button>
+
                       <Button
                         type="button"
                         onClick={handleAddMockupSide}
-                        className="text-xs font-semibold space-x-1.5 h-8 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 shadow-xs"
+                        className="text-xs font-semibold space-x-1.5 h-8 bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700 border border-stone-200 dark:border-stone-750 shadow-xs"
                       >
                         <Plus className="h-4 w-4" />
                         <span>Tambah Posisi Mockup</span>
@@ -871,7 +1039,7 @@ export default function FormUpdateAttributes({
                 type="button"
                 onClick={handleSaveMockupAreas}
                 disabled={isSubmitting}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-600/10"
+                className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-sm"
               >
                 {isSubmitting ? (
                   <>

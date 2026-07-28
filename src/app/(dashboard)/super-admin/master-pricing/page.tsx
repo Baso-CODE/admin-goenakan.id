@@ -83,6 +83,10 @@ export type Product = {
   activeVendorPriceRecord?: VendorPriceRecord | null;
   vendorPrices?: VendorPriceRecord[];
   priceTiers?: PriceTier[];
+  foreignPrice?: number | string | null;
+  currencyCode?: string | null;
+  exchangeRate?: number | string | null;
+  additionalFee?: number | string | null;
 };
 
 type Category = {

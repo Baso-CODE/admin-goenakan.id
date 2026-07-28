@@ -1418,6 +1418,22 @@ export default function SupplierCogsCalculatorPage() {
                   </button>
                 </div>
 
+                {/* COMPARE BUTTON */}
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (selectedRecordIds.length < 2) {
+                      toast.warning("Silakan pilih minimal 2 catatan sourcing dari checkbox tabel untuk dibandingkan.");
+                    } else {
+                      setShowComparison(true);
+                    }
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 h-9 w-full sm:w-auto"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Bandingkan {selectedRecordIds.length >= 2 ? `(${selectedRecordIds.length})` : ""}
+                </Button>
+
                 {/* ADD NEW BUTTON */}
                 <Button
                   onClick={handleAddNew}

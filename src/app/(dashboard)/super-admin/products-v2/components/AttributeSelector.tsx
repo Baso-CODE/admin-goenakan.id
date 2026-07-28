@@ -1197,7 +1197,7 @@ export function AttributeSelector({
                                         </span>
                                       )}
                                     </>
-                                  ) : attr.type === "MODEL_SHAPE" ? (
+                                  ) : (attr.type === "MODEL_SHAPE" || attr.type === "SIZE") ? (
                                     <>
                                       {(() => {
                                         const p = val.value.split("|");
@@ -1372,7 +1372,7 @@ function LocalFieldArrayEditor({
         return (
           <div key={field.id} className="border border-stone-200 p-3 rounded-md bg-stone-50/20 space-y-3 shadow-xs">
             <div className="flex items-center gap-2">
-              {currentLocalType === "MODEL_SHAPE" ? (
+              {(currentLocalType === "MODEL_SHAPE" || currentLocalType === "SIZE") ? (
                 <ModelShapeValueInput
                   value={valValue}
                   onChange={(newVal) => localForm.setValue(`${valuePath}.value`, newVal)}
@@ -1552,7 +1552,7 @@ function LocalSubValuesEditor({
         return (
           <div key={field.id} className="space-y-2 border-b pb-3 last:border-b-0 last:pb-0">
             <div className="flex items-center gap-2">
-              {type === "MODEL_SHAPE" ? (
+              {(type === "MODEL_SHAPE" || type === "SIZE") ? (
                 <ModelShapeValueInput
                   value={valValue}
                   onChange={(newVal) => form.setValue(`${valuePath}.value`, newVal)}
@@ -1645,12 +1645,12 @@ function LocalSubValuesEditor({
 
 // ===================== MODEL / SHAPE ATTRIBUTE VALUE IMAGE UPLOADER ===================== //
 
-interface ModelShapeValueInputProps {
+export interface ModelShapeValueInputProps {
   value: string;
   onChange: (val: string) => void;
 }
 
-function ModelShapeValueInput({ value, onChange }: ModelShapeValueInputProps) {
+export function ModelShapeValueInput({ value, onChange }: ModelShapeValueInputProps) {
   const parts = value ? value.split("|") : [];
   const name = parts[0] || "";
   const imageUrl = parts[1] || "";

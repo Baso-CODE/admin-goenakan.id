@@ -53,6 +53,8 @@ export function useProductFormV2(
   const [variantMetas, setVariantMetas] = useState<any[]>([]);
   const [variantFilesMap, setVariantFilesMap] = useState<File[][]>([]);
   const [productImagesFiles, setProductImagesFiles] = useState<File[]>([]);
+  const [isGenModalOpen, setIsGenModalOpen] = useState<boolean>(false);
+  const [activeGroupFilters, setActiveGroupFilters] = useState<Record<string, Record<string, string[]>>>({});
 
   // === FORM INITIALIZATION ===
   const form = useForm<ProductFormValues>({
@@ -317,61 +319,98 @@ export function useProductFormV2(
       return setCombinations([]);
     }
 
-    const groups = variantGeneratingSelections.map((a) => a.valueIds);
-    if (groups.some((g) => g.length === 0))
-      return toast.error("Semua attribute untuk variasi kombinasi wajib memiliki nilai.");
+    const primarySelection = variantGeneratingSelections[0];
+    if (!primarySelection.valueIds.length) {
+      return toast.error(`Harap isi nilai untuk atribut utama: ${attributesList.find(a => a.id === primarySelection.attributeId)?.name || ""}`);
+    }
 
-    let combos = cartesianProduct(groups);
-    if (combos.length === 0) return setCombinations([]);
-
-    // Filter combos based on hierarchical parentValue constraints
-    combos = combos.filter((combo) => {
-      for (const valueId of combo) {
-        let foundAttr: any = null;
-        for (const attr of attributesList) {
-          const val = attr.values.find((v: any) => v.id === valueId);
-          if (val) {
-            foundAttr = attr;
-            break;
-          }
-        }
-
-        if (foundAttr && foundAttr.parentValueId) {
-          if (!combo.includes(foundAttr.parentValueId)) {
-            return false;
-          }
-        }
-      }
-      return true;
-    });
-
-    const comboObjects = combos.map((combo) => {
-      const names: string[] = [];
-      attributesList.forEach((attr: any) => {
-        const selection = attributeSelections.find((s) => s.attributeId === attr.id);
-        if (selection && selection.isVariantGenerator !== false) {
-          combo.forEach((valueId) => {
-            const found = attr.values.find((v: any) => v.id === valueId);
-            if (found) {
-              let valStr = found.value;
-              if (attr.type === "COLOR") {
-                const parsed = parseColorValue(found.value);
-                valStr = parsed.name || parsed.hex;
-              } else if (found.value.includes("|")) {
-                valStr = found.value.split("|")[0];
-              }
-              names.push(`${attr.name} - ${valStr}`);
-            }
-          });
-        }
+    const initialFilters: Record<string, Record<string, string[]>> = {};
+    primarySelection.valueIds.forEach((primValId) => {
+      initialFilters[primValId] = {};
+      variantGeneratingSelections.slice(1).forEach((sel) => {
+        initialFilters[primValId][sel.attributeId] = [...sel.valueIds];
       });
-      return { valueIds: combo, label: names.join(" | ") };
     });
 
-    setCombinations(comboObjects);
+    setActiveGroupFilters(initialFilters);
+    setIsGenModalOpen(true);
+  };
+
+  const handleConfirmVariantGeneration = () => {
+    const variantGeneratingSelections = attributeSelections.filter(
+      (a) => a.isVariantGenerator !== false
+    );
+    const primarySelection = variantGeneratingSelections[0];
+    const otherSelections = variantGeneratingSelections.slice(1);
+
+    const cartesianProduct = (a: any[]): any[] => {
+      return a.reduce((co, b) => co.flatMap((d: any) => b.map((e: any) => [d, e].flat())));
+    };
+
+    const finalCombos: { valueIds: string[]; label: string }[] = [];
+
+    primarySelection.valueIds.forEach((primValId) => {
+      const activeGroups = otherSelections.map((sel) => activeGroupFilters[primValId]?.[sel.attributeId] || []);
+      
+      let primCombos: string[][] = [];
+      if (activeGroups.length === 0) {
+        primCombos = [[primValId]];
+      } else if (activeGroups.some((g) => g.length === 0)) {
+        return; // skip if any other attribute has 0 selected values
+      } else {
+        const product = cartesianProduct(activeGroups);
+        primCombos = product.map((p) => [primValId, ...(Array.isArray(p) ? p : [p])]);
+      }
+
+      // Filter based on parentValueId constraint
+      const filteredPrimCombos = primCombos.filter((combo) => {
+        for (const valueId of combo) {
+          let foundAttr: any = null;
+          for (const attr of attributesList) {
+            const val = attr.values.find((v: any) => v.id === valueId);
+            if (val) {
+              foundAttr = attr;
+              break;
+            }
+          }
+
+          if (foundAttr && foundAttr.parentValueId) {
+            if (!combo.includes(foundAttr.parentValueId)) {
+              return false;
+            }
+          }
+        }
+        return true;
+      });
+
+      filteredPrimCombos.forEach((combo) => {
+        const names: string[] = [];
+        attributesList.forEach((attr: any) => {
+          const selection = attributeSelections.find((s) => s.attributeId === attr.id);
+          if (selection && selection.isVariantGenerator !== false) {
+            combo.forEach((valueId) => {
+              const found = attr.values.find((v: any) => v.id === valueId);
+              if (found) {
+                let valStr = found.value;
+                if (attr.type === "COLOR") {
+                  const parsed = parseColorValue(found.value);
+                  valStr = parsed.name || parsed.hex;
+                } else if (found.value.includes("|")) {
+                  valStr = found.value.split("|")[0];
+                }
+                names.push(`${attr.name} - ${valStr}`);
+              }
+            });
+          }
+        });
+        finalCombos.push({ valueIds: combo, label: names.join(" | ") });
+      });
+    });
+
+    setCombinations(finalCombos);
+
     const currentBasePrice = Number(form.getValues("basePrice")) || 0;
-    const newVariantMetas = comboObjects.map((comb, idx) => {
-      // Sum modifiers for valueIds in this combo
+    const newVariantMetas = finalCombos.map((comb, idx) => {
       let modifierSum = 0;
       attributeSelections.forEach((selection) => {
         if (selection.isVariantGenerator !== false) {
@@ -399,7 +438,82 @@ export function useProductFormV2(
 
     setVariantMetas(newVariantMetas);
     form.setValue("variantImagesMetadata", newVariantMetas);
-    setVariantFilesMap(comboObjects.map(() => []));
+    setVariantFilesMap(finalCombos.map(() => []));
+    setIsGenModalOpen(false);
+  };
+
+  const handleAddAttributeValueInline = async (attributeId: string, newValueName: string, primValId: string, priceModifier?: string) => {
+    const attr = attributesList.find((a) => a.id === attributeId);
+    if (!attr) return toast.error("Attribute not found.");
+
+    const formattedValues = attr.values.map((v: any) => ({
+      id: v.id,
+      value: v.value,
+      position: v.position || 0,
+    }));
+
+    const nextPosition = formattedValues.length;
+    formattedValues.push({
+      value: newValueName.trim(),
+      position: nextPosition,
+    });
+
+    try {
+      const res = await fetchApi(`/product-attributes/${attributeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: attr.name,
+          type: attr.type || "TEXT",
+          values: formattedValues,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to add value.");
+      }
+
+      const updatedAttr = await res.json();
+      
+      const nextFullList = attributesList.map((a) => (a.id === attributeId ? updatedAttr : a));
+      setAttributesList(nextFullList);
+
+      const newValueObj = updatedAttr.values.find((v: any) => v.value === newValueName.trim());
+      if (newValueObj) {
+        const nextSelections = attributeSelections.map((sel) => {
+          if (sel.attributeId === attributeId) {
+            const nextModifiers = { ...sel.priceModifiers };
+            if (priceModifier && priceModifier.trim() !== "") {
+              nextModifiers[newValueObj.id] = Number(priceModifier) || 0;
+            }
+            return {
+              ...sel,
+              valueIds: [...sel.valueIds, newValueObj.id],
+              priceModifiers: nextModifiers,
+            };
+          }
+          return sel;
+        });
+        setAttributeSelections(nextSelections);
+        form.setValue("attributes", nextSelections);
+
+        setActiveGroupFilters((prev) => {
+          const nextFilters = { ...prev };
+          if (nextFilters[primValId]) {
+            if (!nextFilters[primValId][attributeId]) {
+              nextFilters[primValId][attributeId] = [];
+            }
+            nextFilters[primValId][attributeId] = [...nextFilters[primValId][attributeId], newValueObj.id];
+          }
+          return nextFilters;
+        });
+
+        toast.success(`Berhasil menambahkan nilai "${newValueName}"`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menambahkan nilai atribut.");
+    }
   };
 
   const submit = async (values: ProductFormValues) => {
@@ -521,6 +635,8 @@ export function useProductFormV2(
       productImagesFiles,
       attributesList,
       tagCategories,
+      isGenModalOpen,
+      activeGroupFilters,
     },
     setters: {
       setIsCategoryModalOpen,
@@ -541,6 +657,8 @@ export function useProductFormV2(
       setVariantMetas,
       setVariantFilesMap,
       setTagCategories,
+      setIsGenModalOpen,
+      setActiveGroupFilters,
     },
     handlers: {
       handleBulkCreateTags,
@@ -571,6 +689,8 @@ export function useProductFormV2(
       handleRemoveVariant,
       handleAddCustomVariant,
       handleUpdateVariantLabel,
+      handleConfirmVariantGeneration,
+      handleAddAttributeValueInline,
     },
   };
 }
