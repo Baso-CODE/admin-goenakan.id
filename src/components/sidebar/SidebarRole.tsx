@@ -118,7 +118,7 @@ export default function SidebarRole({ ...props }) {
           { title: "Quotation Notes", url: "/admin-invoice/quotations/notes" },
           {
             title: "Follow Up Tracking",
-            url: "/admin-invoice/follow-up",
+            url: "/admin-invoice/quotations/follow-up",
           },
         ],
       },

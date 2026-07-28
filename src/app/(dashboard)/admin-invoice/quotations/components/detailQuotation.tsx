@@ -47,9 +47,10 @@ import {
 } from "@/components/ui/table";
 import { useApi } from "@/hooks/useApi";
 import { FollowUpStepperDialog } from "./followUpStepperDialog";
+// ✨ PASTIKAN KAMU MENG-IMPORT FUNGSI FORMAT CURRENCY DARI UTILS JIKA ADA
+// import { formatCurrency } from "@/lib/utils";
 
-// === TYPES (Sesuai Schema Database) ===
-// === 1. Tambahkan Type Khusus Follow Up ===
+// === TYPES ===
 type QuotationFollowUp = {
   id: string;
   name: string;
@@ -63,16 +64,18 @@ type QuotationFollowUp = {
 };
 type QuotationItemTier = {
   id: string;
-  quantity: number;
+  minQuantity: number;
+  maxQuantity: number | null;
+  quantityLabel: string | null;
   unitPrice: string | number;
   totalPrice: string | number;
 };
-
-// === 2. Tambahkan Type Khusus Item (Opsional tapi disarankan) ===
 type QuotationItem = {
   id: string;
   productName: string;
   description: string | null;
+  quantity: number; // ✨ Qty utama ada di sini sekarang
+  unitPrice: string | number; // ✨ Harga utama ada di sini
   discount?: string | number;
   variant?: {
     variantName: string;
@@ -90,14 +93,15 @@ type QuotationNote = {
   };
 };
 
-// === 3. Update QuotationDetail Utama ===
 type QuotationDetail = {
   id: string;
   quotationNumber: string;
   date: string;
   validUntil: string | null;
   status: string;
+  currencyCode: string; // ✨ Mengambil kode currency dari database
   subTotal: string | number;
+  discountAmount: string | number;
   totalAmount: string | number;
   notes: QuotationNote[];
   client?: any;
@@ -106,14 +110,12 @@ type QuotationDetail = {
   manualClientEmail?: string | null;
   manualClientPhone?: string | null;
   manualClientAddress?: string | null;
-
-  // Hubungkan dengan type yang kita buat di atas
   items: QuotationItem[];
-  followUps: QuotationFollowUp[]; // <--- Ini yang paling penting
+  followUps: QuotationFollowUp[];
 };
 
 export default function QuotationDetail() {
-  const { fetchApi, status } = useApi(); //  Ambil fetchApi dan status
+  const { fetchApi, status } = useApi();
   const { id } = useParams();
   const router = useRouter();
   const [data, setData] = useState<QuotationDetail | null>(null);
@@ -155,7 +157,6 @@ export default function QuotationDetail() {
 
     setIsDeleting(true);
     try {
-      //  Gunakan fetchApi dengan method DELETE
       const res = await fetchApi(`/quotations/${id}`, {
         method: "DELETE",
       });
@@ -172,11 +173,12 @@ export default function QuotationDetail() {
       setIsDeleting(false);
     }
   };
-  // === UTILS ===
-  const formatIDR = (val: string | number) => {
+
+  const formatDynamicCurrency = (val: string | number) => {
+    const code = data?.currencyCode || "IDR";
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
-      currency: "IDR",
+      currency: code,
       minimumFractionDigits: 0,
     }).format(Number(val));
   };
@@ -186,7 +188,7 @@ export default function QuotationDetail() {
   if (!data) return null;
 
   return (
-    <div className=" mx-auto py-6 space-y-6 pb-20">
+    <div className=" mx-auto  space-y-6 pb-20">
       {/* ACTION BAR ATAS */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <Button variant="ghost" onClick={() => router.back()} className="w-fit">
@@ -201,7 +203,7 @@ export default function QuotationDetail() {
             </Button>
           </Link>
 
-          {/* Tombol Print (Placeholder) */}
+          {/* Tombol Print */}
           <Button
             variant="outline"
             className="gap-2"
@@ -214,7 +216,7 @@ export default function QuotationDetail() {
             <Printer className="h-4 w-4" /> Print PDF
           </Button>
 
-          {/* Tombol Delete dengan Modal Shadcn */}
+          {/* Tombol Delete */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" className="gap-2">
@@ -336,7 +338,7 @@ export default function QuotationDetail() {
                       Deskripsi Produk
                     </TableHead>
                     <TableHead className="text-center whitespace-nowrap">
-                      Opsi Qty
+                      Qty
                     </TableHead>
                     <TableHead className="text-right whitespace-nowrap">
                       Harga Satuan
@@ -348,45 +350,73 @@ export default function QuotationDetail() {
                 </TableHeader>
                 <TableBody>
                   {data.items.map((item, itemIdx) => {
-                    const tiers =
-                      item.tiers && item.tiers.length > 0 ? item.tiers : [];
+                    const itemQty = Number(item.quantity);
+                    const itemPrice = Number(item.unitPrice);
+                    const itemDiscount = Number(item.discount || 0);
+                    const itemTotal = itemQty * itemPrice - itemDiscount;
 
-                    return tiers.map((tier, tierIdx) => (
-                      <TableRow key={tier.id || `${itemIdx}-${tierIdx}`}>
-                        {tierIdx === 0 && (
-                          <TableCell
-                            className="pl-6 align-top border-r border-slate-100"
-                            rowSpan={tiers.length}>
-                            <div className="font-bold text-blue-700">
-                              {item.productName}
+                    return (
+                      <TableRow key={item.id || itemIdx}>
+                        <TableCell className="pl-6 align-top border-r border-slate-100">
+                          <div className="font-bold text-blue-700">
+                            {item.productName}
+                          </div>
+
+                          {item.variant?.variantName && (
+                            <Badge
+                              variant="secondary"
+                              className="mt-1 text-[10px] bg-slate-100 text-slate-600">
+                              {item.variant.variantName}
+                            </Badge>
+                          )}
+
+                          {item.description && (
+                            <div className="text-xs text-muted-foreground whitespace-pre-wrap mt-2 leading-relaxed">
+                              {item.description}
                             </div>
+                          )}
 
-                            {item.variant?.variantName && (
-                              <Badge
-                                variant="secondary"
-                                className="mt-1 text-[10px] bg-slate-100 text-slate-600">
-                                {item.variant.variantName}
-                              </Badge>
-                            )}
-
-                            {item.description && (
-                              <div className="text-xs text-muted-foreground whitespace-pre-wrap mt-2 leading-relaxed">
-                                {item.description}
+                          {/* ✨ PERBAIKAN: TAMPILAN HARGA GROSIR YANG LEBIH CLEAN & PROPER */}
+                          {item.tiers && item.tiers.length > 1 && (
+                            <div className="mt-4 rounded-md border border-slate-200 bg-white overflow-hidden max-w-sm">
+                              {/* Header Mini Tabel */}
+                              <div className="bg-slate-50 px-3 py-1.5 border-b border-slate-200">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  Opsi Harga Grosir
+                                </p>
                               </div>
-                            )}
-                          </TableCell>
-                        )}
+                              {/* Isi Tier */}
+                              <div className="divide-y divide-slate-100">
+                                {item.tiers.map((t, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="flex items-center justify-between px-3 py-1.5 transition-colors hover:bg-slate-50">
+                                    <span className="text-xs font-medium text-slate-600">
+                                      {t.maxQuantity
+                                        ? `${t.minQuantity} - ${t.maxQuantity}`
+                                        : `≥ ${t.minQuantity}`}{" "}
+                                      {t.quantityLabel || "Pcs"}
+                                    </span>
+                                    <span className="text-xs font-bold text-blue-600">
+                                      {formatDynamicCurrency(t.unitPrice)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell className="text-center font-medium">
-                          {tier.quantity}
+                          {itemQty}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatIDR(tier.unitPrice)}
+                          {formatDynamicCurrency(itemPrice)}
                         </TableCell>
                         <TableCell className="text-right pr-6 font-semibold text-slate-700">
-                          {formatIDR(tier.totalPrice)}
+                          {formatDynamicCurrency(itemTotal)}
                         </TableCell>
                       </TableRow>
-                    ));
+                    );
                   })}
 
                   {data.items.length === 0 && (
@@ -415,17 +445,18 @@ export default function QuotationDetail() {
             <CardContent className="space-y-4">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>{formatIDR(data.subTotal)}</span>
+                <span>{formatDynamicCurrency(data.subTotal)}</span>
               </div>
               <div className="flex justify-between text-sm text-red-600">
                 <span>Diskon</span>
-                <span>- Rp 0</span>
+                {/* ✨ Memastikan diskon diformat dengan benar */}
+                <span>- {formatDynamicCurrency(data.discountAmount || 0)}</span>
               </div>
               <Separator />
               <div className="flex justify-between items-end">
                 <span className="font-bold">Total Akhir</span>
                 <span className="text-xl font-bold text-blue-600">
-                  {formatIDR(data.totalAmount)}
+                  {formatDynamicCurrency(data.totalAmount)}
                 </span>
               </div>
             </CardContent>
@@ -440,7 +471,6 @@ export default function QuotationDetail() {
             </CardHeader>
             <CardContent className="space-y-4">
               {publicNotes.length > 0 ? (
-                // Grouping berdasarkan kategori agar rapi
                 Object.entries(
                   publicNotes.reduce(
                     (acc, note) => {
@@ -475,7 +505,7 @@ export default function QuotationDetail() {
             </CardContent>
           </Card>
 
-          {/* === UPDATE: DISPLAY INTERNAL NOTES === */}
+          {/* INTERNAL NOTES */}
           {internalNotes.length > 0 && (
             <Card className="border-amber-200 bg-amber-50/30">
               <CardHeader className="flex flex-row items-center gap-2 py-3">
@@ -500,8 +530,8 @@ export default function QuotationDetail() {
           )}
         </div>
       </div>
-      {/* Table Follow Up */}
 
+      {/* Table Follow Up */}
       <Card className="mt-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
@@ -559,7 +589,6 @@ export default function QuotationDetail() {
                       )}
                     </div>
 
-                    {/* --- TAMPILKAN NAMA / JUDUL DI SINI --- */}
                     <p className="text-base font-bold text-gray-900 mt-1">
                       {fu.name}
                     </p>
@@ -597,7 +626,7 @@ export default function QuotationDetail() {
 // === KOMPONEN LOADING ===
 function LoadingSkeleton() {
   return (
-    <div className="max-w-5xl mx-auto py-6 space-y-6">
+    <div className="w-full mx-auto py-6 space-y-6">
       <div className="flex justify-between">
         <Skeleton className="h-10 w-24" />
         <div className="flex gap-2">

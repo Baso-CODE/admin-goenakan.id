@@ -6,28 +6,21 @@ import html2canvas from "html2canvas-pro";
 import jsPDF from "jspdf";
 import { FileDown, Loader2 } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useApi } from "@/hooks/useApi";
 
-const formatCurrency = (amount: string | number) => {
-  const numericAmount = Number(amount) || 0;
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-  }).format(numericAmount);
-};
-
 export default function QuotationPrint() {
   const { fetchApi, status } = useApi();
+  const params = useParams();
+  const quotationId = params?.quotationId;
 
-  const { quotationId } = useParams();
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   const [data, setData] = useState<any>(null);
+  console.log("ini adalah data", data);
 
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -52,6 +45,21 @@ export default function QuotationPrint() {
       setLoading(false);
     }
   }, [quotationId, status, fetchApi]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // === UTILS: FORMAT CURRENCY DINAMIS ===
+  const formatDynamicCurrency = (amount: string | number) => {
+    const code = data?.currencyCode || "IDR";
+    const numericAmount = Number(amount) || 0;
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: code,
+      minimumFractionDigits: 0,
+    }).format(numericAmount);
+  };
 
   const handleDownloadPDF = async () => {
     const element = invoiceRef.current;
@@ -102,9 +110,11 @@ export default function QuotationPrint() {
   // PREPARE VARIABLES
   // =========================================================
 
-  const salesName = data.sales?.name || "Goenakan Admin";
+  const salesName =
+    data.sales?.name || data.createdBy?.name || "Goenakan Admin";
   const salesPhone = data.sales?.phone || "+62 888-0370-1081";
-  const salesEmail = "goenakan.id@gmail.com";
+  const salesEmail =
+    data.sales?.email || data.createdBy?.email || "goenakan.id@gmail.com";
   const signatureUrl = data.sales?.signatureUrl;
 
   let clientCompany = data.manualClientCompany || data.manualClientName || "-";
@@ -192,7 +202,7 @@ export default function QuotationPrint() {
                     <tr>
                       <td className="py-0.5 pr-4 align-top">Qtn Date</td>
                       <td className="py-0.5 align-top font-medium">
-                        :
+                        :{" "}
                         {data.date
                           ? format(new Date(data.date), "dd MMMM yyyy", {
                               locale: idLocale,
@@ -203,7 +213,7 @@ export default function QuotationPrint() {
                     <tr>
                       <td className="py-0.5 pr-4 align-top">Valid Until</td>
                       <td className="py-0.5 align-top font-medium">
-                        :
+                        :{" "}
                         {data.validUntil
                           ? format(new Date(data.validUntil), "dd MMMM yyyy", {
                               locale: idLocale,
@@ -220,7 +230,7 @@ export default function QuotationPrint() {
                     <tr>
                       <td className="py-0.5 pr-4 align-top">Currency</td>
                       <td className="py-0.5 align-top font-bold text-blue-600">
-                        : IDR
+                        : {data.currencyCode || "IDR"}
                       </td>
                     </tr>
                   </tbody>
@@ -262,7 +272,7 @@ export default function QuotationPrint() {
               </table>
             </div>
 
-            {/* 4. PRODUCT TABLE DENGAN LOGIKA TIER */}
+            {/* 4. PRODUCT TABLE UTAMA */}
             <div className="mb-8">
               <table className="w-full border-collapse border border-[#94a3b8]">
                 <thead>
@@ -280,98 +290,130 @@ export default function QuotationPrint() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.items?.map((item: any) => {
+                  {data.items?.map((item: any, index: number) => {
                     const imageUrl = item.imageUrl;
-                    const tiers =
-                      item.tiers && item.tiers.length > 0 ? item.tiers : [{}];
-                    const rowSpanLength = tiers.length;
-                    return tiers.map((tier: any, index: number) => (
-                      <tr
-                        key={`${item.id}-${index}`}
-                        className="align-top text-[12px]">
-                        {index === 0 && (
-                          <>
-                            <td
-                              className="border border-[#94a3b8] py-2 px-3"
-                              rowSpan={rowSpanLength}>
-                              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3">
-                                {imageUrl && (
-                                  <div className="shrink-0">
-                                    <img
-                                      src={imageUrl}
-                                      alt={item.productName}
-                                      className="w-14 h-14 object-cover rounded shadow-sm border border-gray-200"
-                                      crossOrigin="anonymous"
-                                    />
-                                  </div>
-                                )}
-                                <div className="font-bold text-gray-800 mt-1">
-                                  {item.productName}
-                                  {item.variant?.variantName && (
-                                    <div className="text-[10px] text-blue-600 font-semibold mt-0.5">
-                                      ({item.variant.variantName})
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td
-                              className="border border-[#94a3b8] py-2 px-3 text-gray-700"
-                              rowSpan={rowSpanLength}>
-                              {/* 1. PRODUCT DESCRIPTION */}
-                              {item.description ? (
-                                <div className="text-[11px] leading-relaxed whitespace-pre-line text-justify">
-                                  {item.description}
-                                </div>
-                              ) : null}
+                    const itemQty = Number(item.quantity) || 0;
+                    const itemPrice = Number(item.unitPrice) || 0;
 
-                              {/* 2. PRODUCT SPECIFICATION / CUSTOMIZATION */}
-                              {item.customization && (
-                                <div
-                                  className={`text-[10px] space-y-1 ${item.description ? "mt-3 pt-2 border-t border-gray-100" : ""}`}>
-                                  <div className="font-semibold text-gray-800 mb-1">
-                                    Specifications:
-                                  </div>
+                    return (
+                      <tr
+                        key={item.id || index}
+                        className="align-top text-[12px]">
+                        {/* Kolom 1: Detail Produk & Gambar */}
+                        <td className="border border-[#94a3b8] py-2 px-3">
+                          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3">
+                            {imageUrl && (
+                              <div className="shrink-0">
+                                <img
+                                  src={imageUrl}
+                                  alt={item.productName}
+                                  className="w-14 h-14 object-cover rounded shadow-sm border border-gray-200"
+                                  crossOrigin="anonymous"
+                                />
+                              </div>
+                            )}
+                            <div className="font-bold text-gray-800 mt-1">
+                              {item.productName}
+                              {item.variant?.variantName && (
+                                <div className="text-[10px] text-blue-600 font-semibold mt-0.5">
+                                  ({item.variant.variantName})
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Kolom 2: Deskripsi & Spesifikasi */}
+                        <td className="border border-[#94a3b8] py-2 px-3 text-gray-700">
+                          {item.description ? (
+                            <div className="text-[11px] leading-relaxed whitespace-pre-line text-justify">
+                              {item.description}
+                            </div>
+                          ) : null}
+
+                          {item.customization && (
+                            <div
+                              className={`text-[10px] space-y-1 ${item.description ? "mt-3 pt-2 border-t border-gray-100" : ""}`}>
+                              <div className="font-semibold text-gray-800 mb-1">
+                                Specifications:
+                              </div>
+
+                              {typeof item.customization === "object" ? (
+                                <ul className="list-disc pl-3 text-gray-600 space-y-0.5">
+                                  {Object.entries(item.customization).map(
+                                    ([key, value]) => (
+                                      <li key={key}>
+                                        <span className="font-medium text-gray-700">
+                                          {key}:
+                                        </span>{" "}
+                                        {String(value)}
+                                      </li>
+                                    ),
+                                  )}
+                                </ul>
+                              ) : (
+                                <div className="text-gray-600">
                                   {item.customization}
                                 </div>
                               )}
+                            </div>
+                          )}
 
-                              {/* FALLBACK JIKA KEDUANYA KOSONG */}
-                              {!item.description && !item.customization && (
-                                <span className="text-gray-400 italic text-[10px]">
-                                  No description or specification provided.
-                                </span>
-                              )}
-
-                              {/* 3. REMARKS / CATATAN KHUSUS */}
-                              {item.remarks && (
-                                <div className="mt-2 text-[10px] text-slate-500 italic border-t border-slate-100 pt-1.5 bg-slate-50 p-1 rounded-sm">
-                                  <span className="font-semibold text-slate-700 not-italic">
-                                    Note:
-                                  </span>
-                                  {item.remarks}
-                                </div>
-                              )}
-                            </td>
-                          </>
-                        )}
-
-                        <td className="border border-[#94a3b8] py-2 text-center font-semibold">
-                          {tier.minQuantity || "0"}
-                          {tier.maxQuantity ? ` - ${tier.maxQuantity}` : ""}
-                          {tier.quantityLabel && (
-                            <span className="ml-1 text-[10px] font-normal text-gray-500 uppercase">
-                              {tier.quantityLabel}
+                          {!item.description && !item.customization && (
+                            <span className="text-gray-400 italic text-[10px]">
+                              No description or specification provided.
                             </span>
                           )}
+
+                          {item.remarks && (
+                            <div className="mt-2 text-[10px] text-slate-500 italic border-t border-slate-100 pt-1.5 bg-slate-50 p-1 rounded-sm">
+                              <span className="font-semibold text-slate-700 not-italic">
+                                Note:{" "}
+                              </span>
+                              {item.remarks}
+                            </div>
+                          )}
+
+                          {item.tiers && item.tiers.length > 0 && (
+                            <div className="mt-3 overflow-hidden rounded border border-slate-200">
+                              {/* Header Opsi Grosir */}
+                              <div className="bg-slate-100 px-2 py-1 border-b border-slate-200">
+                                <span className="font-semibold text-[10px] text-slate-700 uppercase tracking-wide">
+                                  Opsi Harga Grosir:
+                                </span>
+                              </div>
+                              {/* Daftar Tiers */}
+                              <div className="bg-slate-50/50 flex flex-col divide-y divide-slate-100">
+                                {item.tiers.map((t: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="flex justify-between items-center px-2 py-1 text-[10px]">
+                                    <span className="text-slate-600 font-medium">
+                                      {t.maxQuantity
+                                        ? `${t.minQuantity} - ${t.maxQuantity}`
+                                        : `≥ ${t.minQuantity}`}{" "}
+                                      {t.quantityLabel || "Pcs"}
+                                    </span>
+                                    <span className="font-semibold text-blue-700 font-mono">
+                                      {formatDynamicCurrency(t.unitPrice)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 text-right px-4 font-mono font-medium text-blue-700">
-                          {tier.unitPrice
-                            ? formatCurrency(tier.unitPrice)
-                            : "-"}
+                        {/* Kolom 3: Quantity */}
+                        <td className="border border-[#94a3b8] py-2 text-center font-semibold align-middle">
+                          {itemQty}
+                        </td>
+
+                        {/* Kolom 4: Unit Price */}
+                        <td className="border border-[#94a3b8] py-2 text-right px-4 font-mono font-medium text-blue-700 align-middle">
+                          {formatDynamicCurrency(itemPrice)}
                         </td>
                       </tr>
-                    ));
+                    );
                   })}
                 </tbody>
               </table>
