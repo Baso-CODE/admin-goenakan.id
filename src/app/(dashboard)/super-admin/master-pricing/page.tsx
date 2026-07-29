@@ -23,7 +23,7 @@ import {
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { formatCurrency } from "@/utils/formatCurrency";
-import { FileText, Layers, RefreshCw, Search } from "lucide-react";
+import { FileText, Layers, RefreshCw, Search, Package } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ManagePriceModal } from "./components/ManagePriceModal";
@@ -75,9 +75,7 @@ export type Product = {
   sku: string;
   basePrice: number | string;
   isCustom: boolean;
-  category?: {
-    name?: string;
-  };
+  category?: Category | null;
   activeVendorPriceRecordId?: string | null;
   activePriceFreightMode?: string | null;
   activeVendorPriceRecord?: VendorPriceRecord | null;
@@ -87,6 +85,11 @@ export type Product = {
   currencyCode?: string | null;
   exchangeRate?: number | string | null;
   additionalFee?: number | string | null;
+  images?: {
+    id: string;
+    url: string;
+    isFeatured: boolean;
+  }[];
 };
 
 type Category = {
@@ -281,18 +284,44 @@ export default function MasterPricingPage() {
                   products.map((p) => {
                     const activeQuote = p.activeVendorPriceRecord;
                     const freightMode = p.activePriceFreightMode;
+                    const thumbnail = p.images?.find((img) => img.isFeatured) || p.images?.[0];
 
                     return (
                       <TableRow key={p.id} className="hover:bg-stone-50/50">
                         <TableCell>
-                          <div className="font-semibold text-stone-900 text-sm">{p.name}</div>
-                          <div className="text-xs text-stone-500 font-mono mt-0.5">{p.sku}</div>
+                          <div className="flex items-center gap-3">
+                            {thumbnail ? (
+                              <img
+                                src={thumbnail.url}
+                                alt={p.name}
+                                className="h-10 w-10 rounded-md object-cover border"
+                              />
+                            ) : (
+                              <div className="h-10 w-10 rounded-md bg-stone-100 dark:bg-stone-850 flex items-center justify-center border">
+                                <Package className="h-5 w-5 text-stone-400" />
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-semibold text-stone-900 text-sm">{p.name}</div>
+                              <div className="text-xs text-stone-500 font-mono mt-0.5">{p.sku}</div>
+                            </div>
+                          </div>
                         </TableCell>
                         <TableCell className="text-stone-600 text-sm">
-                          {p.category?.name || "-"}
+                          {p.category?.name_id || p.category?.name || "N/A"}
+                          {p.category?.name_en && (
+                            <span className="block text-xs text-stone-400 italic font-normal mt-0.5">
+                              {p.category.name_en}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right text-stone-900 font-bold text-sm">
                           Rp {Number(p.basePrice).toLocaleString("id-ID")}
+                          {p.currencyCode && p.currencyCode !== "IDR" && (
+                            <span className="block text-[10px] text-stone-500 font-normal mt-0.5">
+                              {p.currencyCode} {Number(p.foreignPrice).toLocaleString("id-ID")} (Kurs: Rp {Number(p.exchangeRate).toLocaleString("id-ID")})
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="text-center">
                           {p.priceTiers && p.priceTiers.length > 0 ? (

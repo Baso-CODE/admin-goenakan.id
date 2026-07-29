@@ -71,6 +71,7 @@ function calculateCogsAndSellingPrice({
   localFreight,
   margin,
   sponsorPercent,
+  roundUpTo = 1000,
 }: {
   importType: "BORONGAN" | "RESMI";
   beaMasukPercent?: number;
@@ -94,6 +95,7 @@ function calculateCogsAndSellingPrice({
   localFreight: number;
   margin: number;
   sponsorPercent: number;
+  roundUpTo?: number;
 }) {
   const safeQtyPerCtn = Math.max(1, qtyPerCtn || 1);
   const safeQtyPcs = Math.max(1, qtyPcs || safeQtyPerCtn);
@@ -149,8 +151,8 @@ function calculateCogsAndSellingPrice({
   const rawSellSea = (cogsSea * sponsorMultiplier) + margin;
   const rawSellAir = (cogsAir * sponsorMultiplier) + margin;
 
-  const sellPriceSea = Math.ceil(rawSellSea / 1000) * 1000;
-  const sellPriceAir = Math.ceil(rawSellAir / 1000) * 1000;
+  const sellPriceSea = roundUpTo > 1 ? Math.ceil(rawSellSea / roundUpTo) * roundUpTo : Math.round(rawSellSea);
+  const sellPriceAir = roundUpTo > 1 ? Math.ceil(rawSellAir / roundUpTo) * roundUpTo : Math.round(rawSellAir);
 
   return { sellPriceSea, sellPriceAir };
 }
@@ -307,51 +309,71 @@ export function ManagePriceModal({
     }
   }, [currencyCode, rawBasePrice, foreignPrice, exchangeRate, additionalFee, freightMode]);
 
-  // Handle quote reference loading and calculation pre-filling
-  const applyQuoteReference = (quoteId: string, mode: "SEA" | "AIR" | "CUSTOM") => {
-    if (mode === "CUSTOM" || quoteId === "NONE") {
-      setFreightMode("CUSTOM");
-      setSelectedQuoteId("NONE");
+  // Automatically calculate base price and tiers when quote reference, freight mode, or exchange rate changes (for SEA and AIR mode)
+  useEffect(() => {
+    if (freightMode === "CUSTOM" || selectedQuoteId === "NONE") {
       return;
     }
 
-    const quote = product.vendorPrices?.find((v) => v.id === quoteId);
+    const quote = product.vendorPrices?.find((v) => v.id === selectedQuoteId);
     if (!quote) return;
 
     const qtyPerCtn = Number(quote.qtyPerCtn) || 1;
     const moqCtn = Number(quote.moqCtn) || 1;
     const qtyPcs = qtyPerCtn * moqCtn;
+    const roundUpToVal = Number((quote as any).roundUpTo) || 1000;
 
     if (quote.calculationMode === "FIXED") {
-      // Calculate single suggested price
-      const calc = calculateCogsAndSellingPrice({
-        importType: quote.importType as "BORONGAN" | "RESMI",
-        beaMasukPercent: Number(quote.beaMasukPercent) || 0,
-        ppnPercent: Number(quote.ppnPercent) || 0,
-        pphPercent: Number(quote.pphPercent) || 0,
-        formECost: Number(quote.formECost) || 0,
-        insurancePercent: Number(quote.insurancePercent) || 0,
-        handlingCost: Number(quote.handlingCost) || 0,
-        otherCost: Number(quote.otherCost) || 0,
-        foreignPrice: Number(quote.foreignPrice) || 0,
-        gzDeliveryCost: Number(quote.gzDeliveryCost) || 0,
-        exchangeRate: Number(quote.exchangeRate) || 0,
-        qtyPcs,
-        qtyPerCtn,
-        length: Number(quote.length) || 0,
-        width: Number(quote.width) || 0,
-        height: Number(quote.height) || 0,
-        weight: Number(quote.weight) || 0,
-        seaFreightRate: Number(quote.seaFreightRate) || 0,
-        airFreightRate: Number(quote.airFreightRate) || 0,
-        localFreight: Number(quote.localFreight) || 0,
-        margin: Number(quote.margin) || 0,
-        sponsorPercent: Number(quote.sponsorPercent) * 100 || 0,
+      // Generate the 5 MOQ simulation steps as tiers!
+      const baseMoqCtn = Math.max(1, moqCtn || 1);
+      const generatedTiers: EditableTier[] = [0, 1, 2, 3, 4].map((step) => {
+        const stepCtn = baseMoqCtn + step;
+        const stepPcs = stepCtn * qtyPerCtn;
+        const nextStepPcs = (baseMoqCtn + step + 1) * qtyPerCtn;
+        const minQuantity = stepPcs;
+        const maxQuantity = step < 4 ? nextStepPcs - 1 : null;
+
+        const calc = calculateCogsAndSellingPrice({
+          importType: quote.importType as "BORONGAN" | "RESMI",
+          beaMasukPercent: Number(quote.beaMasukPercent) || 0,
+          ppnPercent: Number(quote.ppnPercent) || 0,
+          pphPercent: Number(quote.pphPercent) || 0,
+          formECost: Number(quote.formECost) || 0,
+          insurancePercent: Number(quote.insurancePercent) || 0,
+          handlingCost: Number(quote.handlingCost) || 0,
+          otherCost: Number(quote.otherCost) || 0,
+          foreignPrice: Number(quote.foreignPrice) || 0,
+          gzDeliveryCost: Number(quote.gzDeliveryCost) || 0,
+          exchangeRate: exchangeRate,
+          qtyPcs: stepPcs,
+          qtyPerCtn,
+          length: Number(quote.length) || 0,
+          width: Number(quote.width) || 0,
+          height: Number(quote.height) || 0,
+          weight: Number(quote.weight) || 0,
+          seaFreightRate: Number(quote.seaFreightRate) || 0,
+          airFreightRate: Number(quote.airFreightRate) || 0,
+          localFreight: Number(quote.localFreight) || 0,
+          margin: Number(quote.margin) || 0,
+          sponsorPercent: Number(quote.sponsorPercent) * 100 || 0,
+          roundUpTo: roundUpToVal,
+        });
+
+        const finalPrice = freightMode === "SEA" ? calc.sellPriceSea : calc.sellPriceAir;
+
+        return {
+          id: `temp-fixed-step-${step}`,
+          minQuantity,
+          maxQuantity,
+          price: finalPrice,
+        };
       });
 
-      const finalPrice = mode === "SEA" ? calc.sellPriceSea : calc.sellPriceAir;
-      setBasePrice(finalPrice);
-      setTiers([]);
+      // Set base price to the first tier's price
+      if (generatedTiers.length > 0) {
+        setBasePrice(generatedTiers[0].price);
+      }
+      setTiers(generatedTiers);
     } else {
       // Handle VARIABLE Mode Tiers
       const quoteTiers = quote.tiers;
@@ -375,7 +397,7 @@ export function ManagePriceModal({
             otherCost: Number(quote.otherCost) || 0,
             foreignPrice: Number(item.pricePcs) || 0,
             gzDeliveryCost: Number(item.gzCost) || Number(quote.gzDeliveryCost) || 0,
-            exchangeRate: Number(quote.exchangeRate) || 0,
+            exchangeRate: exchangeRate,
             qtyPcs: minQuantity,
             qtyPerCtn,
             length: Number(quote.length) || 0,
@@ -387,9 +409,10 @@ export function ManagePriceModal({
             localFreight: Number(quote.localFreight) || 0,
             margin: Number(quote.margin) || 0,
             sponsorPercent: Number(quote.sponsorPercent) * 100 || 0,
+            roundUpTo: roundUpToVal,
           });
 
-          const finalPrice = mode === "SEA" ? calc.sellPriceSea : calc.sellPriceAir;
+          const finalPrice = freightMode === "SEA" ? calc.sellPriceSea : calc.sellPriceAir;
 
           return {
             id: `temp-${idx}`,
@@ -408,7 +431,15 @@ export function ManagePriceModal({
         setTiers([]);
       }
     }
+  }, [selectedQuoteId, freightMode, exchangeRate, product.vendorPrices]);
 
+  // Handle quote reference loading and calculation pre-filling
+  const applyQuoteReference = (quoteId: string, mode: "SEA" | "AIR" | "CUSTOM") => {
+    if (mode === "CUSTOM" || quoteId === "NONE") {
+      setFreightMode("CUSTOM");
+      setSelectedQuoteId("NONE");
+      return;
+    }
     setSelectedQuoteId(quoteId);
     setFreightMode(mode);
   };
@@ -623,6 +654,11 @@ export function ManagePriceModal({
                             {cur.code} ({cur.symbol || "$"}) - {cur.name || cur.code}
                           </SelectItem>
                         ))}
+                        {currencyCode !== "IDR" && !masterCurrencies.some((c) => c.code === currencyCode) && (
+                          <SelectItem value={currencyCode}>
+                            {currencyCode}
+                          </SelectItem>
+                        )}
                         
                         <div className="h-px bg-stone-200 my-1 mx-2" />
                         <SelectItem

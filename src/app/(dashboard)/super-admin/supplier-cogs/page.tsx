@@ -74,6 +74,7 @@ function calculateCogsAndSellingPrice({
   localFreight,
   margin,
   sponsorPercent,
+  roundUpTo = 1000,
 }: {
   importType: "BORONGAN" | "RESMI";
   beaMasukPercent?: number;
@@ -97,6 +98,7 @@ function calculateCogsAndSellingPrice({
   localFreight: number;
   margin: number;
   sponsorPercent: number;
+  roundUpTo?: number;
 }) {
   const safeQtyPerCtn = Math.max(1, qtyPerCtn || 1);
   const safeQtyPcs = Math.max(1, qtyPcs || safeQtyPerCtn);
@@ -166,8 +168,8 @@ function calculateCogsAndSellingPrice({
   const rawSellSea = (cogsSea * sponsorMultiplier) + margin;
   const rawSellAir = (cogsAir * sponsorMultiplier) + margin;
 
-  const sellPriceSea = Math.ceil(rawSellSea / 1000) * 1000;
-  const sellPriceAir = Math.ceil(rawSellAir / 1000) * 1000;
+  const sellPriceSea = roundUpTo > 1 ? Math.ceil(rawSellSea / roundUpTo) * roundUpTo : Math.round(rawSellSea);
+  const sellPriceAir = roundUpTo > 1 ? Math.ceil(rawSellAir / roundUpTo) * roundUpTo : Math.round(rawSellAir);
 
   return {
     totalCtn,
@@ -435,8 +437,10 @@ export default function SupplierCogsCalculatorPage() {
     setSeaFreightRate(Number(rec.seaFreightRate) || 10000000);
     setAirFreightRate(Number(rec.airFreightRate) || 260000);
     setMoqCtn(Number(rec.moqCtn) || 10);
+    setQtyPcs(rec.targetQtyPcs || (Number(rec.moqCtn) || 10) * (Number(rec.qtyPerCtn) || 1));
     setMargin(Number(rec.margin) || 0);
     setSponsorPercent(Number(rec.sponsorPercent) * 100);
+    setRoundUpTo(Number(rec.roundUpTo) || 1000);
     setNotes(rec.notes ? `${rec.notes} (Salinan Mode)` : "Salinan Mode");
     setImageUrl(rec.imageUrl || "");
     setImagePublicId(rec.imagePublicId || "");
@@ -506,6 +510,7 @@ export default function SupplierCogsCalculatorPage() {
   const [qtyPcs, setQtyPcs] = useState<number>(100);
   const [margin, setMargin] = useState<number>(10000);
   const [sponsorPercent, setSponsorPercent] = useState<number>(2); // 2%
+  const [roundUpTo, setRoundUpTo] = useState<number>(1000);
   const [notes, setNotes] = useState<string>("");
 
   const [saving, setSaving] = useState(false);
@@ -594,33 +599,38 @@ export default function SupplierCogsCalculatorPage() {
     if (selectedProductId !== "sandbox" && selectedProductId !== "") {
       const prod = products.find((p) => p.id === selectedProductId);
       if (prod) {
-        setQtyPerCtn(prod.qtyPerCtn || 1);
-        setLength(prod.length || 0);
-        setWidth(prod.width || 0);
-        setHeight(prod.height || 0);
-        setWeight(prod.weight || 0);
-        setTempProductName("");
-        
-        // Auto-link catalog product base price to supplier pricing in IDR
-        if (cogsStatus === "EXISTING" || (cogsStatus === "POTENTIAL" && potentialProductType === "EXISTING")) {
-          setForeignPrice(Number(prod.basePrice) || 0);
-          setCurrency("IDR");
-          setExchangeRate(1);
-
-          // Link price tiers if available
-          if (prod.priceTiers && Array.isArray(prod.priceTiers) && prod.priceTiers.length > 0) {
-            const mappedTiers = prod.priceTiers.map((pt: any) => ({
-              id: pt.id || Math.random().toString(),
-              totalPcs: pt.minQuantity || 1,
-              pricePcs: Number(pt.price) || 0,
-              gzCost: 0,
-            }));
-            setVariableTiers(mappedTiers);
+        // If editing a record and selecting the same product, do NOT overwrite custom loaded details
+        const isEditingThisProduct = editingRecord && editingRecord.productId === selectedProductId;
+        if (!isEditingThisProduct) {
+          setQtyPerCtn(prod.qtyPerCtn || 1);
+          setQtyPcs((moqCtn || 1) * (prod.qtyPerCtn || 1));
+          setLength(prod.length || 0);
+          setWidth(prod.width || 0);
+          setHeight(prod.height || 0);
+          setWeight(prod.weight || 0);
+          setTempProductName("");
+          
+          // Auto-link catalog product base price to supplier pricing in IDR
+          if (cogsStatus === "EXISTING" || (cogsStatus === "POTENTIAL" && potentialProductType === "EXISTING")) {
+            setForeignPrice(Number(prod.basePrice) || 0);
+            setCurrency("IDR");
+            setExchangeRate(1);
+ 
+            // Link price tiers if available
+            if (prod.priceTiers && Array.isArray(prod.priceTiers) && prod.priceTiers.length > 0) {
+              const mappedTiers = prod.priceTiers.map((pt: any) => ({
+                id: pt.id || Math.random().toString(),
+                totalPcs: pt.minQuantity || 1,
+                pricePcs: Number(pt.price) || 0,
+                gzCost: 0,
+              }));
+              setVariableTiers(mappedTiers);
+            }
           }
         }
       }
     }
-  }, [selectedProductId, products, cogsStatus, potentialProductType]);
+  }, [selectedProductId, products, cogsStatus, potentialProductType, editingRecord]);
 
 
 
@@ -648,6 +658,7 @@ export default function SupplierCogsCalculatorPage() {
     localFreight,
     margin,
     sponsorPercent,
+    roundUpTo,
   });
 
   const {
@@ -728,8 +739,10 @@ export default function SupplierCogsCalculatorPage() {
         seaFreightRate,
         airFreightRate,
         moqCtn,
+        targetQtyPcs: qtyPcs,
         margin,
         sponsorPercent: sponsorPercent / 100,
+        roundUpTo,
         notes: notes.trim() || undefined,
         importType,
         hsCode: importType === "RESMI" ? (hsCode.trim() || undefined) : undefined,
@@ -850,8 +863,10 @@ export default function SupplierCogsCalculatorPage() {
     setSeaFreightRate(Number(rec.seaFreightRate) || 10000000);
     setAirFreightRate(Number(rec.airFreightRate) || 260000);
     setMoqCtn(Number(rec.moqCtn) || 10);
+    setQtyPcs(rec.targetQtyPcs || (Number(rec.moqCtn) || 10) * (Number(rec.qtyPerCtn) || 1));
     setMargin(Number(rec.margin) || 0);
     setSponsorPercent(Number(rec.sponsorPercent) * 100);
+    setRoundUpTo(Number(rec.roundUpTo) || 1000);
     setNotes(rec.notes || "");
     setImageUrl(rec.imageUrl || "");
     setImagePublicId(rec.imagePublicId || "");
@@ -1008,7 +1023,7 @@ export default function SupplierCogsCalculatorPage() {
                     const computedRecs = selectedRecs.map(rec => {
                       const safeQtyPerCtn = rec.qtyPerCtn || 1;
                       const safeMoqCtn = rec.moqCtn || 1;
-                      const safeQtyPcs = safeMoqCtn * safeQtyPerCtn;
+                      const safeQtyPcs = rec.targetQtyPcs || (safeMoqCtn * safeQtyPerCtn);
                       const isVariable = rec.calculationMode === "VARIABLE";
 
                       // 1. Qty Target
@@ -1053,6 +1068,7 @@ export default function SupplierCogsCalculatorPage() {
                               localFreight: Number(rec.localFreight) || 0,
                               margin: Number(rec.margin) || 0,
                               sponsorPercent: Number(rec.sponsorPercent) * 100 || 0,
+                              roundUpTo: Number(rec.roundUpTo) || 1000,
                             });
                             return {
                               cogsSea: res.cogsSea,
@@ -1120,6 +1136,7 @@ export default function SupplierCogsCalculatorPage() {
                           localFreight: Number(rec.localFreight) || 0,
                           margin: Number(rec.margin) || 0,
                           sponsorPercent: Number(rec.sponsorPercent) * 100 || 0,
+                          roundUpTo: Number(rec.roundUpTo) || 1000,
                         });
                         hppSeaText = `Rp ${Math.round(res.cogsSea).toLocaleString("id-ID")}`;
                         hppAirText = `Rp ${Math.round(res.cogsAir).toLocaleString("id-ID")}`;
@@ -1548,7 +1565,7 @@ export default function SupplierCogsCalculatorPage() {
 
                       const safeQtyPerCtn = rec.qtyPerCtn || 1;
                       const safeMoqCtn = rec.moqCtn || 1;
-                      const safeQtyPcs = safeMoqCtn * safeQtyPerCtn;
+                      const safeQtyPcs = rec.targetQtyPcs || (safeMoqCtn * safeQtyPerCtn);
 
                       // 1. Qty Target
                       const qtyTarget = isVariable 
@@ -1590,6 +1607,7 @@ export default function SupplierCogsCalculatorPage() {
                               localFreight: Number(rec.localFreight) || 0,
                               margin: Number(rec.margin) || 0,
                               sponsorPercent: Number(rec.sponsorPercent) * 100 || 0,
+                              roundUpTo: Number(rec.roundUpTo) || 1000,
                             });
                             return {
                               cogsSea: res.cogsSea,
@@ -1654,6 +1672,7 @@ export default function SupplierCogsCalculatorPage() {
                           localFreight: Number(rec.localFreight) || 0,
                           margin: Number(rec.margin) || 0,
                           sponsorPercent: Number(rec.sponsorPercent) * 100 || 0,
+                          roundUpTo: Number(rec.roundUpTo) || 1000,
                         });
                         hppSeaText = `Rp ${Math.round(res.cogsSea).toLocaleString("id-ID")}`;
                         hppAirText = `Rp ${Math.round(res.cogsAir).toLocaleString("id-ID")}`;
@@ -2444,7 +2463,11 @@ export default function SupplierCogsCalculatorPage() {
                       <Input
                         type="number"
                         value={qtyPerCtn}
-                        onChange={(e) => setQtyPerCtn(Number(e.target.value))}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setQtyPerCtn(val);
+                          setQtyPcs((moqCtn || 1) * val);
+                        }}
                         className="bg-stone-50 border-stone-300"
                       />
                     </div>
@@ -2740,7 +2763,11 @@ export default function SupplierCogsCalculatorPage() {
                       <Input
                         type="number"
                         value={moqCtn}
-                        onChange={(e) => setMoqCtn(Number(e.target.value))}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setMoqCtn(val);
+                          setQtyPcs(val * (qtyPerCtn || 1));
+                        }}
                         className="bg-stone-50 border-stone-300 font-semibold"
                       />
                     </div>
@@ -2782,13 +2809,17 @@ export default function SupplierCogsCalculatorPage() {
                 </div>
 
                 {/* 6. TARGET QUOTATION PRICE CONTROLS */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-t pt-4">
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase text-stone-600">Target Qty Order (Pcs)</Label>
                     <Input
                       type="number"
                       value={qtyPcs}
-                      onChange={(e) => setQtyPcs(Number(e.target.value))}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setQtyPcs(val);
+                        setMoqCtn(Math.max(1, Math.ceil(val / (qtyPerCtn || 1))));
+                      }}
                       className="bg-stone-50 border-stone-300"
                     />
                   </div>
@@ -2814,6 +2845,23 @@ export default function SupplierCogsCalculatorPage() {
                       onChange={(e) => setSponsorPercent(Number(e.target.value))}
                       className="bg-stone-50 border-stone-300"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase text-stone-600">Pembulatan Harga</Label>
+                    <Select
+                      value={String(roundUpTo)}
+                      onValueChange={(val) => setRoundUpTo(Number(val))}
+                    >
+                      <SelectTrigger className="bg-stone-50 border-stone-300 w-full">
+                        <SelectValue placeholder="Pilih Pembulatan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Tanpa Pembulatan</SelectItem>
+                        <SelectItem value="100">Ratusan (Rp 100)</SelectItem>
+                        <SelectItem value="1000">Ribuan (Rp 1.000)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -2900,6 +2948,7 @@ export default function SupplierCogsCalculatorPage() {
                               localFreight,
                               margin,
                               sponsorPercent,
+                              roundUpTo,
                             });
 
                             const safeQtyPerCtn = qtyPerCtn || 1;
@@ -2998,6 +3047,7 @@ export default function SupplierCogsCalculatorPage() {
                               localFreight,
                               margin,
                               sponsorPercent,
+                              roundUpTo,
                             });
 
                             const nextStepPcs = (baseMoqCtn + step + 1) * (qtyPerCtn || 1);
@@ -3219,7 +3269,7 @@ export default function SupplierCogsCalculatorPage() {
                 <CardContent className="text-xs text-stone-500 space-y-2">
                   <p>• Perhitungan <strong>Volume Sea Freight</strong> menggunakan rumus CBM standar (Panjang × Lebar × Tinggi / 1.000.000) dikalikan jumlah box dengan batasan minimal 0.1 CBM per pengiriman.</p>
                   <p>• Perhitungan <strong>Berat Air Freight</strong> membandingkan berat asli dengan berat volumetrik (P×L×T/5.000) dan mengambil nilai tertinggi.</p>
-                  <p>• <strong>Suggested Price</strong> dihitung dengan mengalikan COGS dengan fee sponsor {sponsorPercent}% lalu ditambah target profit margin Rp {margin.toLocaleString("id-ID")} per pcs, kemudian dibulatkan ke kelipatan Rp 1.000 terdekat.</p>
+                  <p>• <strong>Suggested Price</strong> dihitung dengan mengalikan COGS dengan fee sponsor {sponsorPercent}% lalu ditambah target profit margin Rp {margin.toLocaleString("id-ID")} per pcs, kemudian {roundUpTo > 1 ? `dibulatkan ke kelipatan Rp ${roundUpTo.toLocaleString("id-ID")} terdekat` : "tanpa pembulatan"}.</p>
                 </CardContent>
               </Card>
 
