@@ -199,6 +199,9 @@ export default function FormArticle({
           fetchApi("/article-tags/list"),
         ]);
 
+        const catData = await catRes.json();
+        setCategories(catData.data || []);
+
         if (catRes.ok) setCategories(await catRes.json());
         if (prodRes.ok) {
           const p = await prodRes.json();
