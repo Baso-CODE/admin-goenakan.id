@@ -36,7 +36,8 @@ type Article = {
   categoryId: string;
   category: {
     id: string;
-    name: string;
+    name_id: string;
+    name_en: string;
   };
   createdAt: string;
   updatedAt: string;
@@ -233,7 +234,7 @@ export default function ArticlesSection() {
 
                     {/* Category */}
                     <TableCell className="text-sm">
-                      {data.category?.name || "-"}
+                      {data.category?.name_id || data.category?.name_en || "-"}
                     </TableCell>
 
                     {/* Author */}

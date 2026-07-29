@@ -1532,7 +1532,7 @@ export default function AddOrderForm() {
                   );
                 })}
               </div>
-            </div>{" "}
+            </div>
             <Button type="submit" className="text-md" disabled={loading}>
               {loading ? "Submitting Order..." : "Create Order"}
             </Button>

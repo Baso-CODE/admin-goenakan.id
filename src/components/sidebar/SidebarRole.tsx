@@ -80,10 +80,11 @@ export default function SidebarRole({ ...props }) {
         url: "#",
         icon: ListOrdered,
         items: [
-          // { title: "Sales Dashboard", url: "/super-admin" },
-          // { title: "Dashboard Overview", url: "/" },
-          // { title: "Order Form", url: "/super-admin/orders/add" },
           { title: "All Orders List", url: "/super-admin/orders" },
+          {
+            title: "Replacement Order",
+            url: "/super-admin/replacement-orders",
+          },
         ],
       },
       {

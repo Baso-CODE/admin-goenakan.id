@@ -131,6 +131,8 @@ export default function FormArticle({
   const { fetchApi, status } = useApi();
 
   const [categories, setCategories] = useState<any[]>([]);
+  console.log("ini adalah categories", categories);
+
   const [products, setProducts] = useState<any[]>([]);
   const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -192,6 +194,7 @@ export default function FormArticle({
   useEffect(() => {
     const fetchData = async () => {
       if (status !== "authenticated") return;
+
       try {
         const [catRes, prodRes, tagRes] = await Promise.all([
           fetchApi("/article-categories/list"),
@@ -199,21 +202,32 @@ export default function FormArticle({
           fetchApi("/article-tags/list"),
         ]);
 
-        const catData = await catRes.json();
-        setCategories(catData.data || []);
+        // 1. Tangani Data Kategori
+        if (catRes.ok) {
+          const catData = await catRes.json();
+          console.log("Data Kategori dari API:", catData);
+          setCategories(Array.isArray(catData) ? catData : catData.data || []);
+        }
 
-        if (catRes.ok) setCategories(await catRes.json());
+        // 2. Tangani Data Produk
         if (prodRes.ok) {
           const p = await prodRes.json();
-          setProducts(p.data || p || []);
+          setProducts(Array.isArray(p) ? p : p.data || []);
         }
-        if (tagRes.ok) setAvailableTags(await tagRes.json());
+
+        // 3. Tangani Data Tags
+        if (tagRes.ok) {
+          const t = await tagRes.json();
+          setAvailableTags(Array.isArray(t) ? t : t.data || []);
+        }
       } catch (error) {
+        console.error("Fetch Data Error:", error);
         toast.error("Gagal memuat data pendukung.");
       } finally {
         setLoadingData(false);
       }
     };
+
     fetchData();
   }, [status, fetchApi]);
 
@@ -760,7 +774,6 @@ export default function FormArticle({
                       control={form.control}
                       name="autoTranslate"
                       render={({ field }) => {
-                        // Cek apakah ini mode edit dan artikel sudah pernah ditranslate
                         const hasBeenTranslated =
                           isEditing && initialData?.isTranslated;
 
@@ -842,7 +855,7 @@ export default function FormArticle({
                             <SelectContent>
                               {categories.map((cat) => (
                                 <SelectItem key={cat.id} value={cat.id}>
-                                  {cat.name}
+                                  {cat.name_id}
                                 </SelectItem>
                               ))}
 

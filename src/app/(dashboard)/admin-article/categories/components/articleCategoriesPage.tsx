@@ -32,9 +32,12 @@ import { toast } from "sonner";
 // === Type definitions ===
 type ArticleCategory = {
   id: string;
-  name: string;
   slug: string;
-  description: string | null;
+  // Properti baru sesuai schema dua bahasa
+  name_id: string;
+  description_id: string | null;
+  name_en: string | null;
+  description_en: string | null;
   isActive: boolean;
   createdAt: string;
 };
@@ -184,6 +187,7 @@ const ArticleCategories = () => {
       setExporting(false);
     }
   };
+
   useEffect(() => {
     fetchCategories();
   }, [page, debouncedSearch]);
@@ -361,27 +365,49 @@ const ArticleCategories = () => {
               ) : categories.length > 0 ? (
                 categories.map((data) => (
                   <TableRow key={data.id}>
-                    <TableCell className="font-medium">
-                      <div>{data.name}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
+                    {/* TAMPILAN NAMA BILINGUAL */}
+                    <TableCell className="font-medium align-top">
+                      <div className="text-slate-900">{data.name_id}</div>
+                      {data.name_en && (
+                        <div className="text-[11px] font-normal text-slate-500 uppercase mt-0.5">
+                          {data.name_en}
+                        </div>
+                      )}
+                      <div className="text-xs text-blue-600/80 mt-1">
                         {data.slug}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      <div className="line-clamp-2">
-                        {data.description || "-"}
+
+                    {/* TAMPILAN DESKRIPSI BILINGUAL */}
+                    <TableCell className="text-sm align-top">
+                      <div className="flex flex-col gap-1.5">
+                        <div className="text-xs text-slate-700 line-clamp-2">
+                          <span className="font-semibold text-slate-400 mr-1">
+                            ID:
+                          </span>
+                          {data.description_id || "-"}
+                        </div>
+                        {data.description_en && (
+                          <div className="text-xs text-slate-500 line-clamp-2">
+                            <span className="font-semibold text-slate-400 mr-1">
+                              EN:
+                            </span>
+                            {data.description_en}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell>
+
+                    <TableCell className="align-top">
                       <span
                         className={`text-xs font-medium px-2 py-1 rounded-full ${data.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
                         {data.isActive ? "Active" : "Inactive"}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
                       {formatDate(data.createdAt, { style: "relative" })}
                     </TableCell>
-                    <TableCell className="space-x-2">
+                    <TableCell className="space-x-2 align-top">
                       <Link href={`/admin-article/categories/edit/${data.id}`}>
                         <Button
                           variant="outline"
@@ -418,7 +444,7 @@ const ArticleCategories = () => {
       {meta && (
         <div className="flex justify-between items-center p-4 border-t text-sm text-muted-foreground">
           <p className="text-sm text-muted-foreground">
-            Page {meta.page} of {Math.ceil(meta.total / meta.perPage)}
+            Page {meta.page} of {Math.ceil(meta.total / meta.perPage) || 1}
           </p>
 
           <div className="space-x-2">
