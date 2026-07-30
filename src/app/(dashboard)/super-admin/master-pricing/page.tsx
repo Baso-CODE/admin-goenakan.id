@@ -121,7 +121,7 @@ export default function MasterPricingPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [currencies, setCurrencies] = useState<{ code: string; name: string }[]>([]);
+  const [currencies, setCurrencies] = useState<{ code: string; name: string; symbol?: string }[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,7 +134,7 @@ export default function MasterPricingPage() {
 
   // Global pricing modifier states
   const [modifierOpen, setModifierOpen] = useState(false);
-  const [targetCurrency, setTargetCurrency] = useState("CNY");
+  const [targetCurrency, setTargetCurrency] = useState("");
   const [newExchangeRate, setNewExchangeRate] = useState<number | string>("");
   const [offsetValue, setOffsetValue] = useState<number | string>(0);
   const [offsetCurrency, setOffsetCurrency] = useState("IDR");
@@ -176,18 +176,17 @@ export default function MasterPricingPage() {
     }
     setIsFetchingRate(true);
     try {
-      const resRate = await fetchApi("/currencies/convert/rate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fromCurrency: code,
-          toCurrency: "IDR",
-          amount: 1,
-        }),
-      });
-      const dataRate = await resRate.json();
-      if (dataRate?.success && dataRate?.rate) {
-        setNewExchangeRate(dataRate.rate);
+      const apiBase = code === "RMB" ? "CNY" : code;
+      const res = await fetch(`https://open.er-api.com/v6/latest/${apiBase}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.rates) {
+          const rateVal = data.rates.IDR;
+          setNewExchangeRate(rateVal);
+          toast.success(`Kurs ${code} berhasil diperbarui: Rp ${rateVal.toLocaleString("id-ID")}`);
+        } else {
+          toast.error(`Gagal mengambil kurs terbaru untuk ${code}.`);
+        }
       } else {
         toast.error(`Gagal memuat kurs ${code}.`);
       }
@@ -403,75 +402,89 @@ export default function MasterPricingPage() {
 
         {modifierOpen && (
           <div className="p-4 border-t bg-stone-50/50 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <div>
-                <Label className="text-xs font-semibold text-stone-500">Target Currency</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+              <div className="space-y-1">
+                <Label htmlFor="targetCurrency" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                  Target Currency
+                </Label>
                 <Select
                   value={targetCurrency}
                   onValueChange={(val) => {
                     setTargetCurrency(val);
                     if (val === "IDR") setNewExchangeRate(1);
                   }}>
-                  <SelectTrigger className="bg-white border-stone-200 mt-1.5 h-10 font-medium">
-                    <SelectValue placeholder="Pilih Currency" />
+                  <SelectTrigger className="bg-white border-stone-200 mt-1 font-semibold">
+                    <SelectValue placeholder="Select Currency" />
                   </SelectTrigger>
                   <SelectContent>
-                    {currencies.filter(c => c.code !== "IDR").map((c) => (
-                      <SelectItem key={c.code} value={c.code}>
-                        {c.code}
+                    <SelectItem value="IDR">IDR (Rupiah)</SelectItem>
+                    {currencies.filter(c => c.code !== "IDR").map((cur) => (
+                      <SelectItem key={cur.code} value={cur.code}>
+                        {cur.code} ({cur.symbol || "$"}) - {cur.name || cur.code}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div>
-                <Label className="text-xs font-semibold text-stone-500">New Exchange Rate (Kurs)</Label>
-                <div className="relative mt-1.5">
-                  <Input
-                    type="number"
-                    disabled={targetCurrency === "IDR"}
-                    placeholder="Masukkan Kurs..."
-                    className="bg-white border-stone-200 pr-10 h-10 font-medium font-mono"
-                    value={newExchangeRate}
-                    onChange={(e) => setNewExchangeRate(e.target.value)}
-                  />
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="newExchangeRate" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                    New Exchange Rate (Kurs)
+                  </Label>
                   {targetCurrency !== "IDR" && (
-                    <button
-                      disabled={isFetchingRate}
-                      onClick={() => handleFetchRate(targetCurrency)}
+                    <Button
                       type="button"
-                      className="absolute right-3 top-2.5 text-stone-400 hover:text-indigo-600 disabled:opacity-50">
-                      <RefreshCw className={`h-5 w-5 ${isFetchingRate ? "animate-spin text-indigo-600" : ""}`} />
-                    </button>
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 hover:bg-stone-100"
+                      onClick={() => handleFetchRate(targetCurrency)}
+                      disabled={isFetchingRate}
+                    >
+                      <RefreshCw className={`h-3 w-3 text-stone-500 ${isFetchingRate ? "animate-spin text-indigo-600" : ""}`} />
+                    </Button>
                   )}
                 </div>
+                <Input
+                  id="newExchangeRate"
+                  type="number"
+                  disabled={targetCurrency === "IDR"}
+                  placeholder="Masukkan Kurs..."
+                  className="bg-white border-stone-200 mt-1 font-semibold"
+                  value={newExchangeRate}
+                  onChange={(e) => setNewExchangeRate(e.target.value)}
+                />
               </div>
 
-              <div>
-                <Label className="text-xs font-semibold text-stone-500">Offset Value (Adjustment)</Label>
+              <div className="space-y-1">
+                <Label htmlFor="offsetValue" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                  Offset Value (Adjustment)
+                </Label>
                 <Input
+                  id="offsetValue"
                   type="number"
                   placeholder="Contoh: 1000 atau -500"
-                  className="bg-white border-stone-200 mt-1.5 h-10 font-medium font-mono"
+                  className="bg-white border-stone-200 mt-1 font-semibold"
                   value={offsetValue}
                   onChange={(e) => setOffsetValue(e.target.value)}
                 />
               </div>
 
-              <div>
-                <Label className="text-xs font-semibold text-stone-500">Offset Currency</Label>
+              <div className="space-y-1">
+                <Label htmlFor="offsetCurrency" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                  Offset Currency
+                </Label>
                 <Select
                   value={offsetCurrency}
                   onValueChange={setOffsetCurrency}>
-                  <SelectTrigger className="bg-white border-stone-200 mt-1.5 h-10 font-medium">
+                  <SelectTrigger className="bg-white border-stone-200 mt-1 font-semibold">
                     <SelectValue placeholder="Pilih Currency" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="IDR">IDR - Rupiah</SelectItem>
-                    {currencies.filter(c => c.code !== "IDR").map((c) => (
-                      <SelectItem key={c.code} value={c.code}>
-                        {c.code}
+                    <SelectItem value="IDR">IDR (Rupiah)</SelectItem>
+                    {currencies.filter(c => c.code !== "IDR").map((cur) => (
+                      <SelectItem key={cur.code} value={cur.code}>
+                        {cur.code} ({cur.symbol || "$"}) - {cur.name || cur.code}
                       </SelectItem>
                     ))}
                   </SelectContent>
