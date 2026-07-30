@@ -26,7 +26,9 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useApi } from "@/hooks/useApi";
+import { format } from "date-fns";
 import { ChevronLeft, ClipboardList, ImagePlus, Trash2, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -64,6 +66,7 @@ interface PICFormData {
 interface ClientFormData {
   type: ClientType;
   custCode?: string;
+  joinedDate?: Date | undefined;
 
   // B2B
   b2b_brandName?: string;
@@ -81,7 +84,6 @@ interface ClientFormData {
   b2b_subDistrict?: string;
   b2b_postalCode?: string;
   b2b_fullAddress?: string;
-  b2b_purchaseChannelId?: string;
   b2b_pics: PICFormData[];
 
   // B2C
@@ -95,12 +97,12 @@ interface ClientFormData {
   b2c_subDistrict?: string;
   b2c_postalCode?: string;
   b2c_fullAddressB2C?: string;
-  b2c_purchaseChannelIdB2C?: string;
 }
 
 const initialFormData: ClientFormData = {
   type: "",
   custCode: "",
+  joinedDate: undefined,
   b2b_brandName: "",
   b2b_brandWebsiteUrl: "",
   b2b_brandLogoFile: null,
@@ -116,7 +118,6 @@ const initialFormData: ClientFormData = {
   b2b_subDistrict: "",
   b2b_postalCode: "",
   b2b_fullAddress: "",
-  b2b_purchaseChannelId: "",
   b2b_pics: [{ prefix: "", name: "", email: "", phone: "" }],
   b2c_name: "",
   b2c_prefix: "",
@@ -128,7 +129,6 @@ const initialFormData: ClientFormData = {
   b2c_subDistrict: "",
   b2c_postalCode: "",
   b2c_fullAddressB2C: "",
-  b2c_purchaseChannelIdB2C: "",
 };
 
 export default function ClientAddForm({
@@ -236,13 +236,15 @@ export default function ClientAddForm({
       const formDataPayload = new FormData();
       formDataPayload.append("type", clientType);
       formDataPayload.append("status", clientStatus);
+      if (formData.joinedDate) {
+        formDataPayload.append(
+          "joinedDate",
+          format(formData.joinedDate, "yyyy-MM-dd"),
+        );
+      }
       if (clientType === "B2B") {
         formDataPayload.append("companyName", formData.b2b_companyName || "");
         formDataPayload.append("departmentId", formData.b2b_departmentId || "");
-        formDataPayload.append(
-          "purchaseChannelId",
-          formData.b2b_purchaseChannelId || "",
-        );
         if (formData.b2b_phone)
           formDataPayload.append("phone", formData.b2b_phone);
         if (formData.b2b_email)
@@ -427,6 +429,22 @@ export default function ClientAddForm({
                           required
                         />
                       </div>
+
+                      {/* Tanggal Bergabung */}
+                      <div className="space-y-2 flex flex-col justify-end">
+                        <Label>Tanggal Bergabung</Label>
+                        <DatePickerHelper
+                          date={formData.joinedDate}
+                          setDate={(date) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              joinedDate: date,
+                            }))
+                          }
+                          placeholder="Pilih Tanggal (Opsional)"
+                        />
+                      </div>
+
                       <div className="space-y-2">
                         <Label>Email Kantor</Label>
                         <Input
@@ -534,6 +552,21 @@ export default function ClientAddForm({
                           name="b2c_phone"
                           value={formData.b2c_phone}
                           onChange={handleChange}
+                        />
+                      </div>
+
+                      {/* ✨ TAMBAHAN BARU: Tanggal Bergabung untuk B2C */}
+                      <div className="space-y-2 flex flex-col justify-end">
+                        <Label>Tanggal Bergabung</Label>
+                        <DatePickerHelper
+                          date={formData.joinedDate}
+                          setDate={(date) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              joinedDate: date,
+                            }))
+                          }
+                          placeholder="Pilih Tanggal (Opsional)"
                         />
                       </div>
                     </div>

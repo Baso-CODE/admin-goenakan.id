@@ -1,6 +1,8 @@
 "use client";
 
 import { useApi } from "@/hooks/useApi";
+import { ChevronLeft } from "lucide-react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -117,10 +119,27 @@ export default function EditVendorPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold tracking-tight uppercase">
-        Edit Vendor
-      </h2>
+    <div className="w-full mx-auto space-y-6 pb-10">
+      <Link
+        href="/super-admin/vendors"
+        className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+        <ChevronLeft className="w-4 h-4 mr-1" />
+        Kembali ke Daftar Vendor
+      </Link>
+
+      {/* Header Halaman */}
+      <div className="flex items-center justify-between border-b pb-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight uppercase text-slate-800">
+            Edit Vendor
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Perbarui informasi data vendor sesuai kebutuhan.
+          </p>
+        </div>
+      </div>
+
+      {/* Form Edit */}
       {!isLoading && vendorData ? (
         <VendorForm
           initialData={vendorData}
@@ -131,7 +150,9 @@ export default function EditVendorPage() {
         />
       ) : (
         <div className="flex items-center justify-center h-40">
-          <span className="text-muted-foreground">Loading form data...</span>
+          <span className="text-muted-foreground animate-pulse">
+            Loading form data...
+          </span>
         </div>
       )}
     </div>

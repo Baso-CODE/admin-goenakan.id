@@ -5,8 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useApi } from "@/hooks/useApi";
+import { format } from "date-fns";
+import { id } from "date-fns/locale"; // Untuk format tanggal bahasa Indonesia
 import {
   Building,
+  CheckCircle2,
+  ChevronLeft,
+  HelpCircle,
   LaptopMinimalCheck,
   MapPin,
   Trash2,
@@ -20,6 +25,7 @@ import { toast } from "sonner";
 
 // === Tipe Data ===
 type ClientType = "B2B" | "B2C";
+type ClientStatus = "POTENTIAL" | "OFFICIAL";
 
 interface Department {
   id: string;
@@ -55,7 +61,7 @@ interface ClientB2B {
   district: string;
   subDistrict: string;
   postalCode: string;
-  fullAddress: string; // UPDATE
+  fullAddress: string;
 
   pics: {
     id: string;
@@ -70,6 +76,8 @@ interface ClientDetail {
   id: string;
   custCode: string;
   type: ClientType;
+  status: ClientStatus;
+  joinedDate?: string;
   createdAt: string;
   b2b?: ClientB2B;
   b2c?: ClientB2C;
@@ -114,9 +122,27 @@ const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
         </div>
 
         <div className="grid grid-cols-3">
+          <span className="text-muted-foreground font-medium">
+            Email Kantor
+          </span>
+          <span className="col-span-2 font-semibold text-gray-900">
+            {data.email || "-"}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3">
+          <span className="text-muted-foreground font-medium">
+            Telepon Kantor
+          </span>
+          <span className="col-span-2 font-semibold text-gray-900">
+            {data.phone || "-"}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3">
           <span className="text-muted-foreground font-medium">Departemen</span>
           <span className="col-span-2 font-semibold text-gray-900">
-            {data.department?.name}
+            {data.department?.name || "-"}
           </span>
         </div>
       </CardContent>
@@ -135,7 +161,7 @@ const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {data.pics.map((pic) => (
+        {data.pics?.map((pic) => (
           <div
             key={pic.id}
             className="p-4 border rounded-xl bg-muted/40 space-y-3">
@@ -188,53 +214,40 @@ const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
       </CardHeader>
 
       <CardContent className="space-y-4 text-sm">
-        {/* Country */}
         <div className="grid grid-cols-3 gap-2">
           <span className="text-muted-foreground font-medium">Negara</span>
           <span className="col-span-2 font-semibold uppercase">
             {data.country}
           </span>
         </div>
-
-        {/* PROVINSI */}
         <div className="grid grid-cols-3 gap-2">
           <span className="text-muted-foreground font-medium">Provinsi</span>
           <span className="col-span-2 font-semibold uppercase">
             {data.province}
           </span>
         </div>
-
-        {/* KOTA */}
         <div className="grid grid-cols-3 gap-2">
           <span className="text-muted-foreground font-medium">Kota</span>
           <span className="col-span-2 font-semibold">{data.city}</span>
         </div>
-
-        {/* DISTRICT */}
         <div className="grid grid-cols-3 gap-2">
           <span className="text-muted-foreground font-medium">Kecamatan</span>
           <span className="col-span-2 font-semibold uppercase">
             {data.district}
           </span>
         </div>
-
-        {/* DISTRICT */}
         <div className="grid grid-cols-3 gap-2">
           <span className="text-muted-foreground font-medium">Kelurahan</span>
           <span className="col-span-2 font-semibold uppercase">
             {data.subDistrict}
           </span>
         </div>
-
-        {/* POS KODE */}
         <div className="grid grid-cols-3 gap-2">
-          <span className="text-muted-foreground font-medium">Pos Kode</span>
+          <span className="text-muted-foreground font-medium">Kode Pos</span>
           <span className="col-span-2 font-semibold uppercase">
             {data.postalCode}
           </span>
         </div>
-
-        {/* ALAMAT */}
         <div className="grid grid-cols-3 gap-2">
           <span className="text-muted-foreground font-medium">
             Alamat Lengkap
@@ -251,7 +264,6 @@ const B2BDetails: React.FC<{ data: ClientB2B }> = ({ data }) => (
 // === B2C Component ===
 const B2CDetails: React.FC<{ data: ClientB2C }> = ({ data }) => (
   <div className="grid grid-cols-1 gap-6">
-    {/* === Informasi Individu === */}
     <Card className="shadow-sm border rounded-xl">
       <CardHeader className="pb-4">
         <div className="flex items-center gap-3">
@@ -273,7 +285,6 @@ const B2CDetails: React.FC<{ data: ClientB2C }> = ({ data }) => (
             {data.prefix} {data.name}
           </span>
         </div>
-
         <div className="grid grid-cols-3 gap-2">
           <span className="text-muted-foreground font-medium">Telepon</span>
           <span className="col-span-2 font-semibold">{data.phone}</span>
@@ -281,7 +292,6 @@ const B2CDetails: React.FC<{ data: ClientB2C }> = ({ data }) => (
       </CardContent>
     </Card>
 
-    {/* === Alamat Pengiriman === */}
     <Card className="shadow-sm border rounded-xl">
       <CardHeader className="pb-4">
         <div className="flex items-center gap-3">
@@ -347,13 +357,11 @@ const B2CDetails: React.FC<{ data: ClientB2C }> = ({ data }) => (
 // === Main Page ===
 export default function ClientDetail() {
   const { fetchApi, status } = useApi();
-
   const params = useParams<{ clientId: string }>();
   const clientId = params.clientId;
   const router = useRouter();
 
   const [client, setClient] = useState<ClientDetail | null>(null);
-
   const [loading, setLoading] = useState(true);
 
   // === FETCH DATA ===
@@ -387,7 +395,6 @@ export default function ClientDetail() {
     if (status !== "authenticated") return;
 
     try {
-      //  Gunakan fetchApi dengan method DELETE
       const res = await fetchApi(`/clients/${clientId}`, {
         method: "DELETE",
       });
@@ -403,7 +410,6 @@ export default function ClientDetail() {
     }
   };
 
-  // State loading session atau data
   if (status === "loading" || loading)
     return (
       <div className="p-10 text-center animate-pulse text-muted-foreground">
@@ -418,17 +424,9 @@ export default function ClientDetail() {
       </div>
     );
 
-  if (loading)
-    return <div className="p-10 text-center">Memuat data klien...</div>;
-  if (!client)
-    return (
-      <div className="p-10 text-center text-muted-foreground">
-        Data tidak ditemukan.
-      </div>
-    );
-
   const titleName =
     client.type === "B2B" ? client.b2b?.companyName : client.b2c?.name;
+
   const SpecificDetailsComponent =
     client.type === "B2B" ? (
       <B2BDetails data={client.b2b as ClientB2B} />
@@ -436,49 +434,83 @@ export default function ClientDetail() {
       <B2CDetails data={client.b2c as ClientB2C} />
     );
 
+  const displayDate = client.joinedDate
+    ? new Date(client.joinedDate)
+    : new Date(client.createdAt);
+
   return (
     <div className="space-y-10 w-full">
+      <Link
+        href="/super-admin/clients"
+        className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+        <ChevronLeft className="w-4 h-4 mr-1" />
+        Kembali ke Daftar Klien
+      </Link>
+
       {/* === HEADER PREMIUM === */}
-      <header className="flex items-center justify-between">
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-4xl font-bold tracking-tight">{titleName}</h1>
+      <header className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-4xl font-bold tracking-tight">{titleName}</h1>
 
-            <Badge
-              variant="outline"
-              className={`px-3 py-1 text-sm font-semibold flex items-center gap-1 rounded-lg
-            ${
-              client.type === "B2B"
-                ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                : "bg-yellow-50 text-yellow-700 border-yellow-200"
-            }
-          `}>
-              {/* ICON */}
-              {client.type === "B2B" ? (
-                <Building className="w-3.5 h-3.5" />
-              ) : (
-                <User className="w-3.5 h-3.5" />
-              )}
-              {client.type}
-            </Badge>
-          </div>
+          {/* ACTION BUTTONS UNTUK LAYAR KECIL BISA DIPINDAH KE SINI ATAU TETAP DI KANAN BAWAH */}
+        </div>
 
-          {/* METADATA */}
-          <div
-            className="text-sm text-muted-foreground flex items-center gap-3 flex-wrap 
-                   bg-muted/40 px-4 py-2 rounded-lg w-fit border">
-            <span>
-              <span className="font-medium">Kode Klien:</span>
-              <span className="font-mono text-[13px]">{client.custCode}</span>
-            </span>
+        <div className="flex items-center gap-3">
+          {/* BADGE TIPE KLIEN */}
+          <Badge
+            variant="outline"
+            className={`px-3 py-1 text-sm font-semibold flex items-center gap-1 rounded-lg
+          ${
+            client.type === "B2B"
+              ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+              : "bg-yellow-50 text-yellow-700 border-yellow-200"
+          }
+        `}>
+            {client.type === "B2B" ? (
+              <Building className="w-3.5 h-3.5" />
+            ) : (
+              <User className="w-3.5 h-3.5" />
+            )}
+            {client.type}
+          </Badge>
 
-            <span className="text-gray-400">•</span>
+          {/* ✨ TAMBAHAN: BADGE STATUS KLIEN */}
+          <Badge
+            variant="outline"
+            className={`px-3 py-1 text-sm font-semibold flex items-center gap-1 rounded-lg
+          ${
+            client.status === "OFFICIAL"
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+              : "bg-amber-50 text-amber-700 border-amber-200"
+          }
+        `}>
+            {client.status === "OFFICIAL" ? (
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            ) : (
+              <HelpCircle className="w-3.5 h-3.5" />
+            )}
+            {client.status === "OFFICIAL"
+              ? "Official Client"
+              : "Potential Client"}
+          </Badge>
+        </div>
 
-            <span>
-              <span className="font-medium">Bergabung:</span>
-              {new Date(client.createdAt).toLocaleDateString()}
-            </span>
-          </div>
+        {/* METADATA */}
+        <div
+          className="text-sm text-muted-foreground flex items-center gap-3 flex-wrap 
+                 bg-muted/40 px-4 py-2 rounded-lg w-fit border">
+          <span>
+            <span className="font-medium">Kode Klien: </span>
+            <span className="font-mono text-[13px]">{client.custCode}</span>
+          </span>
+
+          <span className="text-gray-400">•</span>
+
+          <span>
+            {/* ✨ TAMBAHAN: MENGGUNAKAN JOINED DATE */}
+            <span className="font-medium">Tanggal Bergabung: </span>
+            {format(displayDate, "dd MMMM yyyy", { locale: id })}
+          </span>
         </div>
       </header>
 
@@ -498,7 +530,7 @@ export default function ClientDetail() {
                   <LaptopMinimalCheck className="w-4 h-4 text-slate-700" />
                 </div>
                 <CardTitle className="text-lg font-semibold tracking-wide">
-                  Quick Actions
+                  Tindakan Cepat
                 </CardTitle>
               </div>
             </CardHeader>
@@ -510,15 +542,15 @@ export default function ClientDetail() {
                 <Button
                   variant="secondary"
                   className="w-full gap-2 py-2.5 rounded-xl hover:bg-secondary transition">
-                  <Wrench className="w-4 h-4" /> Edit Client
+                  <Wrench className="w-4 h-4" /> Edit Klien
                 </Button>
               </Link>
 
               <Button
                 variant="destructive"
-                className="w-full gap-2 py-2.5 rounded-xl hover:bg-destructive/90  transition"
+                className="w-full gap-2 py-2.5 rounded-xl hover:bg-destructive/90 transition"
                 onClick={handleDelete}>
-                <Trash2 className="w-4 h-4" /> Delete Client
+                <Trash2 className="w-4 h-4" /> Hapus Klien
               </Button>
             </CardContent>
           </Card>
