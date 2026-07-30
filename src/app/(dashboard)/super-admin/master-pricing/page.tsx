@@ -23,10 +23,19 @@ import {
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { formatCurrency } from "@/utils/formatCurrency";
-import { FileText, Layers, RefreshCw, Search, Package } from "lucide-react";
+import { FileText, Layers, RefreshCw, Search, Package, ChevronDown, ChevronUp, Coins, TrendingUp, ArrowRight, Check, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ManagePriceModal } from "./components/ManagePriceModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 export type PriceTier = {
   id: string;
@@ -112,6 +121,7 @@ export default function MasterPricingPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [currencies, setCurrencies] = useState<{ code: string; name: string }[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +131,21 @@ export default function MasterPricingPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Global pricing modifier states
+  const [modifierOpen, setModifierOpen] = useState(false);
+  const [targetCurrency, setTargetCurrency] = useState("CNY");
+  const [newExchangeRate, setNewExchangeRate] = useState<number | string>("");
+  const [offsetValue, setOffsetValue] = useState<number | string>(0);
+  const [offsetCurrency, setOffsetCurrency] = useState("IDR");
+  const [isFetchingRate, setIsFetchingRate] = useState(false);
+
+  // Preview Dialog states
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [confirmCheckbox, setConfirmCheckbox] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const debouncedSearch = useDebounce(search, 500);
 
@@ -133,6 +158,120 @@ export default function MasterPricingPage() {
       console.error("Failed to load categories", err);
     }
   };
+
+  const fetchCurrencies = async () => {
+    try {
+      const res = await fetchApi("/currencies");
+      const data = await res.json();
+      setCurrencies(data);
+    } catch (err) {
+      console.error("Failed to load currencies", err);
+    }
+  };
+
+  const handleFetchRate = async (code: string) => {
+    if (code === "IDR") {
+      setNewExchangeRate(1);
+      return;
+    }
+    setIsFetchingRate(true);
+    try {
+      const resRate = await fetchApi("/currencies/convert/rate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromCurrency: code,
+          toCurrency: "IDR",
+          amount: 1,
+        }),
+      });
+      const dataRate = await resRate.json();
+      if (dataRate?.success && dataRate?.rate) {
+        setNewExchangeRate(dataRate.rate);
+      } else {
+        toast.error(`Gagal memuat kurs ${code}.`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Terjadi kesalahan memuat kurs.");
+    } finally {
+      setIsFetchingRate(false);
+    }
+  };
+
+  const handleOpenPreview = async () => {
+    if (!newExchangeRate || isNaN(Number(newExchangeRate)) || Number(newExchangeRate) <= 0) {
+      toast.error("Silakan masukkan nilai kurs yang valid.");
+      return;
+    }
+    setPreviewLoading(true);
+    setIsPreviewOpen(true);
+    setConfirmCheckbox(false);
+    try {
+      const res = await fetchApi("/products/master-price/batch-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetCurrency,
+          newExchangeRate: Number(newExchangeRate),
+          offsetValue: Number(offsetValue) || 0,
+          offsetCurrency,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPreviewData(data);
+      } else {
+        toast.error(data.message || "Gagal memuat preview penyesuaian harga.");
+        setIsPreviewOpen(false);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Terjadi kesalahan koneksi.");
+      setIsPreviewOpen(false);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleApplyBatchUpdate = async () => {
+    if (!confirmCheckbox) {
+      toast.error("Silakan centang persetujuan terlebih dahulu.");
+      return;
+    }
+    setIsUpdating(true);
+    try {
+      const res = await fetchApi("/products/master-price/batch-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetCurrency,
+          newExchangeRate: Number(newExchangeRate),
+          offsetValue: Number(offsetValue) || 0,
+          offsetCurrency,
+        }),
+      });
+      const result = await res.json();
+      if (res.ok) {
+        toast.success(result.message || "Penyesuaian harga global berhasil disimpan!");
+        setIsPreviewOpen(false);
+        fetchProducts();
+      } else {
+        toast.error(result.message || "Gagal menyimpan penyesuaian harga.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Terjadi kesalahan koneksi.");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  useEffect(() => {
+    if (modifierOpen && targetCurrency) {
+      handleFetchRate(targetCurrency);
+    }
+  }, [modifierOpen, targetCurrency]);
 
   const fetchProducts = async () => {
     if (status === "loading") return;
@@ -167,6 +306,7 @@ export default function MasterPricingPage() {
 
   useEffect(() => {
     fetchCategories();
+    fetchCurrencies();
   }, [fetchApi]);
 
   useEffect(() => {
@@ -241,6 +381,238 @@ export default function MasterPricingPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Global Pricing Modifier Card */}
+      <Card className="bg-white border-stone-200 shadow-xs overflow-hidden">
+        <button
+          onClick={() => setModifierOpen(!modifierOpen)}
+          className="w-full flex items-center justify-between p-4 font-semibold text-stone-800 hover:bg-stone-50 transition-colors">
+          <div className="flex items-center gap-2">
+            <Coins className="h-5 w-5 text-indigo-600" />
+            <span>Global Pricing Modifier</span>
+            <Badge className="bg-stone-100 text-stone-600 font-bold border-stone-200 hover:bg-stone-100 text-[10px]">
+              Batch Update
+            </Badge>
+          </div>
+          {modifierOpen ? (
+            <ChevronUp className="h-5 w-5 text-stone-500" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-stone-500" />
+          )}
+        </button>
+
+        {modifierOpen && (
+          <div className="p-4 border-t bg-stone-50/50 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div>
+                <Label className="text-xs font-semibold text-stone-500">Target Currency</Label>
+                <Select
+                  value={targetCurrency}
+                  onValueChange={(val) => {
+                    setTargetCurrency(val);
+                    if (val === "IDR") setNewExchangeRate(1);
+                  }}>
+                  <SelectTrigger className="bg-white border-stone-200 mt-1.5 h-10 font-medium">
+                    <SelectValue placeholder="Pilih Currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {currencies.filter(c => c.code !== "IDR").map((c) => (
+                      <SelectItem key={c.code} value={c.code}>
+                        {c.code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold text-stone-500">New Exchange Rate (Kurs)</Label>
+                <div className="relative mt-1.5">
+                  <Input
+                    type="number"
+                    disabled={targetCurrency === "IDR"}
+                    placeholder="Masukkan Kurs..."
+                    className="bg-white border-stone-200 pr-10 h-10 font-medium font-mono"
+                    value={newExchangeRate}
+                    onChange={(e) => setNewExchangeRate(e.target.value)}
+                  />
+                  {targetCurrency !== "IDR" && (
+                    <button
+                      disabled={isFetchingRate}
+                      onClick={() => handleFetchRate(targetCurrency)}
+                      type="button"
+                      className="absolute right-3 top-2.5 text-stone-400 hover:text-indigo-600 disabled:opacity-50">
+                      <RefreshCw className={`h-5 w-5 ${isFetchingRate ? "animate-spin text-indigo-600" : ""}`} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold text-stone-500">Offset Value (Adjustment)</Label>
+                <Input
+                  type="number"
+                  placeholder="Contoh: 1000 atau -500"
+                  className="bg-white border-stone-200 mt-1.5 h-10 font-medium font-mono"
+                  value={offsetValue}
+                  onChange={(e) => setOffsetValue(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold text-stone-500">Offset Currency</Label>
+                <Select
+                  value={offsetCurrency}
+                  onValueChange={setOffsetCurrency}>
+                  <SelectTrigger className="bg-white border-stone-200 mt-1.5 h-10 font-medium">
+                    <SelectValue placeholder="Pilih Currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="IDR">IDR - Rupiah</SelectItem>
+                    {currencies.filter(c => c.code !== "IDR").map((c) => (
+                      <SelectItem key={c.code} value={c.code}>
+                        {c.code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button
+                onClick={handleOpenPreview}
+                className="bg-indigo-600 text-white font-semibold hover:bg-indigo-700 h-10 px-5 gap-2 shadow-xs">
+                <TrendingUp className="h-5 w-5" />
+                Preview Adjustments
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Preview Global Adjustments Dialog */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-6 bg-white border border-stone-200 rounded-lg shadow-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-stone-900 flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-indigo-600" />
+              Review Global Price Adjustments
+            </DialogTitle>
+            <DialogDescription className="text-sm text-stone-500 mt-1">
+              Pratinjau perubahan nilai exchange rate dan offset harga dasar untuk seluruh katalog produk.
+            </DialogDescription>
+          </DialogHeader>
+
+          {previewLoading ? (
+            <div className="flex-1 py-20 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
+              <span className="text-sm text-stone-600 font-medium">Menghitung ulang harga dasar seluruh produk...</span>
+            </div>
+          ) : previewData ? (
+            <div className="flex-grow overflow-hidden flex flex-col space-y-4 my-2">
+              {/* Summary Banner */}
+              <div className="p-4 rounded-lg bg-indigo-50 border border-indigo-100 flex flex-wrap md:flex-nowrap gap-4 justify-between items-center text-xs">
+                <div className="space-y-1">
+                  <div className="font-semibold text-indigo-900">Parameter Batch Update</div>
+                  <div className="text-indigo-700 flex items-center gap-2 font-mono">
+                    Target: {targetCurrency} Exchange Rate <ArrowRight className="h-3 w-3" /> Rp {Number(newExchangeRate).toLocaleString("id-ID")}
+                  </div>
+                </div>
+                {Number(offsetValue) !== 0 && (
+                  <div className="space-y-1 text-right md:text-left">
+                    <div className="font-semibold text-indigo-900">Tambahan Offset</div>
+                    <div className="text-indigo-700 font-mono">
+                      {Number(offsetValue) > 0 ? "+" : ""}{Number(offsetValue).toLocaleString("id-ID")} {offsetCurrency} (≈ Rp {Number(previewData.summary?.rupiahOffset).toLocaleString("id-ID")})
+                    </div>
+                  </div>
+                )}
+                <div className="p-2 bg-white rounded-md border border-indigo-200 font-bold text-indigo-900 text-center min-w-[100px]">
+                  {previewData.summary?.totalProducts} Produk
+                </div>
+              </div>
+
+              {/* Table List */}
+              <div className="flex-grow overflow-y-auto border border-stone-200 rounded-md">
+                <Table>
+                  <TableHeader className="bg-stone-50 sticky top-0 z-10">
+                    <TableRow>
+                      <TableHead className="w-[45%] bg-stone-50">Produk</TableHead>
+                      <TableHead className="w-[15%] bg-stone-50">Kategori</TableHead>
+                      <TableHead className="w-[15%] text-right bg-stone-50">Harga Lama</TableHead>
+                      <TableHead className="w-[15%] text-right bg-stone-50">Harga Baru</TableHead>
+                      <TableHead className="w-[10%] text-right bg-stone-50">Selisih</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {previewData.previewItems?.map((item: any) => (
+                      <TableRow key={item.productId} className="hover:bg-stone-50/50">
+                        <TableCell>
+                          <div className="font-semibold text-stone-900 text-xs">{item.name}</div>
+                          <div className="text-[10px] text-stone-500 font-mono mt-0.5">{item.sku}</div>
+                        </TableCell>
+                        <TableCell className="text-stone-600 text-xs">{item.categoryName}</TableCell>
+                        <TableCell className="text-right text-stone-600 text-xs font-mono">
+                          Rp {item.currentPrice.toLocaleString("id-ID")}
+                        </TableCell>
+                        <TableCell className="text-right text-stone-900 font-bold text-xs font-mono">
+                          Rp {item.newPrice.toLocaleString("id-ID")}
+                        </TableCell>
+                        <TableCell className={`text-right font-semibold text-xs font-mono ${item.difference > 0 ? "text-emerald-600" : item.difference < 0 ? "text-rose-600" : "text-stone-500"}`}>
+                          {item.difference > 0 ? "+" : ""}{item.difference.toLocaleString("id-ID")}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Agreement Checkbox */}
+              <div className="flex items-start gap-2.5 p-3.5 bg-stone-50 rounded-lg border border-stone-200">
+                <input
+                  type="checkbox"
+                  id="confirm-batch"
+                  className="h-4.5 w-4.5 rounded border-stone-300 text-indigo-600 focus:ring-indigo-500 mt-0.5 cursor-pointer"
+                  checked={confirmCheckbox}
+                  onChange={(e) => setConfirmCheckbox(e.target.checked)}
+                />
+                <label htmlFor="confirm-batch" className="text-xs text-stone-600 leading-normal cursor-pointer select-none">
+                  <span className="font-bold text-stone-800 block mb-0.5">Konfirmasi Batch Update</span>
+                  Saya menyetujui untuk mengubah harga dasar seluruh katalog produk di atas. Tindakan ini bersifat permanen dan akan langsung memperbarui harga jual di website.
+                </label>
+              </div>
+            </div>
+          ) : (
+            <div className="py-12 text-center text-stone-500 text-sm">Gagal memuat pratinjau data.</div>
+          )}
+
+          <DialogFooter className="border-t pt-4 mt-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsPreviewOpen(false)}
+              disabled={isUpdating}
+              className="border-stone-200 text-stone-700 hover:bg-stone-50 font-semibold h-10">
+              Batal
+            </Button>
+            <Button
+              disabled={!confirmCheckbox || isUpdating || !previewData}
+              onClick={handleApplyBatchUpdate}
+              className="bg-indigo-600 text-white font-semibold hover:bg-indigo-700 h-10 px-5 gap-2 shadow-xs disabled:opacity-50">
+              {isUpdating ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Menyimpan...
+                </>
+              ) : (
+                <>
+                  <Check className="h-5 w-5" />
+                  Terapkan Perubahan
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Main Table */}
       <Card className="bg-white border-stone-200 shadow-xs overflow-hidden">
