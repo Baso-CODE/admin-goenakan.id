@@ -30,21 +30,27 @@ import { toast } from "sonner";
 
 type FaqItem = {
   id: string;
-  question: string;
-  answer: string;
+  questionId: string;
+  questionEn: string;
+  answerId: string;
+  answerEn: string;
   isFeatured: boolean;
   isActive: boolean;
   displayOrder: number;
   createdAt: string;
+  updatedAt: string;
+  categoryId: string;
   category: {
     id: string;
-    name: string;
+    nameId: string;
+    nameEn: string;
   };
 };
 
 type CategoryOption = {
   id: string;
-  name: string;
+  nameId: string;
+  nameEn: string;
 };
 
 type Meta = {
@@ -68,6 +74,8 @@ export default function FaqTable() {
 
   // === STATE DATA ===
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
+  console.log("ini adalah faqs", faqs);
+
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
 
@@ -284,7 +292,7 @@ export default function FaqTable() {
                 <SelectItem value="ALL">All Categories</SelectItem>
                 {categories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
+                    {cat.nameId}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -408,13 +416,18 @@ export default function FaqTable() {
                     <TableCell className="max-w-75">
                       <div
                         className="font-medium truncate"
-                        title={faq.question}>
-                        {faq.question}
+                        title={faq.questionId || faq.questionEn}>
+                        {faq.questionId || faq.questionEn}
                       </div>
                       <div
                         className="text-xs text-muted-foreground truncate"
-                        title={faq.answer.replace(/<[^>]*>?/gm, "")}>
-                        {faq.answer.replace(/<[^>]*>?/gm, "").substring(0, 50)}
+                        title={(faq.answerId || faq.answerEn || "").replace(
+                          /<[^>]*>?/gm,
+                          "",
+                        )}>
+                        {(faq.answerId || faq.answerEn || "")
+                          .replace(/<[^>]*>?/gm, "")
+                          .substring(0, 50)}
                         ...
                       </div>
                     </TableCell>
@@ -424,7 +437,16 @@ export default function FaqTable() {
                       <Badge
                         variant="outline"
                         className="whitespace-nowrap bg-blue-50 text-blue-700 border-blue-200">
-                        {faq.category.name}
+                        {faq.category.nameId || faq.category.nameEn}
+                      </Badge>
+                    </TableCell>
+
+                    {/* Category */}
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className="whitespace-nowrap bg-blue-50 text-blue-700 border-blue-200">
+                        {faq.category.nameId}
                       </Badge>
                     </TableCell>
 

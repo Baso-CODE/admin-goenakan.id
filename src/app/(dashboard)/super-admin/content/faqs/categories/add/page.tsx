@@ -27,7 +27,7 @@ export default function AddFaqCategory() {
       }
 
       toast.success("FAQ Category created successfully!");
-      router.push("/super-admin/faqs/categories");
+      router.push("/super-admin/content/faqs/categories");
       router.refresh();
     } catch (err) {
       console.error("❌ Failed to create FAQ category:", err);
