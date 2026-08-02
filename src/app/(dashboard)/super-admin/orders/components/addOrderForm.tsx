@@ -98,7 +98,6 @@ export default function AddOrderForm() {
       currencyCode: "",
       referenceQuotationId: "",
       referenceSampleId: "",
-
       clientId: "",
       clientB2BPICId: "",
       purchaseChannelId: "",
@@ -112,6 +111,7 @@ export default function AddOrderForm() {
           price: 0,
           customization: "",
           remarks: "",
+          selectedAttributes: {},
         },
       ],
     },
@@ -1055,6 +1055,7 @@ export default function AddOrderForm() {
                 )}
               />
             </div>
+
             {/* === SECTION 5: PRODUCTS === */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
@@ -1139,62 +1140,6 @@ export default function AddOrderForm() {
                     return finalPrice;
                   };
 
-                  // LOGIKA PENCOCOKAN FLEKSIBEL (Saat memilih atribut/warna/ukuran)
-                  const handleAttributeSelect = (
-                    attributeId: string,
-                    valueId: string,
-                  ) => {
-                    const newAttrs = {
-                      ...currentSelectedAttrs,
-                      [attributeId]: valueId,
-                    };
-                    form.setValue(
-                      `products.${index}.selectedAttributes`,
-                      newAttrs,
-                    );
-
-                    if (selectedProduct?.productVariants) {
-                      const selectedValIds = Object.values(newAttrs);
-
-                      const matchedVariant = [
-                        ...selectedProduct.productVariants,
-                      ]
-                        .sort(
-                          (a, b) =>
-                            b.combinationIds.length - a.combinationIds.length,
-                        )
-                        .find(
-                          (v) =>
-                            v.combinationIds.length > 0 &&
-                            v.combinationIds.every((id) =>
-                              selectedValIds.includes(id),
-                            ),
-                        );
-
-                      if (matchedVariant) {
-                        form.setValue(
-                          `products.${index}.variantId`,
-                          matchedVariant.id,
-                        );
-                        // ✨ UPDATE: Gunakan resolvePrice agar jika QTY sudah 11, harga grosir tetap dipakai
-                        form.setValue(
-                          `products.${index}.price`,
-                          resolvePrice(
-                            selectedProduct,
-                            matchedVariant.id,
-                            currentQty,
-                          ),
-                        );
-                      } else {
-                        form.setValue(`products.${index}.variantId`, "");
-                        form.setValue(
-                          `products.${index}.price`,
-                          resolvePrice(selectedProduct, "", currentQty),
-                        );
-                      }
-                    }
-                  };
-
                   return (
                     <div
                       key={field.id}
@@ -1262,7 +1207,6 @@ export default function AddOrderForm() {
                                                   {},
                                                 );
 
-                                                // ✨ UPDATE: Terapkan resolvePrice dari awal
                                                 const hasVariants =
                                                   p.productVariants?.length > 0;
                                                 form.setValue(
@@ -1444,47 +1388,122 @@ export default function AddOrderForm() {
                               <p className="text-sm font-semibold text-gray-700 mb-3">
                                 Pilih Varian Produk:
                               </p>
-                              {/* Grid ini membuat atribut berjajar rapi ke samping pada layar besar */}
-                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                {selectedProduct.availableAttributes.map(
-                                  (attr) => (
-                                    <div
-                                      key={attr.attributeId}
-                                      className="flex flex-col space-y-1.5">
-                                      <label className="text-xs font-medium text-gray-500">
-                                        {attr.attributeName}
-                                      </label>
-                                      <Select
-                                        value={
-                                          currentSelectedAttrs[
-                                            attr.attributeId
-                                          ] || ""
-                                        }
-                                        onValueChange={(val) =>
-                                          handleAttributeSelect(
-                                            attr.attributeId,
-                                            val,
-                                          )
-                                        }>
-                                        <SelectTrigger className="h-9 text-sm bg-white border-gray-300 w-full">
-                                          <SelectValue
-                                            placeholder={`Pilih ${attr.attributeName}`}
-                                          />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {attr.values.map((val) => (
-                                            <SelectItem
-                                              key={val.valueId}
-                                              value={val.valueId}>
-                                              {val.value}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
+
+                              <FormField
+                                control={control}
+                                name={`products.${index}.selectedAttributes`}
+                                render={({ field }) => {
+                                  // Ambil state dari field bawaan RHF
+                                  const currentSelectedAttrs =
+                                    field.value || {};
+
+                                  // Logika dipindah ke sini agar bisa memanggil field.onChange()
+                                  const handleAttributeSelect = (
+                                    attributeId: string,
+                                    valueId: string,
+                                  ) => {
+                                    const newAttrs = {
+                                      ...currentSelectedAttrs,
+                                      [attributeId]: valueId,
+                                    };
+
+                                    // 1. Secara resmi mendaftarkan perubahan nilai ke React Hook Form
+                                    field.onChange(newAttrs);
+
+                                    // 2. Logika penentuan Variant & Harga tetap berjalan normal
+                                    if (selectedProduct?.productVariants) {
+                                      const selectedValIds =
+                                        Object.values(newAttrs);
+                                      const matchedVariant = [
+                                        ...selectedProduct.productVariants,
+                                      ]
+                                        .sort(
+                                          (a, b) =>
+                                            b.combinationIds.length -
+                                            a.combinationIds.length,
+                                        )
+                                        .find(
+                                          (v) =>
+                                            v.combinationIds.length > 0 &&
+                                            v.combinationIds.every((id) =>
+                                              selectedValIds.includes(id),
+                                            ),
+                                        );
+
+                                      if (matchedVariant) {
+                                        form.setValue(
+                                          `products.${index}.variantId`,
+                                          matchedVariant.id,
+                                        );
+                                        form.setValue(
+                                          `products.${index}.price`,
+                                          resolvePrice(
+                                            selectedProduct,
+                                            matchedVariant.id,
+                                            currentQty,
+                                          ),
+                                        );
+                                      } else {
+                                        form.setValue(
+                                          `products.${index}.variantId`,
+                                          "",
+                                        );
+                                        form.setValue(
+                                          `products.${index}.price`,
+                                          resolvePrice(
+                                            selectedProduct,
+                                            "",
+                                            currentQty,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  };
+
+                                  return (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                      {selectedProduct.availableAttributes.map(
+                                        (attr) => (
+                                          <div
+                                            key={attr.attributeId}
+                                            className="flex flex-col space-y-1.5">
+                                            <label className="text-xs font-medium text-gray-500">
+                                              {attr.attributeName}
+                                            </label>
+                                            <Select
+                                              value={
+                                                currentSelectedAttrs[
+                                                  attr.attributeId
+                                                ] || ""
+                                              }
+                                              onValueChange={(val) =>
+                                                handleAttributeSelect(
+                                                  attr.attributeId,
+                                                  val,
+                                                )
+                                              }>
+                                              <SelectTrigger className="h-9 text-sm bg-white border-gray-300 w-full">
+                                                <SelectValue
+                                                  placeholder={`Pilih ${attr.attributeName}`}
+                                                />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                {attr.values.map((val) => (
+                                                  <SelectItem
+                                                    key={val.valueId}
+                                                    value={val.valueId}>
+                                                    {val.value}
+                                                  </SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                        ),
+                                      )}
                                     </div>
-                                  ),
-                                )}
-                              </div>
+                                  );
+                                }}
+                              />
                             </div>
                           </div>
                         )}

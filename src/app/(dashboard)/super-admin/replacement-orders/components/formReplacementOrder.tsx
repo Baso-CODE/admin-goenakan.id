@@ -4,13 +4,27 @@ import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useApi } from "@/hooks/useApi";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { PlusCircle, RefreshCcw, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  PlusCircle,
+  RefreshCcw,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import * as z from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Form,
   FormControl,
@@ -21,6 +35,11 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -28,6 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 // 1. ZOD SCHEMA (Validasi Standar Enterprise)
 export const replacementSchema = z.object({
@@ -72,6 +92,7 @@ export default function ReplacementOrderForm({
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [openOrderCombobox, setOpenOrderCombobox] = useState(false);
 
   // 2. SETUP FORM
   const form = useForm<ReplacementFormValues>({
@@ -156,25 +177,121 @@ export default function ReplacementOrderForm({
                 control={control}
                 name="referenceOrderId"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>Reference Order (SO Asli)</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      disabled={loadingData}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Pilih Order Asli" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {orders.map((o) => (
-                          <SelectItem key={o.id} value={o.id}>
-                            {o.orderNumber}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover
+                      open={openOrderCombobox}
+                      onOpenChange={setOpenOrderCombobox}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            disabled={loadingData}
+                            className={cn(
+                              "w-full justify-between font-normal bg-white",
+                              !field.value && "text-muted-foreground",
+                            )}>
+                            {/* Tampilkan nomor order jika sudah dipilih, jika belum tampilkan placeholder */}
+                            {field.value
+                              ? orders.find((o) => o.id === field.value)
+                                  ?.orderNumber
+                              : "Pilih Order Asli..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-100 p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Cari nomor order (contoh: SO-2026-08...)" />
+                          <CommandList>
+                            <CommandEmpty>Order tidak ditemukan.</CommandEmpty>
+                            <CommandGroup>
+                              {orders.map((o) => (
+                                <CommandItem
+                                  key={o.id}
+                                  value={o.orderNumber}
+                                  onSelect={async () => {
+                                    field.onChange(o.id);
+                                    setOpenOrderCombobox(false);
+
+                                    try {
+                                      // 2. Ambil detail order dari API
+                                      const res = await fetchApi(
+                                        `/orders/${o.id}/replacement-data`,
+                                      );
+                                      if (res.ok) {
+                                        const orderDetail = await res.json();
+                                        const dataOrder =
+                                          orderDetail.data || orderDetail;
+
+                                        // 3. Auto-fill Kustomer (Wajib sama)
+                                        if (dataOrder.clientId) {
+                                          form.setValue(
+                                            "clientId",
+                                            dataOrder.clientId,
+                                            {
+                                              shouldValidate: true,
+                                            },
+                                          );
+                                        }
+
+                                        // 4. Auto-fill Items
+                                        const originalItems =
+                                          dataOrder.products;
+                                        console.log(
+                                          "ini adalah data",
+                                          originalItems,
+                                        );
+
+                                        if (
+                                          originalItems &&
+                                          originalItems.length > 0
+                                        ) {
+                                          remove(); // Kosongkan form item saat ini (jika ada baris kosong)
+
+                                          // Masukkan semua produk dari order asli ke dalam form
+                                          const newItems = originalItems.map(
+                                            (item: any) => ({
+                                              productId: item.productId,
+                                              variantId: item.variantId || "",
+                                              quantity: item.quantity,
+                                              unitPrice: item.unitPrice || 0,
+                                              remarks: "", // Dikosongkan agar bisa diisi alasan defect
+                                              customization:
+                                                item.customization || "",
+                                              selectedAttributes:
+                                                item.selectedAttributes || {},
+                                            }),
+                                          );
+                                          append(newItems);
+                                        }
+                                      }
+                                    } catch (error) {
+                                      console.error(
+                                        "Gagal mengambil detail order:",
+                                        error,
+                                      );
+                                    }
+                                  }}>
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      o.id === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0",
+                                    )}
+                                  />
+                                  <span className="font-medium">
+                                    {o.orderNumber}
+                                  </span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -189,7 +306,10 @@ export default function ReplacementOrderForm({
                     <Select
                       onValueChange={field.onChange}
                       value={field.value}
-                      disabled={loadingData}>
+                      // ✨ TAMBAHAN UX: Nonaktifkan pilihan klien jika order sudah dipilih agar data tidak dirusak
+                      disabled={
+                        loadingData || !!form.watch("referenceOrderId")
+                      }>
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Pilih Kustomer" />
@@ -266,18 +386,15 @@ export default function ReplacementOrderForm({
               </div>
 
               {fields.map((field, index) => {
-                // Pantau nilai produk yang sedang dipilih untuk baris ini
                 const currentProductId = form.watch(`items.${index}.productId`);
                 const currentQty = form.watch(`items.${index}.quantity`) || 1;
                 const currentSelectedAttrs =
                   form.watch(`items.${index}.selectedAttributes`) || {};
 
-                // Cari detail produk lengkap dari state Master Data
                 const selectedProduct = products.find(
                   (p) => p.id === currentProductId,
                 );
 
-                // Fungsi Penentu Harga (Base -> Variant -> Tier)
                 const resolvePrice = (
                   prod: any,
                   variantId: string,
@@ -306,7 +423,6 @@ export default function ReplacementOrderForm({
                   return finalPrice;
                 };
 
-                // Logika Pemilihan Atribut Dinamis
                 const handleAttributeSelect = (
                   attributeId: string,
                   valueId: string,
@@ -319,7 +435,6 @@ export default function ReplacementOrderForm({
 
                   if (selectedProduct?.productVariants) {
                     const selectedValIds = Object.values(newAttrs);
-
                     const matchedVariant = [...selectedProduct.productVariants]
                       .sort(
                         (a, b) =>
@@ -360,9 +475,7 @@ export default function ReplacementOrderForm({
                   <div
                     key={field.id}
                     className="border rounded-lg bg-gray-50/50 hover:shadow-sm transition-shadow">
-                    {/* Header Baris Utama */}
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-start border-b border-gray-100">
-                      {/* Product Select */}
                       <div className="md:col-span-4">
                         <FormField
                           control={control}
@@ -373,13 +486,11 @@ export default function ReplacementOrderForm({
                               <Select
                                 onValueChange={(val) => {
                                   inputField.onChange(val);
-                                  // Reset varian & atribut jika ganti produk
                                   form.setValue(`items.${index}.variantId`, "");
                                   form.setValue(
                                     `items.${index}.selectedAttributes`,
                                     {},
                                   );
-
                                   const prod = products.find(
                                     (p) => p.id === val,
                                   );
@@ -412,7 +523,6 @@ export default function ReplacementOrderForm({
                         />
                       </div>
 
-                      {/* Quantity */}
                       <div className="md:col-span-2">
                         <FormField
                           control={control}
@@ -429,7 +539,6 @@ export default function ReplacementOrderForm({
                                     const val = e.target.valueAsNumber;
                                     const newQty = isNaN(val) ? 0 : val;
                                     inputField.onChange(newQty);
-
                                     const currentVarId = form.getValues(
                                       `items.${index}.variantId`,
                                     );
@@ -458,7 +567,6 @@ export default function ReplacementOrderForm({
                         />
                       </div>
 
-                      {/* Unit Price (Opsional, tapi penting ditunjukkan) */}
                       <div className="md:col-span-2">
                         <FormField
                           control={control}
@@ -482,7 +590,6 @@ export default function ReplacementOrderForm({
                         />
                       </div>
 
-                      {/* Action Delete */}
                       <div className="md:col-span-4 flex justify-end pt-7">
                         {fields.length > 1 && (
                           <Button
@@ -497,7 +604,6 @@ export default function ReplacementOrderForm({
                       </div>
                     </div>
 
-                    {/* Area Pilihan Atribut Varian Dinamis */}
                     {selectedProduct?.availableAttributes &&
                       selectedProduct.availableAttributes.length > 0 && (
                         <div className="p-4 bg-gray-50/80">
@@ -546,7 +652,6 @@ export default function ReplacementOrderForm({
                         </div>
                       )}
 
-                    {/* Area Remarks & Customization */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-white rounded-b-lg border-t border-gray-100">
                       <FormField
                         control={control}
@@ -591,6 +696,7 @@ export default function ReplacementOrderForm({
                 );
               })}
             </div>
+
             {/* --- SECTION 3: TANGGAL PENGIRIMAN & CATATAN --- */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border rounded-lg bg-white">
               <h3 className="md:col-span-2 font-semibold text-gray-700 border-b pb-2">
