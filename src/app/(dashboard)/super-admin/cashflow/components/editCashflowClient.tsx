@@ -12,7 +12,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -99,6 +99,9 @@ export default function EditCashflowClient() {
   const { fetchApi, status } = useApi();
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const type = searchParams.get("type") || "order";
+  const referenceId = params.orderId as string;
   const orderId = params.orderId as string;
 
   const [loading, setLoading] = useState(true);
@@ -161,16 +164,20 @@ export default function EditCashflowClient() {
 
   // === LOAD DATA ===
   const loadData = useCallback(async () => {
-    if (status === "loading" || status === "unauthenticated" || !orderId)
+    if (status === "loading" || status === "unauthenticated" || !referenceId)
       return;
 
     try {
       setLoading(true);
 
-      // Fetch master currencies dan data cashflow secara parallel
+      const queryParam =
+        type === "replacement"
+          ? `replacementOrderId=${referenceId}`
+          : `orderId=${referenceId}`;
+
       const [currencyRes, cashflowRes] = await Promise.all([
         fetchApi("/currencies"),
-        fetchApi(`/cashflows/${orderId}`),
+        fetchApi(`/cashflows/detail?${queryParam}`),
       ]);
 
       if (currencyRes.ok) {
@@ -214,7 +221,7 @@ export default function EditCashflowClient() {
     } finally {
       setLoading(false);
     }
-  }, [orderId, reset, status, fetchApi]);
+  }, [referenceId, type, reset, status, fetchApi]);
 
   useEffect(() => {
     loadData();
@@ -269,27 +276,27 @@ export default function EditCashflowClient() {
 
   // === SUBMIT HANDLER ===
   const onSubmit = async (data: CashflowFormValues) => {
-    if (status !== "authenticated") {
-      toast.error("Sesi berakhir, silakan login kembali.");
-      return;
-    }
+    if (status !== "authenticated") return;
 
     try {
       setSubmitting(true);
+
       const cleanData = {
-        poNumber: data.poNumber,
+        orderId: type === "order" ? referenceId : undefined,
+        replacementOrderId: type === "replacement" ? referenceId : undefined,
+        orderNumber: data.poNumber,
         revenueItems: data.revenueItems.map((item) => ({
           ...item,
           total: item.unitPrice * item.quantity * (item.exchangeRate || 1),
         })),
         costItems: data.costItems.map((item) => ({
           ...item,
-          vendorId: item.isManual ? null : item.vendorId,
+          vendorId: item.isManual ? undefined : item.vendorId,
           total: item.costPerUnit * item.quantity * (item.exchangeRate || 1),
         })),
       };
 
-      const res = await fetchApi(`/cashflows/${orderId}`, {
+      const res = await fetchApi(`/cashflows`, {
         method: "POST",
         body: JSON.stringify(cleanData),
       });

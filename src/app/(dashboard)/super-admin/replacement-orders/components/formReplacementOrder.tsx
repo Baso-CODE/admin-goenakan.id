@@ -91,6 +91,7 @@ export default function ReplacementOrderForm({
   const [clients, setClients] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [orderCurrency, setOrderCurrency] = useState("IDR");
   const [loadingData, setLoadingData] = useState(true);
   const [openOrderCombobox, setOpenOrderCombobox] = useState(false);
 
@@ -192,7 +193,6 @@ export default function ReplacementOrderForm({
                               "w-full justify-between font-normal bg-white",
                               !field.value && "text-muted-foreground",
                             )}>
-                            {/* Tampilkan nomor order jika sudah dipilih, jika belum tampilkan placeholder */}
                             {field.value
                               ? orders.find((o) => o.id === field.value)
                                   ?.orderNumber
@@ -235,14 +235,15 @@ export default function ReplacementOrderForm({
                                             },
                                           );
                                         }
+                                        if (dataOrder.currencyCode) {
+                                          setOrderCurrency(
+                                            dataOrder.currencyCode,
+                                          );
+                                        }
 
                                         // 4. Auto-fill Items
                                         const originalItems =
                                           dataOrder.products;
-                                        console.log(
-                                          "ini adalah data",
-                                          originalItems,
-                                        );
 
                                         if (
                                           originalItems &&
@@ -306,7 +307,6 @@ export default function ReplacementOrderForm({
                     <Select
                       onValueChange={field.onChange}
                       value={field.value}
-                      // ✨ TAMBAHAN UX: Nonaktifkan pilihan klien jika order sudah dipilih agar data tidak dirusak
                       disabled={
                         loadingData || !!form.watch("referenceOrderId")
                       }>
@@ -523,6 +523,7 @@ export default function ReplacementOrderForm({
                         />
                       </div>
 
+                      {/* --- INPUT QUANTITY --- */}
                       <div className="md:col-span-2">
                         <FormField
                           control={control}
@@ -539,24 +540,10 @@ export default function ReplacementOrderForm({
                                     const val = e.target.valueAsNumber;
                                     const newQty = isNaN(val) ? 0 : val;
                                     inputField.onChange(newQty);
-                                    const currentVarId = form.getValues(
-                                      `items.${index}.variantId`,
-                                    );
-                                    if (selectedProduct) {
-                                      const hasVariants =
-                                        selectedProduct.productVariants
-                                          ?.length > 0;
-                                      if (!hasVariants || currentVarId) {
-                                        form.setValue(
-                                          `items.${index}.unitPrice`,
-                                          resolvePrice(
-                                            selectedProduct,
-                                            currentVarId ?? "",
-                                            newQty,
-                                          ),
-                                        );
-                                      }
-                                    }
+
+                                    // ✨ PERBAIKAN:
+                                    // Logika resolvePrice DIHAPUS dari sini!
+                                    // Jika qty diubah (misal dari 10 pcs retur jadi 2 pcs), harga satuan (unit price) tidak boleh berubah otomatis.
                                   }}
                                   className="bg-white text-center"
                                 />
@@ -567,6 +554,7 @@ export default function ReplacementOrderForm({
                         />
                       </div>
 
+                      {/* --- INPUT UNIT PRICE --- */}
                       <div className="md:col-span-2">
                         <FormField
                           control={control}
@@ -574,15 +562,37 @@ export default function ReplacementOrderForm({
                           render={({ field: inputField }) => (
                             <FormItem>
                               <FormLabel className="text-xs">
-                                Harga Unit (Opsional)
+                                Harga Unit
                               </FormLabel>
                               <FormControl>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  {...inputField}
-                                  className="bg-white text-right"
-                                />
+                                <div className="relative">
+                                  {/* Tampilkan Simbol Mata Uang */}
+                                  <span className="absolute left-3 top-2.5 text-xs text-gray-500 font-medium">
+                                    {orderCurrency}
+                                  </span>
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={inputField.value}
+                                    onChange={(e) => {
+                                      let val = e.target.value;
+
+                                      val = val.replace(/,/g, ".");
+
+                                      val = val.replace(/[^0-9.]/g, "");
+
+                                      inputField.onChange(val);
+                                    }}
+                                    onBlur={(e) => {
+                                      const parsed = parseFloat(e.target.value);
+                                      inputField.onChange(
+                                        isNaN(parsed) ? 0 : parsed,
+                                      );
+                                      inputField.onBlur();
+                                    }}
+                                    className="bg-white text-right pl-10 font-mono"
+                                  />
+                                </div>
                               </FormControl>
                               <FormMessage />
                             </FormItem>

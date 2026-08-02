@@ -48,8 +48,6 @@ export default function SidebarRole({ ...props }) {
   // Ambil role langsung dari session (string)
   const role = (session?.user?.role as string) || "";
 
-  // ... (Data Anda tetap sama seperti di atas) ...
-
   // === FUNGSI FILTER DINAMIS ===
   const getVisibleItems = (items: any[]) => {
     return items
@@ -79,13 +77,7 @@ export default function SidebarRole({ ...props }) {
         title: "Orders & Dashboard",
         url: "#",
         icon: ListOrdered,
-        items: [
-          { title: "All Orders List", url: "/super-admin/orders" },
-          {
-            title: "Replacement Order",
-            url: "/super-admin/replacement-orders",
-          },
-        ],
+        items: [{ title: "All Orders List", url: "/super-admin/orders" }],
       },
       {
         title: "Cashflow & Invoicing",
@@ -316,7 +308,7 @@ export default function SidebarRole({ ...props }) {
       },
     ],
 
-    // OTHER (PERBAIKAN DISINI)
+    // OTHER
     Etc: [
       {
         name: "Settings",
@@ -331,8 +323,6 @@ export default function SidebarRole({ ...props }) {
     ],
     dashboard: [{ name: "Main Dashboard", url: "/dashboard", icon: Frame }],
   };
-
-  // === ROLE VISIBILITY LOGIC ===
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -382,6 +372,32 @@ export default function SidebarRole({ ...props }) {
           const marketingItems = getVisibleItems(data.navMarketing);
           return marketingItems.length > 0 ? (
             <NavMain label="Marketing & Content" items={marketingItems} />
+          ) : null;
+        })()}
+
+        {/* -- SECTION ETC (BARU DITAMBAHKAN) -- */}
+        {(() => {
+          // Kita filter dulu item Etc berdasarkan role access
+          const etcItems = data.Etc.filter((item) =>
+            checkAccess(role, item.url),
+          );
+
+          // Jika ada item yang bisa diakses, maka render menunya
+          return etcItems.length > 0 ? (
+            <SidebarGroup>
+              <SidebarMenu>
+                {etcItems.map((item, index) => (
+                  <SidebarMenuItem key={index}>
+                    <SidebarMenuButton asChild tooltip={item.name}>
+                      <Link href={item.url}>
+                        <item.icon />
+                        <span>{item.name}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroup>
           ) : null;
         })()}
       </SidebarContent>

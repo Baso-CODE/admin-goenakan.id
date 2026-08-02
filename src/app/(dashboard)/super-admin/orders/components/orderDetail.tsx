@@ -19,12 +19,7 @@ import { GenerateInvoiceDialog } from "./helper/GenerateInvoiceDialog";
 import { InvoiceHistoryTable } from "./invoiceHistoryTable";
 import { OrderItemsTable } from "./orderItemsTable";
 import { OrderSampleFollowUps } from "./orderSampleFollowUps";
-import {
-  CustomerCard,
-  SalesCard,
-  ShippingCard,
-  VendorsCard,
-} from "./orderSidebarCards";
+import { CustomerCard, SalesCard, ShippingCard } from "./orderSidebarCards";
 
 export default function OrderDetailPage() {
   const { fetchApi, status } = useApi();
@@ -186,6 +181,7 @@ export default function OrderDetailPage() {
         <div className="lg:col-span-2 space-y-6">
           <InvoiceHistoryTable invoices={order.invoices} />
           <OrderItemsTable
+            currencyCode={order.currencyCode}
             products={order.products}
             totalAmount={order.totalAmount}
           />
@@ -199,7 +195,7 @@ export default function OrderDetailPage() {
             purchaseChannelName={order.purchaseChannelName}
           />
           <SalesCard sales={order.sales} />
-          <VendorsCard vendors={order.vendors} />
+          {/* <VendorsCard vendors={order.vendors} /> */}
 
           {order.salesCategory === "SAMPLE" && (
             <OrderSampleFollowUps

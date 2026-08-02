@@ -3,8 +3,9 @@
 import { useSearchParams } from "next/navigation";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardList, FlaskConical } from "lucide-react";
+import { ClipboardList, FlaskConical, Layers, RefreshCw } from "lucide-react";
 
+import TableReplacementOrder from "../replacement-orders/components/tableReplacementOrder";
 import OrderStats from "./components/orderStats";
 import SampleStats from "./components/sampleStats";
 import TableOrder from "./components/tableOrder";
@@ -22,27 +23,88 @@ export default function OrderPage() {
             Order Management
           </h1>
           <p className="text-sm text-muted-foreground">
-            Kelola semua pesanan produksi dan sample dalam satu tempat.
+            Kelola semua pesanan produksi, sample, dan replacement dalam satu
+            tempat.
           </p>
         </div>
       </div>
 
       <Tabs defaultValue={defaultTab} className="w-full min-w-0">
         <div className="flex items-center justify-between mb-4">
-          <TabsList className="grid w-full max-w-100 grid-cols-2">
-            <TabsTrigger value="all" className="flex items-center gap-2">
+          {/* ✨ UPDATE: Mengubah grid menjadi 4 kolom di layar besar, dan 2 kolom di layar kecil agar responsif */}
+          <TabsList className="grid w-full max-w-4xl grid-cols-2 md:grid-cols-4 h-auto gap-2 bg-transparent md:bg-muted p-1">
+            <TabsTrigger value="all" className="flex items-center gap-2 py-2">
+              <Layers className="h-4 w-4" />
+              All Orders
+            </TabsTrigger>
+            <TabsTrigger value="sales" className="flex items-center gap-2 py-2">
               <ClipboardList className="h-4 w-4" />
               Sales Orders
             </TabsTrigger>
-            <TabsTrigger value="sample" className="flex items-center gap-2">
+            <TabsTrigger
+              value="sample"
+              className="flex items-center gap-2 py-2">
               <FlaskConical className="h-4 w-4" />
               Sample Only
+            </TabsTrigger>
+            <TabsTrigger
+              value="replacement"
+              className="flex items-center gap-2 py-2">
+              <RefreshCw className="h-4 w-4" />
+              Replacement
             </TabsTrigger>
           </TabsList>
         </div>
 
+        {/* =========================================
+            TAB 1: ALL (GABUNGAN SEMUA TABEL)
+        ========================================= */}
         <TabsContent
           value="all"
+          className="mt-0 focus-visible:outline-none w-full min-w-0 max-w-full overflow-hidden">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-12 w-full min-w-0 max-w-full overflow-hidden">
+            {/* Bagian Sales di tab All */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 border-b pb-2">
+                <ClipboardList className="h-5 w-5 text-blue-600" />
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Sales Orders
+                </h2>
+              </div>
+              <OrderStats />
+              <TableOrder />
+            </div>
+
+            {/* Bagian Sample di tab All */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 border-b pb-2">
+                <FlaskConical className="h-5 w-5 text-purple-600" />
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Sample Orders
+                </h2>
+              </div>
+              <SampleStats />
+              <TableOrderSample />
+            </div>
+
+            {/* Bagian Replacement di tab All */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 border-b pb-2">
+                <RefreshCw className="h-5 w-5 text-orange-600" />
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Replacement Orders
+                </h2>
+              </div>
+              <TableReplacementOrder />
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* =========================================
+            TAB 2: SALES ORDER SAJA
+        ========================================= */}
+        <TabsContent
+          value="sales"
           className="mt-0 focus-visible:outline-none w-full min-w-0 max-w-full overflow-hidden">
           <div className="animate-in fade-in slide-in-from-left-4 duration-300 space-y-6 w-full min-w-0 max-w-full overflow-hidden">
             <OrderStats />
@@ -50,12 +112,26 @@ export default function OrderPage() {
           </div>
         </TabsContent>
 
+        {/* =========================================
+            TAB 3: SAMPLE SAJA
+        ========================================= */}
         <TabsContent
           value="sample"
           className="mt-0 focus-visible:outline-none w-full min-w-0 max-w-full overflow-hidden">
           <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-6 w-full min-w-0 max-w-full overflow-hidden">
             <SampleStats />
             <TableOrderSample />
+          </div>
+        </TabsContent>
+
+        {/* =========================================
+            TAB 4: REPLACEMENT SAJA
+        ========================================= */}
+        <TabsContent
+          value="replacement"
+          className="mt-0 focus-visible:outline-none w-full min-w-0 max-w-full overflow-hidden">
+          <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-6 w-full min-w-0 max-w-full overflow-hidden">
+            <TableReplacementOrder />
           </div>
         </TabsContent>
       </Tabs>

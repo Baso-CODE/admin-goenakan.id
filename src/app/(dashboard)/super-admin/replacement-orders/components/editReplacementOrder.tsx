@@ -60,7 +60,7 @@ export default function EditReplacementOrder() {
         setInitialData(formattedData);
       } catch (error: any) {
         toast.error("Data tidak ditemukan");
-        router.push("/super-admin/replacement-orders");
+        // router.push("/super-admin/replacement-orders");
       } finally {
         setIsLoading(false);
       }
