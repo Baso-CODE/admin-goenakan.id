@@ -45,6 +45,7 @@ type EditableTier = {
   minQuantity: number;
   maxQuantity: number | null;
   price: number;
+  discount: number;
 };
 
 // Replicate COGS suggested pricing formula
@@ -260,32 +261,34 @@ export function ManagePriceModal({
   // Initialize from product current active prices
   useEffect(() => {
     if (product) {
-      const initialCurrency = product.currencyCode || "IDR";
+      const linkedQuote = product.vendorPrices?.find((v) => v.id === product.activeVendorPriceRecordId) || (product.vendorPrices && product.vendorPrices.length > 0 ? product.vendorPrices[0] : null);
+      const initialCurrency = linkedQuote ? (linkedQuote.currencyCode || "IDR") : (product.currencyCode || "IDR");
+      
       setCurrencyCode(initialCurrency);
-      setForeignPrice(Number(product.foreignPrice) || 0);
-      setExchangeRate(Number(product.exchangeRate) || 1);
+      setForeignPrice(Number(product.foreignPrice) || (linkedQuote ? Number(linkedQuote.foreignPrice) : 0));
+      setExchangeRate(Number(product.exchangeRate) || (linkedQuote ? Number(linkedQuote.exchangeRate) : 1));
       setAdditionalFee(Number(product.additionalFee) || 0);
       
       const pBase = Number(product.basePrice) || 0;
-      const pFee = Number(product.additionalFee) || 0;
-      
-      if (product.currencyCode === "IDR" || !product.currencyCode) {
-        setRawBasePrice(pBase - pFee);
-      } else {
-        setRawBasePrice(0);
-      }
  
-      setSelectedQuoteId(product.activeVendorPriceRecordId || "NONE");
-      setFreightMode((product.activePriceFreightMode as "SEA" | "AIR" | "CUSTOM") || "CUSTOM");
+      setSelectedQuoteId(product.activeVendorPriceRecordId || (product.vendorPrices && product.vendorPrices.length > 0 ? product.vendorPrices[0].id : "NONE"));
+      
+      const defaultFreight = product.activePriceFreightMode === "AIR" ? "AIR" : "SEA";
+      setFreightMode(defaultFreight);
  
       if (product.priceTiers && product.priceTiers.length > 0) {
         setTiers(
-          product.priceTiers.map((t) => ({
-            id: t.id,
-            minQuantity: t.minQuantity,
-            maxQuantity: t.maxQuantity,
-            price: Number(t.price) || 0,
-          })),
+          product.priceTiers.map((t) => {
+            const priceVal = Number(t.price) || 0;
+            const discountVal = Math.max(0, pBase - priceVal);
+            return {
+              id: t.id,
+              minQuantity: t.minQuantity,
+              maxQuantity: t.maxQuantity,
+              price: priceVal,
+              discount: discountVal,
+            };
+          }),
         );
       } else {
         setTiers([]);
@@ -297,21 +300,10 @@ export function ManagePriceModal({
       }
     }
   }, [product, fetchExchangeRates]);
- 
-  // Automatically calculate base price in CUSTOM mode when valas inputs change
-  useEffect(() => {
-    if (freightMode === "CUSTOM") {
-      if (currencyCode === "IDR") {
-        setBasePrice(rawBasePrice + additionalFee);
-      } else {
-        setBasePrice((foreignPrice * exchangeRate) + additionalFee);
-      }
-    }
-  }, [currencyCode, rawBasePrice, foreignPrice, exchangeRate, additionalFee, freightMode]);
 
   // Automatically calculate base price and tiers when quote reference, freight mode, or exchange rate changes (for SEA and AIR mode)
   useEffect(() => {
-    if (freightMode === "CUSTOM" || selectedQuoteId === "NONE") {
+    if (selectedQuoteId === "NONE") {
       return;
     }
 
@@ -323,10 +315,13 @@ export function ManagePriceModal({
     const qtyPcs = qtyPerCtn * moqCtn;
     const roundUpToVal = Number((quote as any).roundUpTo) || 1000;
 
+    const savedFreightMode = product.activePriceFreightMode === "CUSTOM" || !product.activePriceFreightMode ? "SEA" : product.activePriceFreightMode;
+    const isInitialConfig = selectedQuoteId === product.activeVendorPriceRecordId && freightMode === savedFreightMode;
+
     if (quote.calculationMode === "FIXED") {
       // Generate the 5 MOQ simulation steps as tiers!
       const baseMoqCtn = Math.max(1, moqCtn || 1);
-      const generatedTiers: EditableTier[] = [0, 1, 2, 3, 4].map((step) => {
+      const tempTiers = [0, 1, 2, 3, 4].map((step) => {
         const stepCtn = baseMoqCtn + step;
         const stepPcs = stepCtn * qtyPerCtn;
         const nextStepPcs = (baseMoqCtn + step + 1) * qtyPerCtn;
@@ -366,13 +361,28 @@ export function ManagePriceModal({
           minQuantity,
           maxQuantity,
           price: finalPrice,
+          discount: 0,
         };
       });
 
-      // Set base price to the first tier's price
-      if (generatedTiers.length > 0) {
-        setBasePrice(generatedTiers[0].price);
-      }
+      const computedBasePrice = tempTiers[0]?.price || 0;
+      const generatedTiers = tempTiers.map((t) => {
+        const existingDbTier = isInitialConfig ? product.priceTiers?.find((pt) => pt.minQuantity === t.minQuantity) : null;
+        if (existingDbTier) {
+          const dbPrice = Number(existingDbTier.price) || 0;
+          return {
+            ...t,
+            price: dbPrice,
+            discount: Math.max(0, computedBasePrice - dbPrice),
+          };
+        }
+        return {
+          ...t,
+          discount: Math.max(0, computedBasePrice - t.price),
+        };
+      });
+
+      setBasePrice(computedBasePrice);
       setTiers(generatedTiers);
     } else {
       // Handle VARIABLE Mode Tiers
@@ -381,7 +391,7 @@ export function ManagePriceModal({
         // Sort tiers by qty
         const sorted = [...quoteTiers].sort((a: any, b: any) => (Number(a.totalPcs) || 0) - (Number(b.totalPcs) || 0));
 
-        const mappedTiers: EditableTier[] = sorted.map((item: any, idx: number) => {
+        const tempTiers = sorted.map((item: any, idx: number) => {
           const minQuantity = Number(item.totalPcs) || 1;
           const nextItem = sorted[idx + 1];
           const maxQuantity = nextItem ? (Number(nextItem.totalPcs) || 0) - 1 : null;
@@ -419,13 +429,28 @@ export function ManagePriceModal({
             minQuantity,
             maxQuantity,
             price: finalPrice,
+            discount: 0,
           };
         });
 
-        // Set base price to the first tier's price
-        if (mappedTiers.length > 0) {
-          setBasePrice(mappedTiers[0].price);
-        }
+        const computedBasePrice = tempTiers[0]?.price || 0;
+        const mappedTiers = tempTiers.map((t) => {
+          const existingDbTier = isInitialConfig ? product.priceTiers?.find((pt) => pt.minQuantity === t.minQuantity) : null;
+          if (existingDbTier) {
+            const dbPrice = Number(existingDbTier.price) || 0;
+            return {
+              ...t,
+              price: dbPrice,
+              discount: Math.max(0, computedBasePrice - dbPrice),
+            };
+          }
+          return {
+            ...t,
+            discount: Math.max(0, computedBasePrice - t.price),
+          };
+        });
+
+        setBasePrice(computedBasePrice);
         setTiers(mappedTiers);
       } else {
         setTiers([]);
@@ -434,14 +459,20 @@ export function ManagePriceModal({
   }, [selectedQuoteId, freightMode, exchangeRate, product.vendorPrices]);
 
   // Handle quote reference loading and calculation pre-filling
-  const applyQuoteReference = (quoteId: string, mode: "SEA" | "AIR" | "CUSTOM") => {
-    if (mode === "CUSTOM" || quoteId === "NONE") {
-      setFreightMode("CUSTOM");
-      setSelectedQuoteId("NONE");
-      return;
-    }
+  const applyQuoteReference = (quoteId: string, mode: "SEA" | "AIR") => {
+    if (quoteId === "NONE") return;
+    const isSameQuote = selectedQuoteId === quoteId;
     setSelectedQuoteId(quoteId);
     setFreightMode(mode);
+
+    if (!isSameQuote) {
+      const quote = product.vendorPrices?.find((v) => v.id === quoteId);
+      if (quote) {
+        setCurrencyCode(quote.currencyCode || "IDR");
+        setForeignPrice(Number(quote.foreignPrice) || 0);
+        setExchangeRate(Number(quote.exchangeRate) || 1);
+      }
+    }
   };
 
   const handleAddTier = () => {
@@ -459,6 +490,7 @@ export function ManagePriceModal({
         minQuantity: newMin,
         maxQuantity: null,
         price: basePrice,
+        discount: 0,
       },
     ]);
   };
@@ -469,10 +501,19 @@ export function ManagePriceModal({
 
   const handleUpdateTierField = (idx: number, field: keyof EditableTier, val: any) => {
     const updated = [...tiers];
-    updated[idx] = {
-      ...updated[idx],
-      [field]: val,
-    };
+    if (field === "discount") {
+      const discountVal = Number(val) || 0;
+      updated[idx] = {
+        ...updated[idx],
+        discount: discountVal,
+        price: Math.max(0, basePrice - discountVal),
+      };
+    } else {
+      updated[idx] = {
+        ...updated[idx],
+        [field]: val,
+      };
+    }
     setTiers(updated);
   };
 
@@ -557,14 +598,15 @@ export function ManagePriceModal({
                 <Select
                   value={selectedQuoteId}
                   onValueChange={(val) => applyQuoteReference(val, "SEA")}>
-                  <SelectTrigger className="bg-white border-stone-200 mt-1.5">
+                  <SelectTrigger className="w-full bg-white border-stone-200 mt-1.5 truncate">
                     <SelectValue placeholder="Pilih Quote" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NONE">Manual Override (Tanpa Link Quote)</SelectItem>
+                  <SelectContent className="max-w-[90vw] md:max-w-md">
                     {product.vendorPrices?.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {v.vendor?.companyName || "Supplier"} ({v.currencyCode} {Number(v.foreignPrice).toLocaleString("id-ID")} via {v.importType})
+                      <SelectItem key={v.id} value={v.id} className="max-w-full">
+                        <div className="truncate max-w-[280px] sm:max-w-sm md:max-w-md">
+                          {v.vendor?.companyName || "Supplier"} ({v.currencyCode} {Number(v.foreignPrice).toLocaleString("id-ID")} via {v.importType})
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -589,13 +631,6 @@ export function ManagePriceModal({
                       className={`flex-1 text-xs font-bold ${freightMode === "AIR" ? "bg-indigo-600 hover:bg-indigo-700 text-white" : "border-stone-200"}`}>
                       ✈️ Air Suggested
                     </Button>
-                    <Button
-                      type="button"
-                      variant={freightMode === "CUSTOM" ? "default" : "outline"}
-                      onClick={() => setFreightMode("CUSTOM")}
-                      className={`flex-1 text-xs font-bold ${freightMode === "CUSTOM" ? "bg-indigo-600 hover:bg-indigo-700 text-white" : "border-stone-200"}`}>
-                      ✏️ Custom Edit
-                    </Button>
                   </div>
                 </div>
               )}
@@ -609,175 +644,20 @@ export function ManagePriceModal({
             </h4>
 
             <div className="space-y-4">
-              {/* Currency and Pricing Input Settings */}
-              {freightMode === "CUSTOM" ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-stone-50/60 p-4 rounded-lg border border-stone-200">
-                  <div className="space-y-1">
-                    <Label htmlFor="currencyCode" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
-                      Mata Uang
-                    </Label>
-                    
-                    <Dialog
-                      open={isCurrencyModalOpen}
-                      onOpenChange={setIsCurrencyModalOpen}
-                    >
-                      <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Tambah Currency Baru</DialogTitle>
-                        </DialogHeader>
-                        <FastCurrencyForm onSubmit={handleAddCurrencyFast} />
-                      </DialogContent>
-                    </Dialog>
-
-                    <Select
-                      value={currencyCode}
-                      onValueChange={(val) => {
-                        if (val === "add_new_currency") {
-                          setIsCurrencyModalOpen(true);
-                        } else {
-                          setCurrencyCode(val);
-                          if (val !== "IDR") {
-                            fetchExchangeRates(val);
-                          } else {
-                            setExchangeRate(1);
-                          }
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="bg-white border-stone-200 mt-1">
-                        <SelectValue placeholder="Pilih Mata Uang" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="IDR">IDR (Rupiah)</SelectItem>
-                        {masterCurrencies.filter((c) => c.code !== "IDR").map((cur) => (
-                          <SelectItem key={cur.code} value={cur.code}>
-                            {cur.code} ({cur.symbol || "$"}) - {cur.name || cur.code}
-                          </SelectItem>
-                        ))}
-                        {currencyCode !== "IDR" && !masterCurrencies.some((c) => c.code === currencyCode) && (
-                          <SelectItem value={currencyCode}>
-                            {currencyCode}
-                          </SelectItem>
-                        )}
-                        
-                        <div className="h-px bg-stone-200 my-1 mx-2" />
-                        <SelectItem
-                          value="add_new_currency"
-                          textValue="Buat Currency Baru"
-                          className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Plus className="w-4 h-4" />
-                            Buat Currency Baru...
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {currencyCode === "IDR" ? (
-                    <div className="space-y-1">
-                      <Label htmlFor="rawBasePrice" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
-                        Harga Dasar IDR (Rp)
-                      </Label>
-                      <Input
-                        id="rawBasePrice"
-                        type="number"
-                        min="0"
-                        value={rawBasePrice || ""}
-                        onChange={(e) => setRawBasePrice(parseFloat(e.target.value) || 0)}
-                        className="bg-white border-stone-200 mt-1 font-semibold"
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-1">
-                        <Label htmlFor="foreignPrice" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
-                          Harga Valas ({currencyCode})
-                        </Label>
-                        <Input
-                          id="foreignPrice"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={foreignPrice || ""}
-                          onChange={(e) => setForeignPrice(parseFloat(e.target.value) || 0)}
-                          className="bg-white border-stone-200 mt-1 font-semibold"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="exchangeRate" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
-                            Kurs / Exchange Rate (Rp)
-                          </Label>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-5 w-5 hover:bg-stone-100"
-                            onClick={() => fetchExchangeRates(currencyCode)}
-                            disabled={fetchingRates || currencyCode === "IDR"}
-                          >
-                            <RefreshCw className={`h-3 w-3 text-stone-500 ${fetchingRates ? "animate-spin" : ""}`} />
-                          </Button>
-                        </div>
-                        <Input
-                          id="exchangeRate"
-                          type="number"
-                          min="0"
-                          value={exchangeRate || ""}
-                          disabled={currencyCode === "IDR"}
-                          onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 0)}
-                          className="bg-white border-stone-200 mt-1 font-semibold"
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  <div className="space-y-1">
-                    <Label htmlFor="additionalFee" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
-                      Biaya Tambahan / Additional Fee (Rp)
-                    </Label>
-                    <Input
-                      id="additionalFee"
-                      type="number"
-                      min="0"
-                      value={additionalFee || ""}
-                      onChange={(e) => setAdditionalFee(parseFloat(e.target.value) || 0)}
-                      className="bg-white border-stone-200 mt-1 font-semibold"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 bg-indigo-50 border border-indigo-100 p-3 rounded-md flex justify-between items-center mt-2">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
-                        Total Harga Dasar Terhitung (IDR)
-                      </span>
-                      <span className="text-xs text-indigo-700/80 font-medium mt-0.5">
-                        {currencyCode !== "IDR" ? `(${foreignPrice} ${currencyCode} x Rp ${exchangeRate.toLocaleString('id-ID')}) + Rp ${additionalFee.toLocaleString('id-ID')}` : `Rp ${rawBasePrice.toLocaleString('id-ID')} + Rp ${additionalFee.toLocaleString('id-ID')}`}
-                      </span>
-                    </div>
-                    <span className="text-lg font-black text-indigo-950">
-                      Rp {basePrice.toLocaleString("id-ID")}
-                    </span>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="basePrice" className="text-xs font-semibold text-stone-600">
+                    Harga Dasar Produk (Rp)
+                  </Label>
+                  <Input
+                    id="basePrice"
+                    type="number"
+                    value={basePrice}
+                    disabled
+                    className="bg-stone-50 border-stone-200 mt-1.5 font-bold text-stone-500"
+                  />
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="basePrice" className="text-xs font-semibold text-stone-600">
-                      Harga Dasar Produk (Rp)
-                    </Label>
-                    <Input
-                      id="basePrice"
-                      type="number"
-                      value={basePrice}
-                      disabled
-                      className="bg-stone-50 border-stone-200 mt-1.5 font-bold text-stone-500"
-                    />
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
 
             {/* Editable Wholesale Tiers Grid */}
@@ -801,6 +681,7 @@ export function ManagePriceModal({
                     <TableHead className="w-28 text-xs font-bold text-stone-600">Min Qty</TableHead>
                     <TableHead className="w-6"></TableHead>
                     <TableHead className="w-36 text-xs font-bold text-stone-600">Max Qty</TableHead>
+                    <TableHead className="w-40 text-xs font-bold text-stone-600">Diskon (Rp)</TableHead>
                     <TableHead className="text-xs font-bold text-stone-600">Harga Satuan Akhir (Rp)</TableHead>
                     <TableHead className="w-12 text-center"></TableHead>
                   </TableRow>
@@ -808,7 +689,7 @@ export function ManagePriceModal({
                 <TableBody>
                   {tiers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-6 text-stone-400 text-xs">
+                      <TableCell colSpan={6} className="text-center py-6 text-stone-400 text-xs">
                         Belum ada tier harga bertingkat untuk produk ini.
                       </TableCell>
                     </TableRow>
@@ -850,9 +731,17 @@ export function ManagePriceModal({
                         <TableCell>
                           <Input
                             type="number"
-                            value={tier.price}
-                            onChange={(e) => handleUpdateTierField(idx, "price", parseFloat(e.target.value) || 0)}
-                            className="bg-white border-stone-200 h-8 text-xs font-bold text-stone-900"
+                            value={tier.discount}
+                            onChange={(e) => handleUpdateTierField(idx, "discount", parseFloat(e.target.value) || 0)}
+                            className="bg-white border-stone-200 h-8 text-xs font-semibold text-stone-900"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={Math.max(0, basePrice - tier.discount)}
+                            disabled
+                            className="bg-stone-50 border-stone-200 h-8 text-xs font-bold text-stone-500"
                           />
                         </TableCell>
                         <TableCell className="text-center">

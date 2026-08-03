@@ -26,7 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, Layers, Loader2, PlusCircle, Trash2 } from "lucide-react";
+import { ArrowRight, Layers, Loader2, PlusCircle, Trash2, Info } from "lucide-react";
 import { useEffect } from "react";
 import { Resolver, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -64,7 +64,7 @@ export default function FormUpdatePriceTiers({
   });
 
   const { control, handleSubmit, reset } = form;
-  const { fields, append, remove } = useFieldArray({
+  const { fields } = useFieldArray({
     control,
     name: "priceTiers",
   });
@@ -95,78 +95,57 @@ export default function FormUpdatePriceTiers({
     }
   }, [initialData, reset]);
 
-  // Handler saat form disubmit
+  // Handler saat form disubmit (not active anymore but kept for schema structure)
   const onSave = async (values: FormValues) => {
-    let basePriceVal = Number(initialData?.basePrice);
-    if (isNaN(basePriceVal)) {
-      basePriceVal = 0;
-    }
-
-    const mappedTiers = values.priceTiers.map((tier) => {
-      const discountVal = Number(tier.discount || 0);
-      const calculatedPrice = Math.max(0, basePriceVal - discountVal);
-
-      return {
-        minQuantity: Number(tier.minQuantity || 1),
-        maxQuantity: tier.maxQuantity ? Number(tier.maxQuantity) : null,
-        price: isNaN(calculatedPrice) ? 0 : calculatedPrice,
-      };
-    });
-
-    await onSubmit(mappedTiers);
+    // Read-only, no save action allowed here.
   };
 
   return (
     <Card className="border shadow-sm">
       <CardHeader className="pb-4 border-b bg-muted/20">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <Layers className="h-5 w-5 text-primary" />
-              Harga Bertingkat (Wholesale)
-            </CardTitle>
-            <CardDescription>
-              Atur nominal diskon berdasarkan jumlah pembelian. Harga dasar produk: <strong>Rp {basePrice.toLocaleString("id-ID")}</strong>.
-            </CardDescription>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                append({ minQuantity: 1, maxQuantity: null, discount: 0 })
-              }
-              className="border-dashed h-8">
-              <PlusCircle className="h-3.5 w-3.5 mr-2" />
-              Tambah Tier
-            </Button>
-          </div>
+        <div className="space-y-1">
+          <CardTitle className="text-lg font-semibold flex items-center gap-2 text-stone-850">
+            <Layers className="h-5 w-5 text-indigo-500" />
+            Harga Bertingkat (Wholesale)
+          </CardTitle>
+          <CardDescription>
+            Harga dasar produk: <strong>Rp {basePrice.toLocaleString("id-ID")}</strong>.
+          </CardDescription>
         </div>
       </CardHeader>
 
       <CardContent className="p-6">
         <Form {...form}>
           <form onSubmit={handleSubmit(onSave)} className="space-y-6">
+            {/* Callout Information Banner */}
+            <div className="p-4 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-900 flex items-start gap-3 shadow-xs">
+              <Info className="h-5 w-5 shrink-0 mt-0.5 text-indigo-655" />
+              <div className="text-xs space-y-1">
+                <p className="font-semibold text-sm">Informasi Master Pricing</p>
+                <p className="leading-relaxed">
+                  Pengaturan harga bertingkat (wholesale price tiers) kini terintegrasi satu arah. Silakan kelola nominal harga, diskon tier, dan kalkulasi cogs produk melalui menu <strong>Kelola Master Pricing</strong> di halaman utama daftar produk.
+                </p>
+              </div>
+            </div>
+
             {fields.length === 0 ? (
-              <div className="text-center py-10 bg-muted/30 rounded-lg border border-dashed">
-                <p className="text-sm text-muted-foreground">
-                  Belum ada tier harga. Klik "Tambah Tier" untuk memulai.
+              <div className="text-center py-10 bg-stone-50 rounded-lg border border-dashed border-stone-250">
+                <p className="text-sm text-stone-500">
+                  Belum ada data tier harga. Silakan atur nominal harga bertingkat melalui menu <strong>Kelola Master Pricing</strong>.
                 </p>
               </div>
             ) : (
               <div className="space-y-4">
                 {/* Tampilan Desktop: Table Style */}
-                <div className="hidden md:block rounded-md border bg-white">
+                <div className="hidden md:block rounded-md border bg-white overflow-hidden">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-muted/50 hover:bg-muted/50">
-                        <TableHead className="w-36">Min Qty</TableHead>
+                      <TableRow className="bg-stone-50 hover:bg-stone-50">
+                        <TableHead className="w-36 font-semibold">Min Qty</TableHead>
                         <TableHead className="w-6"></TableHead>
-                        <TableHead className="w-36">Max Qty</TableHead>
-                        <TableHead className="w-48">Diskon Satuan (Rp)</TableHead>
-                        <TableHead>Harga Akhir Satuan (Rp)</TableHead>
-                        <TableHead className="w-12"></TableHead>
+                        <TableHead className="w-36 font-semibold">Max Qty</TableHead>
+                        <TableHead className="w-48 font-semibold">Diskon Satuan (Rp)</TableHead>
+                        <TableHead className="font-semibold">Harga Akhir Satuan (Rp)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -175,106 +154,101 @@ export default function FormUpdatePriceTiers({
                         const finalPrice = Math.max(0, basePrice - discountVal);
 
                         return (
-                          <TableRow key={field.id}>
+                          <TableRow key={field.id} className="hover:bg-transparent">
                             <TableCell>
                               <FormField
-                                control={control}
-                                name={`priceTiers.${index}.minQuantity`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        type="number"
-                                        min={1}
-                                        placeholder="1"
-                                        {...field}
-                                        onChange={(e) =>
-                                          field.onChange(e.target.valueAsNumber)
-                                        }
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
+                                  control={control}
+                                  name={`priceTiers.${index}.minQuantity`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          type="number"
+                                          min={1}
+                                          placeholder="1"
+                                          disabled
+                                          className="bg-stone-50 text-stone-500 border-stone-200 cursor-not-allowed"
+                                          {...field}
+                                          onChange={(e) =>
+                                            field.onChange(e.target.valueAsNumber)
+                                          }
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
                             </TableCell>
                             <TableCell>
                               <ArrowRight className="h-4 w-4 text-muted-foreground mx-auto" />
                             </TableCell>
                             <TableCell>
                               <FormField
-                                control={control}
-                                name={`priceTiers.${index}.maxQuantity`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <div className="relative">
-                                        <Input
-                                          type="number"
-                                          min={1}
-                                          placeholder="∞"
-                                          {...field}
-                                          value={field.value ?? ""}
-                                          onChange={(e) => {
-                                            const val = e.target.value;
-                                            field.onChange(
-                                              val === "" ? null : parseInt(val),
-                                            );
-                                          }}
-                                        />
-                                        {!field.value && (
-                                          <span className="absolute right-3 top-2.5 text-xs text-muted-foreground pointer-events-none">
-                                            Unlimited
-                                          </span>
-                                        )}
-                                      </div>
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
+                                  control={control}
+                                  name={`priceTiers.${index}.maxQuantity`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <div className="relative">
+                                          <Input
+                                            type="number"
+                                            min={1}
+                                            placeholder="∞"
+                                            disabled
+                                            className="bg-stone-50 text-stone-500 border-stone-200 cursor-not-allowed"
+                                            {...field}
+                                            value={field.value ?? ""}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              field.onChange(
+                                                val === "" ? null : parseInt(val),
+                                              );
+                                            }}
+                                          />
+                                          {!field.value && (
+                                            <span className="absolute right-3 top-2.5 text-xs text-muted-foreground pointer-events-none">
+                                              Unlimited
+                                            </span>
+                                          )}
+                                        </div>
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
                             </TableCell>
                             <TableCell>
                               <FormField
-                                control={control}
-                                name={`priceTiers.${index}.discount`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <div className="relative">
-                                        <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">
-                                          Rp
-                                        </span>
-                                        <Input
-                                          type="number"
-                                          className="pl-9"
-                                          placeholder="0"
-                                          {...field}
-                                          onChange={(e) =>
-                                            field.onChange(parseFloat(e.target.value) || 0)
-                                          }
-                                        />
-                                      </div>
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
+                                  control={control}
+                                  name={`priceTiers.${index}.discount`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <div className="relative">
+                                          <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">
+                                            Rp
+                                          </span>
+                                          <Input
+                                            type="number"
+                                            className="pl-9 bg-stone-50 text-stone-500 border-stone-200 cursor-not-allowed"
+                                            placeholder="0"
+                                            disabled
+                                            {...field}
+                                            onChange={(e) =>
+                                              field.onChange(parseFloat(e.target.value) || 0)
+                                            }
+                                          />
+                                        </div>
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
                             </TableCell>
                             <TableCell className="align-middle">
-                              <div className="text-sm font-semibold text-stone-905">
+                              <div className="text-sm font-semibold text-stone-909">
                                 Rp {finalPrice.toLocaleString("id-ID")}
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                type="button"
-                                onClick={() => remove(index)}
-                                className="text-muted-foreground hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
                             </TableCell>
                           </TableRow>
                         );
@@ -293,15 +267,6 @@ export default function FormUpdatePriceTiers({
                       <div
                         key={field.id}
                         className="bg-card border rounded-lg p-4 space-y-3 relative shadow-sm">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          type="button"
-                          onClick={() => remove(index)}
-                          className="absolute top-2 right-2 text-muted-foreground hover:text-destructive h-8 w-8">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-
                         <div className="grid grid-cols-2 gap-3 items-end">
                           <FormField
                             control={control}
@@ -313,6 +278,8 @@ export default function FormUpdatePriceTiers({
                                   <Input
                                     type="number"
                                     placeholder="Min"
+                                    disabled
+                                    className="bg-stone-50 text-stone-500 border-stone-200 cursor-not-allowed"
                                     {...field}
                                     onChange={(e) =>
                                       field.onChange(e.target.valueAsNumber)
@@ -334,6 +301,8 @@ export default function FormUpdatePriceTiers({
                                   <Input
                                     type="number"
                                     placeholder="Max (∞)"
+                                    disabled
+                                    className="bg-stone-50 text-stone-500 border-stone-200 cursor-not-allowed"
                                     {...field}
                                     value={field.value ?? ""}
                                     onChange={(e) => {
@@ -366,8 +335,9 @@ export default function FormUpdatePriceTiers({
                                     </span>
                                     <Input
                                       type="number"
-                                      className="pl-8 h-8 text-xs"
+                                      className="pl-8 h-8 text-xs bg-stone-50 text-stone-500 border-stone-200 cursor-not-allowed"
                                       placeholder="0"
+                                      disabled
                                       {...field}
                                       onChange={(e) =>
                                         field.onChange(parseFloat(e.target.value) || 0)
@@ -382,7 +352,7 @@ export default function FormUpdatePriceTiers({
 
                           <FormItem>
                             <FormLabel className="text-xs">Harga Akhir</FormLabel>
-                            <div className="h-8 flex items-center text-xs font-semibold text-stone-905 bg-stone-50 border rounded px-3">
+                            <div className="h-8 flex items-center text-xs font-semibold text-stone-909 bg-stone-50 border border-stone-200 rounded px-3 cursor-not-allowed">
                               Rp {finalPrice.toLocaleString("id-ID")}
                             </div>
                           </FormItem>
@@ -393,15 +363,6 @@ export default function FormUpdatePriceTiers({
                 </div>
               </div>
             )}
-
-            <div className="flex justify-end pt-4 border-t">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Simpan Perubahan Harga
-              </Button>
-            </div>
           </form>
         </Form>
       </CardContent>
