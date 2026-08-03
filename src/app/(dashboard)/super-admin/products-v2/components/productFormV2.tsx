@@ -77,6 +77,14 @@ export default function ProductFormV2({
   // Panggil Custom Hook
   const { form, submit, state, setters, handlers } = useProductFormV2(onSubmit);
 
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [itemCategoryOpen, setItemCategoryOpen] = useState(false);
+  const [itemNameOpen, setItemNameOpen] = useState(false);
+  const [materialOpen, setMaterialOpen] = useState(false);
+  const [mockupImageOpen, setMockupImageOpen] = useState<Record<string, boolean>>({});
+  const [mockupAttrOpen, setMockupAttrOpen] = useState<Record<string, boolean>>({});
+  const [mockupPrintOpen, setMockupPrintOpen] = useState<Record<string, boolean>>({});
+
   const [previewUrl, setPreviewUrl] = useState<string | undefined>();
   const [isTagCategoryModalOpen, setIsTagCategoryModalOpen] = useState(false);
   const [tempAttributeSelections, setTempAttributeSelections] = useState<any[]>([]);
@@ -211,11 +219,14 @@ export default function ProductFormV2({
     return list;
   };
 
+  const [hasInitializedAttrs, setHasInitializedAttrs] = useState(false);
+
   useEffect(() => {
-    if (state.attributeSelections) {
+    if (state.attributeSelections && state.attributeSelections.length > 0 && !hasInitializedAttrs) {
       setTempAttributeSelections(state.attributeSelections);
+      setHasInitializedAttrs(true);
     }
-  }, [state.attributeSelections]);
+  }, [state.attributeSelections, hasInitializedAttrs]);
 
   useEffect(() => {
     if (state.attributesList) {
@@ -340,36 +351,64 @@ export default function ProductFormV2({
                         control={form.control}
                         name="categoryId"
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Kategori Utama</FormLabel>
-                            <Select
-                              onValueChange={(val) => {
-                                if (val === "ADD_NEW_CATEGORY")
-                                  return setters.setIsCategoryModalOpen(true);
-                                field.onChange(val);
-                                form.setValue("itemCategoryId", "");
-                                form.setValue("itemNameId", "");
-                              }}
-                              value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Pilih Kategori" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {state.categories.map((cat) => (
-                                  <SelectItem key={cat.id} value={cat.id}>
-                                    {cat.name} {cat.code && `(${cat.code})`}
-                                  </SelectItem>
-                                ))}
-                                <div className="h-px bg-stone-200 my-1 mx-1" />
-                                <SelectItem
-                                  value="ADD_NEW_CATEGORY"
-                                  className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                                  + Kategori Baru
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
+                          <FormItem className="flex flex-col justify-end">
+                            <FormLabel className="mb-2">Kategori Utama</FormLabel>
+                            <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className="w-full justify-between bg-white text-left font-normal border-stone-200 h-10">
+                                    {field.value
+                                      ? state.categories.find((c) => c.id === field.value)?.name || "Pilih Kategori"
+                                      : "Pilih Kategori"}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white border border-stone-200 shadow-md">
+                                <Command>
+                                  <CommandInput placeholder="Cari kategori..." />
+                                  <CommandList>
+                                    <CommandEmpty>Kategori tidak ditemukan.</CommandEmpty>
+                                    <CommandGroup>
+                                      {state.categories.map((cat) => (
+                                        <CommandItem
+                                          key={cat.id}
+                                          value={cat.name}
+                                          onSelect={() => {
+                                            field.onChange(cat.id);
+                                            form.setValue("itemCategoryId", "");
+                                            form.setValue("itemNameId", "");
+                                            setCategoryOpen(false);
+                                          }}>
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              field.value === cat.id ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          {cat.name} {cat.code && `(${cat.code})`}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                    <div className="h-px bg-stone-100 my-1" />
+                                    <CommandGroup>
+                                      <CommandItem
+                                        value="ADD_NEW_CATEGORY"
+                                        onSelect={() => {
+                                          setCategoryOpen(false);
+                                          setters.setIsCategoryModalOpen(true);
+                                        }}
+                                        className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                        + Kategori Baru
+                                      </CommandItem>
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -379,36 +418,64 @@ export default function ProductFormV2({
                         control={form.control}
                         name="itemCategoryId"
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Item Category</FormLabel>
-                            <Select
-                              onValueChange={(val) => {
-                                if (val === "ADD_NEW_ITEM_CATEGORY")
-                                  return setters.setIsItemCategoryModalOpen(true);
-                                field.onChange(val);
-                                form.setValue("itemNameId", "");
-                              }}
-                              value={field.value}
-                              disabled={!state.selectedCategoryId}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Pilih Sub Kategori" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {state.itemCategories.map((ic) => (
-                                  <SelectItem key={ic.id} value={ic.id}>
-                                    {ic.name}
-                                  </SelectItem>
-                                ))}
-                                <div className="h-px bg-stone-200 my-1 mx-1" />
-                                <SelectItem
-                                  value="ADD_NEW_ITEM_CATEGORY"
-                                  className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                                  + Tambah Item Category Baru
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
+                          <FormItem className="flex flex-col justify-end">
+                            <FormLabel className="mb-2">Item Category</FormLabel>
+                            <Popover open={itemCategoryOpen} onOpenChange={setItemCategoryOpen}>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    disabled={!state.selectedCategoryId}
+                                    className="w-full justify-between bg-white text-left font-normal border-stone-200 h-10">
+                                    {field.value
+                                      ? state.itemCategories.find((ic) => ic.id === field.value)?.name || "Pilih Sub Kategori"
+                                      : "Pilih Sub Kategori"}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white border border-stone-200 shadow-md">
+                                <Command>
+                                  <CommandInput placeholder="Cari sub kategori..." />
+                                  <CommandList>
+                                    <CommandEmpty>Sub kategori tidak ditemukan.</CommandEmpty>
+                                    <CommandGroup>
+                                      {state.itemCategories.map((ic) => (
+                                        <CommandItem
+                                          key={ic.id}
+                                          value={ic.name}
+                                          onSelect={() => {
+                                            field.onChange(ic.id);
+                                            form.setValue("itemNameId", "");
+                                            setItemCategoryOpen(false);
+                                          }}>
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              field.value === ic.id ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          {ic.name}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                    <div className="h-px bg-stone-100 my-1" />
+                                    <CommandGroup>
+                                      <CommandItem
+                                        value="ADD_NEW_ITEM_CATEGORY"
+                                        onSelect={() => {
+                                          setItemCategoryOpen(false);
+                                          setters.setIsItemCategoryModalOpen(true);
+                                        }}
+                                        className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                        + Tambah Item Category Baru
+                                      </CommandItem>
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -418,49 +485,74 @@ export default function ProductFormV2({
                         control={form.control}
                         name="itemNameId"
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Item Name</FormLabel>
-                            <Select
-                              value={field.value || ""}
-                              onValueChange={(val) => {
-                                if (val === "ADD_NEW_ITEM_NAME")
-                                  return setters.setIsItemNameModalOpen(true);
-
-                                const oldVal = form.getValues("itemNameId");
-                                const oldItem = state.itemNames.find((inm) => inm.id === oldVal);
-                                const newItem = state.itemNames.find((inm) => inm.id === val);
-
-                                let currentName = form.getValues("name") || "";
-                                if (newItem) {
-                                  if (oldItem && currentName.startsWith(oldItem.name)) {
-                                    currentName = currentName.replace(oldItem.name, newItem.name);
-                                  } else if (!currentName.startsWith(newItem.name)) {
-                                    currentName = currentName ? `${newItem.name} ${currentName}` : newItem.name;
-                                  }
-                                  form.setValue("name", currentName);
-                                }
-
-                                field.onChange(val);
-                              }}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Pilih Nama Item" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {state.itemNames.map((inm) => (
-                                  <SelectItem key={inm.id} value={inm.id}>
-                                    {inm.name}
-                                  </SelectItem>
-                                ))}
-                                <div className="h-px bg-stone-200 my-1 mx-1" />
-                                <SelectItem
-                                  value="ADD_NEW_ITEM_NAME"
-                                  className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                                  + Tambah Item Name Baru
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
+                          <FormItem className="flex flex-col justify-end">
+                            <FormLabel className="mb-2">Item Name</FormLabel>
+                            <Popover open={itemNameOpen} onOpenChange={setItemNameOpen}>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className="w-full justify-between bg-white text-left font-normal border-stone-200 h-10">
+                                    {field.value
+                                      ? state.itemNames.find((inm) => inm.id === field.value)?.name || "Pilih Nama Item"
+                                      : "Pilih Nama Item"}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white border border-stone-200 shadow-md">
+                                <Command>
+                                  <CommandInput placeholder="Cari nama item..." />
+                                  <CommandList>
+                                    <CommandEmpty>Nama item tidak ditemukan.</CommandEmpty>
+                                    <CommandGroup>
+                                      {state.itemNames.map((inm) => (
+                                        <CommandItem
+                                          key={inm.id}
+                                          value={inm.name}
+                                          onSelect={() => {
+                                            const val = inm.id;
+                                            const oldVal = form.getValues("itemNameId");
+                                            const oldItem = state.itemNames.find((i) => i.id === oldVal);
+                                            let currentName = form.getValues("name") || "";
+                                            
+                                            if (oldItem && currentName.startsWith(oldItem.name)) {
+                                              currentName = currentName.replace(oldItem.name, inm.name);
+                                            } else if (!currentName.startsWith(inm.name)) {
+                                              currentName = currentName ? `${inm.name} ${currentName}` : inm.name;
+                                            }
+                                            form.setValue("name", currentName);
+                                            
+                                            field.onChange(val);
+                                            setItemNameOpen(false);
+                                          }}>
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              field.value === inm.id ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          {inm.name}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                    <div className="h-px bg-stone-100 my-1" />
+                                    <CommandGroup>
+                                      <CommandItem
+                                        value="ADD_NEW_ITEM_NAME"
+                                        onSelect={() => {
+                                          setItemNameOpen(false);
+                                          setters.setIsItemNameModalOpen(true);
+                                        }}
+                                        className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                        + Tambah Item Name Baru
+                                      </CommandItem>
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -470,34 +562,62 @@ export default function ProductFormV2({
                         control={form.control}
                         name="materialTypeId"
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Material</FormLabel>
-                            <Select
-                              onValueChange={(val) => {
-                                if (val === "ADD_NEW_MATERIAL")
-                                  return setters.setIsMaterialModalOpen(true);
-                                field.onChange(val);
-                              }}
-                              value={field.value || ""}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Pilih Material" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {state.materialTypes.map((mat) => (
-                                  <SelectItem key={mat.id} value={mat.id}>
-                                    {mat.name}
-                                  </SelectItem>
-                                ))}
-                                <div className="h-px bg-stone-200 my-1 mx-1" />
-                                <SelectItem
-                                  value="ADD_NEW_MATERIAL"
-                                  className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                                  + Tambah Material Baru
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
+                          <FormItem className="flex flex-col justify-end">
+                            <FormLabel className="mb-2">Material</FormLabel>
+                            <Popover open={materialOpen} onOpenChange={setMaterialOpen}>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className="w-full justify-between bg-white text-left font-normal border-stone-200 h-10">
+                                    {field.value
+                                      ? state.materialTypes.find((mat) => mat.id === field.value)?.name || "Pilih Material"
+                                      : "Pilih Material"}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white border border-stone-200 shadow-md">
+                                <Command>
+                                  <CommandInput placeholder="Cari material..." />
+                                  <CommandList>
+                                    <CommandEmpty>Material tidak ditemukan.</CommandEmpty>
+                                    <CommandGroup>
+                                      {state.materialTypes.map((mat) => (
+                                        <CommandItem
+                                          key={mat.id}
+                                          value={mat.name}
+                                          onSelect={() => {
+                                            field.onChange(mat.id);
+                                            setMaterialOpen(false);
+                                          }}>
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              field.value === mat.id ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          {mat.name}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                    <div className="h-px bg-stone-100 my-1" />
+                                    <CommandGroup>
+                                      <CommandItem
+                                        value="ADD_NEW_MATERIAL"
+                                        onSelect={() => {
+                                          setMaterialOpen(false);
+                                          setters.setIsMaterialModalOpen(true);
+                                        }}
+                                        className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                        + Tambah Material Baru
+                                      </CommandItem>
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                             <FormMessage />
                           </FormItem>
                         )}

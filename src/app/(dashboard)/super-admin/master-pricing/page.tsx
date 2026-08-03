@@ -146,6 +146,7 @@ export default function MasterPricingPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [confirmCheckbox, setConfirmCheckbox] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
 
   const debouncedSearch = useDebounce(search, 500);
 
@@ -206,6 +207,7 @@ export default function MasterPricingPage() {
     setPreviewLoading(true);
     setIsPreviewOpen(true);
     setConfirmCheckbox(false);
+    setSelectedProductIds([]);
     try {
       const res = await fetchApi("/products/master-price/batch-preview", {
         method: "POST",
@@ -220,6 +222,7 @@ export default function MasterPricingPage() {
       const data = await res.json();
       if (res.ok) {
         setPreviewData(data);
+        setSelectedProductIds(data.previewItems?.map((item: any) => item.productId) || []);
       } else {
         toast.error(data.message || "Gagal memuat preview penyesuaian harga.");
         setIsPreviewOpen(false);
@@ -238,6 +241,10 @@ export default function MasterPricingPage() {
       toast.error("Silakan centang persetujuan terlebih dahulu.");
       return;
     }
+    if (selectedProductIds.length === 0) {
+      toast.error("Silakan pilih minimal satu produk untuk diupdate.");
+      return;
+    }
     setIsUpdating(true);
     try {
       const res = await fetchApi("/products/master-price/batch-update", {
@@ -248,6 +255,7 @@ export default function MasterPricingPage() {
           newExchangeRate: Number(newExchangeRate),
           offsetValue: Number(offsetValue) || 0,
           offsetCurrency,
+          productIds: selectedProductIds,
         }),
       });
       const result = await res.json();
@@ -540,8 +548,8 @@ export default function MasterPricingPage() {
                     </div>
                   </div>
                 )}
-                <div className="p-2 bg-white rounded-md border border-indigo-200 font-bold text-indigo-900 text-center min-w-[100px]">
-                  {previewData.summary?.totalProducts} Produk
+                <div className="p-2 bg-white rounded-md border border-indigo-200 font-bold text-indigo-900 text-center min-w-[120px]">
+                  {selectedProductIds.length} / {previewData.previewItems?.length || 0} Terpilih
                 </div>
               </div>
 
@@ -550,7 +558,24 @@ export default function MasterPricingPage() {
                 <Table>
                   <TableHeader className="bg-stone-50 sticky top-0 z-10">
                     <TableRow>
-                      <TableHead className="w-[45%] bg-stone-50">Produk</TableHead>
+                      <TableHead className="w-[8%] text-center bg-stone-50">
+                        <input
+                          type="checkbox"
+                          className="h-4.5 w-4.5 rounded border-stone-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          checked={
+                            previewData.previewItems?.length > 0 &&
+                            selectedProductIds.length === previewData.previewItems.length
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedProductIds(previewData.previewItems.map((item: any) => item.productId));
+                            } else {
+                              setSelectedProductIds([]);
+                            }
+                          }}
+                        />
+                      </TableHead>
+                      <TableHead className="w-[37%] bg-stone-50">Produk</TableHead>
                       <TableHead className="w-[15%] bg-stone-50">Kategori</TableHead>
                       <TableHead className="w-[15%] text-right bg-stone-50">Harga Lama</TableHead>
                       <TableHead className="w-[15%] text-right bg-stone-50">Harga Baru</TableHead>
@@ -560,6 +585,20 @@ export default function MasterPricingPage() {
                   <TableBody>
                     {previewData.previewItems?.map((item: any) => (
                       <TableRow key={item.productId} className="hover:bg-stone-50/50">
+                        <TableCell className="text-center">
+                          <input
+                            type="checkbox"
+                            className="h-4.5 w-4.5 rounded border-stone-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            checked={selectedProductIds.includes(item.productId)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedProductIds((prev) => [...prev, item.productId]);
+                              } else {
+                                setSelectedProductIds((prev) => prev.filter((id) => id !== item.productId));
+                              }
+                            }}
+                          />
+                        </TableCell>
                         <TableCell>
                           <div className="font-semibold text-stone-900 text-xs">{item.name}</div>
                           <div className="text-[10px] text-stone-500 font-mono mt-0.5">{item.sku}</div>
@@ -702,9 +741,13 @@ export default function MasterPricingPage() {
                         </TableCell>
                         <TableCell className="text-right text-stone-900 font-bold text-sm">
                           Rp {Number(p.basePrice).toLocaleString("id-ID")}
-                          {p.currencyCode && p.currencyCode !== "IDR" && (
+                          {p.currencyCode && p.currencyCode !== "IDR" ? (
                             <span className="block text-[10px] text-stone-500 font-normal mt-0.5">
                               {p.currencyCode} {Number(p.foreignPrice).toLocaleString("id-ID")} (Kurs: Rp {Number(p.exchangeRate).toLocaleString("id-ID")})
+                            </span>
+                          ) : (
+                            <span className="block text-[10px] text-stone-400 font-normal mt-0.5">
+                              IDR (Local Price)
                             </span>
                           )}
                         </TableCell>

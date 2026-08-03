@@ -48,6 +48,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+import { ChevronsUpDown } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -218,6 +233,7 @@ export default function SupplierCogsCalculatorPage() {
   const [selectedServiceVendorId, setSelectedServiceVendorId] = useState<string>("");
   const [cogsStatus, setCogsStatus] = useState<"EXISTING" | "POTENTIAL">("POTENTIAL");
   const [potentialProductType, setPotentialProductType] = useState<"NEW" | "EXISTING">("NEW");
+  const [productSelectOpen, setProductSelectOpen] = useState(false);
   const [historyStatusFilter, setHistoryStatusFilter] = useState<"ALL" | "EXISTING" | "POTENTIAL">("ALL");
   const [historyTypeFilter, setHistoryTypeFilter] = useState<"ALL" | "BORONGAN" | "RESMI">("ALL");
 
@@ -675,6 +691,10 @@ export default function SupplierCogsCalculatorPage() {
     sellPriceAir,
   } = calcResults;
 
+  const isCalculationStarted = calculationMode === "VARIABLE"
+    ? variableTiers.some(t => Number(t.pricePcs) > 0)
+    : Number(foreignPrice) > 0;
+
   const activeQtyPcs = Math.max(1, qtyPcs);
   const formECostPcsVal = (formECost * exchangeRate) / activeQtyPcs;
   const insuranceCostPcsVal = (insurancePercent / 100) * baseCostPcs;
@@ -794,25 +814,24 @@ export default function SupplierCogsCalculatorPage() {
     setSupplierContactLink("");
     setCalculationMode("FIXED");
     setVariableTiers([
-      { id: "1", totalPcs: 12, pricePcs: 85, gzCost: 0 },
-      { id: "2", totalPcs: 18, pricePcs: 83, gzCost: 0 },
+      { id: "1", totalPcs: 0, pricePcs: 0, gzCost: 0 },
     ]);
-    setForeignPrice(8);
+    setForeignPrice(0);
     setCurrency("RMB");
     setExchangeRate(ratesData.RMB || 2250);
-    setQtyPerCtn(100);
-    setLength(41);
-    setWidth(30);
-    setHeight(11);
-    setWeight(10);
-    setGzDeliveryCost(1);
-    setLocalFreight(7000);
-    setSeaFreightRate(10000000);
-    setAirFreightRate(260000);
-    setMoqCtn(10);
-    setQtyPcs(100);
-    setMargin(10000);
-    setSponsorPercent(2);
+    setQtyPerCtn(0);
+    setLength(0);
+    setWidth(0);
+    setHeight(0);
+    setWeight(0);
+    setGzDeliveryCost(0);
+    setLocalFreight(0);
+    setSeaFreightRate(0);
+    setAirFreightRate(0);
+    setMoqCtn(0);
+    setQtyPcs(0);
+    setMargin(0);
+    setSponsorPercent(0);
     setNotes("");
     setImageUrl("");
     setImagePublicId("");
@@ -1936,38 +1955,32 @@ export default function SupplierCogsCalculatorPage() {
                   </div>
                   
                   {/* MODE SWITCHER & CONVERT */}
-                  {importType !== "RESMI" ? (
-                    <div className="flex gap-1 bg-stone-100 p-1 rounded-md border border-stone-200 self-start md:self-auto">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleOrConvertMode("FIXED")}
-                        className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
-                          calculationMode === "FIXED"
-                            ? "bg-white text-stone-900 shadow-2xs border border-stone-200"
-                            : "text-stone-500 hover:text-stone-800"
-                        }`}
-                        title="Konversi / Alihkan ke Fixed Mode"
-                      >
-                        📏 Fixed Mode
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleOrConvertMode("VARIABLE")}
-                        className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
-                          calculationMode === "VARIABLE"
-                            ? "bg-indigo-600 text-white shadow-2xs"
-                            : "text-stone-500 hover:text-stone-800"
-                        }`}
-                        title="Konversi / Alihkan ke Variable Mode"
-                      >
-                        📊 Variable Mode
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 self-start md:self-auto select-none">
-                      📏 Fixed (Resmi)
-                    </div>
-                  )}
+                  <div className="flex gap-1 bg-stone-100 p-1 rounded-md border border-stone-200 self-start md:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleOrConvertMode("FIXED")}
+                      className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                        calculationMode === "FIXED"
+                          ? "bg-white text-stone-900 shadow-2xs border border-stone-200"
+                          : "text-stone-500 hover:text-stone-800"
+                      }`}
+                      title="Konversi / Alihkan ke Fixed Mode"
+                    >
+                      📏 Fixed Mode
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleOrConvertMode("VARIABLE")}
+                      className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                        calculationMode === "VARIABLE"
+                          ? "bg-indigo-600 text-white shadow-2xs"
+                          : "text-stone-500 hover:text-stone-800"
+                      }`}
+                      title="Konversi / Alihkan ke Variable Mode"
+                    >
+                      📊 Variable Mode
+                    </button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 pt-6">
@@ -2068,21 +2081,56 @@ export default function SupplierCogsCalculatorPage() {
                   {cogsStatus === "EXISTING" ? (
                     <div className="space-y-2 pt-2 border-t border-stone-100 min-w-0">
                       <Label className="text-xs font-bold uppercase text-stone-600">Master Product Catalog</Label>
-                      <Select
-                        value={selectedProductId === "sandbox" ? "" : selectedProductId}
-                        onValueChange={setSelectedProductId}
-                      >
-                        <SelectTrigger className="bg-stone-50 border-stone-300 w-full max-w-full overflow-hidden">
-                          <SelectValue placeholder="Pilih Produk dari Katalog" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name} ({p.sku})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={productSelectOpen} onOpenChange={setProductSelectOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="bg-stone-50 border-stone-300 w-full justify-between font-normal text-stone-850 max-w-full overflow-hidden">
+                            <span className="truncate text-left flex-1 min-w-0 pr-2">
+                              {selectedProductId && selectedProductId !== "sandbox"
+                                ? (() => {
+                                    const p = products.find((prod) => prod.id === selectedProductId);
+                                    return p ? `${p.name} (${p.sku})` : "Pilih Produk dari Katalog";
+                                  })()
+                                : "Pilih Produk dari Katalog"}
+                            </span>
+                            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] max-w-[calc(100vw-40px)] p-0 bg-white border border-stone-250 shadow-md">
+                          <Command>
+                            <CommandInput placeholder="Cari produk..." />
+                            <CommandList>
+                              <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
+                              <CommandGroup>
+                                {products.map((p) => {
+                                  const label = `${p.name} (${p.sku})`;
+                                  return (
+                                    <CommandItem
+                                      key={p.id}
+                                      value={label}
+                                      onSelect={() => {
+                                        setSelectedProductId(p.id);
+                                        setProductSelectOpen(false);
+                                      }}>
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          selectedProductId === p.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <span className="block truncate" title={label}>
+                                        {label}
+                                      </span>
+                                    </CommandItem>
+                                  );
+                                })}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   ) : (
                     <div className="space-y-4 pt-2 border-t border-stone-100">
@@ -2133,21 +2181,56 @@ export default function SupplierCogsCalculatorPage() {
                         ) : (
                           <div className="space-y-2 min-w-0">
                             <Label className="text-xs font-bold uppercase text-stone-600">Master Product Catalog</Label>
-                            <Select
-                              value={selectedProductId === "sandbox" ? "" : selectedProductId}
-                              onValueChange={setSelectedProductId}
-                            >
-                              <SelectTrigger className="bg-stone-50 border-stone-300 w-full max-w-full overflow-hidden">
-                                <SelectValue placeholder="Pilih Produk dari Katalog" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {products.map((p) => (
-                                  <SelectItem key={p.id} value={p.id}>
-                                    {p.name} ({p.sku})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <Popover open={productSelectOpen} onOpenChange={setProductSelectOpen}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className="bg-stone-50 border-stone-300 w-full justify-between font-normal text-stone-850 max-w-full overflow-hidden">
+                                  <span className="truncate text-left flex-1 min-w-0 pr-2">
+                                    {selectedProductId && selectedProductId !== "sandbox"
+                                      ? (() => {
+                                          const p = products.find((prod) => prod.id === selectedProductId);
+                                          return p ? `${p.name} (${p.sku})` : "Pilih Produk dari Katalog";
+                                        })()
+                                      : "Pilih Produk dari Katalog"}
+                                  </span>
+                                  <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[--radix-popover-trigger-width] max-w-[calc(100vw-40px)] p-0 bg-white border border-stone-250 shadow-md">
+                                <Command>
+                                  <CommandInput placeholder="Cari produk..." />
+                                  <CommandList>
+                                    <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
+                                    <CommandGroup>
+                                      {products.map((p) => {
+                                        const label = `${p.name} (${p.sku})`;
+                                        return (
+                                          <CommandItem
+                                            key={p.id}
+                                            value={label}
+                                            onSelect={() => {
+                                              setSelectedProductId(p.id);
+                                              setProductSelectOpen(false);
+                                            }}>
+                                            <Check
+                                              className={cn(
+                                                "mr-2 h-4 w-4",
+                                                selectedProductId === p.id ? "opacity-100" : "opacity-0"
+                                              )}
+                                            />
+                                            <span className="block truncate" title={label}>
+                                              {label}
+                                            </span>
+                                          </CommandItem>
+                                        );
+                                      })}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                           </div>
                         )}
 
@@ -2206,7 +2289,35 @@ export default function SupplierCogsCalculatorPage() {
                     <Label className="text-xs font-bold uppercase text-stone-600">
                       Supplier / Vendor Product
                     </Label>
-                    <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
+                    <Select
+                      value={selectedVendorId}
+                      onValueChange={(val) => {
+                        setSelectedVendorId(val);
+                        if (val && val !== "none") {
+                          const vend = vendors.find((v) => v.id === val);
+                          if (vend) {
+                            if (vend.picName) {
+                              setSupplierContactName(vend.picName);
+                            }
+                            if (vend.contacts && vend.contacts.length > 0) {
+                              const primary = vend.contacts.find((c: any) => c.isPrimary) || vend.contacts[0];
+                              if (primary) {
+                                if (primary.contactId) {
+                                  setSupplierContactLink(primary.contactId);
+                                }
+                                if (primary.platform && primary.platform.name) {
+                                  const platformName = primary.platform.name;
+                                  const matchedPlat = ["1688", "Alibaba", "WeChat", "Taobao", "Made-In-China", "WhatsApp", "Lokal / Indonesia"].find(
+                                    (plat) => plat.toLowerCase() === platformName.toLowerCase()
+                                  );
+                                  setSupplierPlatform(matchedPlat || platformName);
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }}
+                    >
                       <SelectTrigger className="bg-stone-50 border-stone-300 w-full max-w-full overflow-hidden">
                         <SelectValue placeholder="Pilih Supplier Product" />
                       </SelectTrigger>
@@ -2419,8 +2530,8 @@ export default function SupplierCogsCalculatorPage() {
                         <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
                         <Input
                           type="number"
-                          value={foreignPrice}
-                          onChange={(e) => setForeignPrice(Number(e.target.value))}
+                          value={foreignPrice === 0 ? "" : foreignPrice}
+                          onChange={(e) => setForeignPrice(parseFloat(e.target.value) || 0)}
                           className="pl-12 bg-stone-50 border-stone-300"
                         />
                       </div>
@@ -2445,9 +2556,9 @@ export default function SupplierCogsCalculatorPage() {
                       <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
                       <Input
                         type="number"
-                        value={exchangeRate}
+                        value={exchangeRate === 0 ? "" : exchangeRate}
                         disabled={currency === "IDR"}
-                        onChange={(e) => setExchangeRate(Number(e.target.value))}
+                        onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 0)}
                         className="pl-9 bg-stone-50 border-stone-300"
                       />
                     </div>
@@ -2462,9 +2573,9 @@ export default function SupplierCogsCalculatorPage() {
                       <Label className="text-xs text-stone-500">Qty / Carton</Label>
                       <Input
                         type="number"
-                        value={qtyPerCtn}
+                        value={qtyPerCtn === 0 ? "" : qtyPerCtn}
                         onChange={(e) => {
-                          const val = Number(e.target.value);
+                          const val = parseFloat(e.target.value) || 0;
                           setQtyPerCtn(val);
                           setQtyPcs((moqCtn || 1) * val);
                         }}
@@ -2475,8 +2586,8 @@ export default function SupplierCogsCalculatorPage() {
                       <Label className="text-xs text-stone-500">Panjang (cm)</Label>
                       <Input
                         type="number"
-                        value={length}
-                        onChange={(e) => setLength(Number(e.target.value))}
+                        value={length === 0 ? "" : length}
+                        onChange={(e) => setLength(parseFloat(e.target.value) || 0)}
                         className="bg-stone-50 border-stone-300"
                       />
                     </div>
@@ -2484,8 +2595,8 @@ export default function SupplierCogsCalculatorPage() {
                       <Label className="text-xs text-stone-500">Lebar (cm)</Label>
                       <Input
                         type="number"
-                        value={width}
-                        onChange={(e) => setWidth(Number(e.target.value))}
+                        value={width === 0 ? "" : width}
+                        onChange={(e) => setWidth(parseFloat(e.target.value) || 0)}
                         className="bg-stone-50 border-stone-300"
                       />
                     </div>
@@ -2493,8 +2604,8 @@ export default function SupplierCogsCalculatorPage() {
                       <Label className="text-xs text-stone-500">Tinggi (cm)</Label>
                       <Input
                         type="number"
-                        value={height}
-                        onChange={(e) => setHeight(Number(e.target.value))}
+                        value={height === 0 ? "" : height}
+                        onChange={(e) => setHeight(parseFloat(e.target.value) || 0)}
                         className="bg-stone-50 border-stone-300"
                       />
                     </div>
@@ -2502,8 +2613,8 @@ export default function SupplierCogsCalculatorPage() {
                       <Label className="text-xs text-stone-500">Berat (kg)</Label>
                       <Input
                         type="number"
-                        value={weight}
-                        onChange={(e) => setWeight(Number(e.target.value))}
+                        value={weight === 0 ? "" : weight}
+                        onChange={(e) => setWeight(parseFloat(e.target.value) || 0)}
                         className="bg-stone-50 border-stone-300"
                       />
                     </div>
@@ -2557,8 +2668,8 @@ export default function SupplierCogsCalculatorPage() {
                                   <TableCell>
                                     <Input
                                       type="number"
-                                      value={tier.totalPcs}
-                                      onChange={(e) => handleUpdateTier(tier.id, "totalPcs", Number(e.target.value))}
+                                      value={tier.totalPcs === 0 ? "" : tier.totalPcs}
+                                      onChange={(e) => handleUpdateTier(tier.id, "totalPcs", parseFloat(e.target.value) || 0)}
                                       className="bg-white h-8 text-xs font-semibold w-28"
                                     />
                                     <span className="block text-[10px] text-stone-400 font-semibold mt-1 pl-1">
@@ -2573,8 +2684,8 @@ export default function SupplierCogsCalculatorPage() {
                                       <span className="absolute left-2.5 top-1.5 text-xs text-stone-400 font-bold">{currency}</span>
                                       <Input
                                         type="number"
-                                        value={tier.pricePcs}
-                                        onChange={(e) => handleUpdateTier(tier.id, "pricePcs", Number(e.target.value))}
+                                        value={tier.pricePcs === 0 ? "" : tier.pricePcs}
+                                        onChange={(e) => handleUpdateTier(tier.id, "pricePcs", parseFloat(e.target.value) || 0)}
                                         className="bg-white h-8 text-xs font-semibold pl-12 w-40"
                                       />
                                     </div>
@@ -2584,8 +2695,8 @@ export default function SupplierCogsCalculatorPage() {
                                       <span className="absolute left-2.5 top-1.5 text-xs text-stone-400 font-bold">{currency}</span>
                                       <Input
                                         type="number"
-                                        value={tier.gzCost}
-                                        onChange={(e) => handleUpdateTier(tier.id, "gzCost", Number(e.target.value))}
+                                        value={tier.gzCost === 0 ? "" : tier.gzCost}
+                                        onChange={(e) => handleUpdateTier(tier.id, "gzCost", parseFloat(e.target.value) || 0)}
                                         className="bg-white h-8 text-xs font-semibold pl-12 w-32"
                                       />
                                     </div>
@@ -2643,8 +2754,8 @@ export default function SupplierCogsCalculatorPage() {
                             <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
                             <Input
                               type="number"
-                              value={formECost}
-                              onChange={(e) => setFormECost(Number(e.target.value))}
+                              value={formECost === 0 ? "" : formECost}
+                              onChange={(e) => setFormECost(parseFloat(e.target.value) || 0)}
                               className="pl-12 bg-white border-stone-300 font-semibold"
                             />
                           </div>
@@ -2656,8 +2767,8 @@ export default function SupplierCogsCalculatorPage() {
                           <Label className="text-xs text-stone-500 font-semibold">Bea Masuk (%)</Label>
                           <Input
                             type="number"
-                            value={beaMasukPercent}
-                            onChange={(e) => setBeaMasukPercent(Number(e.target.value))}
+                            value={beaMasukPercent === 0 ? "" : beaMasukPercent}
+                            onChange={(e) => setBeaMasukPercent(parseFloat(e.target.value) || 0)}
                             className="bg-white border-stone-300 font-semibold"
                           />
                         </div>
@@ -2666,8 +2777,8 @@ export default function SupplierCogsCalculatorPage() {
                           <Label className="text-xs text-stone-500 font-semibold">PPN (%)</Label>
                           <Input
                             type="number"
-                            value={ppnPercent}
-                            onChange={(e) => setPpnPercent(Number(e.target.value))}
+                            value={ppnPercent === 0 ? "" : ppnPercent}
+                            onChange={(e) => setPpnPercent(parseFloat(e.target.value) || 0)}
                             className="bg-white border-stone-300 font-semibold"
                           />
                         </div>
@@ -2676,8 +2787,8 @@ export default function SupplierCogsCalculatorPage() {
                           <Label className="text-xs text-stone-500 font-semibold">PPh (%)</Label>
                           <Input
                             type="number"
-                            value={pphPercent}
-                            onChange={(e) => setPphPercent(Number(e.target.value))}
+                            value={pphPercent === 0 ? "" : pphPercent}
+                            onChange={(e) => setPphPercent(parseFloat(e.target.value) || 0)}
                             className="bg-white border-stone-300 font-semibold"
                           />
                         </div>
@@ -2686,8 +2797,8 @@ export default function SupplierCogsCalculatorPage() {
                           <Label className="text-xs text-stone-500 font-semibold">Asuransi (%)</Label>
                           <Input
                             type="number"
-                            value={insurancePercent}
-                            onChange={(e) => setInsurancePercent(Number(e.target.value))}
+                            value={insurancePercent === 0 ? "" : insurancePercent}
+                            onChange={(e) => setInsurancePercent(parseFloat(e.target.value) || 0)}
                             className="bg-white border-stone-300 font-semibold"
                           />
                         </div>
@@ -2700,8 +2811,8 @@ export default function SupplierCogsCalculatorPage() {
                             <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
                             <Input
                               type="number"
-                              value={handlingCost}
-                              onChange={(e) => setHandlingCost(Number(e.target.value))}
+                              value={handlingCost === 0 ? "" : handlingCost}
+                              onChange={(e) => setHandlingCost(parseFloat(e.target.value) || 0)}
                               className="pl-9 bg-white border-stone-300 font-semibold"
                             />
                           </div>
@@ -2713,8 +2824,8 @@ export default function SupplierCogsCalculatorPage() {
                             <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
                             <Input
                               type="number"
-                              value={otherCost}
-                              onChange={(e) => setOtherCost(Number(e.target.value))}
+                              value={otherCost === 0 ? "" : otherCost}
+                              onChange={(e) => setOtherCost(parseFloat(e.target.value) || 0)}
                               className="pl-9 bg-white border-stone-300 font-semibold"
                             />
                           </div>
@@ -2736,8 +2847,8 @@ export default function SupplierCogsCalculatorPage() {
                         <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
                         <Input
                           type="number"
-                          value={seaFreightRate}
-                          onChange={(e) => setSeaFreightRate(Number(e.target.value))}
+                          value={seaFreightRate === 0 ? "" : seaFreightRate}
+                          onChange={(e) => setSeaFreightRate(parseFloat(e.target.value) || 0)}
                           className="pl-9 bg-stone-50 border-stone-300 font-semibold"
                         />
                       </div>
@@ -2751,8 +2862,8 @@ export default function SupplierCogsCalculatorPage() {
                         <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
                         <Input
                           type="number"
-                          value={airFreightRate}
-                          onChange={(e) => setAirFreightRate(Number(e.target.value))}
+                          value={airFreightRate === 0 ? "" : airFreightRate}
+                          onChange={(e) => setAirFreightRate(parseFloat(e.target.value) || 0)}
                           className="pl-9 bg-stone-50 border-stone-300 font-semibold"
                         />
                       </div>
@@ -2762,9 +2873,9 @@ export default function SupplierCogsCalculatorPage() {
                       <Label className="text-xs font-bold uppercase text-stone-600">MOQ Sourcing (Carton)</Label>
                       <Input
                         type="number"
-                        value={moqCtn}
+                        value={moqCtn === 0 ? "" : moqCtn}
                         onChange={(e) => {
-                          const val = Number(e.target.value);
+                          const val = parseFloat(e.target.value) || 0;
                           setMoqCtn(val);
                           setQtyPcs(val * (qtyPerCtn || 1));
                         }}
@@ -2783,8 +2894,8 @@ export default function SupplierCogsCalculatorPage() {
                           <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">{currency}</span>
                           <Input
                             type="number"
-                            value={gzDeliveryCost}
-                            onChange={(e) => setGzDeliveryCost(Number(e.target.value))}
+                            value={gzDeliveryCost === 0 ? "" : gzDeliveryCost}
+                            onChange={(e) => setGzDeliveryCost(parseFloat(e.target.value) || 0)}
                             className="pl-12 bg-stone-50 border-stone-300 font-semibold"
                           />
                         </div>
@@ -2799,8 +2910,8 @@ export default function SupplierCogsCalculatorPage() {
                         <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
                         <Input
                           type="number"
-                          value={localFreight}
-                          onChange={(e) => setLocalFreight(Number(e.target.value))}
+                          value={localFreight === 0 ? "" : localFreight}
+                          onChange={(e) => setLocalFreight(parseFloat(e.target.value) || 0)}
                           className="pl-9 bg-stone-50 border-stone-300 font-semibold"
                         />
                       </div>
@@ -2814,9 +2925,9 @@ export default function SupplierCogsCalculatorPage() {
                     <Label className="text-xs font-bold uppercase text-stone-600">Target Qty Order (Pcs)</Label>
                     <Input
                       type="number"
-                      value={qtyPcs}
+                      value={qtyPcs === 0 ? "" : qtyPcs}
                       onChange={(e) => {
-                        const val = Number(e.target.value);
+                        const val = parseFloat(e.target.value) || 0;
                         setQtyPcs(val);
                         setMoqCtn(Math.max(1, Math.ceil(val / (qtyPerCtn || 1))));
                       }}
@@ -2830,8 +2941,8 @@ export default function SupplierCogsCalculatorPage() {
                       <span className="absolute left-3 top-2.5 text-xs text-stone-400 font-bold">Rp</span>
                       <Input
                         type="number"
-                        value={margin}
-                        onChange={(e) => setMargin(Number(e.target.value))}
+                        value={margin === 0 ? "" : margin}
+                        onChange={(e) => setMargin(parseFloat(e.target.value) || 0)}
                         className="pl-9 bg-stone-50 border-stone-300"
                       />
                     </div>
@@ -2841,8 +2952,8 @@ export default function SupplierCogsCalculatorPage() {
                     <Label className="text-xs font-bold uppercase text-stone-600">Sponsor / Agent Fee (%)</Label>
                     <Input
                       type="number"
-                      value={sponsorPercent}
-                      onChange={(e) => setSponsorPercent(Number(e.target.value))}
+                      value={sponsorPercent === 0 ? "" : sponsorPercent}
+                      onChange={(e) => setSponsorPercent(parseFloat(e.target.value) || 0)}
                       className="bg-stone-50 border-stone-300"
                     />
                   </div>
@@ -2893,7 +3004,19 @@ export default function SupplierCogsCalculatorPage() {
             {/* RESULTS PANEL (RIGHT COLUMN) */}
             <div className="xl:col-span-5 space-y-6">
               
-              {calculationMode === "VARIABLE" ? (
+              {!isCalculationStarted ? (
+                <Card className="bg-stone-50 border border-dashed border-stone-300 p-8 flex flex-col items-center justify-center text-center space-y-4 shadow-sm min-h-[400px]">
+                  <div className="p-3 bg-stone-100 rounded-full border border-stone-200 shadow-2xs">
+                    <FileSpreadsheet className="h-8 w-8 text-stone-400" />
+                  </div>
+                  <div className="space-y-1 max-w-sm">
+                    <h4 className="text-sm font-bold text-stone-700">Belum Ada Kalkulasi</h4>
+                    <p className="text-xs text-stone-500 leading-relaxed">
+                      Masukkan harga beli supplier, kuantitas order, serta dimensi kemasan di kolom kiri untuk melihat simulasi HPP (COGS) dan harga jual.
+                    </p>
+                  </div>
+                </Card>
+              ) : calculationMode === "VARIABLE" ? (
                 <Card className="bg-white border border-stone-200 shadow-sm overflow-hidden">
                   <CardHeader className="bg-stone-50 border-b pb-3">
                     <div className="flex items-center justify-between">

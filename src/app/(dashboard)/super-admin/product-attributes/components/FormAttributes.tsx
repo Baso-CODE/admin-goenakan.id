@@ -203,7 +203,6 @@ export default function AttributeForm({
                       <SelectItem value="COLOR">Color Swatch</SelectItem>
                       <SelectItem value="SIZE">Size / Capacity</SelectItem>
                       <SelectItem value="MOCKUP_SIDE">Mockup Side / Print Position</SelectItem>
-                      <SelectItem value="PRINT_SIDE">Jumlah Sisi Print</SelectItem>
                       <SelectItem value="MODEL_SHAPE">Model / Shape</SelectItem>
                       <SelectItem value="PRINT_METHOD">Printing Method</SelectItem>
                     </SelectContent>
@@ -246,8 +245,6 @@ export default function AttributeForm({
                                     value={field.value}
                                     onChange={field.onChange}
                                   />
-                                ) : currentType === "PRINT_SIDE" ? (
-                                  <Input type="number" placeholder="Enter number of print sides..." {...field} />
                                 ) : (
                                   <Input {...field} />
                                 )}

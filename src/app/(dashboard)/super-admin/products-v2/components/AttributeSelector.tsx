@@ -20,8 +20,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { useApi } from "@/hooks/useApi";
-import { ArrowDown, ArrowUp, GripVertical, ListChecks, Loader2, Plus, Trash2, Pencil } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical, ListChecks, Loader2, Plus, Trash2, Pencil, Check, ChevronsUpDown } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -98,6 +112,7 @@ export function AttributeSelector({
   const [allAttributes, setAllAttributes] = useState<AttributeFromServer[]>([]);
   const [selectedCloneId, setSelectedCloneId] = useState("");
   const [submittingClone, setSubmittingClone] = useState(false);
+  const [cloneSelectOpen, setCloneSelectOpen] = useState(false);
 
   // Drag states for option choices
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -106,7 +121,42 @@ export function AttributeSelector({
   // Sync: Ambil data dari parent saat pertama kali atau saat 'value' berubah
   useEffect(() => {
     if (value) {
-      setLocal(value);
+      // Check if value is structurally identical to local to avoid infinite loop
+      const isIdentical =
+        value.length === local.length &&
+        value.every((valRow, idx) => {
+          const locRow = local[idx];
+          if (!locRow) return false;
+          if (valRow.attributeId !== locRow.attributeId) return false;
+          if (valRow.isVariantGenerator !== locRow.isVariantGenerator) return false;
+          if (valRow.valueIds.length !== locRow.valueIds.length) return false;
+          
+          // Check valueIds
+          const valueIdsMatch = valRow.valueIds.every((vId, vIdx) => locRow.valueIds[vIdx] === vId);
+          if (!valueIdsMatch) return false;
+
+          // Helper to check shallow object equality
+          const objEquals = (a: any, b: any) => {
+            if (!a && !b) return true;
+            if (!a || !b) return false;
+            const keysA = Object.keys(a);
+            const keysB = Object.keys(b);
+            if (keysA.length !== keysB.length) return false;
+            return keysA.every((k) => a[k] === b[k]);
+          };
+
+          return (
+            objEquals(valRow.priceModifiers, locRow.priceModifiers) &&
+            objEquals(valRow.weights, locRow.weights) &&
+            objEquals(valRow.widths, locRow.widths) &&
+            objEquals(valRow.heights, locRow.heights) &&
+            objEquals(valRow.lengths, locRow.lengths)
+          );
+        });
+
+      if (!isIdentical) {
+        setLocal(value);
+      }
     }
   }, [value]);
 
@@ -116,7 +166,6 @@ export function AttributeSelector({
       const attr = available.find((a) => a.id === row.attributeId);
       if (
         (attr?.type === "MOCKUP_SIDE" ||
-          attr?.type === "PRINT_SIDE" ||
           attr?.type === "PRINT_METHOD") &&
         row.isVariantGenerator !== false
       ) {
@@ -156,11 +205,14 @@ export function AttributeSelector({
   const fetchAttributes = useCallback(async () => {
     if (status === "loading" || status === "unauthenticated") return;
 
+    if (!productId) {
+      setAvailable([]);
+      return;
+    }
+
     setLoading(true);
     try {
-      const url = productId
-        ? `/product-attributes/list?productId=${productId}`
-        : "/product-attributes/list";
+      const url = `/product-attributes/list?productId=${productId}`;
       const res = await fetchApi(url);
 
       if (!res.ok) throw new Error();
@@ -501,7 +553,11 @@ export function AttributeSelector({
       toast.success("Attribute deleted successfully.");
       // Remove from active selections
       setLocal((prev) => prev.filter((_, i) => i !== selectionIdx));
-      await fetchAttributes();
+      if (!productId) {
+        setAvailable((prev) => prev.filter((a) => a.id !== attrId));
+      } else {
+        await fetchAttributes();
+      }
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Failed to delete attribute.");
@@ -527,26 +583,6 @@ export function AttributeSelector({
       } else if (!data.allowCustomColor && hasCustom) {
         valuesToSend = valuesToSend.map((v) => {
           if (v.value.toLowerCase().includes("custom") || v.value.toLowerCase().includes("kustom")) {
-            if (v.id) {
-              return { ...v, deleted: true };
-            }
-            return null;
-          }
-          return v;
-        }).filter(Boolean);
-      }
-    } else if (data.type === "PRINT_SIDE") {
-      const hasFullSide = valuesToSend.some(
-        (v) => !v.deleted && v.value.toLowerCase().includes("full side")
-      );
-      if (data.allowFullSide && !hasFullSide) {
-        valuesToSend.push({
-          value: "Full Side",
-          hasSubAttributes: false,
-        });
-      } else if (!data.allowFullSide && hasFullSide) {
-        valuesToSend = valuesToSend.map((v) => {
-          if (v.value.toLowerCase().includes("full side")) {
             if (v.id) {
               return { ...v, deleted: true };
             }
@@ -592,8 +628,20 @@ export function AttributeSelector({
         throw new Error(errData.message || `Failed to ${editingAttributeId ? "update" : "create"} attribute.`);
       }
 
+      const newAttr = await res.json();
       toast.success(`Attribute ${editingAttributeId ? "updated" : "created"} successfully.`);
-      await fetchAttributes();
+      
+      if (!productId) {
+        setAvailable((prev) => {
+          const exists = prev.some((a) => a.id === newAttr.id);
+          if (exists) {
+            return prev.map((a) => (a.id === newAttr.id ? newAttr : a));
+          }
+          return [...prev, newAttr];
+        });
+      } else {
+        await fetchAttributes();
+      }
       setIsCreateOpen(false);
       setEditingAttributeId(null);
       localForm.reset({
@@ -655,8 +703,13 @@ export function AttributeSelector({
         throw new Error(errData.message || "Failed to clone attribute.");
       }
 
+      const clonedAttr = await res.json();
       toast.success("Attribute cloned successfully.");
-      await fetchAttributes();
+      if (!productId) {
+        setAvailable((prev) => [...prev, clonedAttr]);
+      } else {
+        await fetchAttributes();
+      }
       setIsCloneOpen(false);
       setSelectedCloneId("");
     } catch (error: any) {
@@ -749,7 +802,6 @@ export function AttributeSelector({
                         <SelectItem value="COLOR" className="hover:bg-slate-50">Color Swatch</SelectItem>
                         <SelectItem value="SIZE" className="hover:bg-slate-50">Size / Capacity</SelectItem>
                         <SelectItem value="MOCKUP_SIDE" className="hover:bg-slate-50">Mockup Side / Print Position</SelectItem>
-                        <SelectItem value="PRINT_SIDE" className="hover:bg-slate-50">Jumlah Sisi Print</SelectItem>
                         <SelectItem value="MODEL_SHAPE" className="hover:bg-slate-50">Model / Shape</SelectItem>
                         <SelectItem value="PRINT_METHOD" className="hover:bg-slate-50">Printing Method</SelectItem>
                       </SelectContent>
@@ -766,21 +818,6 @@ export function AttributeSelector({
                         />
                         <label htmlFor="modal-allow-custom-color" className="text-xs font-bold text-indigo-700 cursor-pointer">
                           Aktifkan Pilihan Warna Kustom (Pembeli bebas pilih warna sendiri)
-                        </label>
-                      </div>
-                    )}
-
-                    {currentLocalType === "PRINT_SIDE" && (
-                      <div className="flex items-center space-x-2 select-none border border-indigo-100 bg-indigo-50/30 p-2.5 rounded-md mt-2">
-                        <Checkbox
-                          id="modal-allow-full-side"
-                          checked={localForm.watch("allowFullSide") || false}
-                          onCheckedChange={(checked) => {
-                            localForm.setValue("allowFullSide", !!checked);
-                          }}
-                        />
-                        <label htmlFor="modal-allow-full-side" className="text-xs font-bold text-indigo-700 cursor-pointer">
-                          Aktifkan Pilihan "Full Side" (Cetak Full Area / Keliling)
                         </label>
                       </div>
                     )}
@@ -841,31 +878,56 @@ export function AttributeSelector({
                 </DialogHeader>
                 <div className="space-y-3">
                   <Label htmlFor="clone-select" className="text-slate-700 text-sm font-semibold">Select Attribute to Clone</Label>
-                  <Select
-                    value={selectedCloneId}
-                    onValueChange={setSelectedCloneId}
-                  >
-                    <SelectTrigger id="clone-select" className="w-full mt-1 border-slate-300 bg-white text-slate-800">
-                      <SelectValue placeholder="Choose attribute..." />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border">
-                      {cloneableAttributes.map((attr) => {
-                        const fullText = `${attr.name} (${attr.values.map((v) => v.value).join(", ")})`;
-                        return (
-                          <SelectItem key={attr.id} value={attr.id} className="hover:bg-slate-50 max-w-full">
-                            <span className="block truncate max-w-[240px] sm:max-w-[340px]" title={fullText}>
-                              {fullText}
-                            </span>
-                          </SelectItem>
-                        );
-                      })}
-                      {cloneableAttributes.length === 0 && (
-                        <p className="p-2 text-xs text-slate-500 text-center">
-                          No attributes available to clone.
-                        </p>
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={cloneSelectOpen} onOpenChange={setCloneSelectOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between mt-1 border-slate-300 bg-white text-slate-800 font-normal max-w-full overflow-hidden">
+                        <span className="truncate text-left flex-1 min-w-0 pr-2 max-w-[240px] sm:max-w-[340px]">
+                          {selectedCloneId
+                            ? (() => {
+                                const attr = cloneableAttributes.find((a) => a.id === selectedCloneId);
+                                return attr ? `${attr.name} (${attr.values.map((v) => v.value).join(", ")})` : "Choose attribute..."
+                              })()
+                            : "Choose attribute..."}
+                        </span>
+                        <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] max-w-[calc(100vw-60px)] p-0 bg-white border border-stone-250 shadow-md">
+                      <Command>
+                        <CommandInput placeholder="Cari atribut untuk di-clone..." />
+                        <CommandList>
+                          <CommandEmpty>Atribut tidak ditemukan.</CommandEmpty>
+                          <CommandGroup>
+                            {cloneableAttributes.map((attr) => {
+                              const fullText = `${attr.name} (${attr.values.map((v) => v.value).join(", ")})`;
+                              return (
+                                <CommandItem
+                                  key={attr.id}
+                                  value={`${fullText}-${attr.id}`}
+                                  onSelect={() => {
+                                    setSelectedCloneId(attr.id);
+                                    setCloneSelectOpen(false);
+                                  }}>
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedCloneId === attr.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <span className="block truncate max-w-[240px] sm:max-w-[340px]" title={fullText}>
+                                    {fullText}
+                                  </span>
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <DialogFooter className="gap-2">
                   <Button
@@ -970,8 +1032,6 @@ export function AttributeSelector({
                                 ? "bg-amber-50 text-amber-700 border border-amber-200"
                                 : attr.type === "MOCKUP_SIDE"
                                 ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                                : attr.type === "PRINT_SIDE"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                 : attr.type === "MODEL_SHAPE"
                                 ? "bg-purple-50 text-purple-700 border border-purple-200"
                                 : attr.type === "PRINT_METHOD"
@@ -984,8 +1044,6 @@ export function AttributeSelector({
                                 ? "Size / Capacity"
                                 : attr.type === "MOCKUP_SIDE"
                                 ? "Mockup Side / Print Position"
-                                : attr.type === "PRINT_SIDE"
-                                ? "Jumlah Sisi Print"
                                 : attr.type === "MODEL_SHAPE"
                                 ? "Model / Shape"
                                 : attr.type === "PRINT_METHOD"
@@ -1009,17 +1067,22 @@ export function AttributeSelector({
                             <SelectValue placeholder="Pilih jenis attribute (e.g., Warna, Ukuran)..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {/* Tampilkan attribute yang sudah dipilih + yang belum dipilih lainnya */}
-                            {unselectedAttributes.map((a) => (
-                              <SelectItem key={a.id} value={a.id}>
-                                {a.name} ({a.type === "COLOR" ? "Color" : a.type === "SIZE" ? "Size" : a.type === "MOCKUP_SIDE" ? "Mockup Side" : a.type === "PRINT_SIDE" ? "Jumlah Sisi" : a.type === "MODEL_SHAPE" ? "Model / Shape" : a.type === "PRINT_METHOD" ? "Print Method" : "Text"} - {a.values.length} values)
-                              </SelectItem>
-                            ))}
-                            {attr && (
-                              <SelectItem key={attr.id} value={attr.id}>
-                                {attr.name} ({attr.type === "COLOR" ? "Color" : attr.type === "SIZE" ? "Size" : attr.type === "MOCKUP_SIDE" ? "Mockup Side" : attr.type === "PRINT_SIDE" ? "Jumlah Sisi" : attr.type === "MODEL_SHAPE" ? "Model / Shape" : attr.type === "PRINT_METHOD" ? "Print Method" : "Text"} - Currently Selected)
-                              </SelectItem>
-                            )}
+                             {/* Tampilkan attribute yang sudah dipilih + yang belum dipilih lainnya */}
+                             {unselectedAttributes.map((a) => (
+                               <SelectItem key={a.id} value={a.id}>
+                                 {a.name} ({a.type === "COLOR" ? "Color" : a.type === "SIZE" ? "Size" : a.type === "MOCKUP_SIDE" ? "Mockup Side" : a.type === "MODEL_SHAPE" ? "Model / Shape" : a.type === "PRINT_METHOD" ? "Print Method" : "Text"} - {a.values.length} values)
+                               </SelectItem>
+                             ))}
+                             {attr && (
+                               <SelectItem key={attr.id} value={attr.id}>
+                                 {attr.name} ({attr.type === "COLOR" ? "Color" : attr.type === "SIZE" ? "Size" : attr.type === "MOCKUP_SIDE" ? "Mockup Side" : attr.type === "MODEL_SHAPE" ? "Model / Shape" : attr.type === "PRINT_METHOD" ? "Print Method" : "Text"} - Currently Selected)
+                               </SelectItem>
+                             )}
+                             {unselectedAttributes.length === 0 && !attr && (
+                               <SelectItem value="placeholder-empty" disabled className="text-xs text-stone-500 text-center">
+                                 Belum ada atribut. Silakan Clone atau Buat Baru terlebih dahulu.
+                               </SelectItem>
+                             )}
                           </SelectContent>
                         </Select>
 
@@ -1057,20 +1120,17 @@ export function AttributeSelector({
                             id={`generate-variants-${idx}`}
                             checked={
                               (attr?.type === "MOCKUP_SIDE" ||
-                                attr?.type === "PRINT_SIDE" ||
                                 attr?.type === "PRINT_METHOD")
                                 ? false
                                 : row.isVariantGenerator !== false
                             }
                             disabled={
                               attr?.type === "MOCKUP_SIDE" ||
-                              attr?.type === "PRINT_SIDE" ||
                               attr?.type === "PRINT_METHOD"
                             }
                             onCheckedChange={(checked) => {
                               if (
                                 attr?.type === "MOCKUP_SIDE" ||
-                                attr?.type === "PRINT_SIDE" ||
                                 attr?.type === "PRINT_METHOD"
                               )
                                 return;
@@ -1085,14 +1145,12 @@ export function AttributeSelector({
                           <label
                             htmlFor={
                               attr?.type === "MOCKUP_SIDE" ||
-                              attr?.type === "PRINT_SIDE" ||
                               attr?.type === "PRINT_METHOD"
                                 ? undefined
                                 : `generate-variants-${idx}`
                             }
                             className={`text-xs font-semibold select-none ${
                               attr?.type === "MOCKUP_SIDE" ||
-                              attr?.type === "PRINT_SIDE" ||
                               attr?.type === "PRINT_METHOD"
                                 ? "text-gray-300 cursor-not-allowed italic"
                                 : "text-gray-500 cursor-pointer"
@@ -1100,7 +1158,6 @@ export function AttributeSelector({
                           >
                             Gunakan untuk menghasilkan variasi kombinasi (Stok & SKU){" "}
                             {(attr?.type === "MOCKUP_SIDE" ||
-                              attr?.type === "PRINT_SIDE" ||
                               attr?.type === "PRINT_METHOD") &&
                               "(Dinonaktifkan untuk Tipe Cetak)"}
                           </label>
@@ -1382,14 +1439,6 @@ function LocalFieldArrayEditor({
                   value={valValue}
                   onChange={(newVal) => localForm.setValue(`${valuePath}.value`, newVal)}
                 />
-              ) : currentLocalType === "PRINT_SIDE" ? (
-                <Input
-                  type="number"
-                  placeholder="Enter number of print sides..."
-                  {...localForm.register(`${valuePath}.value`)}
-                  className="flex-1 border-slate-300 text-slate-800 bg-white"
-                  required
-                />
               ) : (
                 <Input
                   placeholder={`Value #${index + 1}`}
@@ -1561,14 +1610,6 @@ function LocalSubValuesEditor({
                 <ColorValueInput
                   value={valValue}
                   onChange={(newVal) => form.setValue(`${valuePath}.value`, newVal)}
-                />
-              ) : type === "PRINT_SIDE" ? (
-                <Input
-                  type="number"
-                  placeholder="Enter number of print sides..."
-                  {...form.register(`${valuePath}.value`)}
-                  className="flex-1 h-9 border-slate-300 bg-white"
-                  required
                 />
               ) : (
                 <Input
