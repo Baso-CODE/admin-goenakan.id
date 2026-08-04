@@ -49,7 +49,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
@@ -61,12 +61,7 @@ import { Currency, Product, Vendor } from "../../orders/types/order.types";
 const purchaseOrderSchema = z.object({
   poDate: z.string().min(1, "Date is required"),
   poNumber: z.string().optional(),
-  purchaseType: z.enum([
-    "DIRECT_MATERIAL",
-    "DIRECT_EXPENSES",
-    "INDIRECT_EXPENSES",
-    "STOCK",
-  ]),
+  purchaseType: z.enum(["DIRECT_MATERIAL", "DIRECT_EXPENSES", "STOCK"]),
   expenseCategory: z.enum(["PRODUCT", "PACKAGING", "LOGISTIC", "UTILITY"]),
   paymentTerms: z.enum(["IMMEDIATELY", "NET_14", "NET_30", "NET_60"]),
   vendorId: z.string().min(1, "Vendor is required"),
@@ -138,6 +133,7 @@ export default function AddPurchaseOrderForm() {
 
   // === MASTER DATA STATES ===
   const [vendors, setVendors] = useState<Vendor[]>([]);
+
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<OrderRef[]>([]);
@@ -149,6 +145,28 @@ export default function AddPurchaseOrderForm() {
   const [openOrderCombobox, setOpenOrderCombobox] = useState<
     Record<number, boolean>
   >({});
+
+  // Observe nilai expenseCategory
+  const selectedExpenseCategory = watch("expenseCategory");
+
+  const filteredVendors = useMemo(() => {
+    if (selectedExpenseCategory === "PRODUCT") {
+      return vendors.filter((v: any) => v.types && v.types.includes("PRODUCT"));
+    }
+    return vendors;
+  }, [vendors, selectedExpenseCategory]);
+
+  useEffect(() => {
+    const currentVendorId = getValues("vendorId");
+    if (currentVendorId) {
+      const isStillValid = filteredVendors.some(
+        (v) => v.id === currentVendorId,
+      );
+      if (!isStillValid) {
+        setValue("vendorId", "");
+      }
+    }
+  }, [selectedExpenseCategory, filteredVendors, getValues, setValue]);
 
   // Load Master Data
   useEffect(() => {
@@ -442,7 +460,7 @@ export default function AddPurchaseOrderForm() {
                           <CommandList>
                             <CommandEmpty>No vendor found.</CommandEmpty>
                             <CommandGroup>
-                              {vendors.map((vendor) => (
+                              {filteredVendors.map((vendor) => (
                                 <CommandItem
                                   value={`${vendor.companyName}-${vendor.id}`}
                                   key={vendor.id}
@@ -817,12 +835,12 @@ export default function AddPurchaseOrderForm() {
                                             </span>
                                           </CommandItem>
 
-                                          {/* Daftar Referensi Order */}
+                                          {/* Daftar Referensi Order dengan Fitur Auto-Fill */}
                                           {orders.map((o) => (
                                             <CommandItem
                                               key={o.id}
                                               value={o.orderNumber}
-                                              onSelect={() => {
+                                              onSelect={async () => {
                                                 field.onChange(o.id);
                                                 setOpenOrderCombobox(
                                                   (prev) => ({
@@ -830,6 +848,77 @@ export default function AddPurchaseOrderForm() {
                                                     [index]: false,
                                                   }),
                                                 );
+
+                                                try {
+                                                  // ✨ Ambil detail produk dari Sales Order yang dipilih
+                                                  const res = await fetchApi(
+                                                    `/orders/${o.id}/replacement-data`,
+                                                  );
+                                                  if (res.ok) {
+                                                    const orderDetail =
+                                                      await res.json();
+                                                    const dataOrder =
+                                                      orderDetail.data ||
+                                                      orderDetail;
+
+                                                    const originalItems =
+                                                      dataOrder.products;
+
+                                                    // Jika SO memiliki produk, ambil produk pertama atau sesuaikan
+                                                    if (
+                                                      originalItems &&
+                                                      originalItems.length > 0
+                                                    ) {
+                                                      // Contoh mengambil item pertama dari SO untuk auto-fill baris ini
+                                                      const firstItem =
+                                                        originalItems[0];
+
+                                                      form.setValue(
+                                                        `items.${index}.productId`,
+                                                        firstItem.productId ||
+                                                          "",
+                                                      );
+                                                      form.setValue(
+                                                        `items.${index}.variantId`,
+                                                        firstItem.variantId ||
+                                                          "",
+                                                      );
+                                                      form.setValue(
+                                                        `items.${index}.itemName`,
+                                                        firstItem.productName ||
+                                                          firstItem.name ||
+                                                          "",
+                                                      );
+                                                      form.setValue(
+                                                        `items.${index}.quantityOrder`,
+                                                        firstItem.quantity || 1,
+                                                      );
+                                                      form.setValue(
+                                                        `items.${index}.unitPrice`,
+                                                        Number(
+                                                          firstItem.unitPrice ||
+                                                            firstItem.price ||
+                                                            0,
+                                                        ),
+                                                      );
+                                                      form.setValue(
+                                                        `items.${index}.selectedAttributes`,
+                                                        firstItem.selectedAttributes ||
+                                                          {},
+                                                      );
+
+                                                      // Jalankan kalkulasi ulang kuantiti beli (To Buy)
+                                                      recalculateQtyPurchase(
+                                                        index,
+                                                      );
+                                                    }
+                                                  }
+                                                } catch (error) {
+                                                  console.error(
+                                                    "Gagal mengambil detail order untuk PO:",
+                                                    error,
+                                                  );
+                                                }
                                               }}>
                                               <Check
                                                 className={cn(

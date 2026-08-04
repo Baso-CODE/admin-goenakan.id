@@ -249,16 +249,15 @@ export default function ReplacementOrderForm({
                                           originalItems &&
                                           originalItems.length > 0
                                         ) {
-                                          remove(); // Kosongkan form item saat ini (jika ada baris kosong)
+                                          remove();
 
-                                          // Masukkan semua produk dari order asli ke dalam form
                                           const newItems = originalItems.map(
                                             (item: any) => ({
                                               productId: item.productId,
                                               variantId: item.variantId || "",
                                               quantity: item.quantity,
                                               unitPrice: item.unitPrice || 0,
-                                              remarks: "", // Dikosongkan agar bisa diisi alasan defect
+                                              remarks: "",
                                               customization:
                                                 item.customization || "",
                                               selectedAttributes:

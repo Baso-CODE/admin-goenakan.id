@@ -112,7 +112,11 @@ export type Client = {
 };
 
 export type Sales = { id: string; name: string; phone: string };
-export type Vendor = { id: string; companyName: string };
+export type Vendor = {
+  id: string;
+  companyName: string;
+  vendorType: "PRODUCT" | "SERVICE";
+};
 
 export type AttributeValueOption = {
   valueId: string;

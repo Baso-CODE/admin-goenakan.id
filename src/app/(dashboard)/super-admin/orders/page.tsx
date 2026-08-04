@@ -8,6 +8,7 @@ import { ClipboardList, FlaskConical, Layers, RefreshCw } from "lucide-react";
 import TableReplacementOrder from "../replacement-orders/components/tableReplacementOrder";
 import OrderStats from "./components/orderStats";
 import SampleStats from "./components/sampleStats";
+import TableCombinedOrder from "./components/tableCombinedOrder";
 import TableOrder from "./components/tableOrder";
 import TableOrderSample from "./components/tableOrderSample";
 
@@ -62,41 +63,11 @@ export default function OrderPage() {
         <TabsContent
           value="all"
           className="mt-0 focus-visible:outline-none w-full min-w-0 max-w-full overflow-hidden">
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-12 w-full min-w-0 max-w-full overflow-hidden">
-            {/* Bagian Sales di tab All */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b pb-2">
-                <ClipboardList className="h-5 w-5 text-blue-600" />
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Sales Orders
-                </h2>
-              </div>
-              <OrderStats />
-              <TableOrder />
-            </div>
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6 w-full min-w-0 max-w-full overflow-hidden">
+            {/* Opsi: Jika kamu ingin tetap menampilkan kartu statistik di bagian atas tab All, kamu bisa membiarkan <OrderStats /> di sini. Jika tidak, baris ini bisa dihapus. */}
+            {/* <OrderStats /> */}
 
-            {/* Bagian Sample di tab All */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b pb-2">
-                <FlaskConical className="h-5 w-5 text-purple-600" />
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Sample Orders
-                </h2>
-              </div>
-              <SampleStats />
-              <TableOrderSample />
-            </div>
-
-            {/* Bagian Replacement di tab All */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b pb-2">
-                <RefreshCw className="h-5 w-5 text-orange-600" />
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Replacement Orders
-                </h2>
-              </div>
-              <TableReplacementOrder />
-            </div>
+            <TableCombinedOrder />
           </div>
         </TabsContent>
 
