@@ -188,10 +188,41 @@ export default function EditCashflowClient() {
       if (!cashflowRes.ok) throw new Error("Failed to load cashflow data");
 
       const detailData = await cashflowRes.json();
-      setVendors(detailData.availableVendors || []);
+
+      // ✨ 1. Simpan SEMUA data vendor untuk Dropdown pilihan manual
+      const allVendors = detailData.availableVendors || [];
+      setVendors(allVendors);
+
+      // ✨ 2. Ambil VENDOR KHUSUS dari PO untuk Auto-fill
+      const fetchedPOVendors = detailData.poVendors || [];
 
       const bCurrency = detailData.summary?.baseCurrencyId || "IDR";
       setBaseCurrency(bCurrency);
+
+      // ✨ 3. Logika Auto-fill menggunakan fetchedPOVendors
+      const initialCostItems =
+        detailData.costs && detailData.costs.length > 0
+          ? detailData.costs.map((c: any) => ({
+              isManual: !c.vendorId,
+              description: c.description,
+              vendorId: c.vendorId || "",
+              costPerUnit: Number(c.costPerUnit),
+              quantity: Number(c.quantity),
+              currency: c.currencyCode || c.currency || bCurrency,
+              exchangeRate: Number(c.exchangeRate) || 1,
+              total: Number(c.total),
+            }))
+          : fetchedPOVendors.map((v: any) => ({
+              // <-- Menggunakan data PO Vendor
+              isManual: false,
+              description: "",
+              vendorId: v.id,
+              costPerUnit: 0,
+              quantity: 1,
+              currency: bCurrency,
+              exchangeRate: 1,
+              total: 0,
+            }));
 
       reset({
         poNumber: detailData.summary.orderNumber || detailData.summary.poNumber,
@@ -204,16 +235,7 @@ export default function EditCashflowClient() {
           exchangeRate: Number(r.exchangeRate) || 1,
           total: Number(r.total),
         })),
-        costItems: detailData.costs.map((c: any) => ({
-          isManual: !c.vendorId,
-          description: c.description,
-          vendorId: c.vendorId || "",
-          costPerUnit: Number(c.costPerUnit),
-          quantity: Number(c.quantity),
-          currency: c.currencyCode || c.currency || bCurrency,
-          exchangeRate: Number(c.exchangeRate) || 1,
-          total: Number(c.total),
-        })),
+        costItems: initialCostItems,
       });
     } catch (error) {
       console.error(error);
@@ -222,7 +244,6 @@ export default function EditCashflowClient() {
       setLoading(false);
     }
   }, [referenceId, type, reset, status, fetchApi]);
-
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -509,7 +530,6 @@ export default function EditCashflowClient() {
                         <div
                           key={field.id}
                           className="flex flex-col gap-4 border border-gray-200 shadow-sm bg-gray-50/30 p-4 rounded-xl">
-                          {/* 🔥 BARIS 1: TOMBOL SWITCH */}
                           <div className="flex items-center justify-between pb-3 border-b border-gray-200/80">
                             <div className="flex items-center gap-3">
                               <Switch
@@ -529,7 +549,6 @@ export default function EditCashflowClient() {
                             </div>
                           </div>
 
-                          {/* 🔥 BARIS 2: VENDOR & DESKRIPSI */}
                           <div className="w-full">
                             {!isManual ? (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -551,7 +570,7 @@ export default function EditCashflowClient() {
                                         }}
                                         value={field.value}>
                                         <FormControl>
-                                          <SelectTrigger className="h-10 text-sm bg-white">
+                                          <SelectTrigger className="h-10 text-sm bg-white w-full">
                                             <SelectValue placeholder="Pilih Vendor" />
                                           </SelectTrigger>
                                         </FormControl>
@@ -590,7 +609,7 @@ export default function EditCashflowClient() {
                                           value={field.value}
                                           disabled={!currentVendorId}>
                                           <FormControl>
-                                            <SelectTrigger className="h-10 text-sm bg-white">
+                                            <SelectTrigger className="h-10 text-sm bg-white w-full">
                                               <SelectValue placeholder="Pilih Item" />
                                             </SelectTrigger>
                                           </FormControl>
@@ -638,9 +657,7 @@ export default function EditCashflowClient() {
                             )}
                           </div>
 
-                          {/* 🔥 BARIS 3: FINANCIALS SEJAJAR */}
                           <div className="grid grid-cols-2 lg:grid-cols-12 gap-4 items-end bg-white p-3.5 rounded-lg border border-gray-100 shadow-sm mt-1">
-                            {/* Master Currency Dropdown */}
                             <div className="col-span-1 lg:col-span-2 space-y-1.5">
                               <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
                                 Curr{" "}

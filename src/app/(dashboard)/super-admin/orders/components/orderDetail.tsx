@@ -19,7 +19,12 @@ import { GenerateInvoiceDialog } from "./helper/GenerateInvoiceDialog";
 import { InvoiceHistoryTable } from "./invoiceHistoryTable";
 import { OrderItemsTable } from "./orderItemsTable";
 import { OrderSampleFollowUps } from "./orderSampleFollowUps";
-import { CustomerCard, SalesCard, ShippingCard } from "./orderSidebarCards";
+import {
+  CustomerCard,
+  SalesCard,
+  ShippingCard,
+  VendorsCard,
+} from "./orderSidebarCards";
 
 export default function OrderDetailPage() {
   const { fetchApi, status } = useApi();
@@ -42,6 +47,8 @@ export default function OrderDetailPage() {
       if (!res.ok) throw new Error("Gagal memuat detail order");
 
       const data = await res.json();
+      console.log("ini adlaah data", data);
+
       setOrder(data);
     } catch (error) {
       console.error(error);
@@ -195,7 +202,7 @@ export default function OrderDetailPage() {
             purchaseChannelName={order.purchaseChannelName}
           />
           <SalesCard sales={order.sales} />
-          {/* <VendorsCard vendors={order.vendors} /> */}
+          <VendorsCard vendors={order.vendors} />
 
           {order.salesCategory === "SAMPLE" && (
             <OrderSampleFollowUps

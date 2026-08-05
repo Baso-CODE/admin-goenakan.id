@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  LinkIcon,
   Mail,
   MapPin,
   Phone,
@@ -134,10 +135,6 @@ export function SalesCard({ sales }: SalesCardProps) {
     </Card>
   );
 }
-
-// ========================
-// VendorsCard
-// ========================
 interface VendorsCardProps {
   vendors: OrderVendor[];
 }
@@ -156,27 +153,41 @@ export function VendorsCard({ vendors }: VendorsCardProps) {
           <div className="divide-y divide-gray-100">
             {vendors.map((vendor, idx) => (
               <div key={idx} className="py-4 first:pt-5 last:pb-2">
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-semibold text-sm text-gray-900">
+                <div className="flex justify-between items-start mb-2 gap-2">
+                  <h4 className="font-semibold text-sm text-gray-900 leading-snug">
                     {vendor.companyName}
                   </h4>
                   <Badge
                     variant="secondary"
-                    className="text-[10px] h-5 px-1.5 font-normal bg-gray-100 text-gray-600">
+                    className="text-[10px] h-5 px-1.5 font-normal bg-gray-100 text-gray-600 shrink-0">
                     {vendor.role}
                   </Badge>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground bg-gray-50 p-2 rounded border border-gray-100/50">
-                  <div className="flex items-center gap-1.5">
-                    <User className="h-3 w-3 text-gray-400" />
-                    <span className="font-medium text-gray-700">
+
+                {/* ✨ PERBAIKAN LAYOUT BOX KONTAK */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-xs text-muted-foreground bg-gray-50 p-3 rounded-lg border border-gray-100/80">
+                  {/* Nama PIC */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="h-6 w-6 rounded-full bg-white border flex items-center justify-center shadow-2xs shrink-0">
+                      <User className="h-3 w-3 text-gray-500" />
+                    </div>
+                    <span className="font-medium text-gray-800">
                       {vendor.picName}
                     </span>
                   </div>
-                  <div className="h-3 w-px bg-gray-300" />
-                  <div className="flex items-center gap-1.5">
-                    <Phone className="h-3 w-3 text-gray-400" />
-                    <span>{vendor.picPhone}</span>
+
+                  <div className="hidden sm:block h-3 w-px bg-gray-300 shrink-0" />
+
+                  {/* Kontak / URL Platform (Diberi pembatas agar tidak meluber) */}
+                  <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                    <div className="h-6 w-6 rounded-full bg-white border flex items-center justify-center shadow-2xs shrink-0">
+                      <LinkIcon className="h-3 w-3 text-gray-500" />
+                    </div>
+                    <span
+                      className="text-gray-600 truncate block w-full select-all font-mono text-[11px]"
+                      title={vendor.picPhone}>
+                      {vendor.picPhone}
+                    </span>
                   </div>
                 </div>
               </div>
