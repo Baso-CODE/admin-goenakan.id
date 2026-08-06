@@ -72,10 +72,13 @@ export default function LogisticsTrackingDetail() {
 
   useEffect(() => {
     loadData();
-  }, [orderId, status, fetchApi]); // Tambahkan dependensi agar sinkron
+  }, [orderId, status, fetchApi]);
 
   if (loading) return <div>Loading Tracking Data...</div>;
   if (!order) return <div>Order not found</div>;
+
+  const productionVendors = vendors.filter((v) => v.type === "PRODUCT");
+  const logisticVendors = vendors.filter((v) => v.type === "SERVICE");
 
   return (
     <div className="space-y-6  mx-auto pb-20">
@@ -183,7 +186,7 @@ export default function LogisticsTrackingDetail() {
           <ProductionTab
             orderId={order.id}
             products={order.products}
-            vendors={vendors}
+            vendors={productionVendors}
             onUpdate={loadData}
           />
         </TabsContent>
@@ -198,7 +201,8 @@ export default function LogisticsTrackingDetail() {
               order.shipments?.filter((s: any) => s.type === "INBOUND") || []
             }
             products={order.products}
-            couriers={vendors}
+            couriers={logisticVendors}
+            allVendors={vendors}
             onUpdate={loadData}
           />
         </TabsContent>
@@ -213,7 +217,8 @@ export default function LogisticsTrackingDetail() {
               order.shipments?.filter((s: any) => s.type === "OUTBOUND") || []
             }
             products={order.products}
-            couriers={vendors}
+            couriers={logisticVendors}
+            allVendors={vendors}
             onUpdate={loadData}
           />
         </TabsContent>

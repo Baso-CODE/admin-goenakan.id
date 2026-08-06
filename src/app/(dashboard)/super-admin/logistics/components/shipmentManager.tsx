@@ -69,19 +69,20 @@ import { cn } from "@/lib/utils";
 // --- KONFIGURASI STATUS (Sesuai DTO Backend) ---
 const SHIPMENT_STATUSES = {
   INBOUND: [
-    { value: "PREPARED", label: "Prepared (Disiapkan)" },
-    { value: "DISPATCHED", label: "Dispatched (Berangkat/OTW)" },
-    { value: "ARRIVED", label: "Arrived (Sampai Tujuan Step Ini)" },
-    { value: "CANCELLED", label: "Cancelled (Dibatalkan)" },
+    { value: "PREPARED", label: "📦 Prepared (Disiapkan di Pabrik)" },
+    { value: "DISPATCHED", label: "🚚 Dispatched (Berangkat/OTW)" },
+    { value: "IN_TRANSIT", label: "🏢 In Transit (Singgah/Transit)" },
+    { value: "ARRIVED", label: "✅ Arrived (Sampai di Gudang)" },
+    { value: "CANCELLED", label: "❌ Cancelled (Dibatalkan)" },
   ],
   OUTBOUND: [
-    { value: "PREPARED", label: "Prepared (Disiapkan)" },
-    { value: "DISPATCHED", label: "Dispatched (Dikirim)" },
-    { value: "ARRIVED", label: "Arrived (Diterima Client/Tujuan)" },
-    { value: "CANCELLED", label: "Cancelled (Dibatalkan)" },
+    { value: "PREPARED", label: "📦 Prepared (Disiapkan di Gudang)" },
+    { value: "DISPATCHED", label: "🚚 Dispatched (Diserahkan ke Kurir)" },
+    { value: "IN_TRANSIT", label: "🏢 In Transit (Paket di Kota Transit)" },
+    { value: "ARRIVED", label: "✅ Arrived (Diterima Klien)" },
+    { value: "CANCELLED", label: "❌ Cancelled (Dibatalkan)" },
   ],
 };
-
 // --- TIPE DATA ---
 type NoteCategory = {
   id: string;
@@ -94,6 +95,7 @@ interface ShipmentManagerProps {
   orderId: string;
   orderInfo: any;
   shipments: any[];
+  allVendors: any[];
   products: any[];
   couriers: any[];
   onUpdate: () => void;
@@ -105,6 +107,7 @@ export default function ShipmentManager({
   shipments,
   orderInfo,
   products,
+  allVendors,
   couriers,
   onUpdate,
 }: ShipmentManagerProps) {
@@ -166,11 +169,9 @@ export default function ShipmentManager({
     if (isOpen || updateStatusId) {
       fetchCategories();
     }
-  }, [isOpen, updateStatusId, status, fetchApi]); // Tambahkan dependensi lengkap
+  }, [isOpen, updateStatusId, status, fetchApi]);
 
   // === HELPER FUNCTIONS ===
-
-  // 🔄 UPDATE: Menambahkan parameter currentStep
   const getRemainingQty = (
     productId: string,
     totalOrderQty: number,
@@ -435,7 +436,7 @@ export default function ShipmentManager({
     return currentStatuses.find((s) => s.value === val)?.label || val;
   };
 
-  // ✨ LOGIKA CERDAS 1: Auto-fill Origin berdasarkan riwayat
+  // 1: Auto-fill Origin berdasarkan riwayat
   const handleOpenCreateDialog = () => {
     const maxStep =
       shipments.length > 0 ? Math.max(...shipments.map((s) => s.step || 1)) : 0;
@@ -449,7 +450,8 @@ export default function ShipmentManager({
       if (nextStep === 1) {
         // Step 1 Inbound: Asal (Origin) = Kota Vendor Produksi (Pabrik)
         const prodVendorId = products?.[0]?.productionTrackers?.[0]?.vendorId;
-        const prodVendor = couriers.find((v) => v.id === prodVendorId);
+        const prodVendor = allVendors.find((v) => v.id === prodVendorId);
+
         autoOrigin = prodVendor?.city || "";
       } else {
         // Step Lanjutan Inbound: Asal (Origin) = Tujuan dari Step sebelumnya
@@ -470,13 +472,10 @@ export default function ShipmentManager({
         );
 
         autoOrigin = lastInbound?.destination || "";
-        // Default Tujuan Outbound diarahkan ke Alamat Klien
         autoDest = orderInfo?.shippingAddress || "";
       } else {
-        // Step Lanjutan Outbound: Asal (Origin) = Tujuan dari Step sebelumnya
         const prevShip = shipments.find((s) => s.step === nextStep - 1);
         if (prevShip) autoOrigin = prevShip.destination || "";
-        // Default Tujuan Outbound diarahkan ke Alamat Klien
         autoDest = orderInfo?.shippingAddress || "";
       }
     }
@@ -486,12 +485,15 @@ export default function ShipmentManager({
     setIsOpen(true);
   };
 
+  // ✨ LOGIKA CERDAS 2: Penyesuaian untuk Outbound
   const handleVendorChange = (selectedVendorId: string) => {
     setVendorId(selectedVendorId);
 
     const selectedCourier = couriers.find((c) => c.id === selectedVendorId);
     if (selectedCourier?.city) {
-      setDestination(selectedCourier.city);
+      if (type === "INBOUND") {
+        setDestination(selectedCourier.city);
+      }
     }
   };
   return (
@@ -802,6 +804,12 @@ export default function ShipmentManager({
                   onChange={(e) => setDestination(e.target.value)}
                   placeholder="Contoh: Jakarta"
                 />
+                {type === "OUTBOUND" &&
+                  destination === orderInfo?.shippingAddress && (
+                    <p className="text-[10px] font-medium text-emerald-600 flex items-center gap-1 mt-1">
+                      ✓ Menggunakan alamat pengiriman Klien
+                    </p>
+                  )}
               </div>
               <div className="space-y-2">
                 <Label>
@@ -1013,8 +1021,25 @@ export default function ShipmentManager({
             {/* 1. Status Selection */}
             <div className="space-y-2">
               <Label>Status Baru</Label>
-              <Select value={statusVal} onValueChange={setStatusVal}>
-                <SelectTrigger>
+              <Select
+                value={statusVal}
+                onValueChange={(val) => {
+                  setStatusVal(val);
+                  const currentShipment = shipments.find(
+                    (s) => s.id === updateStatusId,
+                  );
+
+                  if (currentShipment) {
+                    if (val === "PREPARED" || val === "DISPATCHED") {
+                      setStatusCity(currentShipment.origin || "");
+                    } else if (val === "ARRIVED") {
+                      setStatusCity(currentShipment.destination || "");
+                    } else {
+                      setStatusCity("");
+                    }
+                  }
+                }}>
+                <SelectTrigger className="bg-white">
                   <SelectValue placeholder="Pilih tahapan..." />
                 </SelectTrigger>
                 <SelectContent>
