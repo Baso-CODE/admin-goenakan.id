@@ -102,7 +102,6 @@ export default function EditCashflowClient() {
   const searchParams = useSearchParams();
   const type = searchParams.get("type") || "order";
   const referenceId = params.orderId as string;
-  const orderId = params.orderId as string;
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -392,96 +391,176 @@ export default function EditCashflowClient() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="p-4 space-y-4">
-                    {revenueFields.fields.map((field, index) => (
-                      <div
-                        key={field.id}
-                        className="flex flex-col md:flex-row gap-3 items-start border-b border-dashed pb-4 last:border-0 last:pb-0">
-                        {/* Description */}
-                        <div className="flex-1 w-full">
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                            Description
-                          </label>
-                          <FormField
-                            control={control}
-                            name={`revenueItems.${index}.description`}
-                            render={({ field }) => (
-                              <Input
-                                {...field}
-                                placeholder="Product Name / Service"
-                                className="h-9 text-sm"
+                  <div className="p-4 space-y-5">
+                    {revenueFields.fields.map((field, index) => {
+                      // Ambil mata uang baris ini, default ke baseCurrency
+                      const rowCurrency =
+                        watch(`revenueItems.${index}.currency`) || baseCurrency;
+
+                      return (
+                        <div
+                          key={field.id}
+                          className="flex flex-col gap-4 border border-gray-200 shadow-sm bg-gray-50/30 p-4 rounded-xl">
+                          {/* Deskripsi */}
+                          <div className="w-full">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1.5 block">
+                              Description / Nama Pemasukan
+                            </label>
+                            <FormField
+                              control={control}
+                              name={`revenueItems.${index}.description`}
+                              render={({ field }) => (
+                                <Input
+                                  {...field}
+                                  placeholder="Product Name / Service"
+                                  className="h-10 text-sm bg-white"
+                                />
+                              )}
+                            />
+                          </div>
+
+                          {/* Grid Konversi & Nominal */}
+                          <div className="grid grid-cols-2 lg:grid-cols-12 gap-4 items-end bg-white p-3.5 rounded-lg border border-gray-100 shadow-sm mt-1">
+                            {/* Curr */}
+                            <div className="col-span-1 lg:col-span-2 space-y-1.5">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                Curr{" "}
+                                {isConvertingRate && (
+                                  <Loader2 className="w-2 h-2 animate-spin text-primary" />
+                                )}
+                              </label>
+                              <FormField
+                                control={control}
+                                name={`revenueItems.${index}.currency`}
+                                render={({ field }) => (
+                                  <Select
+                                    onValueChange={(val) =>
+                                      handleCurrencyChange(
+                                        index,
+                                        val,
+                                        "revenue",
+                                      )
+                                    }
+                                    value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger
+                                        className="h-9 text-sm bg-white"
+                                        disabled={isConvertingRate}>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {currencies.map((c) => (
+                                        <SelectItem key={c.code} value={c.code}>
+                                          {c.code}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
                               />
-                            )}
-                          />
-                        </div>
+                            </div>
 
-                        {/* Unit Price Dinamis */}
-                        <div className="w-full md:w-32">
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block uppercase">
-                            Unit Price (
-                            {watch(`revenueItems.${index}.currency`) ||
-                              baseCurrency}
-                            )
-                          </label>
-                          <FormField
-                            control={control}
-                            name={`revenueItems.${index}.unitPrice`}
-                            render={({ field }) => (
-                              <Input
-                                type="number"
-                                {...field}
-                                className="h-9 text-sm text-right"
+                            {/* Unit Price */}
+                            <div className="col-span-1 lg:col-span-3 space-y-1.5">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                Unit Price
+                              </label>
+                              <FormField
+                                control={control}
+                                name={`revenueItems.${index}.unitPrice`}
+                                render={({ field }) => (
+                                  <Input
+                                    type="number"
+                                    {...field}
+                                    className="h-9 text-sm text-right bg-white"
+                                  />
+                                )}
                               />
-                            )}
-                          />
-                        </div>
+                            </div>
 
-                        {/* Qty */}
-                        <div className="w-full md:w-20">
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                            Qty
-                          </label>
-                          <FormField
-                            control={control}
-                            name={`revenueItems.${index}.quantity`}
-                            render={({ field }) => (
-                              <Input
-                                type="number"
-                                {...field}
-                                className="h-9 text-sm text-center"
+                            {/* Rate Otomatis/Manual */}
+                            <div className="col-span-1 lg:col-span-2 space-y-1.5">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                Rate ({baseCurrency})
+                              </label>
+                              <FormField
+                                control={control}
+                                name={`revenueItems.${index}.exchangeRate`}
+                                render={({ field }) => (
+                                  <Input
+                                    type="number"
+                                    {...field}
+                                    className="h-9 text-sm text-right bg-gray-50"
+                                    disabled={
+                                      rowCurrency === baseCurrency ||
+                                      isConvertingRate
+                                    }
+                                  />
+                                )}
                               />
-                            )}
-                          />
-                        </div>
+                            </div>
 
-                        {/* Subtotal (Readonly) */}
-                        <div className="w-full md:w-32 pt-6 text-right">
-                          <span className="text-sm font-semibold text-emerald-700">
-                            {formatCurrency(
-                              (watch(`revenueItems.${index}.unitPrice`) || 0) *
-                                (watch(`revenueItems.${index}.quantity`) || 0) *
-                                (watch(`revenueItems.${index}.exchangeRate`) ||
-                                  1),
-                              baseCurrency,
-                            )}
-                          </span>
-                        </div>
+                            {/* Qty */}
+                            <div className="col-span-1 lg:col-span-2 space-y-1.5">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                Qty
+                              </label>
+                              <FormField
+                                control={control}
+                                name={`revenueItems.${index}.quantity`}
+                                render={({ field }) => (
+                                  <Input
+                                    type="number"
+                                    {...field}
+                                    className="h-9 text-sm text-center bg-white"
+                                  />
+                                )}
+                              />
+                            </div>
 
-                        {/* Delete */}
-                        <div className="pt-6">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 text-muted-foreground hover:text-red-600"
-                            onClick={() => revenueFields.remove(index)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                            {/* Total & Delete */}
+                            <div className="col-span-2 lg:col-span-3 flex justify-end items-center gap-4 h-9">
+                              <div className="flex flex-col items-end leading-none justify-center">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">
+                                  Total {baseCurrency}
+                                </span>
+                                <span className="text-[15px] font-bold text-emerald-600 leading-none">
+                                  {formatCurrency(
+                                    (watch(`revenueItems.${index}.unitPrice`) ||
+                                      0) *
+                                      (watch(
+                                        `revenueItems.${index}.quantity`,
+                                      ) || 0) *
+                                      (watch(
+                                        `revenueItems.${index}.exchangeRate`,
+                                      ) || 1),
+                                    baseCurrency,
+                                  )}
+                                </span>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-gray-400 hover:bg-red-100 hover:text-red-600 shrink-0"
+                                onClick={() => revenueFields.remove(index)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
                         </div>
+                      );
+                    })}
+
+                    {revenueFields.fields.length === 0 && (
+                      <div className="text-center py-10 text-muted-foreground text-sm border-2 border-dashed rounded-xl bg-gray-50">
+                        Belum ada pemasukan diinput.
                       </div>
-                    ))}
+                    )}
                   </div>
-                  <div className="bg-gray-50 p-3 border-t flex justify-center">
+
+                  <div className="bg-gray-50/80 p-4 border-t border-gray-200 flex justify-center rounded-b-lg">
                     <Button
                       type="button"
                       variant="outline"
@@ -497,8 +576,9 @@ export default function EditCashflowClient() {
                           total: 0,
                         })
                       }
-                      className="text-emerald-700 border-emerald-200 hover:bg-emerald-50">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Revenue Item
+                      className="text-emerald-700 border-emerald-200 hover:bg-emerald-50 bg-white shadow-sm">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Tambah Pemasukan
+                      Baru
                     </Button>
                   </div>
                 </CardContent>

@@ -92,6 +92,7 @@ type NoteCategory = {
 interface ShipmentManagerProps {
   type: "INBOUND" | "OUTBOUND";
   orderId: string;
+  orderInfo: any;
   shipments: any[];
   products: any[];
   couriers: any[];
@@ -102,6 +103,7 @@ export default function ShipmentManager({
   type,
   orderId,
   shipments,
+  orderInfo,
   products,
   couriers,
   onUpdate,
@@ -432,6 +434,66 @@ export default function ShipmentManager({
 
     return currentStatuses.find((s) => s.value === val)?.label || val;
   };
+
+  // ✨ LOGIKA CERDAS 1: Auto-fill Origin berdasarkan riwayat
+  const handleOpenCreateDialog = () => {
+    const maxStep =
+      shipments.length > 0 ? Math.max(...shipments.map((s) => s.step || 1)) : 0;
+    const nextStep = maxStep + 1;
+    setStep(nextStep);
+
+    let autoOrigin = "";
+    let autoDest = "";
+
+    if (type === "INBOUND") {
+      if (nextStep === 1) {
+        // Step 1 Inbound: Asal (Origin) = Kota Vendor Produksi (Pabrik)
+        const prodVendorId = products?.[0]?.productionTrackers?.[0]?.vendorId;
+        const prodVendor = couriers.find((v) => v.id === prodVendorId);
+        autoOrigin = prodVendor?.city || "";
+      } else {
+        // Step Lanjutan Inbound: Asal (Origin) = Tujuan dari Step sebelumnya
+        const prevShip = shipments.find((s) => s.step === nextStep - 1);
+        if (prevShip) autoOrigin = prevShip.destination || "";
+      }
+    } else if (type === "OUTBOUND") {
+      if (nextStep === 1) {
+        // Step 1 Outbound: Asal (Origin) = Tujuan akhir dari INBOUND (Gudang)
+        const inboundShips =
+          orderInfo?.shipments?.filter((s: any) => s.type === "INBOUND") || [];
+        const maxInbound =
+          inboundShips.length > 0
+            ? Math.max(...inboundShips.map((s: any) => s.step))
+            : 0;
+        const lastInbound = inboundShips.find(
+          (s: any) => s.step === maxInbound,
+        );
+
+        autoOrigin = lastInbound?.destination || "";
+        // Default Tujuan Outbound diarahkan ke Alamat Klien
+        autoDest = orderInfo?.shippingAddress || "";
+      } else {
+        // Step Lanjutan Outbound: Asal (Origin) = Tujuan dari Step sebelumnya
+        const prevShip = shipments.find((s) => s.step === nextStep - 1);
+        if (prevShip) autoOrigin = prevShip.destination || "";
+        // Default Tujuan Outbound diarahkan ke Alamat Klien
+        autoDest = orderInfo?.shippingAddress || "";
+      }
+    }
+
+    setOrigin(autoOrigin);
+    setDestination(autoDest);
+    setIsOpen(true);
+  };
+
+  const handleVendorChange = (selectedVendorId: string) => {
+    setVendorId(selectedVendorId);
+
+    const selectedCourier = couriers.find((c) => c.id === selectedVendorId);
+    if (selectedCourier?.city) {
+      setDestination(selectedCourier.city);
+    }
+  };
   return (
     <div className="space-y-6">
       <Card
@@ -454,14 +516,7 @@ export default function ShipmentManager({
             </CardDescription>
           </div>
           <Button
-            onClick={() => {
-              const maxStep =
-                shipments.length > 0
-                  ? Math.max(...shipments.map((s) => s.step || 1))
-                  : 0;
-              setStep(maxStep + 1);
-              setIsOpen(true);
-            }}
+            onClick={handleOpenCreateDialog}
             className="bg-primary hover:bg-primary/90">
             <Plus className="mr-2 h-4 w-4" /> Buat Pengiriman
           </Button>
@@ -715,7 +770,7 @@ export default function ShipmentManager({
 
               <div className="space-y-2 md:col-span-2">
                 <Label>Ekspedisi / Vendor</Label>
-                <Select value={vendorId} onValueChange={setVendorId}>
+                <Select value={vendorId} onValueChange={handleVendorChange}>
                   <SelectTrigger className="bg-white">
                     <SelectValue placeholder="Pilih Kurir/Vendor..." />
                   </SelectTrigger>

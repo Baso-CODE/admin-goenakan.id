@@ -193,6 +193,7 @@ export default function LogisticsTrackingDetail() {
           <ShipmentManager
             type="INBOUND"
             orderId={order.id}
+            orderInfo={order}
             shipments={
               order.shipments?.filter((s: any) => s.type === "INBOUND") || []
             }
@@ -207,6 +208,7 @@ export default function LogisticsTrackingDetail() {
           <ShipmentManager
             type="OUTBOUND"
             orderId={order.id}
+            orderInfo={order}
             shipments={
               order.shipments?.filter((s: any) => s.type === "OUTBOUND") || []
             }
