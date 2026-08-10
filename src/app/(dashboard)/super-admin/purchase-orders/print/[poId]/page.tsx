@@ -106,17 +106,23 @@ export default function PurchaseOrderPrint() {
   // PREPARE VARIABLES DARI DATA PO
   // =========================================================
   const vendorName = data.vendor?.companyName || "-";
-  const vendorAddress = data.vendorAddress || data.vendor?.address || "-";
+  const vendorPic = data.vendor?.picName || "-";
 
-  // Mencari kontak utama vendor jika ada
-  let vendorPhone = "-";
-  let vendorEmail = "-";
-  if (data.vendor?.contacts && data.vendor.contacts.length > 0) {
-    const primaryContact =
-      data.vendor.contacts.find((c: any) => c.isPrimary) ||
-      data.vendor.contacts[0];
-    vendorPhone = primaryContact.contactId || "-"; // Asumsi contactId berisi nomor telp/email
-  }
+  // 1. Merangkai Alamat Lengkap Vendor
+  const v = data.vendor || {};
+  const addressLine1 = v.address || "";
+  const addressLine2 = [v.subDistrict, v.district].filter(Boolean).join(", ");
+  const addressLine3 = [v.city, v.province, v.country]
+    .filter(Boolean)
+    .join(", ");
+  const postalCode = v.postalCode ? ` - ${v.postalCode}` : "";
+  const fullAddress3 = `${addressLine3}${postalCode}`;
+
+  const vendorContacts = v.contacts
+    ? [...v.contacts].sort((a: any, b: any) =>
+        b.isPrimary === a.isPrimary ? 0 : b.isPrimary ? 1 : -1,
+      )
+    : [];
 
   const grandTotal = Number(data.totalAmount) || 0;
 
@@ -145,7 +151,7 @@ export default function PurchaseOrderPrint() {
           style={{
             width: "210mm",
             minHeight: "297mm", // Ukuran A4
-            padding: "15mm 15mm",
+            padding: "10mm 10mm",
             display: "flex",
             flexDirection: "column",
           }}>
@@ -155,34 +161,61 @@ export default function PurchaseOrderPrint() {
               <h1 className="text-2xl font-extrabold tracking-wide">
                 PURCHASE ORDER
               </h1>
-              {/* Ganti src dengan logo perusahaanmu (misal dari folder public/images) */}
               <img
-                src="/images/logo.png"
+                src="/images/logo-gd.png"
                 alt="Company Logo"
-                className="h-8 object-contain"
+                className="h-14 object-contain"
                 crossOrigin="anonymous"
               />
             </div>
 
             {/* 2. KOTAK INFO PERUSAHAAN (Kiri Atas) */}
-            <div className="w-1/2 border border-black p-2 mb-4 text-center font-medium">
-              <div className="font-bold">PT Nama Perusahaan Kamu</div>
-              <div>Jalan Alamat Perusahaan No. 123, Kota, Kodepos</div>
-              <div>PHONE : +6281234567890</div>
-              <div>EMAIL : info@perusahaan.com</div>
+            <div className="w-1/2 border border-black p-2 mb-4 text-start font-medium leading-relaxed">
+              <div className="font-bold text-[12px] mb-1">
+                Goenakan Indonesia
+              </div>
+              <div>Jl. Darmo Baru Barat I No. 35</div>
+              <div>Sonokwijenan, Sukomanunggal</div>
+              <div>Surabaya, Jawa Timur, Indonesia - 60189</div>
+              <div className="mt-1">PHONE : +62 823-8790-2238</div>
+              <div>EMAIL : goenakan.id@gmail.com</div>
             </div>
 
             {/* 3. GRID 3 KOLOM INFO PO */}
             <div className="grid grid-cols-3 border-t border-l border-r border-black mb-4">
-              {/* Kolom 1: Vendor */}
               <div className="border-r border-black p-2 flex flex-col gap-1">
                 <div className="flex">
-                  <span className="w-20">VENDOR:</span>{" "}
-                  <span>{vendorName}</span>
+                  <span className="w-14 font-bold">VENDOR:</span>{" "}
+                  <span className="font-bold uppercase">{vendorName}</span>
                 </div>
-                <div className="uppercase">{vendorAddress}</div>
-                <div>{vendorPhone}</div>
-                <div>{vendorEmail}</div>
+                <div className="uppercase">UP: {vendorPic}</div>
+
+                {/* Menampilkan Alamat Vendor Terangkai */}
+                <div className="uppercase mt-1 leading-snug">
+                  {addressLine1 && <div>{addressLine1}</div>}
+                  {addressLine2 && <div>{addressLine2}</div>}
+                  {fullAddress3 && <div>{fullAddress3}</div>}
+                  {!addressLine1 && !addressLine2 && !fullAddress3 && (
+                    <div>-</div>
+                  )}
+                </div>
+
+                {/* ✨ UPDATE: Menampilkan Kontak Secara Dinamis */}
+                <div className="mt-1">
+                  {vendorContacts.length > 0 ? (
+                    vendorContacts.map((contact: any, idx: number) => (
+                      <div key={idx} className="uppercase flex gap-1">
+                        {/* Menampilkan Nama Platform, contoh: INSTAGRAM : */}
+                        <span className="w-16">
+                          {contact.platform?.name || "CONTACT"}
+                        </span>
+                        <span>: {contact.contactId}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div>CONTACT : -</div>
+                  )}
+                </div>
               </div>
 
               {/* Kolom 2: PO Detail */}
@@ -257,14 +290,27 @@ export default function PurchaseOrderPrint() {
                       </td>
                       <td className="border-r border-black py-1 px-2">
                         <div className="font-semibold">{item.itemName}</div>
+
+                        {item.variant?.variantName && (
+                          <div className="text-[10px] text-gray-700 font-semibold mt-0.5">
+                            Varian: {item.variant.variantName}
+                          </div>
+                        )}
+
                         {item.selectedAttributes &&
                           Object.keys(item.selectedAttributes).length > 0 && (
                             <div className="text-[10px] text-gray-600 mt-0.5">
-                              {Object.values(item.selectedAttributes).join(
-                                ", ",
-                              )}
+                              {Object.entries(item.selectedAttributes)
+                                .map(([key, val]) => `${key}: ${val}`)
+                                .join(", ")}
                             </div>
                           )}
+
+                        {item.remarks && (
+                          <div className="text-[10px] text-gray-500 italic mt-0.5">
+                            Note: {item.remarks}
+                          </div>
+                        )}
                       </td>
                       <td className="border-r border-black py-1 px-2 text-center">
                         {itemQty}
@@ -374,18 +420,26 @@ export default function PurchaseOrderPrint() {
                 <div className="text-center py-1 border-b border-black font-medium">
                   Acknowledged & Approved by
                 </div>
-                <div className="flex-1 flex justify-between px-6 pt-16 pb-2 text-center">
-                  <div className="flex flex-col items-center">
-                    <div className="border-b border-black w-32 mb-1 font-bold">
+
+                <div className="flex-1 flex justify-between gap-3 px-2 pt-20 pb-2 text-center">
+                  {/* Tanda Tangan 1: Menggunakan w-1/2 agar lebarnya pas 50% dari ruang yang tersisa */}
+                  <div className="flex flex-col items-center w-1/2">
+                    <div className="border-b border-black w-full mb-1 font-bold">
                       Manager 1
                     </div>
-                    <div className="text-[9px]">Procurement Manager</div>
+                    <div className="text-[9px] leading-tight">
+                      Procurement Manager
+                    </div>
                   </div>
-                  <div className="flex flex-col items-center">
-                    <div className="border-b border-black w-32 mb-1 font-bold">
+
+                  {/* Tanda Tangan 2: Menggunakan w-1/2 */}
+                  <div className="flex flex-col items-center w-1/2">
+                    <div className="border-b border-black w-full mb-1 font-bold">
                       Manager 2
                     </div>
-                    <div className="text-[9px]">Group Procurement Manager</div>
+                    <div className="text-[9px] leading-tight">
+                      Group Procurement Manager
+                    </div>
                   </div>
                 </div>
               </div>
