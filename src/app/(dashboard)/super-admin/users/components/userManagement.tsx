@@ -22,7 +22,6 @@ import {
 
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
-import TableRole from "./tableRole";
 
 // --- Definisi Tipe (Sesuai dengan balikan dari UserService backend) ---
 interface User {
@@ -255,15 +254,6 @@ export default function UserManagementPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* ========================================== */}
-      {/* BAGIAN 2: TABEL ROLE MANAGEMENT            */}
-      {/* ========================================== */}
-      <hr className="border-dashed border-gray-300 my-8" />
-
-      <div id="roles-section">
-        <TableRole />
       </div>
     </div>
   );

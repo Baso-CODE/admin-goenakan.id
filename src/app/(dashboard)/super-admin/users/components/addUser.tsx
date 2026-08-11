@@ -28,7 +28,6 @@ export default function AddUser() {
       formData.append("password", data.password);
       formData.append("roleId", data.roleId);
 
-      // Pastikan string "image" ini sama persis dengan yang diatur di upload.single("image") di Router Backend
       if (file) {
         formData.append("image", file);
       }
@@ -36,7 +35,6 @@ export default function AddUser() {
       const res = await fetchApi("/users", {
         method: "POST",
         body: formData,
-        // Jangan set headers "Content-Type", biarkan browser yang atur multipart/form-data
       });
 
       if (!res.ok) {
