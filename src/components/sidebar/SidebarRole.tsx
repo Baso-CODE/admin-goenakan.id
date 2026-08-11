@@ -12,8 +12,8 @@ import {
 } from "@/components/ui/sidebar";
 import { useSession } from "next-auth/react";
 
-// === ICONS ===
-import { checkAccess } from "@/lib/roleAccess";
+import { checkPermission } from "@/lib/roleAccess";
+
 import {
   AlignHorizontalDistributeStart,
   AudioWaveform,
@@ -45,24 +45,43 @@ import { TeamSwitcher } from "./team-switcher";
 export default function SidebarRole({ ...props }) {
   const { data: session } = useSession();
 
-  // Ambil role langsung dari session (string)
+  const userPermissions = (session?.user as any)?.permissions || [];
   const role = (session?.user?.role as string) || "";
 
-  // === FUNGSI FILTER DINAMIS ===
-  const getVisibleItems = (items: any[]) => {
-    return items
-      .map((group) => ({
-        ...group,
-        items: group.items?.filter((item: any) => checkAccess(role, item.url)),
-      }))
-      .filter((group) => group.items?.length > 0);
+  const getPermissionFromMenuUrl = (url: string): string | null => {
+    if (!url || url === "#") return null;
+
+    // Pecah URL berdasarkan garis miring
+    const segments = url.split("/").filter(Boolean);
+    if (segments.length === 0) return null;
+
+    const filteredSegments = segments.filter(
+      (seg) =>
+        ![
+          "super-admin",
+          "admin",
+          "dashboard",
+          "admin-invoice",
+          "admin-article",
+        ].includes(seg),
+    );
+
+    if (filteredSegments.length === 0) return null;
+
+    let rawModule = filteredSegments[0];
+
+    let cleanModule = rawModule.replace(/-/g, "_");
+    if (cleanModule.endsWith("s")) {
+      cleanModule = cleanModule.slice(0, -1);
+    }
+
+    return `read_${cleanModule}`;
   };
 
-  // === BASE DATA ===
   const data = {
     user: {
-      name: session?.user.name || "Super Admin",
-      email: session?.user.email || "admin@example.com",
+      name: session?.user.name || "User",
+      email: session?.user.email || "user@example.com",
       avatar: "/avatars/shadcn.jpg",
     },
     teams: [
@@ -272,22 +291,13 @@ export default function SidebarRole({ ...props }) {
             title: "Testimonials & Photos",
             url: "/super-admin/content/testimonials",
           },
-          {
-            title: "Faqs",
-            url: "/super-admin/content/faqs",
-          },
+          { title: "Faqs", url: "/super-admin/content/faqs" },
           {
             title: "Best Price Guarantee",
             url: "/super-admin/content/best-price-guarantee",
           },
-          {
-            title: "Policies",
-            url: "/super-admin/content/policies",
-          },
-          {
-            title: "Portfolios",
-            url: "/super-admin/content/portfolios",
-          },
+          { title: "Policies", url: "/super-admin/content/policies" },
+          { title: "Portfolios", url: "/super-admin/content/portfolios" },
           {
             title: "Event Categories",
             url: "/super-admin/content/event-categories",
@@ -324,6 +334,20 @@ export default function SidebarRole({ ...props }) {
     dashboard: [{ name: "Main Dashboard", url: "/dashboard", icon: Frame }],
   };
 
+  // === FUNGSI FILTER OTOMATIS BERDASARKAN URL ===
+  const getVisibleItems = (items: any[]) => {
+    return items.filter((group) => {
+      // Ambil URL pertama dari sub-item di dalam grup menu
+      const firstSubUrl = group.items?.[0]?.url || group.url;
+      const inferredPermission = getPermissionFromMenuUrl(firstSubUrl);
+
+      if (inferredPermission) {
+        return checkPermission(userPermissions, inferredPermission, role);
+      }
+      return true;
+    });
+  };
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -331,58 +355,56 @@ export default function SidebarRole({ ...props }) {
       </SidebarHeader>
 
       <SidebarContent>
-        {checkAccess(role, "/super-admin") && (
-          <SidebarGroup>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Sales Dashboard">
-                  <Link href="/super-admin">
-                    <LucideChartNetwork />
-                    <span>Sales Dashboard</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-        )}
+        {/* Main Dashboard */}
+        <SidebarGroup>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Main Dashboard">
+                <Link href="/">
+                  <Frame />
+                  <span>Main Dashboard</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
 
         {/* -- SECTION DINAMIS -- */}
-        {(() => {
-          const orderItems = getVisibleItems(data.navOrder);
-          return orderItems.length > 0 ? (
-            <NavMain label="Order Management" items={orderItems} />
-          ) : null;
-        })()}
+        {getVisibleItems(data.navOrder).length > 0 && (
+          <NavMain
+            label="Order Management"
+            items={getVisibleItems(data.navOrder)}
+          />
+        )}
 
-        {(() => {
-          const dbItems = getVisibleItems(data.navDatabase);
-          return dbItems.length > 0 ? (
-            <NavMain label="Database" items={dbItems} />
-          ) : null;
-        })()}
+        {getVisibleItems(data.navDatabase).length > 0 && (
+          <NavMain label="Database" items={getVisibleItems(data.navDatabase)} />
+        )}
 
-        {(() => {
-          const userItems = getVisibleItems(data.navUserManagement);
-          return userItems.length > 0 ? (
-            <NavMain label="User Management" items={userItems} />
-          ) : null;
-        })()}
+        {getVisibleItems(data.navUserManagement).length > 0 && (
+          <NavMain
+            label="User Management"
+            items={getVisibleItems(data.navUserManagement)}
+          />
+        )}
 
-        {(() => {
-          const marketingItems = getVisibleItems(data.navMarketing);
-          return marketingItems.length > 0 ? (
-            <NavMain label="Marketing & Content" items={marketingItems} />
-          ) : null;
-        })()}
+        {getVisibleItems(data.navMarketing).length > 0 && (
+          <NavMain
+            label="Marketing & Content"
+            items={getVisibleItems(data.navMarketing)}
+          />
+        )}
 
-        {/* -- SECTION ETC (BARU DITAMBAHKAN) -- */}
+        {/* -- SECTION ETC -- */}
         {(() => {
-          // Kita filter dulu item Etc berdasarkan role access
-          const etcItems = data.Etc.filter((item) =>
-            checkAccess(role, item.url),
-          );
+          const etcItems = data.Etc.filter((item) => {
+            const inferredPermission = getPermissionFromMenuUrl(item.url);
+            if (inferredPermission) {
+              return checkPermission(userPermissions, inferredPermission, role);
+            }
+            return true;
+          });
 
-          // Jika ada item yang bisa diakses, maka render menunya
           return etcItems.length > 0 ? (
             <SidebarGroup>
               <SidebarMenu>
@@ -391,7 +413,9 @@ export default function SidebarRole({ ...props }) {
                     <SidebarMenuButton asChild tooltip={item.name}>
                       <Link href={item.url}>
                         <item.icon />
-                        <span>{item.name}</span>
+                        <span>
+                          <span>{item.name}</span>
+                        </span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

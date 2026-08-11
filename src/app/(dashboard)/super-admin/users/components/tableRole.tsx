@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Search, ShieldCheck, Trash2 } from "lucide-react";
+import { KeyRound, Pencil, Search, ShieldCheck, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -110,7 +110,7 @@ export default function TableRole() {
       }
 
       toast.success("Role berhasil dihapus!");
-      fetchRoles(); // Refresh data
+      fetchRoles();
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -171,7 +171,7 @@ export default function TableRole() {
                   <TableHead className="w-32 text-center">
                     Total Users
                   </TableHead>
-                  <TableHead className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] w-32">
+                  <TableHead className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] w-40">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -190,7 +190,7 @@ export default function TableRole() {
                         <Skeleton className="h-5 w-16 mx-auto" />
                       </TableCell>
                       <TableCell className="sticky right-0 bg-white">
-                        <Skeleton className="h-8 w-16 mx-auto" />
+                        <Skeleton className="h-8 w-24 mx-auto" />
                       </TableCell>
                     </TableRow>
                   ))
@@ -234,18 +234,31 @@ export default function TableRole() {
                         </TableCell>
 
                         <TableCell className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)]">
-                          <div className="flex items-center justify-center gap-2">
+                          <div className="flex items-center justify-center gap-1">
+                            {/* ✨ Tombol Atur Akses / Permissions */}
+                            <Link
+                              href={`/super-admin/users/roles/permissions/${role.id}`}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                title="Manage Permissions">
+                                <KeyRound className="h-4 w-4" />
+                              </Button>
+                            </Link>
+
                             {/* Tombol Edit */}
                             <Link href={`/super-admin/roles/edit/${role.id}`}>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50">
+                                className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                title="Edit Role">
                                 <Pencil className="h-4 w-4" />
                               </Button>
                             </Link>
 
-                            {/* Tombol Delete (Disembunyikan untuk SUPER_ADMIN atau jika ada usernya) */}
+                            {/* Tombol Delete */}
                             <Button
                               variant="ghost"
                               size="icon"

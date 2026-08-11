@@ -1,4 +1,3 @@
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { sign } from "jsonwebtoken";
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -6,7 +5,7 @@ import { comparePassword } from "./argon";
 import { prisma } from "./prisma";
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  // adapter: PrismaAdapter(prisma),
 
   providers: [
     CredentialsProvider({
@@ -20,10 +19,16 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email dan password wajib diisi");
         }
 
-        // PERUBAHAN: Tambahkan include: { role: true } untuk mengambil data relasi
+        // ✨ PERUBAHAN: Include relasi role dan permissions dari database
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
-          include: { role: true },
+          include: {
+            role: {
+              include: {
+                permissions: true,
+              },
+            },
+          },
         });
 
         if (!user || !user.password) {
@@ -39,12 +44,16 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Password salah");
         }
 
+        const userPermissions =
+          user.role?.permissions?.map((p) => p.name) || [];
+
         return {
           id: user.id,
           name: user.name,
           email: user.email,
-          // PERUBAHAN: Ambil properti 'name' dari objek role, dengan fallback aman
           role: user.role?.name || "CUSTOMER",
+          roleId: user.roleId,
+          permissions: userPermissions,
         };
       },
     }),
@@ -54,12 +63,18 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = user.role; // Ini sekarang akan berisi string seperti "SUPER_ADMIN"
+        token.role = user.role;
+        token.roleId = user.roleId;
+        token.permissions = user.permissions;
 
-        // Jangan membuat token JWT baru di dalam callback jwt
-        // jika strategy-nya sudah "jwt", biarkan NextAuth mengelola sign-nya
         token.accessToken = sign(
-          { id: user.id, email: user.email, role: user.role },
+          {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            roleId: user.roleId,
+            permissions: user.permissions,
+          },
           process.env.NEXTAUTH_SECRET!,
           { expiresIn: "7d" },
         );
@@ -70,6 +85,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        session.user.roleId = token.roleId as string;
+        (session.user as any).permissions = token.permissions;
         session.user.accessToken = token.accessToken as string;
       }
       return session;
