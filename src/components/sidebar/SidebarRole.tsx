@@ -356,18 +356,20 @@ export default function SidebarRole({ ...props }) {
 
       <SidebarContent>
         {/* Main Dashboard */}
-        <SidebarGroup>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Main Dashboard">
-                <Link href="/">
-                  <Frame />
-                  <span>Main Dashboard</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
+        {role === "SUPER_ADMIN" && (
+          <SidebarGroup>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Main Dashboard">
+                  <Link href="/super-admin/">
+                    <Frame />
+                    <span>Main Dashboard</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+        )}
 
         {/* -- SECTION DINAMIS -- */}
         {getVisibleItems(data.navOrder).length > 0 && (
