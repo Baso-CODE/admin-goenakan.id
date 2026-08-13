@@ -549,9 +549,6 @@ export default function AddPurchaseOrderForm() {
                         <SelectItem value="DIRECT_EXPENSES">
                           Direct Expenses (SO Based)
                         </SelectItem>
-                        <SelectItem value="INDIRECT_EXPENSES">
-                          Indirect Expenses (Non-SO)
-                        </SelectItem>
                         <SelectItem value="STOCK">Stock (Inventory)</SelectItem>
                       </SelectContent>
                     </Select>
