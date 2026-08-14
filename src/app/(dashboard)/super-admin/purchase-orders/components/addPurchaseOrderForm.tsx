@@ -1,24 +1,4 @@
 "use client";
-
-import { zodResolver } from "@hookform/resolvers/zod";
-import { format } from "date-fns";
-import {
-  CalendarIcon,
-  Check,
-  ChevronsUpDown,
-  DollarSign,
-  Loader2,
-  PlusCircle,
-  Settings2,
-  ShoppingBag,
-  Trash2,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
-import { toast } from "sonner";
-import * as z from "zod";
-
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,41 +32,72 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { format } from "date-fns";
+import {
+  Calendar as CalendarIcon,
+  Check,
+  ChevronsUpDown,
+  DollarSign,
+  Loader2,
+  PlusCircle,
+  Settings2,
+  ShoppingBag,
+  Trash2,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
+import { toast } from "sonner";
+import * as z from "zod";
 
 // ==========================================
 // ZOD SCHEMA UNTUK FORM VALIDATION
 // ==========================================
-const purchaseOrderSchema = z.object({
-  poDate: z.string().min(1, "Date is required"),
-  poNumber: z.string().optional(),
-  purchaseType: z.enum(["DIRECT_MATERIAL", "DIRECT_EXPENSES", "STOCK"]),
-  expenseCategory: z.enum(["PRODUCT", "PACKAGING", "LOGISTIC", "UTILITY"]),
-  paymentTerms: z.enum(["IMMEDIATELY", "NET_14", "NET_30", "NET_60"]),
-  vendorId: z.string().min(1, "Vendor is required"),
-  currencyCode: z.string().optional(),
-  notes: z.string().optional(),
-  items: z
-    .array(
-      z.object({
-        itemName: z.string().min(1, "Item name is required"),
-        productId: z.string().optional(),
-        variantId: z.string().optional(),
-        selectedAttributes: z.record(z.string(), z.string()).optional(),
-        orderId: z.string().optional(),
-        replacementOrderId: z.string().optional(),
-        quantityOrder: z.number().min(1),
-        quantityStock: z.number().min(0),
-        quantityPurchase: z.number().min(0),
-        uom: z.string().min(1, "UOM is required"),
-        unitPrice: z.number().positive("Harga harus positif"),
-        remarks: z.string().optional(),
-      }),
-    )
-    .min(1, "Minimal 1 item dibutuhkan"),
+const baseItemSchema = z.object({
+  itemName: z.string().min(1, "Item name is required"),
+  productId: z.string().optional(),
+  variantId: z.string().optional(),
+  vendorItemId: z.string().optional(),
+  selectedAttributes: z.record(z.string(), z.string()).optional(),
+  orderId: z.string().optional(),
+  replacementOrderId: z.string().optional(),
+  quantityOrder: z.number().min(1),
+  quantityStock: z.number().min(0),
+  quantityPurchase: z.number().min(0),
+  uom: z.string().min(1, "UOM is required"),
+  unitPrice: z.number().positive("Harga harus positif"),
+  remarks: z.string().optional(),
 });
+
+const purchaseOrderSchema = z
+  .object({
+    poDate: z.string().min(1, "Date is required"),
+    poNumber: z.string().optional(),
+    purchaseType: z.enum(["DIRECT_MATERIAL", "DIRECT_EXPENSES", "STOCK"]),
+    expenseCategory: z.enum(["PRODUCT", "PACKAGING", "LOGISTIC", "UTILITY"]),
+    paymentTerms: z.enum(["IMMEDIATELY", "NET_14", "NET_30", "NET_60"]),
+    vendorId: z.string().min(1, "Vendor is required"),
+    currencyCode: z.string().optional(),
+    notes: z.string().optional(),
+    items: z.array(baseItemSchema).min(1, "Minimal 1 item dibutuhkan"),
+  })
+  .superRefine((data, ctx) => {
+    // Validasi: Jika kategori PRODUCT, referensi SO/REP Wajib diisi!
+    if (data.expenseCategory === "PRODUCT") {
+      data.items.forEach((item, index) => {
+        if (!item.orderId && !item.replacementOrderId) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Reference SO/REP is Wajib for PRODUCT expense",
+            path: ["items", index, "orderId"],
+          });
+        }
+      });
+    }
+  });
 
 type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
 
@@ -100,13 +111,22 @@ type ReplacementRef = {
   referenceOrderId?: string;
 };
 
-const UOM_OPTIONS = ["pcs", "ctn", "ea", "kg", "liter", "pack", "roll"];
+const UOM_OPTIONS = [
+  "pcs",
+  "ctn",
+  "ea",
+  "kg",
+  "liter",
+  "pack",
+  "roll",
+  "lot",
+  "trip",
+];
 
 export default function AddPurchaseOrderForm() {
   const { fetchApi, status } = useApi();
   const router = useRouter();
 
-  // ✨ STATE TAB UTAMA: Membedakan mode SO atau REP untuk seluruh form
   const [poCategory, setPoCategory] = useState<"SO" | "REP">("SO");
 
   const form = useForm<PurchaseOrderFormValues>({
@@ -125,6 +145,7 @@ export default function AddPurchaseOrderForm() {
           itemName: "",
           productId: "",
           variantId: "",
+          vendorItemId: "",
           selectedAttributes: {},
           orderId: "",
           replacementOrderId: "",
@@ -161,34 +182,57 @@ export default function AddPurchaseOrderForm() {
   const [openOrderCombobox, setOpenOrderCombobox] = useState<
     Record<number, boolean>
   >({});
+  const [openVendorItemCombobox, setOpenVendorItemCombobox] = useState<
+    Record<number, boolean>
+  >({});
 
   const selectedExpenseCategory = watch("expenseCategory");
+  const selectedVendorId = watch("vendorId");
 
+  const isProductExpense = selectedExpenseCategory === "PRODUCT";
+
+  const availableVendorItems = useMemo(() => {
+    if (isProductExpense || !selectedVendorId) return [];
+    const currentVendor = vendors.find((v) => v.id === selectedVendorId);
+    return currentVendor?.vendorItems?.map((vi: any) => vi.item) || [];
+  }, [selectedVendorId, vendors, isProductExpense]);
+
+  // ✨ LOGIKA FILTER VENDOR YANG DIPERBAIKI
   const filteredVendors = useMemo(() => {
-    if (selectedExpenseCategory === "PRODUCT") {
+    if (isProductExpense) {
       return vendors.filter((v: any) => v.types && v.types.includes("PRODUCT"));
+    } else {
+      return vendors.filter((v: any) => v.types && v.types.includes("SERVICE"));
     }
-    return vendors;
-  }, [vendors, selectedExpenseCategory]);
+  }, [vendors, isProductExpense]);
 
   useEffect(() => {
-    const currentVendorId = getValues("vendorId");
-    if (currentVendorId) {
+    if (selectedVendorId) {
       const isStillValid = filteredVendors.some(
-        (v) => v.id === currentVendorId,
+        (v) => v.id === selectedVendorId,
       );
       if (!isStillValid) {
         setValue("vendorId", "");
+        fields.forEach((_, index) => {
+          setValue(`items.${index}.vendorItemId`, "");
+          if (!isProductExpense) setValue(`items.${index}.itemName`, "");
+        });
       }
     }
-  }, [selectedExpenseCategory, filteredVendors, getValues, setValue]);
+  }, [
+    selectedExpenseCategory,
+    filteredVendors,
+    setValue,
+    selectedVendorId,
+    fields,
+    isProductExpense,
+  ]);
 
   useEffect(() => {
     async function loadMasterData() {
       if (status !== "authenticated") return;
       try {
         setLoadingData(true);
-        // Load dua-duanya sekaligus agar admin bisa pindah Tab dengan cepat
         const [resV, resCur, resP, resO, resRep] = await Promise.all([
           fetchApi("/vendors/order/add"),
           fetchApi("/currencies"),
@@ -233,13 +277,20 @@ export default function AddPurchaseOrderForm() {
         ...data,
         items: data.items.map((item) => ({
           ...item,
-          productId: item.productId || undefined,
-          // Pastikan referensi silang dibersihkan berdasarkan Tab yang aktif
+          productId: isProductExpense ? item.productId || undefined : undefined,
+          vendorItemId: !isProductExpense
+            ? item.vendorItemId || undefined
+            : undefined,
+          // ✨ PERBAIKAN: Selalu simpan referensi order ke database meskipun untuk layanan jasa
           orderId: poCategory === "SO" ? item.orderId || undefined : undefined,
           replacementOrderId:
             poCategory === "REP"
               ? item.replacementOrderId || undefined
               : undefined,
+          selectedAttributes: isProductExpense
+            ? item.selectedAttributes
+            : undefined,
+          variantId: isProductExpense ? item.variantId : undefined,
         })),
       };
 
@@ -267,7 +318,6 @@ export default function AddPurchaseOrderForm() {
     setValue(`items.${index}.quantityPurchase`, qtyPurchase);
   };
 
-  // ✨ FUNGSI AUTO-FILL (Dukungan Cerdas untuk Multi-Vendor)
   const handleAutoFillFromReference = async (
     refType: "SO" | "REP",
     refId: string,
@@ -276,7 +326,7 @@ export default function AddPurchaseOrderForm() {
     try {
       let originalItems = [];
       let suggestedVendorId = "";
-      let vendorCount = 0; // Tambahan: Untuk menghitung jumlah vendor di histori
+      let vendorCount = 0;
 
       if (refType === "SO") {
         const res = await fetchApi(`/orders/${refId}`);
@@ -286,8 +336,8 @@ export default function AddPurchaseOrderForm() {
 
         originalItems = orderData.products || [];
         if (orderData.vendors && orderData.vendors.length > 0) {
-          suggestedVendorId = orderData.vendors[0].id; // Ambil vendor urutan pertama
-          vendorCount = orderData.vendors.length; // Simpan total vendor
+          suggestedVendorId = orderData.vendors[0].id;
+          vendorCount = orderData.vendors.length;
         }
       } else if (refType === "REP") {
         const resRep = await fetchApi(`/replacement-orders/${refId}`);
@@ -304,8 +354,8 @@ export default function AddPurchaseOrderForm() {
             const soData = detailSo.data || detailSo;
 
             if (soData.vendors && soData.vendors.length > 0) {
-              suggestedVendorId = soData.vendors[0].id; // Ambil vendor urutan pertama
-              vendorCount = soData.vendors.length; // Simpan total vendor
+              suggestedVendorId = soData.vendors[0].id;
+              vendorCount = soData.vendors.length;
             }
           }
         }
@@ -316,31 +366,15 @@ export default function AddPurchaseOrderForm() {
         return;
       }
 
-      console.log("=== DEBUGGING AUTO-FILL ===");
-      console.log("1. Data Asli Item Pertama dari API:", originalItems[0]);
-      console.log("2. Apakah productId ada?", originalItems[0].productId);
-      console.log("3. Data Master Products:", products);
-      // ✨ LOGIKA NOTIFIKASI MULTI-VENDOR
       if (suggestedVendorId) {
         setValue("vendorId", suggestedVendorId);
-
-        // Jika vendor lebih dari 1, berikan peringatan khusus
         if (vendorCount > 1) {
           toast.success(
-            `Ditemukan ${vendorCount} vendor pada pesanan asli. Vendor pertama diisi otomatis. Silakan ubah secara manual jika ingin menggunakan vendor alternatif.`,
+            `Ditemukan ${vendorCount} vendor pada pesanan asli. Vendor pertama diisi otomatis.`,
           );
         } else {
-          // Jika hanya 1 vendor, tampilkan pesan sukses biasa
-          toast.success(
-            refType === "SO"
-              ? "Vendor berhasil ditarik dari riwayat SO."
-              : "Vendor otomatis ditarik dari riwayat pesanan aslinya.",
-          );
+          toast.success("Vendor berhasil ditarik otomatis.");
         }
-      } else {
-        toast.info(
-          "Tidak ada riwayat vendor sebelumnya, silakan pilih manual.",
-        );
       }
 
       const mapItemToForm = (item: any) => {
@@ -397,7 +431,6 @@ export default function AddPurchaseOrderForm() {
             Create Purchase Order
           </CardTitle>
 
-          {/* ✨ TAB PALING ATAS: Pemilih Mode PO */}
           <div className="flex p-1 space-x-1 bg-slate-100/80 rounded-lg w-full md:w-fit border border-slate-200">
             <button
               type="button"
@@ -474,11 +507,11 @@ export default function AddPurchaseOrderForm() {
                           selected={
                             field.value ? new Date(field.value) : undefined
                           }
-                          onSelect={(date) => {
+                          onSelect={(date) =>
                             field.onChange(
                               date ? format(date, "yyyy-MM-dd") : "",
-                            );
-                          }}
+                            )
+                          }
                           initialFocus
                         />
                       </PopoverContent>
@@ -487,6 +520,7 @@ export default function AddPurchaseOrderForm() {
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={control}
                 name="poNumber"
@@ -504,6 +538,7 @@ export default function AddPurchaseOrderForm() {
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={control}
                 name="currencyCode"
@@ -530,6 +565,7 @@ export default function AddPurchaseOrderForm() {
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={control}
                 name="purchaseType"
@@ -556,6 +592,7 @@ export default function AddPurchaseOrderForm() {
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={control}
                 name="expenseCategory"
@@ -579,6 +616,7 @@ export default function AddPurchaseOrderForm() {
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={control}
                 name="paymentTerms"
@@ -699,6 +737,7 @@ export default function AddPurchaseOrderForm() {
                       itemName: "",
                       productId: "",
                       variantId: "",
+                      vendorItemId: "",
                       selectedAttributes: {},
                       orderId: "",
                       replacementOrderId: "",
@@ -721,12 +760,19 @@ export default function AddPurchaseOrderForm() {
                     "hidden lg:grid lg:grid-cols-12 gap-3 px-4 py-3 rounded-t-lg font-medium text-sm text-slate-50 transition-colors",
                     poCategory === "REP" ? "bg-orange-600" : "bg-slate-700",
                   )}>
-                  <div className="col-span-3">Item Name & Product</div>
+                  <div className="col-span-3">
+                    {isProductExpense
+                      ? "Item Name & Product"
+                      : "Service Name (Vendor Item)"}
+                  </div>
+                  {/* ✨ Kolom Header Referensi Ditampilkan Untuk Semua Kategori */}
                   <div className="col-span-2">
                     {poCategory === "SO" ? "Reference SO" : "Reference REP"}
                   </div>
                   <div className="col-span-3 text-center">
-                    Qty (Order | Stock | Buy)
+                    {isProductExpense
+                      ? "Qty (Order | Stock | Buy)"
+                      : "Quantity"}
                   </div>
                   <div className="col-span-2">Unit Price</div>
                   <div className="col-span-1 text-right">Subtotal</div>
@@ -745,6 +791,9 @@ export default function AddPurchaseOrderForm() {
                   );
                   const currentSelectedAttrs =
                     watch(`items.${index}.selectedAttributes`) || {};
+
+                  const orderIdError =
+                    form.formState.errors.items?.[index]?.orderId?.message;
 
                   const handleAttributeSelect = (
                     attributeId: string,
@@ -800,7 +849,7 @@ export default function AddPurchaseOrderForm() {
                           "border-orange-200 hover:border-orange-300",
                       )}>
                       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start p-4 lg:p-4">
-                        {/* 1. Item Name & Product Relation */}
+                        {/* 1. Item Name / Product / Service Relation */}
                         <div className="lg:col-span-3 space-y-3">
                           <FormField
                             control={control}
@@ -812,7 +861,11 @@ export default function AddPurchaseOrderForm() {
                                 </FormLabel>
                                 <FormControl>
                                   <Input
-                                    placeholder="Type item name..."
+                                    placeholder={
+                                      isProductExpense
+                                        ? "Type item name..."
+                                        : "Tulis nama manual..."
+                                    }
                                     className="h-10"
                                     {...field}
                                   />
@@ -821,114 +874,220 @@ export default function AddPurchaseOrderForm() {
                               </FormItem>
                             )}
                           />
-                          <FormField
-                            control={control}
-                            name={`items.${index}.productId`}
-                            render={({ field }) => (
-                              <FormItem className="flex flex-col">
-                                <Popover
-                                  open={openCombobox[index]}
-                                  onOpenChange={(val) =>
-                                    setOpenCombobox((prev) => ({
-                                      ...prev,
-                                      [index]: val,
-                                    }))
-                                  }>
-                                  <PopoverTrigger asChild>
-                                    <FormControl>
-                                      <Button
-                                        variant="outline"
-                                        role="combobox"
-                                        className={cn(
-                                          "w-full justify-between h-9 text-xs font-normal bg-slate-50 border-dashed",
-                                          !field.value &&
-                                            "text-muted-foreground",
-                                        )}>
-                                        {field.value
-                                          ? products.find(
-                                              (p) => p.id === field.value,
-                                            )?.name
-                                          : "Link to Master Product..."}
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                      </Button>
-                                    </FormControl>
-                                  </PopoverTrigger>
-                                  <PopoverContent
-                                    className="w-75 p-0"
-                                    align="start">
-                                    <Command>
-                                      <CommandInput placeholder="Search by name or SKU..." />
-                                      <CommandList>
-                                        <CommandEmpty>
-                                          Product not found.
-                                        </CommandEmpty>
-                                        <CommandGroup>
-                                          {products.map((p) => (
-                                            <CommandItem
-                                              key={p.id}
-                                              value={`${p.name} ${p.sku}`}
-                                              onSelect={() => {
-                                                field.onChange(p.id);
-                                                form.setValue(
-                                                  `items.${index}.variantId`,
-                                                  "",
-                                                );
-                                                form.setValue(
-                                                  `items.${index}.selectedAttributes`,
-                                                  {},
-                                                );
-                                                form.setValue(
-                                                  `items.${index}.itemName`,
-                                                  p.name,
-                                                );
-                                                form.setValue(
-                                                  `items.${index}.quantityStock`,
-                                                  p.stock || 0,
-                                                );
-                                                form.setValue(
-                                                  `items.${index}.uom`,
-                                                  p.uom || "pcs",
-                                                );
-                                                form.setValue(
-                                                  `items.${index}.unitPrice`,
-                                                  p.productVariants?.length
-                                                    ? 0
-                                                    : Number(p.basePrice),
-                                                );
-                                                recalculateQtyPurchase(index);
-                                                setOpenCombobox((prev) => ({
-                                                  ...prev,
-                                                  [index]: false,
-                                                }));
-                                              }}>
-                                              <Check
-                                                className={cn(
-                                                  "mr-2 h-4 w-4",
-                                                  p.id === field.value
-                                                    ? "opacity-100"
-                                                    : "opacity-0",
-                                                )}
-                                              />
-                                              <div className="flex flex-col">
-                                                <span>{p.name}</span>
-                                                <span className="text-[10px] text-gray-500">
-                                                  SKU: {p.sku}
-                                                </span>
-                                              </div>
-                                            </CommandItem>
-                                          ))}
-                                        </CommandGroup>
-                                      </CommandList>
-                                    </Command>
-                                  </PopoverContent>
-                                </Popover>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+
+                          {isProductExpense ? (
+                            <FormField
+                              control={control}
+                              name={`items.${index}.productId`}
+                              render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                  <Popover
+                                    open={openCombobox[index]}
+                                    onOpenChange={(val) =>
+                                      setOpenCombobox((prev) => ({
+                                        ...prev,
+                                        [index]: val,
+                                      }))
+                                    }>
+                                    <PopoverTrigger asChild>
+                                      <FormControl>
+                                        <Button
+                                          variant="outline"
+                                          role="combobox"
+                                          className={cn(
+                                            "w-full justify-between h-9 text-xs font-normal bg-slate-50 border-dashed",
+                                            !field.value &&
+                                              "text-muted-foreground",
+                                          )}>
+                                          {field.value
+                                            ? products.find(
+                                                (p) => p.id === field.value,
+                                              )?.name
+                                            : "Link to Master Product..."}
+                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                      </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                      className="w-75 p-0"
+                                      align="start">
+                                      <Command>
+                                        <CommandInput placeholder="Search by name or SKU..." />
+                                        <CommandList>
+                                          <CommandEmpty>
+                                            Product not found.
+                                          </CommandEmpty>
+                                          <CommandGroup>
+                                            {products.map((p) => (
+                                              <CommandItem
+                                                key={p.id}
+                                                value={`${p.name} ${p.sku}`}
+                                                onSelect={() => {
+                                                  field.onChange(p.id);
+                                                  form.setValue(
+                                                    `items.${index}.variantId`,
+                                                    "",
+                                                  );
+                                                  form.setValue(
+                                                    `items.${index}.selectedAttributes`,
+                                                    {},
+                                                  );
+                                                  form.setValue(
+                                                    `items.${index}.itemName`,
+                                                    p.name,
+                                                  );
+                                                  form.setValue(
+                                                    `items.${index}.quantityStock`,
+                                                    p.stock || 0,
+                                                  );
+                                                  form.setValue(
+                                                    `items.${index}.uom`,
+                                                    p.uom || "pcs",
+                                                  );
+                                                  form.setValue(
+                                                    `items.${index}.unitPrice`,
+                                                    p.productVariants?.length
+                                                      ? 0
+                                                      : Number(p.basePrice),
+                                                  );
+                                                  recalculateQtyPurchase(index);
+                                                  setOpenCombobox((prev) => ({
+                                                    ...prev,
+                                                    [index]: false,
+                                                  }));
+                                                }}>
+                                                <Check
+                                                  className={cn(
+                                                    "mr-2 h-4 w-4",
+                                                    p.id === field.value
+                                                      ? "opacity-100"
+                                                      : "opacity-0",
+                                                  )}
+                                                />
+                                                <div className="flex flex-col">
+                                                  <span>{p.name}</span>
+                                                  <span className="text-[10px] text-gray-500">
+                                                    SKU: {p.sku}
+                                                  </span>
+                                                </div>
+                                              </CommandItem>
+                                            ))}
+                                          </CommandGroup>
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          ) : (
+                            <FormField
+                              control={control}
+                              name={`items.${index}.vendorItemId`}
+                              render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                  <Popover
+                                    open={openVendorItemCombobox[index]}
+                                    onOpenChange={(val) =>
+                                      setOpenVendorItemCombobox((prev) => ({
+                                        ...prev,
+                                        [index]: val,
+                                      }))
+                                    }>
+                                    <PopoverTrigger asChild>
+                                      <FormControl>
+                                        <Button
+                                          variant="outline"
+                                          role="combobox"
+                                          disabled={!selectedVendorId}
+                                          className={cn(
+                                            "w-full justify-between h-9 text-xs font-normal bg-purple-50/50 border-purple-200 border-dashed text-purple-700 hover:bg-purple-100",
+                                            !field.value &&
+                                              "text-muted-foreground",
+                                            !selectedVendorId &&
+                                              "opacity-50 cursor-not-allowed",
+                                          )}>
+                                          {field.value
+                                            ? availableVendorItems.find(
+                                                (vi: any) =>
+                                                  vi.id === field.value,
+                                              )?.name
+                                            : "Pilih Master Jasa Vendor..."}
+                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                      </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                      className="w-75 p-0"
+                                      align="start">
+                                      <Command>
+                                        <CommandInput placeholder="Search vendor item..." />
+                                        <CommandList>
+                                          <CommandEmpty>
+                                            Vendor Item not found.
+                                          </CommandEmpty>
+                                          <CommandGroup>
+                                            {availableVendorItems.map(
+                                              (vi: any) => (
+                                                <CommandItem
+                                                  key={vi.id}
+                                                  value={vi.name}
+                                                  onSelect={() => {
+                                                    field.onChange(vi.id);
+                                                    form.setValue(
+                                                      `items.${index}.itemName`,
+                                                      vi.name,
+                                                    );
+                                                    form.setValue(
+                                                      `items.${index}.productId`,
+                                                      "",
+                                                    );
+                                                    form.setValue(
+                                                      `items.${index}.variantId`,
+                                                      "",
+                                                    );
+                                                    form.setValue(
+                                                      `items.${index}.selectedAttributes`,
+                                                      {},
+                                                    );
+                                                    setOpenVendorItemCombobox(
+                                                      (prev) => ({
+                                                        ...prev,
+                                                        [index]: false,
+                                                      }),
+                                                    );
+                                                  }}>
+                                                  <Check
+                                                    className={cn(
+                                                      "mr-2 h-4 w-4",
+                                                      vi.id === field.value
+                                                        ? "opacity-100"
+                                                        : "opacity-0",
+                                                    )}
+                                                  />
+                                                  {vi.name}
+                                                </CommandItem>
+                                              ),
+                                            )}
+                                          </CommandGroup>
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {!selectedVendorId && (
+                                    <p className="text-[10px] text-red-500 mt-1">
+                                      Pilih Vendor di atas terlebih dahulu.
+                                    </p>
+                                  )}
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
                         </div>
 
-                        {/* 2. ✨ KOTAK REFERENSI (Berubah berdasarkan Tab Utama) */}
+                        {/* 2. ✨ KOTAK REFERENSI (Tampil untuk Semua Kategori) */}
                         <div className="lg:col-span-2">
                           <FormItem className="flex flex-col">
                             <FormLabel className="lg:hidden">
@@ -961,16 +1120,22 @@ export default function AddPurchaseOrderForm() {
                                           `items.${index}.replacementOrderId`,
                                         ) &&
                                         "border-orange-300 text-orange-700 bg-orange-50/50",
+                                      orderIdError &&
+                                        "border-red-500 ring-1 ring-red-500",
                                     )}>
                                     {poCategory === "SO"
                                       ? watch(`items.${index}.orderId`)
                                         ? `SO: ${orders.find((o) => o.id === watch(`items.${index}.orderId`))?.orderNumber}`
-                                        : "Select SO..."
+                                        : isProductExpense
+                                          ? "Pilih SO (Wajib)..."
+                                          : "Pilih SO (Opsional)..."
                                       : watch(
                                             `items.${index}.replacementOrderId`,
                                           )
                                         ? `REP: ${replacementOrders.find((r) => r.id === watch(`items.${index}.replacementOrderId`))?.replacementNumber}`
-                                        : "Select REP..."}
+                                        : isProductExpense
+                                          ? "Pilih REP (Wajib)..."
+                                          : "Pilih REP (Opsional)..."}
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                   </Button>
                                 </FormControl>
@@ -1023,7 +1188,6 @@ export default function AddPurchaseOrderForm() {
                                       </CommandItem>
                                     </CommandGroup>
 
-                                    {/* LIST JIKA MODE SO */}
                                     {poCategory === "SO" && (
                                       <CommandGroup heading="Daftar Sales Orders">
                                         {orders.map((o) => (
@@ -1043,10 +1207,18 @@ export default function AddPurchaseOrderForm() {
                                                 ...prev,
                                                 [index]: false,
                                               }));
-                                              handleAutoFillFromReference(
-                                                "SO",
-                                                o.id,
-                                                index,
+
+                                              // ✨ PERBAIKAN: HANYA AUTOFILL JIKA PRODUK
+                                              if (isProductExpense) {
+                                                handleAutoFillFromReference(
+                                                  "SO",
+                                                  o.id,
+                                                  index,
+                                                );
+                                              }
+
+                                              form.clearErrors(
+                                                `items.${index}.orderId`,
                                               );
                                             }}>
                                             <Check
@@ -1068,7 +1240,6 @@ export default function AddPurchaseOrderForm() {
                                       </CommandGroup>
                                     )}
 
-                                    {/* LIST JIKA MODE REP */}
                                     {poCategory === "REP" && (
                                       <CommandGroup heading="Daftar Replacement Orders">
                                         {replacementOrders.map((r) => (
@@ -1088,10 +1259,18 @@ export default function AddPurchaseOrderForm() {
                                                 ...prev,
                                                 [index]: false,
                                               }));
-                                              handleAutoFillFromReference(
-                                                "REP",
-                                                r.id,
-                                                index,
+
+                                              // ✨ PERBAIKAN: HANYA AUTOFILL JIKA PRODUK
+                                              if (isProductExpense) {
+                                                handleAutoFillFromReference(
+                                                  "REP",
+                                                  r.id,
+                                                  index,
+                                                );
+                                              }
+
+                                              form.clearErrors(
+                                                `items.${index}.orderId`,
                                               );
                                             }}>
                                             <Check
@@ -1116,6 +1295,11 @@ export default function AddPurchaseOrderForm() {
                                 </Command>
                               </PopoverContent>
                             </Popover>
+                            {orderIdError && (
+                              <span className="text-red-500 text-xs mt-1 font-medium">
+                                {String(orderIdError)}
+                              </span>
+                            )}
                           </FormItem>
                         </div>
 
@@ -1125,9 +1309,12 @@ export default function AddPurchaseOrderForm() {
                             control={control}
                             name={`items.${index}.quantityOrder`}
                             render={({ field }) => (
-                              <FormItem>
+                              <FormItem
+                                className={
+                                  !isProductExpense ? "col-span-3" : ""
+                                }>
                                 <FormLabel className="lg:hidden text-xs text-center block">
-                                  Qty Order
+                                  {isProductExpense ? "Qty Order" : "Quantity"}
                                 </FormLabel>
                                 <FormControl>
                                   <Input
@@ -1138,7 +1325,13 @@ export default function AddPurchaseOrderForm() {
                                       field.onChange(
                                         e.target.valueAsNumber || 0,
                                       );
-                                      recalculateQtyPurchase(index);
+                                      if (isProductExpense)
+                                        recalculateQtyPurchase(index);
+                                      else
+                                        form.setValue(
+                                          `items.${index}.quantityPurchase`,
+                                          e.target.valueAsNumber || 0,
+                                        );
                                     }}
                                     className="text-center h-10 border-blue-200 bg-blue-50/30"
                                   />
@@ -1146,50 +1339,55 @@ export default function AddPurchaseOrderForm() {
                               </FormItem>
                             )}
                           />
-                          <FormField
-                            control={control}
-                            name={`items.${index}.quantityStock`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="lg:hidden text-xs text-center block">
-                                  In Stock
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    {...field}
-                                    onChange={(e) => {
-                                      field.onChange(
-                                        e.target.valueAsNumber || 0,
-                                      );
-                                      recalculateQtyPurchase(index);
-                                    }}
-                                    className="text-center h-10 text-slate-500 bg-slate-50"
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={control}
-                            name={`items.${index}.quantityPurchase`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="lg:hidden text-xs text-center block">
-                                  To Buy
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    readOnly
-                                    {...field}
-                                    className="text-center h-10 font-bold bg-green-50 text-green-700 border-green-200"
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
+
+                          {isProductExpense && (
+                            <>
+                              <FormField
+                                control={control}
+                                name={`items.${index}.quantityStock`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="lg:hidden text-xs text-center block">
+                                      In Stock
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        {...field}
+                                        onChange={(e) => {
+                                          field.onChange(
+                                            e.target.valueAsNumber || 0,
+                                          );
+                                          recalculateQtyPurchase(index);
+                                        }}
+                                        className="text-center h-10 text-slate-500 bg-slate-50"
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={control}
+                                name={`items.${index}.quantityPurchase`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="lg:hidden text-xs text-center block">
+                                      To Buy
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        readOnly
+                                        {...field}
+                                        className="text-center h-10 font-bold bg-green-50 text-green-700 border-green-200"
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            </>
+                          )}
                         </div>
 
                         {/* 4. Unit Price & UOM */}
@@ -1274,8 +1472,9 @@ export default function AddPurchaseOrderForm() {
                         </div>
                       </div>
 
-                      {/* Variants Logic */}
-                      {selectedProduct?.availableAttributes &&
+                      {/* Variants Logic (Hanya untuk Product) */}
+                      {isProductExpense &&
+                        selectedProduct?.availableAttributes &&
                         selectedProduct.availableAttributes.length > 0 && (
                           <div className="px-4 pb-4">
                             <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">

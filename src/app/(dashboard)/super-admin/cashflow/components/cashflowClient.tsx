@@ -38,15 +38,18 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import UtangPiutangCard from "./utangPiutangCard";
 // === TYPES ===
-// ✨ PERBAIKAN: Menyesuaikan tipe data dengan respons API terbaru
 type CashflowItem = {
   id: string;
   referenceId: string;
   type: "order" | "replacement";
   dateOrder: string;
   orderNumber: string;
-  salesCategory: string; // SALES, SAMPLE, atau REPLACEMENT
-  currencyCode: string;
+  salesCategory: string;
+  currencyCode: string; // "IDR"
+  originalCurrencyCode: string; // "EUR", "RMB", dll
+  originalRevenue: number; // Nilai murni asli (misal: 578)
+  originalCost: number; // Nilai murni asli cost
+  originalProfitOrLoss: number; // Nilai murni asli profit
   clientName: string;
   totalRevenue: number;
   totalCost: number;
@@ -301,7 +304,6 @@ export default function CashflowClient() {
                         </div>
                       </TableCell>
 
-                      {/* ✨ PERBAIKAN: Penambahan Kategori REPLACEMENT dengan warna khusus */}
                       <TableCell>
                         <Badge
                           variant="outline"
@@ -321,42 +323,99 @@ export default function CashflowClient() {
                         {item.clientName}
                       </TableCell>
 
-                      <TableCell className="text-right text-sm font-medium text-emerald-700">
-                        {formatCurrency(item.totalRevenue, item.currencyCode)}
-                      </TableCell>
-
-                      <TableCell className="text-right text-sm font-medium text-red-700">
-                        {item.totalCost > 0 ? (
-                          formatCurrency(item.totalCost, item.currencyCode)
-                        ) : (
-                          <span className="text-gray-400 italic text-[10px]">
-                            --
+                      {/* Kolom Revenue */}
+                      <TableCell className="text-right">
+                        <div className="flex flex-col">
+                          {/* Nilai Konversi ke Rupiah (IDR) */}
+                          <span className="text-sm font-semibold text-emerald-700">
+                            {formatCurrency(
+                              item.totalRevenue,
+                              item.currencyCode,
+                            )}
                           </span>
-                        )}
+
+                          {/* Nilai Murni Asli (Contoh: €578,48) */}
+                          {item.originalCurrencyCode &&
+                            item.originalCurrencyCode !== "IDR" && (
+                              <span className="text-[11px] text-muted-foreground italic">
+                                Asli:{" "}
+                                {formatCurrency(
+                                  item.originalRevenue,
+                                  item.originalCurrencyCode,
+                                )}
+                              </span>
+                            )}
+                        </div>
                       </TableCell>
 
-                      <TableCell className="text-right text-sm">
+                      {/* Kolom Cost */}
+                      <TableCell className="text-right">
+                        <div className="flex flex-col">
+                          {item.totalCost > 0 ? (
+                            <>
+                              <span className="text-sm font-semibold text-red-700">
+                                {formatCurrency(
+                                  item.totalCost,
+                                  item.currencyCode,
+                                )}
+                              </span>
+                              {item.originalCurrencyCode &&
+                                item.originalCurrencyCode !== "IDR" && (
+                                  <span className="text-[11px] text-muted-foreground italic">
+                                    Asli:{" "}
+                                    {formatCurrency(
+                                      item.originalCost,
+                                      item.originalCurrencyCode,
+                                    )}
+                                  </span>
+                                )}
+                            </>
+                          ) : (
+                            <span className="text-gray-400 italic text-[10px]">
+                              --
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      {/* Kolom Profit / Loss */}
+                      <TableCell className="text-right">
                         <div
                           className={cn(
-                            "font-bold flex items-center justify-end gap-1",
+                            "font-bold flex flex-col items-end",
                             item.profitOrLoss > 0
                               ? "text-emerald-600"
                               : item.profitOrLoss < 0
                                 ? "text-red-600"
                                 : "text-gray-400",
                           )}>
-                          {item.profitOrLoss > 0 && (
-                            <TrendingUp className="h-3 w-3" />
-                          )}
-                          {item.profitOrLoss < 0 && (
-                            <TrendingDown className="h-3 w-3" />
-                          )}
-                          {formatCurrency(item.profitOrLoss, item.currencyCode)}
+                          <div className="flex items-center gap-1 text-sm">
+                            {item.profitOrLoss > 0 && (
+                              <TrendingUp className="h-3 w-3" />
+                            )}
+                            {item.profitOrLoss < 0 && (
+                              <TrendingDown className="h-3 w-3" />
+                            )}
+                            {formatCurrency(
+                              item.profitOrLoss,
+                              item.currencyCode,
+                            )}
+                          </div>
+
+                          {item.originalCurrencyCode &&
+                            item.originalCurrencyCode !== "IDR" && (
+                              <span className="text-[11px] text-muted-foreground italic font-normal">
+                                Asli:{" "}
+                                {formatCurrency(
+                                  item.originalProfitOrLoss,
+                                  item.originalCurrencyCode,
+                                )}
+                              </span>
+                            )}
                         </div>
                       </TableCell>
 
                       <TableCell className="text-center">
-                        {/* ✨ PERBAIKAN: Menyisipkan tipe (order/replacement) ke URL */}
                         <Link
                           href={`/super-admin/cashflow/edit/${item.referenceId}?type=${item.type}`}>
                           <Button

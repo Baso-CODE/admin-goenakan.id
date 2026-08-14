@@ -54,44 +54,79 @@ import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
-import { Currency, Product, Vendor } from "../../orders/types/order.types";
+// import { Currency, Product, Vendor } from "../../orders/types/order.types";
 
-const purchaseOrderSchema = z.object({
-  poDate: z.string().min(1, "Date is required"),
-  poNumber: z.string().optional(),
-  purchaseType: z.enum(["DIRECT_MATERIAL", "DIRECT_EXPENSES", "STOCK"]),
-  expenseCategory: z.enum(["PRODUCT", "PACKAGING", "LOGISTIC", "UTILITY"]),
-  paymentTerms: z.enum(["IMMEDIATELY", "NET_14", "NET_30", "NET_60"]),
-  vendorId: z.string().min(1, "Vendor is required"),
-  currencyCode: z.string().optional(),
-  notes: z.string().optional(),
-  items: z
-    .array(
-      z.object({
-        itemName: z.string().min(1, "Item name is required"),
-        productId: z.string().optional(),
-        variantId: z.string().optional(),
-        selectedAttributes: z.record(z.string(), z.string()).optional(),
-        orderId: z.string().optional(),
-        replacementOrderId: z.string().optional(),
-        quantityOrder: z.number().min(1),
-        quantityStock: z.number().min(0),
-        quantityPurchase: z.number().min(0),
-        uom: z.string().min(1, "UOM is required"),
-        unitPrice: z.number().positive("Harga harus positif"),
-        remarks: z.string().optional(),
-      }),
-    )
-    .min(1, "Minimal 1 item dibutuhkan"),
+// ==========================================
+// ZOD SCHEMA UNTUK FORM VALIDATION
+// ==========================================
+const baseItemSchema = z.object({
+  itemName: z.string().min(1, "Item name is required"),
+  productId: z.string().optional(),
+  variantId: z.string().optional(),
+  vendorItemId: z.string().optional(), // ✨ Untuk menyimpan ID jasa dari vendor
+  selectedAttributes: z.record(z.string(), z.string()).optional(),
+  orderId: z.string().optional(),
+  replacementOrderId: z.string().optional(),
+  quantityOrder: z.number().min(1),
+  quantityStock: z.number().min(0),
+  quantityPurchase: z.number().min(0),
+  uom: z.string().min(1, "UOM is required"),
+  unitPrice: z.number().positive("Harga harus positif"),
+  remarks: z.string().optional(),
 });
 
-const UOM_OPTIONS = ["pcs", "ctn", "ea", "kg", "liter", "pack", "roll"];
+const purchaseOrderSchema = z
+  .object({
+    poDate: z.string().min(1, "Date is required"),
+    poNumber: z.string().optional(),
+    purchaseType: z.enum([
+      "DIRECT_MATERIAL",
+      "DIRECT_EXPENSES",
+      "INDIRECT_EXPENSES",
+      "STOCK",
+    ]),
+    expenseCategory: z.enum(["PRODUCT", "PACKAGING", "LOGISTIC", "UTILITY"]),
+    paymentTerms: z.enum(["IMMEDIATELY", "NET_14", "NET_30", "NET_60"]),
+    vendorId: z.string().min(1, "Vendor is required"),
+    currencyCode: z.string().optional(),
+    notes: z.string().optional(),
+    items: z.array(baseItemSchema).min(1, "Minimal 1 item dibutuhkan"),
+  })
+  .superRefine((data, ctx) => {
+    // ✨ Validasi Bersyarat: Jika kategori PRODUCT, referensi SO/REP Wajib diisi!
+    if (data.expenseCategory === "PRODUCT") {
+      data.items.forEach((item, index) => {
+        if (!item.orderId && !item.replacementOrderId) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Reference SO/REP is Wajib for PRODUCT expense",
+            path: ["items", index, "orderId"],
+          });
+        }
+      });
+    }
+  });
+
+const UOM_OPTIONS = [
+  "pcs",
+  "ctn",
+  "ea",
+  "kg",
+  "liter",
+  "pack",
+  "roll",
+  "lot",
+  "trip",
+];
 type OrderRef = { id: string; orderNumber: string };
 type ReplacementRef = {
   id: string;
   replacementNumber: string;
   referenceOrderId?: string;
 };
+type Vendor = any;
+type Currency = any;
+type Product = any;
 type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
 
 export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
@@ -117,6 +152,9 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
   const [openOrderCombobox, setOpenOrderCombobox] = useState<
     Record<number, boolean>
   >({});
+  const [openVendorItemCombobox, setOpenVendorItemCombobox] = useState<
+    Record<number, boolean>
+  >({});
 
   const form = useForm<PurchaseOrderFormValues>({
     resolver: zodResolver(purchaseOrderSchema),
@@ -131,14 +169,27 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
   const selectedCurrencyCode = watch("currencyCode");
   const currentCurrencySymbol =
     currencies.find((c) => c.code === selectedCurrencyCode)?.symbol || "Rp";
-  const selectedExpenseCategory = watch("expenseCategory");
 
+  const selectedExpenseCategory = watch("expenseCategory");
+  const selectedVendorId = watch("vendorId");
+
+  const isProductExpense = selectedExpenseCategory === "PRODUCT";
+
+  // ✨ Mengambil daftar service/jasa dari vendor yang dipilih
+  const availableVendorItems = useMemo(() => {
+    if (isProductExpense || !selectedVendorId) return [];
+    const currentVendor = vendors.find((v) => v.id === selectedVendorId);
+    return currentVendor?.vendorItems?.map((vi: any) => vi.item) || [];
+  }, [selectedVendorId, vendors, isProductExpense]);
+
+  // ✨ Filter vendor pintar berdasarkan kategori pengeluaran
   const filteredVendors = useMemo(() => {
-    if (selectedExpenseCategory === "PRODUCT") {
+    if (isProductExpense) {
       return vendors.filter((v: any) => v.types && v.types.includes("PRODUCT"));
+    } else {
+      return vendors.filter((v: any) => v.types && v.types.includes("SERVICE"));
     }
-    return vendors;
-  }, [vendors, selectedExpenseCategory]);
+  }, [vendors, isProductExpense]);
 
   useEffect(() => {
     const currentVendorId = getValues("vendorId");
@@ -148,9 +199,20 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
       );
       if (!isStillValid) {
         setValue("vendorId", "");
+        fields.forEach((_, index) => {
+          setValue(`items.${index}.vendorItemId`, "");
+          if (!isProductExpense) setValue(`items.${index}.itemName`, "");
+        });
       }
     }
-  }, [selectedExpenseCategory, filteredVendors, getValues, setValue]);
+  }, [
+    selectedExpenseCategory,
+    filteredVendors,
+    getValues,
+    setValue,
+    fields,
+    isProductExpense,
+  ]);
 
   const recalculateQtyPurchase = (index: number) => {
     const qtyOrder = getValues(`items.${index}.quantityOrder`) || 0;
@@ -164,7 +226,6 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
       if (status !== "authenticated" || !poId) return;
       try {
         setLoading(true);
-        // Load semua referensi secara paralel
         const [resV, resCur, resP, resO, resRep, resPO] = await Promise.all([
           fetchApi("/vendors/order/add"),
           fetchApi("/currencies"),
@@ -192,7 +253,6 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
         setOrders(oData?.data || oData || []);
         setReplacementOrders(repData?.data || repData || []);
 
-        // ✨ AUTO-DETECT MODE TAB BERDASARKAN DATA PO
         if (data.items && data.items.length > 0) {
           if (data.items[0].replacementOrderId) {
             setPoCategory("REP");
@@ -201,7 +261,6 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
           }
         }
 
-        // Reset form dengan data PO yang didapat dari DB
         form.reset({
           poDate: data.poDate.split("T")[0],
           poNumber: data.poNumber || "",
@@ -215,9 +274,10 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
             itemName: i.itemName || i.itemNameManual || "",
             productId: i.productId || "",
             variantId: i.variantId || "",
+            vendorItemId: i.vendorItemId || "",
             selectedAttributes: i.selectedAttributes || {},
             orderId: i.orderId || "",
-            replacementOrderId: i.replacementOrderId || "", // Pastikan ter-mapping
+            replacementOrderId: i.replacementOrderId || "",
             quantityOrder: i.quantityOrder,
             quantityStock: i.quantityStock,
             quantityPurchase: i.quantityPurchase,
@@ -243,13 +303,19 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
         ...data,
         items: data.items.map((item) => ({
           ...item,
-          productId: item.productId || undefined,
-          // Validasi silang berdasarkan Tab aktif agar bersih
+          productId: isProductExpense ? item.productId || undefined : undefined,
+          vendorItemId: !isProductExpense
+            ? item.vendorItemId || undefined
+            : undefined,
           orderId: poCategory === "SO" ? item.orderId || undefined : undefined,
           replacementOrderId:
             poCategory === "REP"
               ? item.replacementOrderId || undefined
               : undefined,
+          selectedAttributes: isProductExpense
+            ? item.selectedAttributes
+            : undefined,
+          variantId: isProductExpense ? item.variantId : undefined,
         })),
       };
 
@@ -268,7 +334,6 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
     }
   };
 
-  // ✨ FUNGSI AUTO-FILL (Dukungan Cerdas untuk Multi-Vendor)
   const handleAutoFillFromReference = async (
     refType: "SO" | "REP",
     refId: string,
@@ -277,7 +342,7 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
     try {
       let originalItems = [];
       let suggestedVendorId = "";
-      let vendorCount = 0; // Tambahan: Untuk menghitung jumlah vendor di histori
+      let vendorCount = 0;
 
       if (refType === "SO") {
         const res = await fetchApi(`/orders/${refId}`);
@@ -287,8 +352,8 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
 
         originalItems = orderData.products || [];
         if (orderData.vendors && orderData.vendors.length > 0) {
-          suggestedVendorId = orderData.vendors[0].id; // Ambil vendor urutan pertama
-          vendorCount = orderData.vendors.length; // Simpan total vendor
+          suggestedVendorId = orderData.vendors[0].id;
+          vendorCount = orderData.vendors.length;
         }
       } else if (refType === "REP") {
         const resRep = await fetchApi(`/replacement-orders/${refId}`);
@@ -305,8 +370,8 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
             const soData = detailSo.data || detailSo;
 
             if (soData.vendors && soData.vendors.length > 0) {
-              suggestedVendorId = soData.vendors[0].id; // Ambil vendor urutan pertama
-              vendorCount = soData.vendors.length; // Simpan total vendor
+              suggestedVendorId = soData.vendors[0].id;
+              vendorCount = soData.vendors.length;
             }
           }
         }
@@ -317,30 +382,17 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
         return;
       }
 
-      // ✨ LOGIKA NOTIFIKASI MULTI-VENDOR
       if (suggestedVendorId) {
         setValue("vendorId", suggestedVendorId);
-
-        // Jika vendor lebih dari 1, berikan peringatan khusus
         if (vendorCount > 1) {
           toast.success(
-            `Ditemukan ${vendorCount} vendor pada pesanan asli. Vendor pertama diisi otomatis. Silakan ubah secara manual jika ingin menggunakan vendor alternatif.`,
+            `Ditemukan ${vendorCount} vendor pada pesanan asli. Vendor pertama diisi otomatis.`,
           );
         } else {
-          // Jika hanya 1 vendor, tampilkan pesan sukses biasa
-          toast.success(
-            refType === "SO"
-              ? "Vendor berhasil ditarik dari riwayat SO."
-              : "Vendor otomatis ditarik dari riwayat pesanan aslinya.",
-          );
+          toast.success("Vendor berhasil ditarik otomatis.");
         }
-      } else {
-        toast.info(
-          "Tidak ada riwayat vendor sebelumnya, silakan pilih manual.",
-        );
       }
 
-      // ... (Bagian mapping item ke form tetap sama persis seperti sebelumnya) ...
       const mapItemToForm = (item: any) => {
         const fallbackProductName =
           products.find((p) => p.id === item.productId)?.name || "";
@@ -715,6 +767,7 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                       itemName: "",
                       productId: "",
                       variantId: "",
+                      vendorItemId: "",
                       selectedAttributes: {},
                       orderId: "",
                       replacementOrderId: "",
@@ -737,12 +790,18 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                     "hidden lg:grid lg:grid-cols-12 gap-3 px-4 py-3 rounded-t-lg font-medium text-sm text-slate-50 transition-colors",
                     poCategory === "REP" ? "bg-orange-600" : "bg-slate-700",
                   )}>
-                  <div className="col-span-3">Item Name & Product</div>
+                  <div className="col-span-3">
+                    {isProductExpense
+                      ? "Item Name & Product"
+                      : "Service Name (Vendor Item)"}
+                  </div>
                   <div className="col-span-2">
                     {poCategory === "SO" ? "Reference SO" : "Reference REP"}
                   </div>
                   <div className="col-span-3 text-center">
-                    Qty (Order | Stock | Buy)
+                    {isProductExpense
+                      ? "Qty (Order | Stock | Buy)"
+                      : "Quantity"}
                   </div>
                   <div className="col-span-2">Unit Price</div>
                   <div className="col-span-1 text-right">Subtotal</div>
@@ -761,6 +820,9 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                   );
                   const currentSelectedAttrs =
                     watch(`items.${index}.selectedAttributes`) || {};
+
+                  const orderIdError =
+                    form.formState.errors.items?.[index]?.orderId?.message;
 
                   const handleAttributeSelect = (
                     attributeId: string,
@@ -787,7 +849,7 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                         .find(
                           (v) =>
                             v.combinationIds.length > 0 &&
-                            v.combinationIds.every((id) =>
+                            v.combinationIds.every((id: any) =>
                               selectedValIds.includes(id),
                             ),
                         );
@@ -816,7 +878,7 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                           "border-orange-200 hover:border-orange-300",
                       )}>
                       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start p-4 lg:p-4">
-                        {/* 1. Item Name & Product Relation */}
+                        {/* 1. Item Name & Product / Service Relation */}
                         <div className="lg:col-span-3 space-y-3">
                           <FormField
                             control={control}
@@ -828,7 +890,11 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                                 </FormLabel>
                                 <FormControl>
                                   <Input
-                                    placeholder="Type item name..."
+                                    placeholder={
+                                      isProductExpense
+                                        ? "Type item name..."
+                                        : "Tulis nama manual..."
+                                    }
                                     className="h-10"
                                     {...field}
                                   />
@@ -837,114 +903,220 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                               </FormItem>
                             )}
                           />
-                          <FormField
-                            control={control}
-                            name={`items.${index}.productId`}
-                            render={({ field }) => (
-                              <FormItem className="flex flex-col">
-                                <Popover
-                                  open={openCombobox[index]}
-                                  onOpenChange={(val) =>
-                                    setOpenCombobox((prev) => ({
-                                      ...prev,
-                                      [index]: val,
-                                    }))
-                                  }>
-                                  <PopoverTrigger asChild>
-                                    <FormControl>
-                                      <Button
-                                        variant="outline"
-                                        role="combobox"
-                                        className={cn(
-                                          "w-full justify-between h-9 text-xs font-normal bg-slate-50 border-dashed",
-                                          !field.value &&
-                                            "text-muted-foreground",
-                                        )}>
-                                        {field.value
-                                          ? products.find(
-                                              (p) => p.id === field.value,
-                                            )?.name
-                                          : "Link to Master Product..."}
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                      </Button>
-                                    </FormControl>
-                                  </PopoverTrigger>
-                                  <PopoverContent
-                                    className="w-75 p-0"
-                                    align="start">
-                                    <Command>
-                                      <CommandInput placeholder="Search by name or SKU..." />
-                                      <CommandList>
-                                        <CommandEmpty>
-                                          Product not found.
-                                        </CommandEmpty>
-                                        <CommandGroup>
-                                          {products.map((p) => (
-                                            <CommandItem
-                                              key={p.id}
-                                              value={`${p.name} ${p.sku}`}
-                                              onSelect={() => {
-                                                field.onChange(p.id);
-                                                form.setValue(
-                                                  `items.${index}.variantId`,
-                                                  "",
-                                                );
-                                                form.setValue(
-                                                  `items.${index}.selectedAttributes`,
-                                                  {},
-                                                );
-                                                form.setValue(
-                                                  `items.${index}.itemName`,
-                                                  p.name,
-                                                );
-                                                form.setValue(
-                                                  `items.${index}.quantityStock`,
-                                                  p.stock || 0,
-                                                );
-                                                form.setValue(
-                                                  `items.${index}.uom`,
-                                                  p.uom || "pcs",
-                                                );
-                                                form.setValue(
-                                                  `items.${index}.unitPrice`,
-                                                  p.productVariants?.length
-                                                    ? 0
-                                                    : Number(p.basePrice),
-                                                );
-                                                recalculateQtyPurchase(index);
-                                                setOpenCombobox((prev) => ({
-                                                  ...prev,
-                                                  [index]: false,
-                                                }));
-                                              }}>
-                                              <Check
-                                                className={cn(
-                                                  "mr-2 h-4 w-4",
-                                                  p.id === field.value
-                                                    ? "opacity-100"
-                                                    : "opacity-0",
-                                                )}
-                                              />
-                                              <div className="flex flex-col">
-                                                <span>{p.name}</span>
-                                                <span className="text-[10px] text-gray-500">
-                                                  SKU: {p.sku}
-                                                </span>
-                                              </div>
-                                            </CommandItem>
-                                          ))}
-                                        </CommandGroup>
-                                      </CommandList>
-                                    </Command>
-                                  </PopoverContent>
-                                </Popover>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+
+                          {isProductExpense ? (
+                            <FormField
+                              control={control}
+                              name={`items.${index}.productId`}
+                              render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                  <Popover
+                                    open={openCombobox[index]}
+                                    onOpenChange={(val) =>
+                                      setOpenCombobox((prev) => ({
+                                        ...prev,
+                                        [index]: val,
+                                      }))
+                                    }>
+                                    <PopoverTrigger asChild>
+                                      <FormControl>
+                                        <Button
+                                          variant="outline"
+                                          role="combobox"
+                                          className={cn(
+                                            "w-full justify-between h-9 text-xs font-normal bg-slate-50 border-dashed",
+                                            !field.value &&
+                                              "text-muted-foreground",
+                                          )}>
+                                          {field.value
+                                            ? products.find(
+                                                (p) => p.id === field.value,
+                                              )?.name
+                                            : "Link to Master Product..."}
+                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                      </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                      className="w-75 p-0"
+                                      align="start">
+                                      <Command>
+                                        <CommandInput placeholder="Search by name or SKU..." />
+                                        <CommandList>
+                                          <CommandEmpty>
+                                            Product not found.
+                                          </CommandEmpty>
+                                          <CommandGroup>
+                                            {products.map((p) => (
+                                              <CommandItem
+                                                key={p.id}
+                                                value={`${p.name} ${p.sku}`}
+                                                onSelect={() => {
+                                                  field.onChange(p.id);
+                                                  form.setValue(
+                                                    `items.${index}.variantId`,
+                                                    "",
+                                                  );
+                                                  form.setValue(
+                                                    `items.${index}.selectedAttributes`,
+                                                    {},
+                                                  );
+                                                  form.setValue(
+                                                    `items.${index}.itemName`,
+                                                    p.name,
+                                                  );
+                                                  form.setValue(
+                                                    `items.${index}.quantityStock`,
+                                                    p.stock || 0,
+                                                  );
+                                                  form.setValue(
+                                                    `items.${index}.uom`,
+                                                    p.uom || "pcs",
+                                                  );
+                                                  form.setValue(
+                                                    `items.${index}.unitPrice`,
+                                                    p.productVariants?.length
+                                                      ? 0
+                                                      : Number(p.basePrice),
+                                                  );
+                                                  recalculateQtyPurchase(index);
+                                                  setOpenCombobox((prev) => ({
+                                                    ...prev,
+                                                    [index]: false,
+                                                  }));
+                                                }}>
+                                                <Check
+                                                  className={cn(
+                                                    "mr-2 h-4 w-4",
+                                                    p.id === field.value
+                                                      ? "opacity-100"
+                                                      : "opacity-0",
+                                                  )}
+                                                />
+                                                <div className="flex flex-col">
+                                                  <span>{p.name}</span>
+                                                  <span className="text-[10px] text-gray-500">
+                                                    SKU: {p.sku}
+                                                  </span>
+                                                </div>
+                                              </CommandItem>
+                                            ))}
+                                          </CommandGroup>
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          ) : (
+                            <FormField
+                              control={control}
+                              name={`items.${index}.vendorItemId`}
+                              render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                  <Popover
+                                    open={openVendorItemCombobox[index]}
+                                    onOpenChange={(val) =>
+                                      setOpenVendorItemCombobox((prev) => ({
+                                        ...prev,
+                                        [index]: val,
+                                      }))
+                                    }>
+                                    <PopoverTrigger asChild>
+                                      <FormControl>
+                                        <Button
+                                          variant="outline"
+                                          role="combobox"
+                                          disabled={!selectedVendorId}
+                                          className={cn(
+                                            "w-full justify-between h-9 text-xs font-normal bg-purple-50/50 border-purple-200 border-dashed text-purple-700 hover:bg-purple-100",
+                                            !field.value &&
+                                              "text-muted-foreground",
+                                            !selectedVendorId &&
+                                              "opacity-50 cursor-not-allowed",
+                                          )}>
+                                          {field.value
+                                            ? availableVendorItems.find(
+                                                (vi: any) =>
+                                                  vi.id === field.value,
+                                              )?.name
+                                            : "Pilih Master Jasa Vendor..."}
+                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                      </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                      className="w-75 p-0"
+                                      align="start">
+                                      <Command>
+                                        <CommandInput placeholder="Search vendor item..." />
+                                        <CommandList>
+                                          <CommandEmpty>
+                                            Vendor Item not found.
+                                          </CommandEmpty>
+                                          <CommandGroup>
+                                            {availableVendorItems.map(
+                                              (vi: any) => (
+                                                <CommandItem
+                                                  key={vi.id}
+                                                  value={vi.name}
+                                                  onSelect={() => {
+                                                    field.onChange(vi.id);
+                                                    form.setValue(
+                                                      `items.${index}.itemName`,
+                                                      vi.name,
+                                                    );
+                                                    form.setValue(
+                                                      `items.${index}.productId`,
+                                                      "",
+                                                    );
+                                                    form.setValue(
+                                                      `items.${index}.variantId`,
+                                                      "",
+                                                    );
+                                                    form.setValue(
+                                                      `items.${index}.selectedAttributes`,
+                                                      {},
+                                                    );
+                                                    setOpenVendorItemCombobox(
+                                                      (prev) => ({
+                                                        ...prev,
+                                                        [index]: false,
+                                                      }),
+                                                    );
+                                                  }}>
+                                                  <Check
+                                                    className={cn(
+                                                      "mr-2 h-4 w-4",
+                                                      vi.id === field.value
+                                                        ? "opacity-100"
+                                                        : "opacity-0",
+                                                    )}
+                                                  />
+                                                  {vi.name}
+                                                </CommandItem>
+                                              ),
+                                            )}
+                                          </CommandGroup>
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {!selectedVendorId && (
+                                    <p className="text-[10px] text-red-500 mt-1">
+                                      Pilih Vendor di atas terlebih dahulu.
+                                    </p>
+                                  )}
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
                         </div>
 
-                        {/* 2. ✨ KOTAK REFERENSI (Berubah berdasarkan Tab Utama) */}
+                        {/* 2. KOTAK REFERENSI */}
                         <div className="lg:col-span-2">
                           <FormItem className="flex flex-col">
                             <FormLabel className="lg:hidden">
@@ -977,16 +1149,22 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                                           `items.${index}.replacementOrderId`,
                                         ) &&
                                         "border-orange-300 text-orange-700 bg-orange-50/50",
+                                      orderIdError &&
+                                        "border-red-500 ring-1 ring-red-500",
                                     )}>
                                     {poCategory === "SO"
                                       ? watch(`items.${index}.orderId`)
                                         ? `SO: ${orders.find((o) => o.id === watch(`items.${index}.orderId`))?.orderNumber}`
-                                        : "Select SO..."
+                                        : isProductExpense
+                                          ? "Pilih SO (Wajib)..."
+                                          : "Pilih SO (Opsional)..."
                                       : watch(
                                             `items.${index}.replacementOrderId`,
                                           )
                                         ? `REP: ${replacementOrders.find((r) => r.id === watch(`items.${index}.replacementOrderId`))?.replacementNumber}`
-                                        : "Select REP..."}
+                                        : isProductExpense
+                                          ? "Pilih REP (Wajib)..."
+                                          : "Pilih REP (Opsional)..."}
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                   </Button>
                                 </FormControl>
@@ -1039,7 +1217,6 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                                       </CommandItem>
                                     </CommandGroup>
 
-                                    {/* LIST JIKA MODE SO */}
                                     {poCategory === "SO" && (
                                       <CommandGroup heading="Daftar Sales Orders">
                                         {orders.map((o) => (
@@ -1059,10 +1236,15 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                                                 ...prev,
                                                 [index]: false,
                                               }));
-                                              handleAutoFillFromReference(
-                                                "SO",
-                                                o.id,
-                                                index,
+                                              if (isProductExpense) {
+                                                handleAutoFillFromReference(
+                                                  "SO",
+                                                  o.id,
+                                                  index,
+                                                );
+                                              }
+                                              form.clearErrors(
+                                                `items.${index}.orderId`,
                                               );
                                             }}>
                                             <Check
@@ -1084,7 +1266,6 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                                       </CommandGroup>
                                     )}
 
-                                    {/* LIST JIKA MODE REP */}
                                     {poCategory === "REP" && (
                                       <CommandGroup heading="Daftar Replacement Orders">
                                         {replacementOrders.map((r) => (
@@ -1104,10 +1285,15 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                                                 ...prev,
                                                 [index]: false,
                                               }));
-                                              handleAutoFillFromReference(
-                                                "REP",
-                                                r.id,
-                                                index,
+                                              if (isProductExpense) {
+                                                handleAutoFillFromReference(
+                                                  "REP",
+                                                  r.id,
+                                                  index,
+                                                );
+                                              }
+                                              form.clearErrors(
+                                                `items.${index}.orderId`,
                                               );
                                             }}>
                                             <Check
@@ -1132,6 +1318,11 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                                 </Command>
                               </PopoverContent>
                             </Popover>
+                            {orderIdError && (
+                              <span className="text-red-500 text-xs mt-1 font-medium">
+                                {String(orderIdError)}
+                              </span>
+                            )}
                           </FormItem>
                         </div>
 
@@ -1141,9 +1332,12 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                             control={control}
                             name={`items.${index}.quantityOrder`}
                             render={({ field }) => (
-                              <FormItem>
+                              <FormItem
+                                className={
+                                  !isProductExpense ? "col-span-3" : ""
+                                }>
                                 <FormLabel className="lg:hidden text-xs text-center block">
-                                  Qty Order
+                                  {isProductExpense ? "Qty Order" : "Quantity"}
                                 </FormLabel>
                                 <FormControl>
                                   <Input
@@ -1154,7 +1348,13 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                                       field.onChange(
                                         e.target.valueAsNumber || 0,
                                       );
-                                      recalculateQtyPurchase(index);
+                                      if (isProductExpense)
+                                        recalculateQtyPurchase(index);
+                                      else
+                                        form.setValue(
+                                          `items.${index}.quantityPurchase`,
+                                          e.target.valueAsNumber || 0,
+                                        );
                                     }}
                                     className="text-center h-10 border-blue-200 bg-blue-50/30"
                                   />
@@ -1162,50 +1362,55 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                               </FormItem>
                             )}
                           />
-                          <FormField
-                            control={control}
-                            name={`items.${index}.quantityStock`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="lg:hidden text-xs text-center block">
-                                  In Stock
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    {...field}
-                                    onChange={(e) => {
-                                      field.onChange(
-                                        e.target.valueAsNumber || 0,
-                                      );
-                                      recalculateQtyPurchase(index);
-                                    }}
-                                    className="text-center h-10 text-slate-500 bg-slate-50"
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={control}
-                            name={`items.${index}.quantityPurchase`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="lg:hidden text-xs text-center block">
-                                  To Buy
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    readOnly
-                                    {...field}
-                                    className="text-center h-10 font-bold bg-green-50 text-green-700 border-green-200"
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
+
+                          {isProductExpense && (
+                            <>
+                              <FormField
+                                control={control}
+                                name={`items.${index}.quantityStock`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="lg:hidden text-xs text-center block">
+                                      In Stock
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        {...field}
+                                        onChange={(e) => {
+                                          field.onChange(
+                                            e.target.valueAsNumber || 0,
+                                          );
+                                          recalculateQtyPurchase(index);
+                                        }}
+                                        className="text-center h-10 text-slate-500 bg-slate-50"
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={control}
+                                name={`items.${index}.quantityPurchase`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="lg:hidden text-xs text-center block">
+                                      To Buy
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        readOnly
+                                        {...field}
+                                        className="text-center h-10 font-bold bg-green-50 text-green-700 border-green-200"
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            </>
+                          )}
                         </div>
 
                         {/* 4. Unit Price & UOM */}
@@ -1290,8 +1495,9 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
                         </div>
                       </div>
 
-                      {/* Variants Logic */}
-                      {selectedProduct?.availableAttributes &&
+                      {/* Variants Logic (Hanya untuk Product) */}
+                      {isProductExpense &&
+                        selectedProduct?.availableAttributes &&
                         selectedProduct.availableAttributes.length > 0 && (
                           <div className="px-4 pb-4">
                             <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">

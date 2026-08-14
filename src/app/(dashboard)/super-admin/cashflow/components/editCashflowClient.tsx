@@ -7,6 +7,7 @@ import {
   Calculator,
   Loader2,
   PlusCircle,
+  RefreshCw,
   Save,
   Trash2,
   TrendingDown,
@@ -45,7 +46,6 @@ type Vendor = {
 };
 
 // === UTILS ===
-// Format dinamis menyesuaikan currency code
 const formatCurrency = (amount: number, currencyCode: string = "IDR") => {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -57,10 +57,12 @@ const formatCurrency = (amount: number, currencyCode: string = "IDR") => {
 
 // === HELPER SCHEMAS ===
 const anyToNumber = z.any().transform((val) => {
+  if (val === "" || val === null || val === undefined) return 0;
   const parsed = Number(val);
   return isNaN(parsed) ? 0 : parsed;
 });
 const anyToNumberDefaultOne = z.any().transform((val) => {
+  if (val === "" || val === null || val === undefined) return 1;
   const parsed = Number(val);
   return isNaN(parsed) || parsed === 0 ? 1 : parsed;
 });
@@ -127,39 +129,46 @@ export default function EditCashflowClient() {
   const revenueFields = useFieldArray({ control, name: "revenueItems" });
   const costFields = useFieldArray({ control, name: "costItems" });
 
-  // === CALCULATIONS STATE ===
-  const [summary, setSummary] = useState({
-    totalRevenue: 0,
-    totalCost: 0,
-    profit: 0,
-  });
+  // === REAL-TIME WATCH VALUES FOR SUMMARY ===
+  const watchedRevenues = watch("revenueItems");
+  const watchedCosts = watch("costItems");
 
-  const revenues = watch("revenueItems");
-  const costs = watch("costItems");
+  // Kalkulasi Real-time dalam satuan IDR untuk Analisis Profit Kanan
+  const totalRevenueCalculated = (watchedRevenues || []).reduce((acc, item) => {
+    const price = Number(item.unitPrice) || 0;
+    const qty = Number(item.quantity) || 0;
+    const rate = Number(item.exchangeRate) || 1;
+    return acc + price * qty * rate;
+  }, 0);
 
-  useEffect(() => {
-    const totalRev = revenues.reduce((acc, item) => {
-      const val =
-        (Number(item.unitPrice) || 0) *
-        (Number(item.quantity) || 0) *
-        (Number(item.exchangeRate) || 1);
-      return acc + val;
-    }, 0);
+  const totalCostCalculated = (watchedCosts || []).reduce((acc, item) => {
+    const cost = Number(item.costPerUnit) || 0;
+    const qty = Number(item.quantity) || 0;
+    const rate = Number(item.exchangeRate) || 1;
+    return acc + cost * qty * rate;
+  }, 0);
 
-    const totalCst = costs.reduce((acc, item) => {
-      const val =
-        (Number(item.costPerUnit) || 0) *
-        (Number(item.quantity) || 0) *
-        (Number(item.exchangeRate) || 1);
-      return acc + val;
-    }, 0);
+  const netProfitCalculated = totalRevenueCalculated - totalCostCalculated;
 
-    setSummary({
-      totalRevenue: totalRev,
-      totalCost: totalCst,
-      profit: totalRev - totalCst,
-    });
-  }, [revenues, costs]);
+  // Kalkulasi Total untuk Badge Header Card (Berdasarkan mata uang acuan atau penjumlahan item)
+  const totalRevenueHeaderBadge = (watchedRevenues || []).reduce(
+    (acc, item) => {
+      const price = Number(item.unitPrice) || 0;
+      const qty = Number(item.quantity) || 0;
+      return acc + price * qty;
+    },
+    0,
+  );
+
+  const totalCostHeaderBadge = (watchedCosts || []).reduce((acc, item) => {
+    const cost = Number(item.costPerUnit) || 0;
+    const qty = Number(item.quantity) || 0;
+    return acc + cost * qty;
+  }, 0);
+
+  // Ambil mata uang baris pertama sebagai referensi badge header jika ada
+  const firstRevenueCurrency = watchedRevenues?.[0]?.currency || baseCurrency;
+  const firstCostCurrency = watchedCosts?.[0]?.currency || baseCurrency;
 
   // === LOAD DATA ===
   const loadData = useCallback(async () => {
@@ -188,22 +197,18 @@ export default function EditCashflowClient() {
 
       const detailData = await cashflowRes.json();
 
-      // ✨ 1. Simpan SEMUA data vendor untuk Dropdown pilihan manual
       const allVendors = detailData.availableVendors || [];
       setVendors(allVendors);
 
-      // ✨ 2. Ambil VENDOR KHUSUS dari PO untuk Auto-fill
       const fetchedPOVendors = detailData.poVendors || [];
-
       const bCurrency = detailData.summary?.baseCurrencyId || "IDR";
       setBaseCurrency(bCurrency);
 
-      // ✨ 3. Logika Auto-fill menggunakan fetchedPOVendors
       const initialCostItems =
         detailData.costs && detailData.costs.length > 0
           ? detailData.costs.map((c: any) => ({
               isManual: !c.vendorId,
-              description: c.description,
+              description: c.description || "",
               vendorId: c.vendorId || "",
               costPerUnit: Number(c.costPerUnit),
               quantity: Number(c.quantity),
@@ -212,14 +217,25 @@ export default function EditCashflowClient() {
               total: Number(c.total),
             }))
           : fetchedPOVendors.map((v: any) => ({
-              // <-- Menggunakan data PO Vendor
-              isManual: false,
-              description: "",
-              vendorId: v.id,
-              costPerUnit: 0,
-              quantity: 1,
-              currency: bCurrency,
-              exchangeRate: 1,
+              isManual: !v.vendorId && !v.id,
+              description:
+                v.itemName ||
+                v.vendorItem?.name ||
+                v.description ||
+                v.name ||
+                "",
+              vendorId: v.vendorId || v.id || "",
+              costPerUnit: Number(v.unitPrice || v.costPerUnit || 0),
+              quantity: Number(
+                v.quantityPurchase || v.quantityOrder || v.quantity || 1,
+              ),
+              currency:
+                v.currencyCode ||
+                v.currency ||
+                v.po?.currencyCode ||
+                detailData.summary?.currencyCode ||
+                bCurrency,
+              exchangeRate: Number(v.exchangeRate) || 1,
               total: 0,
             }));
 
@@ -243,57 +259,77 @@ export default function EditCashflowClient() {
       setLoading(false);
     }
   }, [referenceId, type, reset, status, fetchApi]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // === FUNGSI AUTO CONVERT RATE ===
+  // === FUNGSI AUTO CONVERT RATE YANG BENAR (MEMANFAATKAN BACKEND SEPENUHNYA) ===
   const handleCurrencyChange = async (
     index: number,
     newCurrency: string,
+    oldCurrency: string, // Parameter oldCurrency yang ditambahkan sebelumnya
     type: "cost" | "revenue",
+    isManualTrigger: boolean = false,
   ) => {
-    setValue(`${type}Items.${index}.currency` as any, newCurrency);
+    const fieldNamePrefix =
+      type === "revenue" ? `revenueItems.${index}` : `costItems.${index}`;
+    const currentPriceField = type === "revenue" ? "unitPrice" : "costPerUnit";
 
-    if (newCurrency === baseCurrency) {
-      setValue(`${type}Items.${index}.exchangeRate` as any, 1);
+    // Ambil harga saat ini (Misal: 12000000 IDR)
+    const currentPrice =
+      Number(getValues(`${fieldNamePrefix}.${currentPriceField}` as any)) || 0;
+
+    if (!isManualTrigger) {
+      setValue(`${fieldNamePrefix}.currency` as any, newCurrency);
+    }
+
+    if (newCurrency === oldCurrency && !isManualTrigger) {
       return;
     }
 
-    // 3. Panggil API Konversi
     try {
       setIsConvertingRate(true);
+
+      // Kita buat SATU skenario kuat: Kirim harga aktualnya ke Backend, dan biarkan Backend menghitung.
       const res = await fetchApi("/currencies/convert/rate", {
         method: "POST",
         body: JSON.stringify({
-          fromCurrency: newCurrency,
-          toCurrency: baseCurrency,
-          amount: 1,
+          fromCurrency: oldCurrency, // Dari (Misal: IDR)
+          toCurrency: newCurrency, // Ke (Misal: EUR)
+          amount: currentPrice || 1, // Kirim harga aktualnya! (Jika 0, kirim 1 agar dapat rate dasar)
         }),
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Gagal mengkonversi kurs");
-      }
-
+      if (!res.ok) throw new Error(`Gagal konversi ke ${newCurrency}`);
       const data = await res.json();
-      const rate = data.rate || data.data?.rate;
 
-      setValue(`${type}Items.${index}.exchangeRate` as any, rate);
-      toast.success(
-        `Kurs ${newCurrency} ke ${baseCurrency} diperbarui (${rate})`,
-      );
+      // ✨ Jika harga awal bukan 0, langsung pakai hasil perhitungan (convertedAmount) dari API!
+      if (currentPrice > 0) {
+        const finalPrice = data.convertedAmount || data.data?.convertedAmount;
+
+        setValue(
+          `${fieldNamePrefix}.${currentPriceField}` as any,
+          Number(finalPrice),
+        );
+        setValue(`${fieldNamePrefix}.exchangeRate` as any, 1);
+        toast.success(`Berhasil mengubah nilai ke ${newCurrency}!`);
+      }
+      // Jika harga awal 0, cuma ambil rate-nya saja (refresh rate)
+      else {
+        const rateToTarget = data.rate || data.data?.rate || 1;
+        setValue(`${fieldNamePrefix}.exchangeRate` as any, rateToTarget);
+        toast.success(
+          `Kurs 1 ${oldCurrency} ke ${newCurrency} berhasil dimuat.`,
+        );
+      }
     } catch (error: any) {
       console.error(error);
-      toast.error(
-        error.message || "Gagal mendapatkan kurs otomatis, mohon isi manual.",
-      );
+      toast.error(error.message || "Gagal mendapatkan kurs otomatis.");
     } finally {
       setIsConvertingRate(false);
     }
   };
-
   // === SUBMIT HANDLER ===
   const onSubmit = async (data: CashflowFormValues) => {
     if (status !== "authenticated") return;
@@ -305,15 +341,26 @@ export default function EditCashflowClient() {
         orderId: type === "order" ? referenceId : undefined,
         replacementOrderId: type === "replacement" ? referenceId : undefined,
         orderNumber: data.poNumber,
-        revenueItems: data.revenueItems.map((item) => ({
-          ...item,
-          total: item.unitPrice * item.quantity * (item.exchangeRate || 1),
-        })),
-        costItems: data.costItems.map((item) => ({
-          ...item,
-          vendorId: item.isManual ? undefined : item.vendorId,
-          total: item.costPerUnit * item.quantity * (item.exchangeRate || 1),
-        })),
+        revenueItems: data.revenueItems.map((item) => {
+          const rate = Number(item.exchangeRate) || 1;
+          return {
+            ...item,
+            exchangeRate: rate,
+            historicalExchangeRate: rate,
+            total: Number(item.unitPrice) * Number(item.quantity) * rate,
+          };
+        }),
+        costItems: data.costItems.map((item) => {
+          const rate = Number(item.exchangeRate) || 1;
+          return {
+            ...item,
+            isManual: Boolean(item.isManual),
+            vendorId: item.isManual ? undefined : item.vendorId,
+            exchangeRate: rate,
+            historicalExchangeRate: rate,
+            total: Number(item.costPerUnit) * Number(item.quantity) * rate,
+          };
+        }),
       };
 
       const res = await fetchApi(`/cashflows`, {
@@ -333,6 +380,62 @@ export default function EditCashflowClient() {
       toast.error(error.message || "Gagal menyimpan data");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // === FUNGSI KONVERSI UNIVERSAL KE RUPIAH (IDR) ===
+  const convertToRupiahDirectly = async (
+    index: number,
+    type: "cost" | "revenue",
+  ) => {
+    try {
+      setIsConvertingRate(true);
+
+      const fieldName =
+        type === "revenue" ? `revenueItems.${index}` : `costItems.${index}`;
+      const item = getValues(fieldName as any);
+
+      const currentUnitPrice =
+        Number(item?.unitPrice || item?.costPerUnit) || 0;
+      const currentCurr = item?.currency || baseCurrency;
+
+      if (currentCurr === "IDR") {
+        toast.info("Mata uang sudah dalam bentuk IDR.");
+        return;
+      }
+
+      const res = await fetchApi("/currencies/convert/rate", {
+        method: "POST",
+        body: JSON.stringify({
+          fromCurrency: currentCurr,
+          toCurrency: "IDR",
+          amount: 1,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Gagal mengambil kurs ke IDR");
+
+      const data = await res.json();
+      const rateToIdr = data.rate || data.data?.rate || 1;
+
+      const priceInIdr = currentUnitPrice * rateToIdr;
+
+      setValue(`${fieldName}.currency` as any, "IDR");
+      if (type === "revenue") {
+        setValue(`revenueItems.${index}.unitPrice` as any, priceInIdr);
+      } else {
+        setValue(`costItems.${index}.costPerUnit` as any, priceInIdr);
+      }
+      setValue(`${fieldName}.exchangeRate` as any, 1);
+
+      toast.success(
+        `Berhasil mengkonversi ${currentCurr} ke IDR menggunakan kurs ${rateToIdr}!`,
+      );
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Gagal mengkonversi ke Rupiah.");
+    } finally {
+      setIsConvertingRate(false);
     }
   };
 
@@ -371,39 +474,48 @@ export default function EditCashflowClient() {
 
       <Form {...form}>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Grid utama 3 kolom: 2 untuk form kiri, 1 untuk sticky kanan tanpa overflow-hidden pembatas */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
             {/* === LEFT COLUMN: FORM INPUTS (Revenue & Cost) === */}
             <div className="xl:col-span-2 space-y-8">
               {/* --- 1. REVENUE SECTION --- */}
-              <Card className="border-t-4 border-t-emerald-500 shadow-sm">
-                <CardHeader className="bg-emerald-50/30 pb-4">
+              <Card className="border border-white/60 bg-white/40 backdrop-blur-xl shadow-xl overflow-hidden rounded-2xl relative">
+                {/* Efek gradasi halus di latar belakang (opsional, untuk menambah kesan liquid) */}
+                <div className="absolute inset-0 bg-linear-to-br from-emerald-100/20 via-transparent to-transparent pointer-events-none" />
+
+                <CardHeader className="bg-white/30 backdrop-blur-md pb-4 border-b border-white/50 relative z-10">
                   <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg text-emerald-800 flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5" />
+                    <CardTitle className="text-lg text-emerald-900 flex items-center gap-2 font-semibold">
+                      <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-700 shadow-sm backdrop-blur-md">
+                        <TrendingUp className="h-5 w-5" />
+                      </div>
                       Revenue (Pemasukan)
                     </CardTitle>
                     <Badge
                       variant="secondary"
-                      className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200">
+                      className="bg-white/60 backdrop-blur-md text-emerald-800 border border-white/50 shadow-sm hover:bg-white/80 transition-colors">
                       Total:{" "}
-                      {formatCurrency(summary.totalRevenue, baseCurrency)}
+                      {formatCurrency(
+                        totalRevenueHeaderBadge,
+                        firstRevenueCurrency,
+                      )}
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
+
+                <CardContent className="p-0 relative z-10">
                   <div className="p-4 space-y-5">
                     {revenueFields.fields.map((field, index) => {
-                      // Ambil mata uang baris ini, default ke baseCurrency
                       const rowCurrency =
                         watch(`revenueItems.${index}.currency`) || baseCurrency;
 
                       return (
                         <div
                           key={field.id}
-                          className="flex flex-col gap-4 border border-gray-200 shadow-sm bg-gray-50/30 p-4 rounded-xl">
-                          {/* Deskripsi */}
+                          // Efek Glass untuk setiap item baris
+                          className="flex flex-col gap-4 border border-white/60 shadow-md bg-white/50 backdrop-blur-lg p-4 rounded-xl transition-all duration-300 hover:shadow-lg hover:bg-white/60">
                           <div className="w-full">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1.5 block">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase mb-1.5 block tracking-wider">
                               Description / Nama Pemasukan
                             </label>
                             <FormField
@@ -413,20 +525,18 @@ export default function EditCashflowClient() {
                                 <Input
                                   {...field}
                                   placeholder="Product Name / Service"
-                                  className="h-10 text-sm bg-white"
+                                  className="h-10 text-sm bg-white/70 border-white/50 shadow-inner focus:bg-white transition-colors"
                                 />
                               )}
                             />
                           </div>
 
-                          {/* Grid Konversi & Nominal */}
-                          <div className="grid grid-cols-2 lg:grid-cols-12 gap-4 items-end bg-white p-3.5 rounded-lg border border-gray-100 shadow-sm mt-1">
-                            {/* Curr */}
+                          <div className="grid grid-cols-2 lg:grid-cols-12 gap-4 items-end bg-white/40 p-3.5 rounded-lg border border-white/50 shadow-sm mt-1">
                             <div className="col-span-1 lg:col-span-2 space-y-1.5">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1 tracking-wider">
                                 Curr{" "}
                                 {isConvertingRate && (
-                                  <Loader2 className="w-2 h-2 animate-spin text-primary" />
+                                  <Loader2 className="w-2 h-2 animate-spin text-emerald-600" />
                                 )}
                               </label>
                               <FormField
@@ -438,18 +548,19 @@ export default function EditCashflowClient() {
                                       handleCurrencyChange(
                                         index,
                                         val,
+                                        field.value || baseCurrency,
                                         "revenue",
                                       )
                                     }
-                                    value={field.value}>
+                                    value={field.value || baseCurrency}>
                                     <FormControl>
                                       <SelectTrigger
-                                        className="h-9 text-sm bg-white"
+                                        className="h-9 text-sm bg-white/70 border-white/50 shadow-inner focus:bg-white"
                                         disabled={isConvertingRate}>
                                         <SelectValue />
                                       </SelectTrigger>
                                     </FormControl>
-                                    <SelectContent>
+                                    <SelectContent className="bg-white/90 backdrop-blur-xl border-white/50">
                                       {currencies.map((c) => (
                                         <SelectItem key={c.code} value={c.code}>
                                           {c.code}
@@ -461,9 +572,8 @@ export default function EditCashflowClient() {
                               />
                             </div>
 
-                            {/* Unit Price */}
                             <div className="col-span-1 lg:col-span-3 space-y-1.5">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                 Unit Price
                               </label>
                               <FormField
@@ -472,38 +582,83 @@ export default function EditCashflowClient() {
                                 render={({ field }) => (
                                   <Input
                                     type="number"
+                                    step="any"
                                     {...field}
-                                    className="h-9 text-sm text-right bg-white"
+                                    className="h-9 text-sm text-right bg-white/70 border-white/50 shadow-inner focus:bg-white"
                                   />
                                 )}
                               />
                             </div>
 
-                            {/* Rate Otomatis/Manual */}
                             <div className="col-span-1 lg:col-span-2 space-y-1.5">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                 Rate ({baseCurrency})
                               </label>
                               <FormField
                                 control={control}
                                 name={`revenueItems.${index}.exchangeRate`}
                                 render={({ field }) => (
-                                  <Input
-                                    type="number"
-                                    {...field}
-                                    className="h-9 text-sm text-right bg-gray-50"
-                                    disabled={
-                                      rowCurrency === baseCurrency ||
-                                      isConvertingRate
-                                    }
-                                  />
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="number"
+                                      step="any"
+                                      {...field}
+                                      className="h-9 text-sm text-right bg-white/70 border-white/50 shadow-inner flex-1 focus:bg-white"
+                                      disabled={
+                                        rowCurrency === baseCurrency ||
+                                        isConvertingRate
+                                      }
+                                      onChange={(e) =>
+                                        field.onChange(e.target.value)
+                                      }
+                                    />
+                                    {rowCurrency !== baseCurrency && (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-9 w-9 shrink-0 text-emerald-600 hover:text-emerald-700 bg-white/50 hover:bg-white/80 border-white/50 shadow-sm transition-all"
+                                        title="Tarik Kurs Terkini"
+                                        onClick={() =>
+                                          handleCurrencyChange(
+                                            index,
+                                            rowCurrency,
+                                            rowCurrency,
+                                            "revenue",
+                                            true,
+                                          )
+                                        }
+                                        disabled={isConvertingRate}>
+                                        <RefreshCw
+                                          className={cn(
+                                            "h-4 w-4",
+                                            isConvertingRate && "animate-spin",
+                                          )}
+                                        />
+                                      </Button>
+                                    )}
+                                  </div>
                                 )}
                               />
+                              {rowCurrency !== "IDR" && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full h-8 text-[11px] mt-1 bg-white/60 text-emerald-700 border-white/60 shadow-sm hover:bg-white/90 backdrop-blur-sm transition-all"
+                                  title="Ubah nominal ini langsung ke Rupiah (IDR)"
+                                  onClick={() =>
+                                    convertToRupiahDirectly(index, "revenue")
+                                  }
+                                  disabled={isConvertingRate}>
+                                  <RefreshCw className="mr-1 h-3 w-3" />
+                                  Ubah ke IDR
+                                </Button>
+                              )}
                             </div>
 
-                            {/* Qty */}
                             <div className="col-span-1 lg:col-span-2 space-y-1.5">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                 Qty
                               </label>
                               <FormField
@@ -512,30 +667,34 @@ export default function EditCashflowClient() {
                                 render={({ field }) => (
                                   <Input
                                     type="number"
+                                    step="any"
                                     {...field}
-                                    className="h-9 text-sm text-center bg-white"
+                                    className="h-9 text-sm text-center bg-white/70 border-white/50 shadow-inner focus:bg-white"
                                   />
                                 )}
                               />
                             </div>
 
-                            {/* Total & Delete */}
+                            {/* Total & Delete (Revenue) */}
                             <div className="col-span-2 lg:col-span-3 flex justify-end items-center gap-4 h-9">
                               <div className="flex flex-col items-end leading-none justify-center">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">
-                                  Total {baseCurrency}
+                                <span className="text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-wider">
+                                  Total {rowCurrency}
                                 </span>
-                                <span className="text-[15px] font-bold text-emerald-600 leading-none">
+                                <span className="text-[15px] font-extrabold text-emerald-700 leading-none drop-shadow-sm">
                                   {formatCurrency(
-                                    (watch(`revenueItems.${index}.unitPrice`) ||
-                                      0) *
-                                      (watch(
-                                        `revenueItems.${index}.quantity`,
+                                    (Number(
+                                      watch(`revenueItems.${index}.unitPrice`),
+                                    ) || 0) *
+                                      (Number(
+                                        watch(`revenueItems.${index}.quantity`),
                                       ) || 0) *
-                                      (watch(
-                                        `revenueItems.${index}.exchangeRate`,
+                                      (Number(
+                                        watch(
+                                          `revenueItems.${index}.exchangeRate`,
+                                        ),
                                       ) || 1),
-                                    baseCurrency,
+                                    rowCurrency,
                                   )}
                                 </span>
                               </div>
@@ -543,7 +702,7 @@ export default function EditCashflowClient() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-gray-400 hover:bg-red-100 hover:text-red-600 shrink-0"
+                                className="h-8 w-8 text-slate-400 hover:bg-red-500/10 hover:text-red-600 shrink-0 transition-colors rounded-full"
                                 onClick={() => revenueFields.remove(index)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -554,13 +713,14 @@ export default function EditCashflowClient() {
                     })}
 
                     {revenueFields.fields.length === 0 && (
-                      <div className="text-center py-10 text-muted-foreground text-sm border-2 border-dashed rounded-xl bg-gray-50">
+                      <div className="text-center py-10 text-slate-500 text-sm border-2 border-dashed border-white/60 rounded-xl bg-white/30 backdrop-blur-sm">
                         Belum ada pemasukan diinput.
                       </div>
                     )}
                   </div>
 
-                  <div className="bg-gray-50/80 p-4 border-t border-gray-200 flex justify-center rounded-b-lg">
+                  {/* Area Tombol Tambah */}
+                  <div className="bg-white/30 backdrop-blur-md p-4 border-t border-white/50 flex justify-center rounded-b-2xl relative z-10">
                     <Button
                       type="button"
                       variant="outline"
@@ -576,7 +736,7 @@ export default function EditCashflowClient() {
                           total: 0,
                         })
                       }
-                      className="text-emerald-700 border-emerald-200 hover:bg-emerald-50 bg-white shadow-sm">
+                      className="text-emerald-800 border-white/60 bg-white/50 backdrop-blur-sm hover:bg-white/80 shadow-sm transition-all rounded-full px-6">
                       <PlusCircle className="mr-2 h-4 w-4" /> Tambah Pemasukan
                       Baru
                     </Button>
@@ -585,21 +745,29 @@ export default function EditCashflowClient() {
               </Card>
 
               {/* --- 2. COST SECTION --- */}
-              <Card className="border-t-4 border-t-red-500 shadow-sm">
-                <CardHeader className="bg-red-50/30 pb-4">
+              {/* Menggunakan efek Glassmorphism untuk Card Utama */}
+              <Card className="border border-white/60 bg-white/40 backdrop-blur-xl shadow-xl overflow-hidden rounded-2xl relative mt-8">
+                {/* Efek gradasi halus di latar belakang untuk nuansa merah */}
+                <div className="absolute inset-0 bg-linear-to-br from-red-100/20 via-transparent to-transparent pointer-events-none" />
+
+                <CardHeader className="bg-white/30 backdrop-blur-md pb-4 border-b border-white/50 relative z-10">
                   <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg text-red-800 flex items-center gap-2">
-                      <TrendingDown className="h-5 w-5" />
+                    <CardTitle className="text-lg text-red-900 flex items-center gap-2 font-semibold">
+                      <div className="p-2 rounded-xl bg-red-500/20 text-red-700 shadow-sm backdrop-blur-md">
+                        <TrendingDown className="h-5 w-5" />
+                      </div>
                       Cost (Pengeluaran)
                     </CardTitle>
                     <Badge
                       variant="secondary"
-                      className="bg-red-100 text-red-700 hover:bg-red-200">
-                      Total: {formatCurrency(summary.totalCost, baseCurrency)}
+                      className="bg-white/60 backdrop-blur-md text-red-800 border border-white/50 shadow-sm hover:bg-white/80 transition-colors">
+                      Total:{" "}
+                      {formatCurrency(totalCostHeaderBadge, firstCostCurrency)}
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
+
+                <CardContent className="p-0 relative z-10">
                   <div className="p-4 space-y-5">
                     {costFields.fields.map((field, index) => {
                       const isManual = watch(`costItems.${index}.isManual`);
@@ -609,8 +777,9 @@ export default function EditCashflowClient() {
                       return (
                         <div
                           key={field.id}
-                          className="flex flex-col gap-4 border border-gray-200 shadow-sm bg-gray-50/30 p-4 rounded-xl">
-                          <div className="flex items-center justify-between pb-3 border-b border-gray-200/80">
+                          // Efek Glass untuk setiap item baris
+                          className="flex flex-col gap-4 border border-white/60 shadow-md bg-white/50 backdrop-blur-lg p-4 rounded-xl transition-all duration-300 hover:shadow-lg hover:bg-white/60">
+                          <div className="flex items-center justify-between pb-3 border-b border-slate-300/40">
                             <div className="flex items-center gap-3">
                               <Switch
                                 checked={isManual}
@@ -623,7 +792,7 @@ export default function EditCashflowClient() {
                                   );
                                 }}
                               />
-                              <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                              <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
                                 Input Manual?
                               </span>
                             </div>
@@ -633,7 +802,7 @@ export default function EditCashflowClient() {
                             {!isManual ? (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                  <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                     Vendor
                                   </label>
                                   <FormField
@@ -648,13 +817,13 @@ export default function EditCashflowClient() {
                                             "",
                                           );
                                         }}
-                                        value={field.value}>
+                                        value={field.value || ""}>
                                         <FormControl>
-                                          <SelectTrigger className="h-10 text-sm bg-white w-full">
+                                          <SelectTrigger className="h-10 text-sm bg-white/70 border-white/50 shadow-inner focus:bg-white w-full transition-colors">
                                             <SelectValue placeholder="Pilih Vendor" />
                                           </SelectTrigger>
                                         </FormControl>
-                                        <SelectContent>
+                                        <SelectContent className="bg-white/90 backdrop-blur-xl border-white/50">
                                           {vendors.map((v) => (
                                             <SelectItem key={v.id} value={v.id}>
                                               {v.companyName}
@@ -667,7 +836,7 @@ export default function EditCashflowClient() {
                                 </div>
 
                                 <div className="space-y-1.5">
-                                  <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                     Item / Servis Vendor
                                   </label>
                                   <FormField
@@ -686,16 +855,16 @@ export default function EditCashflowClient() {
                                       return (
                                         <Select
                                           onValueChange={field.onChange}
-                                          value={field.value}
+                                          value={field.value || ""}
                                           disabled={!currentVendorId}>
                                           <FormControl>
-                                            <SelectTrigger className="h-10 text-sm bg-white w-full">
+                                            <SelectTrigger className="h-10 text-sm bg-white/70 border-white/50 shadow-inner focus:bg-white w-full transition-colors">
                                               <SelectValue placeholder="Pilih Item" />
                                             </SelectTrigger>
                                           </FormControl>
-                                          <SelectContent>
+                                          <SelectContent className="bg-white/90 backdrop-blur-xl border-white/50">
                                             {vendorItems.length > 0 ? (
-                                              vendorItems.map((item) => (
+                                              vendorItems.map((item: any) => (
                                                 <SelectItem
                                                   key={item.id}
                                                   value={item.name}>
@@ -703,10 +872,22 @@ export default function EditCashflowClient() {
                                                 </SelectItem>
                                               ))
                                             ) : (
-                                              <div className="p-2 text-xs text-muted-foreground text-center">
+                                              <div className="p-2 text-xs text-slate-500 text-center">
                                                 Item kosong
                                               </div>
                                             )}
+
+                                            {field.value &&
+                                              !vendorItems.some(
+                                                (vi: any) =>
+                                                  vi.name === field.value,
+                                              ) &&
+                                              field.value !== "Lainnya" && (
+                                                <SelectItem value={field.value}>
+                                                  {field.value} (Sesuai PO)
+                                                </SelectItem>
+                                              )}
+
                                             <SelectItem value="Lainnya">
                                               Lainnya (Manual)
                                             </SelectItem>
@@ -719,7 +900,7 @@ export default function EditCashflowClient() {
                               </div>
                             ) : (
                               <div className="space-y-1.5 w-full">
-                                <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                   Nama Pengeluaran / Deskripsi
                                 </label>
                                 <FormField
@@ -728,8 +909,8 @@ export default function EditCashflowClient() {
                                   render={({ field }) => (
                                     <Input
                                       {...field}
-                                      placeholder="Contoh: Bensin Operasional, Makan Siang..."
-                                      className="h-10 text-sm bg-white"
+                                      placeholder="Contoh: Bensin Operasional..."
+                                      className="h-10 text-sm bg-white/70 border-white/50 shadow-inner focus:bg-white transition-colors"
                                     />
                                   )}
                                 />
@@ -737,12 +918,13 @@ export default function EditCashflowClient() {
                             )}
                           </div>
 
-                          <div className="grid grid-cols-2 lg:grid-cols-12 gap-4 items-end bg-white p-3.5 rounded-lg border border-gray-100 shadow-sm mt-1">
+                          {/* Grid Dalam (Angka & Rate) */}
+                          <div className="grid grid-cols-2 lg:grid-cols-12 gap-4 items-end bg-white/40 p-3.5 rounded-lg border border-white/50 shadow-sm mt-1">
                             <div className="col-span-1 lg:col-span-2 space-y-1.5">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1 tracking-wider">
                                 Curr{" "}
                                 {isConvertingRate && (
-                                  <Loader2 className="w-2 h-2 animate-spin text-primary" />
+                                  <Loader2 className="w-2 h-2 animate-spin text-red-600" />
                                 )}
                               </label>
                               <FormField
@@ -751,17 +933,22 @@ export default function EditCashflowClient() {
                                 render={({ field }) => (
                                   <Select
                                     onValueChange={(val) =>
-                                      handleCurrencyChange(index, val, "cost")
+                                      handleCurrencyChange(
+                                        index,
+                                        val,
+                                        field.value || baseCurrency,
+                                        "cost",
+                                      )
                                     }
-                                    value={field.value}>
+                                    value={field.value || baseCurrency}>
                                     <FormControl>
                                       <SelectTrigger
-                                        className="h-9 text-sm bg-white"
+                                        className="h-9 text-sm bg-white/70 border-white/50 shadow-inner focus:bg-white"
                                         disabled={isConvertingRate}>
                                         <SelectValue />
                                       </SelectTrigger>
                                     </FormControl>
-                                    <SelectContent>
+                                    <SelectContent className="bg-white/90 backdrop-blur-xl border-white/50">
                                       {currencies.map((c) => (
                                         <SelectItem key={c.code} value={c.code}>
                                           {c.code}
@@ -773,9 +960,8 @@ export default function EditCashflowClient() {
                               />
                             </div>
 
-                            {/* Cost/Unit */}
                             <div className="col-span-1 lg:col-span-3 space-y-1.5">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                 Cost/Unit
                               </label>
                               <FormField
@@ -784,38 +970,83 @@ export default function EditCashflowClient() {
                                 render={({ field }) => (
                                   <Input
                                     type="number"
+                                    step="any"
                                     {...field}
-                                    className="h-9 text-sm text-right bg-white"
+                                    className="h-9 text-sm text-right bg-white/70 border-white/50 shadow-inner focus:bg-white"
                                   />
                                 )}
                               />
                             </div>
 
-                            {/* Rate Otomatis/Manual */}
                             <div className="col-span-1 lg:col-span-2 space-y-1.5">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                 Rate ({baseCurrency})
                               </label>
                               <FormField
                                 control={control}
                                 name={`costItems.${index}.exchangeRate`}
                                 render={({ field }) => (
-                                  <Input
-                                    type="number"
-                                    {...field}
-                                    className="h-9 text-sm text-right bg-gray-50"
-                                    disabled={
-                                      rowCurrency === baseCurrency ||
-                                      isConvertingRate
-                                    }
-                                  />
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="number"
+                                      step="any"
+                                      {...field}
+                                      className="h-9 text-sm text-right bg-white/70 border-white/50 shadow-inner flex-1 focus:bg-white"
+                                      disabled={
+                                        rowCurrency === baseCurrency ||
+                                        isConvertingRate
+                                      }
+                                      onChange={(e) =>
+                                        field.onChange(e.target.value)
+                                      }
+                                    />
+                                    {rowCurrency !== baseCurrency && (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-9 w-9 shrink-0 text-red-600 hover:text-red-700 bg-white/50 hover:bg-white/80 border-white/50 shadow-sm transition-all"
+                                        title="Tarik Kurs Terkini"
+                                        onClick={() =>
+                                          handleCurrencyChange(
+                                            index,
+                                            rowCurrency,
+                                            rowCurrency,
+                                            "cost",
+                                            true,
+                                          )
+                                        }
+                                        disabled={isConvertingRate}>
+                                        <RefreshCw
+                                          className={cn(
+                                            "h-4 w-4",
+                                            isConvertingRate && "animate-spin",
+                                          )}
+                                        />
+                                      </Button>
+                                    )}
+                                  </div>
                                 )}
                               />
+                              {rowCurrency !== "IDR" && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full h-8 text-[11px] mt-1 bg-white/60 text-red-700 border-white/60 shadow-sm hover:bg-white/90 backdrop-blur-sm transition-all"
+                                  title="Ubah nominal ini langsung ke Rupiah (IDR)"
+                                  onClick={() =>
+                                    convertToRupiahDirectly(index, "cost")
+                                  }
+                                  disabled={isConvertingRate}>
+                                  <RefreshCw className="mr-1 h-3 w-3" />
+                                  Ubah ke IDR
+                                </Button>
+                              )}
                             </div>
 
-                            {/* Qty */}
                             <div className="col-span-1 lg:col-span-2 space-y-1.5">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                 Qty
                               </label>
                               <FormField
@@ -824,29 +1055,34 @@ export default function EditCashflowClient() {
                                 render={({ field }) => (
                                   <Input
                                     type="number"
+                                    step="any"
                                     {...field}
-                                    className="h-9 text-sm text-center bg-white"
+                                    className="h-9 text-sm text-center bg-white/70 border-white/50 shadow-inner focus:bg-white"
                                   />
                                 )}
                               />
                             </div>
 
-                            {/* Total & Delete */}
+                            {/* Total & Delete (Cost) */}
                             <div className="col-span-2 lg:col-span-3 flex justify-end items-center gap-4 h-9">
                               <div className="flex flex-col items-end leading-none justify-center">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">
-                                  Total {baseCurrency}
+                                <span className="text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-wider">
+                                  Total {rowCurrency}
                                 </span>
-                                <span className="text-[15px] font-bold text-red-600 leading-none">
+                                <span className="text-[15px] font-extrabold text-red-700 leading-none drop-shadow-sm">
                                   {formatCurrency(
-                                    (watch(`costItems.${index}.costPerUnit`) ||
-                                      0) *
-                                      (watch(`costItems.${index}.quantity`) ||
-                                        0) *
-                                      (watch(
-                                        `costItems.${index}.exchangeRate`,
+                                    (Number(
+                                      watch(`costItems.${index}.costPerUnit`),
+                                    ) || 0) *
+                                      (Number(
+                                        watch(`costItems.${index}.quantity`),
+                                      ) || 0) *
+                                      (Number(
+                                        watch(
+                                          `costItems.${index}.exchangeRate`,
+                                        ),
                                       ) || 1),
-                                    baseCurrency,
+                                    rowCurrency,
                                   )}
                                 </span>
                               </div>
@@ -854,7 +1090,7 @@ export default function EditCashflowClient() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-gray-400 hover:bg-red-100 hover:text-red-600 shrink-0"
+                                className="h-8 w-8 text-slate-400 hover:bg-red-500/10 hover:text-red-600 shrink-0 transition-colors rounded-full"
                                 onClick={() => costFields.remove(index)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -865,13 +1101,14 @@ export default function EditCashflowClient() {
                     })}
 
                     {costFields.fields.length === 0 && (
-                      <div className="text-center py-10 text-muted-foreground text-sm border-2 border-dashed rounded-xl bg-gray-50">
+                      <div className="text-center py-10 text-slate-500 text-sm border-2 border-dashed border-white/60 rounded-xl bg-white/30 backdrop-blur-sm">
                         Belum ada pengeluaran diinput.
                       </div>
                     )}
                   </div>
 
-                  <div className="bg-gray-50/80 p-4 border-t border-gray-200 flex justify-center rounded-b-lg">
+                  {/* Area Tombol Tambah Cost */}
+                  <div className="bg-white/30 backdrop-blur-md p-4 border-t border-white/50 flex justify-center rounded-b-2xl relative z-10">
                     <Button
                       type="button"
                       variant="outline"
@@ -888,7 +1125,7 @@ export default function EditCashflowClient() {
                           total: 0,
                         })
                       }
-                      className="text-red-700 border-red-200 hover:bg-red-50 bg-white shadow-sm">
+                      className="text-red-800 border-white/60 bg-white/50 backdrop-blur-sm hover:bg-white/80 shadow-sm transition-all rounded-full px-6">
                       <PlusCircle className="mr-2 h-4 w-4" /> Tambah Pengeluaran
                       Baru
                     </Button>
@@ -897,58 +1134,75 @@ export default function EditCashflowClient() {
               </Card>
             </div>
 
-            {/* === RIGHT COLUMN: SUMMARY STICKY === */}
+            {/* === RIGHT COLUMN: SUMMARY STICKY (APPLE GLASS STYLE & FIXED STICKY) === */}
             <div className="xl:col-span-1">
               <div className="sticky top-6 space-y-6">
-                <Card className="shadow-lg border-t-0 bg-slate-900 text-white">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xl flex items-center gap-2">
-                      <Calculator className="h-5 w-5 text-blue-400" />
-                      Profit Analysis ({baseCurrency})
+                {/* Kartu Profit Analysis */}
+                <Card className="shadow-2xl border border-white/40 bg-white/70 backdrop-blur-xl text-slate-800 rounded-2xl">
+                  <CardHeader className="pb-3 border-b border-slate-100/80 bg-white/40 rounded-t-2xl">
+                    <CardTitle className="text-lg flex items-center gap-2.5 text-slate-900">
+                      <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600">
+                        <Calculator className="h-5 w-5" />
+                      </div>
+                      Profit Analysis (IDR)
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4 pt-4">
+                  <CardContent className="space-y-4 pt-5">
+                    {/* Total Revenue Real-time */}
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-400">Total Revenue</span>
-                      <span className="font-semibold text-emerald-400">
-                        {formatCurrency(summary.totalRevenue, baseCurrency)}
+                      <span className="text-slate-500 font-medium">
+                        Total Revenue
+                      </span>
+                      <span className="font-bold text-emerald-600 text-base">
+                        {formatCurrency(totalRevenueCalculated, "IDR")}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-400">Total Cost</span>
-                      <span className="font-semibold text-red-400">
-                        ({formatCurrency(summary.totalCost, baseCurrency)})
-                      </span>
-                    </div>
-                    <Separator className="bg-slate-700 my-2" />
 
-                    <div className="flex justify-between items-center text-lg">
-                      <span className="font-bold">Net Profit</span>
+                    {/* Total Cost Real-time */}
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-500 font-medium">
+                        Total Cost
+                      </span>
+                      <span className="font-bold text-rose-600 text-base">
+                        ({formatCurrency(totalCostCalculated, "IDR")})
+                      </span>
+                    </div>
+
+                    <Separator className="bg-slate-200/60 my-1" />
+
+                    {/* Net Profit Real-time */}
+                    <div className="flex justify-between items-center text-base pt-1">
+                      <span className="font-bold text-slate-900">
+                        Net Profit
+                      </span>
                       <span
                         className={cn(
-                          "font-bold font-mono",
-                          summary.profit >= 0
-                            ? "text-emerald-400"
-                            : "text-red-400",
+                          "font-extrabold font-mono text-lg",
+                          netProfitCalculated >= 0
+                            ? "text-emerald-600"
+                            : "text-rose-600",
                         )}>
-                        {formatCurrency(summary.profit, baseCurrency)}
+                        {formatCurrency(netProfitCalculated, "IDR")}
                       </span>
                     </div>
 
-                    {/* Margin Calc */}
-                    {summary.totalRevenue > 0 && (
-                      <div className="text-right text-xs text-slate-500">
+                    {/* Margin Info */}
+                    {totalRevenueCalculated > 0 && (
+                      <div className="text-right text-xs text-slate-400 font-medium pt-0.5">
                         Margin:{" "}
-                        {(
-                          (summary.profit / summary.totalRevenue) *
-                          100
-                        ).toFixed(2)}
-                        %
+                        <span className="text-slate-700 font-semibold">
+                          {(
+                            (netProfitCalculated / totalRevenueCalculated) *
+                            100
+                          ).toFixed(2)}
+                          %
+                        </span>
                       </div>
                     )}
 
+                    {/* Tombol Simpan */}
                     <Button
-                      className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                      className="w-full mt-4 h-11 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl shadow-lg shadow-blue-500/25 transition-all duration-200"
                       size="lg"
                       onClick={form.handleSubmit(onSubmit, (errors) => {
                         toast.error(
@@ -967,25 +1221,25 @@ export default function EditCashflowClient() {
                 </Card>
 
                 {/* Guidelines Card */}
-                <Card className="bg-blue-50 border-blue-100 shadow-sm">
+                <Card className="border border-white/40 bg-white/60 backdrop-blur-lg shadow-lg rounded-2xl">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-blue-800">
+                    <CardTitle className="text-sm font-semibold text-slate-800">
                       Tips Pengisian
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="text-xs text-blue-700 space-y-2">
+                  <CardContent className="text-xs text-slate-600 space-y-2 leading-relaxed">
                     <p>
-                      1. <strong>Mata Uang Utama:</strong> Halaman ini
-                      disesuaikan dengan mata uang awal Order ({baseCurrency}).
+                      1. <strong>Real-time Calculation:</strong> Angka profit di
+                      atas otomatis berubah seketika saat kamu mengubah harga,
+                      jumlah, atau kurs di sebelah kiri.
                     </p>
                     <p>
-                      2. Jika Anda memilih mata uang pengeluaran yang berbeda
-                      (misal USD), sistem akan mengontak server untuk mengambil{" "}
-                      <strong>kurs terkini</strong>.
+                      2. Tekan tombol <strong>"Ubah ke IDR"</strong> untuk
+                      konversi mata uang asing secara instan.
                     </p>
                     <p>
-                      3. Anda tetap bisa mengubah nilai <strong>Rate</strong>{" "}
-                      tersebut secara manual jika diperlukan.
+                      3. Pastikan data sudah benar sebelum menekan tombol{" "}
+                      <strong>Save Changes</strong>.
                     </p>
                   </CardContent>
                 </Card>
