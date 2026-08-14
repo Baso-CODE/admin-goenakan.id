@@ -3,11 +3,21 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Loader2, Pencil, Plus, Star, X } from "lucide-react";
+import { Loader2, Pencil, Plus, Star, X, Layers } from "lucide-react";
 import Image from "next/image";
-import { ChangeEvent, useRef, useState } from "react";
+import { ChangeEvent, useRef, useState, useEffect } from "react";
 import { ImageDetailModalCore } from "../imageDetailCore";
 import { VideoDetailModalCore } from "../videoDetailCore";
+import { MockupAreaSelector } from "../MockupAreaSelector";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ProductMedia {
   id: string;
@@ -20,6 +30,10 @@ interface Product {
   id: string;
   images: ProductMedia[];
   videos: ProductMedia[];
+  isCustom?: boolean;
+  isMultiFace?: boolean;
+  mockupFrontImageId?: string | null;
+  mockupBackImageId?: string | null;
 }
 
 interface FormUpdateProductMediaProps {
@@ -299,6 +313,7 @@ export default function FormUpdateProductMedia({
           </div>
         </CardContent>
       </Card>
+
       {isModalOpen && selectedMedia && (
         <ImageDetailModalCore
           tempId={selectedMedia.id as any}
