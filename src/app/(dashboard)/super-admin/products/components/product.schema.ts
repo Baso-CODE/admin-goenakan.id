@@ -11,16 +11,18 @@ export type Category = {
 export const priceTierSchema = z.object({
   minQuantity: z.number().min(1, "Min qty wajib diisi"),
   maxQuantity: z.number().min(1).nullable().optional(),
+  discount: z.coerce.number().min(0).optional(),
   price: z
     .string()
     .or(z.number())
     .transform((val) => String(val))
-    .refine((val) => val.length > 0, "Harga wajib diisi"),
+    .optional(),
 });
 
 export const attributeSelectionSchema = z.object({
   attributeId: z.string().min(1, "Attribute required"),
   valueIds: z.array(z.string()).min(1, "Choose at least one value"),
+  priceModifiers: z.record(z.string(), z.number()).optional(),
 });
 
 export const variantMetaSchema = z.object({
@@ -55,6 +57,7 @@ export const productSchema = z.object({
   description: z.string().optional(),
   basePrice: z.number().min(0, "Base price must be >= 0"),
   isCustom: z.boolean().optional(),
+  isMadeByOrder: z.boolean().optional(),
   materialTypeId: z.string().min(1, "Material wajib dipilih"),
   stock: z.number().min(0, "Stock minimal 0").optional().default(0),
   materialType: z.string().optional(),
@@ -74,6 +77,11 @@ export const productSchema = z.object({
     .optional(),
   videosMetadata: z.array(videoMetaSchema).optional(),
   variantImagesMetadata: z.array(variantMetaSchema).optional(),
+  mockupAreaX: z.number().optional().nullable(),
+  mockupAreaY: z.number().optional().nullable(),
+  mockupAreaWidth: z.number().optional().nullable(),
+  mockupAreaHeight: z.number().optional().nullable(),
+  mockupSides: z.array(z.any()).optional(),
 });
 
 export type ProductFormValues = z.infer<typeof productSchema> & {

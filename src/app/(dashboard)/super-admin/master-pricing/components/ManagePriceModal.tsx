@@ -293,11 +293,6 @@ export function ManagePriceModal({
       } else {
         setTiers([]);
       }
-
-      // Auto-fetch exchange rate on open if it's a foreign currency
-      if (initialCurrency !== "IDR") {
-        fetchExchangeRates(initialCurrency);
-      }
     }
   }, [product, fetchExchangeRates]);
 
@@ -319,71 +314,124 @@ export function ManagePriceModal({
     const isInitialConfig = selectedQuoteId === product.activeVendorPriceRecordId && freightMode === savedFreightMode;
 
     if (quote.calculationMode === "FIXED") {
-      // Generate the 5 MOQ simulation steps as tiers!
-      const baseMoqCtn = Math.max(1, moqCtn || 1);
-      const tempTiers = [0, 1, 2, 3, 4].map((step) => {
-        const stepCtn = baseMoqCtn + step;
-        const stepPcs = stepCtn * qtyPerCtn;
-        const nextStepPcs = (baseMoqCtn + step + 1) * qtyPerCtn;
-        const minQuantity = stepPcs;
-        const maxQuantity = step < 4 ? nextStepPcs - 1 : null;
+      const activeTiers = (product.priceTiers && product.priceTiers.length > 0) 
+        ? product.priceTiers 
+        : null;
 
-        const calc = calculateCogsAndSellingPrice({
-          importType: quote.importType as "BORONGAN" | "RESMI",
-          beaMasukPercent: Number(quote.beaMasukPercent) || 0,
-          ppnPercent: Number(quote.ppnPercent) || 0,
-          pphPercent: Number(quote.pphPercent) || 0,
-          formECost: Number(quote.formECost) || 0,
-          insurancePercent: Number(quote.insurancePercent) || 0,
-          handlingCost: Number(quote.handlingCost) || 0,
-          otherCost: Number(quote.otherCost) || 0,
-          foreignPrice: Number(quote.foreignPrice) || 0,
-          gzDeliveryCost: Number(quote.gzDeliveryCost) || 0,
-          exchangeRate: exchangeRate,
-          qtyPcs: stepPcs,
-          qtyPerCtn,
-          length: Number(quote.length) || 0,
-          width: Number(quote.width) || 0,
-          height: Number(quote.height) || 0,
-          weight: Number(quote.weight) || 0,
-          seaFreightRate: Number(quote.seaFreightRate) || 0,
-          airFreightRate: Number(quote.airFreightRate) || 0,
-          localFreight: Number(quote.localFreight) || 0,
-          margin: Number(quote.margin) || 0,
-          sponsorPercent: Number(quote.sponsorPercent) * 100 || 0,
-          roundUpTo: roundUpToVal,
+      if (activeTiers) {
+        // Recalculate using existing saved tiers
+        const tempTiers = activeTiers.map((t, idx) => {
+          const calc = calculateCogsAndSellingPrice({
+            importType: quote.importType as "BORONGAN" | "RESMI",
+            beaMasukPercent: Number(quote.beaMasukPercent) || 0,
+            ppnPercent: Number(quote.ppnPercent) || 11,
+            pphPercent: Number(quote.pphPercent) || 2.5,
+            formECost: Number(quote.formECost) || 0,
+            insurancePercent: Number(quote.insurancePercent) || 0,
+            handlingCost: Number(quote.handlingCost) || 0,
+            otherCost: Number(quote.otherCost) || 0,
+            foreignPrice: Number(quote.foreignPrice) || 0,
+            gzDeliveryCost: Number(quote.gzDeliveryCost) || 0,
+            exchangeRate: exchangeRate,
+            qtyPcs: t.minQuantity,
+            qtyPerCtn,
+            length: Number(quote.length) || 0,
+            width: Number(quote.width) || 0,
+            height: Number(quote.height) || 0,
+            weight: Number(quote.weight) || 0,
+            seaFreightRate: Number(quote.seaFreightRate) || 0,
+            airFreightRate: Number(quote.airFreightRate) || 0,
+            localFreight: Number(quote.localFreight) || 0,
+            margin: Number(quote.margin) || 0,
+            sponsorPercent: Number(quote.sponsorPercent) * 100 || 0,
+            roundUpTo: roundUpToVal,
+          });
+
+          const finalPrice = freightMode === "SEA" ? calc.sellPriceSea : calc.sellPriceAir;
+          
+          // Use saved database price if initial config, otherwise use calculated finalPrice
+          const targetPrice = isInitialConfig ? (Number(t.price) || finalPrice) : finalPrice;
+
+          return {
+            id: t.id || `temp-fixed-step-${idx}`,
+            minQuantity: t.minQuantity,
+            maxQuantity: t.maxQuantity,
+            price: targetPrice,
+            discount: 0,
+          };
         });
 
-        const finalPrice = freightMode === "SEA" ? calc.sellPriceSea : calc.sellPriceAir;
+        const computedBasePrice = isInitialConfig 
+          ? (Number(product.basePrice) || 0) 
+          : (tempTiers[0]?.price || 0);
 
-        return {
-          id: `temp-fixed-step-${step}`,
-          minQuantity,
-          maxQuantity,
-          price: finalPrice,
-          discount: 0,
-        };
-      });
-
-      const computedBasePrice = tempTiers[0]?.price || 0;
-      const generatedTiers = tempTiers.map((t) => {
-        const existingDbTier = isInitialConfig ? product.priceTiers?.find((pt) => pt.minQuantity === t.minQuantity) : null;
-        if (existingDbTier) {
-          const dbPrice = Number(existingDbTier.price) || 0;
+        const generatedTiers = tempTiers.map((t) => {
           return {
             ...t,
-            price: dbPrice,
-            discount: Math.max(0, computedBasePrice - dbPrice),
+            discount: Math.max(0, computedBasePrice - t.price),
           };
-        }
-        return {
-          ...t,
-          discount: Math.max(0, computedBasePrice - t.price),
-        };
-      });
+        });
 
-      setBasePrice(computedBasePrice);
-      setTiers(generatedTiers);
+        setBasePrice(computedBasePrice);
+        setTiers(generatedTiers);
+      } else {
+        // Generate the 5 MOQ simulation steps as tiers! (Fallback)
+        const baseMoqCtn = Math.max(1, moqCtn || 1);
+        const tempTiers = [0, 1, 2, 3, 4].map((step) => {
+          const stepCtn = baseMoqCtn + step;
+          const stepPcs = stepCtn * qtyPerCtn;
+          const nextStepPcs = (baseMoqCtn + step + 1) * qtyPerCtn;
+          const minQuantity = stepPcs;
+          const maxQuantity = step < 4 ? nextStepPcs - 1 : null;
+
+          const calc = calculateCogsAndSellingPrice({
+            importType: quote.importType as "BORONGAN" | "RESMI",
+            beaMasukPercent: Number(quote.beaMasukPercent) || 0,
+            ppnPercent: Number(quote.ppnPercent) || 0,
+            pphPercent: Number(quote.pphPercent) || 0,
+            formECost: Number(quote.formECost) || 0,
+            insurancePercent: Number(quote.insurancePercent) || 0,
+            handlingCost: Number(quote.handlingCost) || 0,
+            otherCost: Number(quote.otherCost) || 0,
+            foreignPrice: Number(quote.foreignPrice) || 0,
+            gzDeliveryCost: Number(quote.gzDeliveryCost) || 0,
+            exchangeRate: exchangeRate,
+            qtyPcs: stepPcs,
+            qtyPerCtn,
+            length: Number(quote.length) || 0,
+            width: Number(quote.width) || 0,
+            height: Number(quote.height) || 0,
+            weight: Number(quote.weight) || 0,
+            seaFreightRate: Number(quote.seaFreightRate) || 0,
+            airFreightRate: Number(quote.airFreightRate) || 0,
+            localFreight: Number(quote.localFreight) || 0,
+            margin: Number(quote.margin) || 0,
+            sponsorPercent: Number(quote.sponsorPercent) * 100 || 0,
+            roundUpTo: roundUpToVal,
+          });
+
+          const finalPrice = freightMode === "SEA" ? calc.sellPriceSea : calc.sellPriceAir;
+
+          return {
+            id: `temp-fixed-step-${step}`,
+            minQuantity,
+            maxQuantity,
+            price: finalPrice,
+            discount: 0,
+          };
+        });
+
+        const computedBasePrice = tempTiers[0]?.price || 0;
+        const generatedTiers = tempTiers.map((t) => {
+          return {
+            ...t,
+            discount: Math.max(0, computedBasePrice - t.price),
+          };
+        });
+
+        setBasePrice(computedBasePrice);
+        setTiers(generatedTiers);
+      }
     } else {
       // Handle VARIABLE Mode Tiers
       const quoteTiers = quote.tiers;

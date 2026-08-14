@@ -71,9 +71,14 @@ type Product = {
   };
 
   images?: {
+    id: string;
     url: string;
     isFeatured: boolean;
   }[];
+
+  isMultiFace?: boolean;
+  mockupFrontImageId?: string | null;
+  mockupBackImageId?: string | null;
 };
 
 type Category = {
@@ -484,78 +489,84 @@ export default function ProductsAll() {
                           {formatDate(product.createdAt, { style: "relative" })}
                         </TableCell>
                         <TableCell className="text-center">
-                          {/* Bungkus semuanya di dalam komponen Dialog */}
-                          <Dialog>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                {/* Tombol Titik Tiga */}
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                  <span className="sr-only">Open menu</span>
-                                  <MoreHorizontal className="h-4 w-4 text-slate-500" />
-                                </Button>
-                              </DropdownMenuTrigger>
+                          <div className="flex items-center justify-center gap-1.5">
+                            {/* Bungkus semuanya di dalam komponen Dialog */}
+                            <Dialog>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  {/* Tombol Titik Tiga */}
+                                  <Button
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0">
+                                    <span className="sr-only">Open menu</span>
+                                    <MoreHorizontal className="h-4 w-4 text-slate-500" />
+                                  </Button>
+                                </DropdownMenuTrigger>
 
-                              <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
+                                <DropdownMenuContent
+                                  align="end"
+                                  className="w-48">
+                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
 
-                                {/* ACTION: DETAIL */}
-                                <DropdownMenuItem
-                                  asChild
-                                  className="cursor-pointer">
-                                  <Link
-                                    href={`/super-admin/products/detail/${product.id}`}>
-                                    <ScanEye className="mr-2 h-4 w-4 text-blue-500" />
-                                    <span>Detail</span>
-                                  </Link>
-                                </DropdownMenuItem>
-
-                                {/* ACTION: EDIT */}
-                                <DropdownMenuItem
-                                  asChild
-                                  className="cursor-pointer">
-                                  <Link
-                                    href={`/super-admin/products/update/${product.id}`}>
-                                    <Pencil className="mr-2 h-4 w-4 text-orange-500" />
-                                    <span>Edit</span>
-                                  </Link>
-                                </DropdownMenuItem>
-
-                                {/* ACTION: EDIT SEO (Membuka Modal) */}
-                                <DialogTrigger asChild>
+                                  {/* ACTION: DETAIL */}
                                   <DropdownMenuItem
-                                    className="cursor-pointer"
-                                    // Penting: mencegah dropdown menutup secara brutal dan memblokir modal
-                                    onSelect={(e) => e.preventDefault()}>
-                                    <Globe className="mr-2 h-4 w-4 text-emerald-600" />
-                                    <span>Edit SEO</span>
+                                    asChild
+                                    className="cursor-pointer">
+                                    <Link
+                                      href={`/super-admin/products/detail/${product.id}`}>
+                                      <ScanEye className="mr-2 h-4 w-4 text-blue-500" />
+                                      <span>Detail</span>
+                                    </Link>
                                   </DropdownMenuItem>
-                                </DialogTrigger>
 
-                                <DropdownMenuSeparator />
+                                  {/* ACTION: EDIT */}
+                                  <DropdownMenuItem
+                                    asChild
+                                    className="cursor-pointer">
+                                    <Link
+                                      href={`/super-admin/products/update/${product.id}`}>
+                                      <Pencil className="mr-2 h-4 w-4 text-orange-500" />
+                                      <span>Edit</span>
+                                    </Link>
+                                  </DropdownMenuItem>
 
-                                {/* ACTION: DELETE */}
-                                <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50">
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  <span>Delete</span>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                                  {/* ACTION: EDIT SEO (Membuka Modal) */}
+                                  <DialogTrigger asChild>
+                                    <DropdownMenuItem
+                                      className="cursor-pointer"
+                                      // Penting: mencegah dropdown menutup secara brutal dan memblokir modal
+                                      onSelect={(e) => e.preventDefault()}>
+                                      <Globe className="mr-2 h-4 w-4 text-emerald-600" />
+                                      <span>Edit SEO</span>
+                                    </DropdownMenuItem>
+                                  </DialogTrigger>
 
-                            {/* ISI MODAL UNTUK SEO FORM */}
-                            <DialogContent className="max-w-5xl overflow-y-auto max-h-[90vh]">
-                              <DialogHeader>
-                                <DialogTitle className="text-xl">
-                                  Setup Product SEO
-                                </DialogTitle>
-                              </DialogHeader>
+                                  <DropdownMenuSeparator />
 
-                              {/* Panggil komponen Form SEO-mu di sini, lempar ID produknya */}
-                              <div className="mt-4">
-                                <ProductSeoForm productId={product.id} />
-                              </div>
-                            </DialogContent>
-                          </Dialog>
+                                  {/* ACTION: DELETE */}
+                                  <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    <span>Delete</span>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+
+                              {/* ISI MODAL UNTUK SEO FORM */}
+                              <DialogContent className="max-w-5xl overflow-y-auto max-h-[90vh]">
+                                <DialogHeader>
+                                  <DialogTitle className="text-xl">
+                                    Setup Product SEO
+                                  </DialogTitle>
+                                </DialogHeader>
+
+                                {/* Panggil komponen Form SEO-mu di sini, lempar ID produknya */}
+                                <div className="mt-4">
+                                  <ProductSeoForm productId={product.id} />
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

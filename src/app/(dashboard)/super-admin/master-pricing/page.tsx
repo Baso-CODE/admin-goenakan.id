@@ -135,8 +135,7 @@ export default function MasterPricingPage() {
   // Global pricing modifier states
   const [modifierOpen, setModifierOpen] = useState(false);
   const [targetCurrency, setTargetCurrency] = useState("");
-  const [exchangeRateDiff, setExchangeRateDiff] = useState<number | string>("");
-  const [liveRate, setLiveRate] = useState<number | null>(null);
+  const [newExchangeRate, setNewExchangeRate] = useState<number | string>("");
   const [offsetValue, setOffsetValue] = useState<number | string>(0);
   const [offsetCurrency, setOffsetCurrency] = useState("IDR");
   const [isFetchingRate, setIsFetchingRate] = useState(false);
@@ -173,7 +172,7 @@ export default function MasterPricingPage() {
 
   const handleFetchRate = async (code: string) => {
     if (!code || code === "IDR") {
-      setLiveRate(1);
+      setNewExchangeRate(1);
       return;
     }
     setIsFetchingRate(true);
@@ -184,7 +183,7 @@ export default function MasterPricingPage() {
         const data = await res.json();
         if (data.rates) {
           const rateVal = data.rates.IDR;
-          setLiveRate(rateVal);
+          setNewExchangeRate(rateVal);
           toast.success(`Kurs ${code} berhasil diperbarui: Rp ${rateVal.toLocaleString("id-ID")}`);
         } else {
           toast.error(`Gagal mengambil kurs terbaru untuk ${code}.`);
@@ -201,8 +200,8 @@ export default function MasterPricingPage() {
   };
 
   const handleOpenPreview = async () => {
-    if (targetCurrency !== "IDR" && (exchangeRateDiff === "" || isNaN(Number(exchangeRateDiff)))) {
-      toast.error("Silakan masukkan nilai selisih kurs yang valid.");
+    if (!newExchangeRate || isNaN(Number(newExchangeRate)) || Number(newExchangeRate) <= 0) {
+      toast.error("Silakan masukkan nilai kurs yang valid.");
       return;
     }
     setPreviewLoading(true);
@@ -215,7 +214,7 @@ export default function MasterPricingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           targetCurrency,
-          exchangeRateDiff: targetCurrency === "IDR" ? 0 : Number(exchangeRateDiff),
+          newExchangeRate: Number(newExchangeRate),
           offsetValue: Number(offsetValue) || 0,
           offsetCurrency,
         }),
@@ -253,7 +252,7 @@ export default function MasterPricingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           targetCurrency,
-          exchangeRateDiff: targetCurrency === "IDR" ? 0 : Number(exchangeRateDiff),
+          newExchangeRate: Number(newExchangeRate),
           offsetValue: Number(offsetValue) || 0,
           offsetCurrency,
           productIds: selectedProductIds,
@@ -420,11 +419,7 @@ export default function MasterPricingPage() {
                   value={targetCurrency}
                   onValueChange={(val) => {
                     setTargetCurrency(val);
-                    if (val === "IDR") {
-                      setExchangeRateDiff(0);
-                    } else {
-                      setExchangeRateDiff("");
-                    }
+                    if (val === "IDR") setNewExchangeRate(1);
                   }}>
                   <SelectTrigger className="bg-white border-stone-200 mt-1 font-semibold">
                     <SelectValue placeholder="Select Currency" />
@@ -442,8 +437,8 @@ export default function MasterPricingPage() {
 
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="exchangeRateDiff" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
-                    Exchange Rate Adjustment (Selisih Kurs)
+                  <Label htmlFor="newExchangeRate" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                    New Exchange Rate (Kurs)
                   </Label>
                   {targetCurrency !== "IDR" && (
                     <Button
@@ -459,19 +454,14 @@ export default function MasterPricingPage() {
                   )}
                 </div>
                 <Input
-                  id="exchangeRateDiff"
+                  id="newExchangeRate"
                   type="number"
                   disabled={targetCurrency === "IDR"}
-                  placeholder="Contoh: +500 atau -200"
+                  placeholder="Masukkan Kurs..."
                   className="bg-white border-stone-200 mt-1 font-semibold"
-                  value={exchangeRateDiff}
-                  onChange={(e) => setExchangeRateDiff(e.target.value)}
+                  value={newExchangeRate}
+                  onChange={(e) => setNewExchangeRate(e.target.value)}
                 />
-                {liveRate && targetCurrency !== "IDR" && (
-                  <p className="text-[10px] text-stone-500 mt-1">
-                    Kurs Live saat ini: <span className="font-bold font-mono">Rp {liveRate.toLocaleString("id-ID")}</span>
-                  </p>
-                )}
               </div>
 
               <div className="space-y-1">
@@ -550,14 +540,14 @@ export default function MasterPricingPage() {
                 <div className="space-y-1">
                   <div className="font-semibold text-indigo-900">Parameter Batch Update</div>
                   <div className="text-indigo-700 flex items-center gap-2 font-mono">
-                    Target: {targetCurrency} Exchange Rate Adjustment <ArrowRight className="h-3 w-3" /> {Number(exchangeRateDiff) >= 0 ? "+" : ""}{Number(exchangeRateDiff).toLocaleString("id-ID")}
+                    Target: {targetCurrency} Exchange Rate <ArrowRight className="h-3 w-3" /> Rp {Number(newExchangeRate).toLocaleString("id-ID")}
                   </div>
                 </div>
                 {Number(offsetValue) !== 0 && (
                   <div className="space-y-1 text-right md:text-left">
                     <div className="font-semibold text-indigo-900">Tambahan Offset</div>
                     <div className="text-indigo-700 font-mono">
-                      {Number(offsetValue) > 0 ? "+" : ""}{Number(offsetValue).toLocaleString("id-ID")} {offsetCurrency}
+                      {Number(offsetValue) > 0 ? "+" : ""}{Number(offsetValue).toLocaleString("id-ID")} {offsetCurrency} (≈ Rp {Number(previewData.summary?.rupiahOffset).toLocaleString("id-ID")})
                     </div>
                   </div>
                 )}
