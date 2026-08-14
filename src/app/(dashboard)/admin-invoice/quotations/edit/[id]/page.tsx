@@ -35,7 +35,8 @@ export default function EditQuotationPage() {
       if (!res.ok) throw new Error("Failed to fetch quotation details");
 
       const data = await res.json();
-      console.log("data", data);
+
+      console.log("ini adalah data", data);
 
       const formattedData: any = {
         date: new Date(data.date),
@@ -57,8 +58,7 @@ export default function EditQuotationPage() {
           productId: item.productId || "",
           variantId: item.variantId || "",
 
-          selectedAttributes: item.customization?.selectedAttributes || {},
-
+          selectedAttributes: item.selectedAttributes || {},
           productName: item.productName,
           description: item.description || "",
 

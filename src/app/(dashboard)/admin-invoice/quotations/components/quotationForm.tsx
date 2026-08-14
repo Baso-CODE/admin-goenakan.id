@@ -298,7 +298,7 @@ function NotesSection({
 }
 
 // ============================================================
-// SUB-COMPONENT: ItemRow untuk Edit Quotation (Final Fix)
+// SUB-COMPONENT: ItemRow Edit Quotation
 // ============================================================
 function ItemRow({
   index,
@@ -327,7 +327,7 @@ function ItemRow({
   const selectedProductId = form.watch(`items.${index}.productId`);
   const selectedProduct = products.find((p: any) => p.id === selectedProductId);
 
-  const currentVariantId = form.watch(`items.${index}.variantId`);
+  // Menggunakan format object kosong default agar tidak undefined
   const currentSelectedAttrs =
     form.watch(`items.${index}.selectedAttributes`) || {};
 
@@ -340,43 +340,6 @@ function ItemRow({
     name: `items.${index}.tiers`,
   });
 
-  // ✨ FUNGSI UTAMA: Hanya menghitung ulang harga berdasarkan Qty saat user mengetik secara manual
-  const handleQuantityChange = (newQtyValue: string) => {
-    const qty = Number(newQtyValue) || 0;
-    form.setValue(`items.${index}.quantity`, qty);
-
-    if (!isManualProduct && selectedProduct) {
-      let newPrice = 0;
-
-      if (selectedProduct.priceTiers && selectedProduct.priceTiers.length > 0) {
-        const sortedTiers = [...selectedProduct.priceTiers].sort(
-          (a, b) => b.minQuantity - a.minQuantity,
-        );
-
-        const matchedTier = sortedTiers.find((tier) => qty >= tier.minQuantity);
-
-        if (matchedTier) {
-          newPrice = Number(matchedTier.price);
-        } else {
-          newPrice = Number(selectedProduct.basePrice);
-        }
-      } else if (currentVariantId && selectedProduct.productVariants) {
-        const matchedVariant = selectedProduct.productVariants.find(
-          (v) => v.id === currentVariantId,
-        );
-        newPrice = matchedVariant
-          ? Number(matchedVariant.price)
-          : Number(selectedProduct.basePrice);
-      } else {
-        newPrice = Number(selectedProduct.basePrice);
-      }
-
-      form.setValue(`items.${index}.unitPrice`, newPrice, {
-        shouldValidate: true,
-      });
-    }
-  };
-
   useEffect(() => {
     if (imageFile) {
       const url = URL.createObjectURL(imageFile);
@@ -387,45 +350,85 @@ function ItemRow({
     }
   }, [imageFile]);
 
-  // ✨ Mengubah unitPrice hanya ketika user mengubah atribut/varian produk
-  const handleAttributeSelect = (attributeId: string, valueId: string) => {
+  // ✨ LOGIKA UTAMA YANG SUDAH DIPERBARUI: (Kalkulasi Tiers Dipertahankan)
+  const handleAttributeToggle = (attributeId: string, valueId: string) => {
+    // 1. Tentukan status baru (toggle)
+    const currentArr: string[] = Array.isArray(
+      currentSelectedAttrs[attributeId],
+    )
+      ? currentSelectedAttrs[attributeId]
+      : [];
+
+    const isSelected = currentArr.includes(valueId);
+    const newArr = isSelected
+      ? currentArr.filter((id: string) => id !== valueId)
+      : [...currentArr, valueId];
+
     const newAttrs = {
       ...currentSelectedAttrs,
-      [attributeId]: valueId,
+      [attributeId]: newArr,
     };
-    form.setValue(`items.${index}.selectedAttributes`, newAttrs);
 
-    if (selectedProduct?.productVariants) {
-      const selectedValIds = Object.values(newAttrs);
+    // 2. FUNGSI HITUNG ULANG TOTAL EKSTRA (Murni dari Atribut, tanpa dobel varian)
+    const calculateTotalExtra = (attrsObj: Record<string, string[]>) => {
+      let extra = 0;
+      let matchedVariantId = undefined;
 
-      const matchedVariant = [...selectedProduct.productVariants]
-        .sort((a, b) => b.combinationIds.length - a.combinationIds.length)
-        .find(
-          (v: any) =>
-            v.combinationIds.length > 0 &&
-            v.combinationIds.every((id: string) => selectedValIds.includes(id)),
+      if (!selectedProduct) return { extra, matchedVariantId };
+
+      const allSelectedValIds = Object.values(attrsObj)
+        .flat()
+        .filter(Boolean) as string[];
+
+      // A. Hitung modifier atribut
+      selectedProduct.availableAttributes?.forEach((attr: any) => {
+        attr.values.forEach((val: any) => {
+          if (allSelectedValIds.includes(val.valueId)) {
+            extra += Number(val.priceModifier || 0);
+          }
+        });
+      });
+
+      // B. Cari ID Varian yang cocok tanpa menambah harganya lagi ke extra
+      const matchedVariant = selectedProduct.productVariants?.find((v: any) => {
+        if (!v.combinationIds) return false;
+        return (
+          v.combinationIds.length === allSelectedValIds.length &&
+          v.combinationIds.every((id: string) => allSelectedValIds.includes(id))
         );
+      });
 
       if (matchedVariant) {
-        form.setValue(`items.${index}.variantId`, matchedVariant.id);
-        form.setValue(
-          `items.${index}.unitPrice`,
-          Number(matchedVariant.price),
-          {
-            shouldValidate: true,
-          },
-        );
-      } else {
-        form.setValue(`items.${index}.variantId`, undefined);
-        form.setValue(
-          `items.${index}.unitPrice`,
-          Number(selectedProduct.basePrice),
-          {
-            shouldValidate: true,
-          },
-        );
+        matchedVariantId = matchedVariant.id;
       }
-    }
+
+      return { extra, matchedVariantId };
+    };
+
+    // Hitung ekstra lama dan ekstra baru untuk mendapatkan SELISIH (Diff)
+    const oldCalc = calculateTotalExtra(currentSelectedAttrs);
+    const newCalc = calculateTotalExtra(newAttrs);
+    const priceDiff = newCalc.extra - oldCalc.extra;
+
+    // 3. UPDATE FORM DENGAN HARGA PASTI UNTUK HARGA UTAMA (Base Price + Ekstra Baru)
+    const basePrice = Number(selectedProduct?.basePrice || 0);
+    const newTotalUnitPrice = basePrice + newCalc.extra;
+
+    form.setValue(`items.${index}.selectedAttributes`, newAttrs);
+    form.setValue(`items.${index}.variantId`, newCalc.matchedVariantId);
+
+    // Set harga utama
+    form.setValue(`items.${index}.unitPrice`, newTotalUnitPrice);
+
+    // 4. UPDATE TIERS BERDASARKAN SELISIH (Agar tingkatan harga tetap terjaga)
+    const currentTiers = form.getValues(`items.${index}.tiers`) || [];
+    currentTiers.forEach((tier: any, i: number) => {
+      const currentTierPrice = Number(tier.unitPrice || 0);
+      form.setValue(
+        `items.${index}.tiers.${i}.unitPrice`,
+        currentTierPrice + priceDiff,
+      );
+    });
   };
 
   return (
@@ -504,12 +507,37 @@ function ItemRow({
                                 `items.${index}.selectedAttributes`,
                                 {},
                               );
+
+                              const basePrice = Number(p.basePrice || 0);
                               form.setValue(
                                 `items.${index}.unitPrice`,
-                                p.productVariants?.length
-                                  ? 0
-                                  : Number(p.basePrice),
+                                basePrice,
                               );
+
+                              if (p.priceTiers && p.priceTiers.length > 0) {
+                                const autoTiers = p.priceTiers.map(
+                                  (tier: any) => ({
+                                    minQuantity: tier.minQuantity,
+                                    maxQuantity: tier.maxQuantity || undefined,
+                                    quantityLabel: "Pcs",
+                                    unitPrice: Number(tier.price),
+                                  }),
+                                );
+                                form.setValue(
+                                  `items.${index}.tiers`,
+                                  autoTiers,
+                                );
+                              } else {
+                                form.setValue(`items.${index}.tiers`, [
+                                  {
+                                    minQuantity: 1,
+                                    maxQuantity: undefined,
+                                    quantityLabel: "Pcs",
+                                    unitPrice: basePrice,
+                                  },
+                                ]);
+                              }
+
                               if (p.description) {
                                 form.setValue(
                                   `items.${index}.description`,
@@ -561,16 +589,14 @@ function ItemRow({
           )}
         </div>
 
-        {/* Qty (Menggunakan onChange manual agar aman saat loading data) */}
+        {/* Qty */}
         <div className="col-span-2">
           <div className="relative">
             <Input
               type="number"
               placeholder="0"
               className="pr-10 h-10 text-center"
-              {...form.register(`items.${index}.quantity`, {
-                onChange: (e: any) => handleQuantityChange(e.target.value),
-              })}
+              {...form.register(`items.${index}.quantity`)}
             />
             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
               Qty
@@ -632,41 +658,65 @@ function ItemRow({
         </div>
       </div>
 
-      {/* --- AREA FULL-WIDTH: PILIHAN ATRIBUT/VARIAN --- */}
+      {/* ✨ AREA FULL-WIDTH: PILIHAN ATRIBUT/VARIAN (GLASSMORPHISM / iPHONE STYLE) */}
       {!isManualProduct &&
         selectedProduct?.availableAttributes &&
         selectedProduct.availableAttributes.length > 0 && (
-          <div className="px-3 pb-3">
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-              <p className="text-xs font-semibold text-slate-700 mb-2">
-                Pilih Varian Produk:
+          <div className="px-3 pb-4">
+            <div className="relative overflow-hidden bg-linear-to-br from-slate-50/90 to-slate-100/50 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] ring-1 ring-slate-900/5">
+              <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-blue-500" /> Pilih
+                Varian/Atribut:
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {selectedProduct.availableAttributes.map((attr: any) => (
                   <div
                     key={attr.attributeId}
-                    className="flex flex-col space-y-1">
-                    <label className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                    className="flex flex-col space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
                       {attr.attributeName}
                     </label>
-                    <Select
-                      value={currentSelectedAttrs[attr.attributeId] || ""}
-                      onValueChange={(val) =>
-                        handleAttributeSelect(attr.attributeId, val)
-                      }>
-                      <SelectTrigger className="h-8 text-xs bg-white border-slate-300 w-full shadow-none">
-                        <SelectValue
-                          placeholder={`Pilih ${attr.attributeName}`}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {attr.values.map((val: any) => (
-                          <SelectItem key={val.valueId} value={val.valueId}>
+                    <div className="flex flex-wrap gap-2">
+                      {attr.values.map((val: any) => {
+                        const attributeSelection =
+                          currentSelectedAttrs[attr.attributeId];
+                        const isSelected = Array.isArray(attributeSelection)
+                          ? attributeSelection.includes(val.valueId)
+                          : false;
+
+                        return (
+                          <button
+                            type="button"
+                            key={val.valueId}
+                            onClick={() =>
+                              handleAttributeToggle(
+                                attr.attributeId,
+                                val.valueId,
+                              )
+                            }
+                            className={cn(
+                              "relative px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 ease-out flex items-center justify-center",
+                              isSelected
+                                ? "bg-blue-600 text-white shadow-[0_2px_8px_rgba(37,99,235,0.4)] scale-105 border border-blue-500/80"
+                                : "bg-white/80 text-slate-600 border border-slate-200/80 shadow-sm hover:bg-white hover:scale-105 hover:shadow-md backdrop-blur-md",
+                            )}>
                             {val.value}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                            {val.priceModifier > 0 && (
+                              <span
+                                className={cn(
+                                  "ml-1.5 opacity-90 text-[10px] font-medium tracking-wide",
+                                  isSelected
+                                    ? "text-blue-100"
+                                    : "text-emerald-600",
+                                )}>
+                                (+{val.priceModifier})
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -869,7 +919,7 @@ const quotationSchema = z.object({
         isManualProduct: z.boolean().default(false),
         productId: z.string().optional(),
         variantId: z.string().optional(),
-        selectedAttributes: z.record(z.string(), z.string()).optional(),
+        selectedAttributes: z.record(z.string(), z.any()).optional(),
         productName: z.string().min(1, "Product name is required"),
         description: z.string().optional(),
         quantity: z.coerce.number().min(0).default(0),
