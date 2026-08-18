@@ -1,6 +1,7 @@
 "use client";
 
 import { ConfirmDeleteDialog } from "@/app/(dashboard)/components/confirmDeleteDialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ type ProductTag = {
   name: string;
   slug: string;
   createdAt: string;
+  categories?: { id: string; name: string }[];
 };
 
 type Meta = {
@@ -268,6 +270,7 @@ export default function ProductTags() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-62.5">Tag Name</TableHead>
+                <TableHead className="w-48">Groups</TableHead>
                 <TableHead>Slug</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="">Actions</TableHead>
@@ -278,16 +281,19 @@ export default function ProductTags() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={index}>
-                    <TableCell className="h-12 w-[30%]">
+                    <TableCell className="h-12 w-[25%]">
                       <Skeleton className="h-4 w-37.5" />
                     </TableCell>
-                    <TableCell className="h-12 w-[30%]">
+                    <TableCell className="h-12 w-[20%]">
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell className="h-12 w-[25%]">
                       <Skeleton className="h-4 w-50" />
                     </TableCell>
-                    <TableCell className="h-12 w-[20%]">
+                    <TableCell className="h-12 w-[15%]">
                       <Skeleton className="h-4 w-25" />
                     </TableCell>
-                    <TableCell className="h-12 w-[20%] ">
+                    <TableCell className="h-12 w-[15%] ">
                       <div className="flex space-x-2">
                         <Skeleton className="h-8 w-12.5" />
                         <Skeleton className="h-8 w-15" />
@@ -298,7 +304,7 @@ export default function ProductTags() {
               ) : error ? (
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="text-center text-red-500 py-6">
                     Error: {error}
                   </TableCell>
@@ -307,6 +313,19 @@ export default function ProductTags() {
                 tags.map((data) => (
                   <TableRow key={data.id}>
                     <TableCell className="font-medium">{data.name}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {data.categories && data.categories.length > 0 ? (
+                          data.categories.map((cat) => (
+                            <Badge key={cat.id} variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
+                              {cat.name}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-muted-foreground text-xs italic">Ungrouped</span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>{data.slug}</TableCell>
                     <TableCell>
                       {formatDate(data.createdAt, { style: "relative" })}
@@ -333,7 +352,7 @@ export default function ProductTags() {
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="text-center py-6 text-muted-foreground">
                     No tags found.
                   </TableCell>

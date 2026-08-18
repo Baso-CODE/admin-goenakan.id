@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { Plus, Trash2, Layers, Tag, Ruler } from "lucide-react";
+import { Plus, Trash2, Layers, Tag, Ruler, Loader2 } from "lucide-react";
 
 export interface MockupArea {
   id: string;
@@ -36,6 +36,50 @@ export function MockupAreaSelector({ imageUrl, areas = [], onChange }: MockupAre
       setSelectedId(null);
     }
   }, [areas, selectedId]);
+
+  // Keyboard controls for adjustment
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedId || areas.length === 0) return;
+      const area = areas.find((a) => a.id === selectedId);
+      if (!area) return;
+
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          activeEl.getAttribute("contenteditable") === "true")
+      ) {
+        return;
+      }
+
+      const step = e.shiftKey ? 5.0 : 1.0;
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        const nextX = Math.max(0, area.x - step);
+        handleUpdateField(area.id, "x", nextX);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        const nextX = Math.max(0, Math.min(area.x + step, 100 - area.width));
+        handleUpdateField(area.id, "x", nextX);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const nextY = Math.max(0, area.y - step);
+        handleUpdateField(area.id, "y", nextY);
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const nextY = Math.max(0, Math.min(area.y + step, 100 - area.height));
+        handleUpdateField(area.id, "y", nextY);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedId, areas]);
 
   const handleAddArea = () => {
     const newId = `temp_${Date.now()}`;
@@ -199,9 +243,167 @@ export function MockupAreaSelector({ imageUrl, areas = [], onChange }: MockupAre
             );
           })}
         </div>
-        <p className="text-[11px] text-stone-500 dark:text-stone-400 text-center max-w-xs leading-relaxed">
-          Geser area terpilih untuk memindahkan. Seret kotak pojok kanan bawah untuk mengubah ukuran.
-        </p>
+
+        {/* Tool Control Panel */}
+        {activeArea && (
+          <div className="w-full flex flex-col gap-2 p-2 border border-stone-200 dark:border-stone-800 rounded-lg bg-stone-50 dark:bg-stone-900/60 animate-fade-in max-w-xs">
+            {/* Row 1: Align */}
+            <div className="flex items-center justify-between gap-1 flex-wrap">
+              <span className="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider ml-1">Align:</span>
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "x", 0)}
+                  className="p-1 hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors"
+                  title="Rata Kiri"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 22V2M8 4h12M8 12h8M8 20h12"/></svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "x", (100 - activeArea.width) / 2)}
+                  className="p-1 hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors"
+                  title="Tengah Horizontal"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M8 5h8M6 12h12M8 19h8"/></svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "x", 100 - activeArea.width)}
+                  className="p-1 hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors"
+                  title="Rata Kanan"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 22V2M4 4h12M8 12h8M4 20h12"/></svg>
+                </button>
+                <div className="w-[1px] h-4 bg-stone-300 dark:bg-stone-700 mx-0.5" />
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "y", 0)}
+                  className="p-1 hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors"
+                  title="Rata Atas"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 4H2M4 8v12M12 8v8M20 8v12"/></svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "y", (100 - activeArea.height) / 2)}
+                  className="p-1 hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors"
+                  title="Tengah Vertikal"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12h20M5 8v8M12 6v12M19 8v8"/></svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "y", 100 - activeArea.height)}
+                  className="p-1 hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors"
+                  title="Rata Bawah"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 20H2M4 4v12M12 8v8M20 4v12"/></svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Row 2: Nudge, Resize, Copy */}
+            <div className="flex items-center justify-between gap-1 flex-wrap border-t border-stone-200/50 dark:border-stone-805/50 pt-1.5">
+              <span className="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider ml-1">Geser:</span>
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "x", Math.max(0, activeArea.x - 1))}
+                  className="h-6 w-6 flex items-center justify-center hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors font-bold text-xs"
+                  title="Geser Kiri (Keyboard: ←)"
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "y", Math.max(0, activeArea.y - 1))}
+                  className="h-6 w-6 flex items-center justify-center hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors font-bold text-xs"
+                  title="Geser Atas (Keyboard: ↑)"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "y", Math.min(100 - activeArea.height, activeArea.y + 1))}
+                  className="h-6 w-6 flex items-center justify-center hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors font-bold text-xs"
+                  title="Geser Bawah (Keyboard: ↓)"
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "x", Math.min(100 - activeArea.width, activeArea.x + 1))}
+                  className="h-6 w-6 flex items-center justify-center hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors font-bold text-xs"
+                  title="Geser Kanan (Keyboard: →)"
+                >
+                  →
+                </button>
+              </div>
+
+              <div className="w-[1px] h-4 bg-stone-300 dark:bg-stone-700 mx-0.5" />
+
+              <span className="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider">Size:</span>
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "width", Math.max(5, activeArea.width - 1))}
+                  className="px-1.5 h-6 hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors text-[10px] font-bold"
+                  title="Kecilkan Lebar"
+                >
+                  W-
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "width", Math.min(100 - activeArea.x, activeArea.width + 1))}
+                  className="px-1.5 h-6 hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors text-[10px] font-bold"
+                  title="Lebarkan Lebar"
+                >
+                  W+
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "height", Math.max(5, activeArea.height - 1))}
+                  className="px-1.5 h-6 hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors text-[10px] font-bold"
+                  title="Kecilkan Tinggi"
+                >
+                  H-
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField(activeArea.id, "height", Math.min(100 - activeArea.y, activeArea.height + 1))}
+                  className="px-1.5 h-6 hover:bg-stone-200 dark:hover:bg-stone-800 rounded text-stone-700 dark:text-stone-300 transition-colors text-[10px] font-bold"
+                  title="Lebarkan Tinggi"
+                >
+                  H+
+                </button>
+              </div>
+
+              <div className="w-[1px] h-4 bg-stone-300 dark:bg-stone-700 mx-0.5" />
+
+              <button
+                type="button"
+                onClick={() => {
+                  const newId = `temp_${Date.now()}`;
+                  const newArea = {
+                    ...activeArea,
+                    id: newId,
+                    x: Math.min(100 - activeArea.width, activeArea.x + 3),
+                    y: Math.min(100 - activeArea.height, activeArea.y + 3),
+                    label: `${activeArea.label} (Copy)`
+                  };
+                  onChange([...areas, newArea]);
+                  setSelectedId(newId);
+                }}
+                className="px-2 h-6 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 rounded text-indigo-700 dark:text-indigo-350 transition-colors text-[10px] font-bold flex items-center gap-1"
+                title="Duplikat Area"
+              >
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Duplikat
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Kanan: Sidebar Detail & Pengaturan */}

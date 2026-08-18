@@ -45,6 +45,7 @@ type Attribute = {
       name: string;
     };
   } | null;
+  type: string;
 };
 
 type Meta = {
@@ -348,8 +349,8 @@ export default function ProductAttributesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-24">Order</TableHead>
                 <TableHead className="w-50">Attribute Name</TableHead>
+                <TableHead className="w-32">Type</TableHead>
                 <TableHead>Scope</TableHead>
                 <TableHead>Values</TableHead>
                 <TableHead>Created</TableHead>
@@ -363,10 +364,10 @@ export default function ProductAttributesPage() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell>
-                      <Skeleton className="h-8 w-16" />
+                      <Skeleton className="h-4 w-35" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-4 w-35" />
+                      <Skeleton className="h-4 w-20" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-4.5 w-24" />
@@ -394,32 +395,8 @@ export default function ProductAttributesPage() {
                   </TableCell>
                 </TableRow>
               ) : attributes.length > 0 ? (
-                attributes.map((attr, index) => (
+                attributes.map((attr) => (
                   <TableRow key={attr.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 cursor-pointer"
-                          disabled={index === 0 || loading}
-                          onClick={() => handleMoveAttribute(index, "up")}
-                        >
-                          <ArrowUp className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 cursor-pointer"
-                          disabled={index === attributes.length - 1 || loading}
-                          onClick={() => handleMoveAttribute(index, "down")}
-                        >
-                          <ArrowDown className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
                     <TableCell className="font-medium">
                       <div>
                         {attr.name}
@@ -429,6 +406,13 @@ export default function ProductAttributesPage() {
                           </div>
                         )}
                       </div>
+                    </TableCell>
+
+                    {/* TYPE */}
+                    <TableCell>
+                      <Badge variant="secondary" className="uppercase font-mono text-xs">
+                        {attr.type}
+                      </Badge>
                     </TableCell>
 
                     {/* SCOPE */}
@@ -491,7 +475,7 @@ export default function ProductAttributesPage() {
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={6}
                     className="text-center py-6 text-muted-foreground">
                     No attributes found.
                   </TableCell>

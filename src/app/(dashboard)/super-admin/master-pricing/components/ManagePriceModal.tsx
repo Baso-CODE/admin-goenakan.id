@@ -365,10 +365,16 @@ export function ManagePriceModal({
           ? (Number(product.basePrice) || 0) 
           : (tempTiers[0]?.price || 0);
 
-        const generatedTiers = tempTiers.map((t) => {
+        const generatedTiers = tempTiers.map((t, idx) => {
+          const existingLocalTier = tiers.find((lt) => lt.minQuantity === t.minQuantity) || tiers[idx];
+          const discountVal = existingLocalTier 
+            ? existingLocalTier.discount 
+            : Math.max(0, computedBasePrice - t.price);
+
           return {
             ...t,
-            discount: Math.max(0, computedBasePrice - t.price),
+            discount: discountVal,
+            price: Math.max(0, computedBasePrice - discountVal),
           };
         });
 
@@ -422,10 +428,16 @@ export function ManagePriceModal({
         });
 
         const computedBasePrice = tempTiers[0]?.price || 0;
-        const generatedTiers = tempTiers.map((t) => {
+        const generatedTiers = tempTiers.map((t, idx) => {
+          const existingLocalTier = tiers.find((lt) => lt.minQuantity === t.minQuantity) || tiers[idx];
+          const discountVal = existingLocalTier 
+            ? existingLocalTier.discount 
+            : Math.max(0, computedBasePrice - t.price);
+
           return {
             ...t,
-            discount: Math.max(0, computedBasePrice - t.price),
+            discount: discountVal,
+            price: Math.max(0, computedBasePrice - discountVal),
           };
         });
 
@@ -482,7 +494,15 @@ export function ManagePriceModal({
         });
 
         const computedBasePrice = tempTiers[0]?.price || 0;
-        const mappedTiers = tempTiers.map((t) => {
+        const mappedTiers = tempTiers.map((t, idx) => {
+          const existingLocalTier = tiers.find((lt) => lt.minQuantity === t.minQuantity) || tiers[idx];
+          if (existingLocalTier) {
+            return {
+              ...t,
+              discount: existingLocalTier.discount,
+              price: Math.max(0, computedBasePrice - existingLocalTier.discount),
+            };
+          }
           const existingDbTier = isInitialConfig ? product.priceTiers?.find((pt) => pt.minQuantity === t.minQuantity) : null;
           if (existingDbTier) {
             const dbPrice = Number(existingDbTier.price) || 0;

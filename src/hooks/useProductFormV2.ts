@@ -55,6 +55,7 @@ export function useProductFormV2(
   const [productImagesFiles, setProductImagesFiles] = useState<File[]>([]);
   const [isGenModalOpen, setIsGenModalOpen] = useState<boolean>(false);
   const [activeGroupFilters, setActiveGroupFilters] = useState<Record<string, Record<string, string[]>>>({});
+  const [createdAttributeIds, setCreatedAttributeIds] = useState<string[]>([]);
 
   // === FORM INITIALIZATION ===
   const form = useForm<ProductFormValues>({
@@ -74,6 +75,7 @@ export function useProductFormV2(
       length: 0,
       isCustom: false,
       isMadeByOrder: false,
+      isActive: true,
       materialTypeId: "",
       stock: 0,
       attributes: [],
@@ -540,6 +542,7 @@ export function useProductFormV2(
         attributes: isCustomProduct ? attributeSelections : undefined,
         variantImagesMetadata: isCustomProduct ? variantMetas : [],
         priceTiers: mappedPriceTiers,
+        createdAttributeIds,
       };
 
       const filesToSubmit = {
@@ -637,6 +640,7 @@ export function useProductFormV2(
       tagCategories,
       isGenModalOpen,
       activeGroupFilters,
+      createdAttributeIds,
     },
     setters: {
       setIsCategoryModalOpen,
@@ -659,6 +663,7 @@ export function useProductFormV2(
       setTagCategories,
       setIsGenModalOpen,
       setActiveGroupFilters,
+      setCreatedAttributeIds,
     },
     handlers: {
       handleBulkCreateTags,

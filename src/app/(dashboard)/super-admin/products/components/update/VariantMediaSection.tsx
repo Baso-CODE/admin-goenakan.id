@@ -139,7 +139,8 @@ export default function FormUpdateProductMedia({
 }: FormUpdateProductMediaProps) {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [imageUploadProgress, setImageUploadProgress] = useState(0);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const [selectedMedia, setSelectedMedia] = useState<ProductMedia | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -187,17 +188,17 @@ export default function FormUpdateProductMedia({
     if (!file) return;
 
     setIsUploadingVideo(true);
-    setUploadProgress(0);
+    setVideoUploadProgress(0);
 
     try {
       await onAddVideo(file, (progress) => {
-        setUploadProgress(Math.round(progress));
+        setVideoUploadProgress(Math.round(progress));
       });
     } catch (error) {
       console.error("Video upload failed", error);
     } finally {
       setIsUploadingVideo(false);
-      setUploadProgress(0);
+      setVideoUploadProgress(0);
       if (videoInputRef.current) {
         videoInputRef.current.value = "";
       }
@@ -209,12 +210,16 @@ export default function FormUpdateProductMedia({
     if (!file) return;
 
     setIsUploadingImage(true);
+    setImageUploadProgress(0);
     try {
-      await onAddImage(file);
+      await onAddImage(file, (progress) => {
+        setImageUploadProgress(Math.round(progress));
+      });
     } catch (error) {
       console.error("Image upload failed", error);
     } finally {
       setIsUploadingImage(false);
+      setImageUploadProgress(0);
       if (imageInputRef.current) {
         imageInputRef.current.value = "";
       }
@@ -241,7 +246,7 @@ export default function FormUpdateProductMedia({
               onEdit={handleOpenModal}
               isSubmitting={isSubmitting}
             />
-            <div className="mt-3 flex gap-2 items-center">
+             <div className="mt-3 flex gap-2 items-center">
               <Input
                 type="file"
                 accept="image/*"
@@ -255,11 +260,30 @@ export default function FormUpdateProductMedia({
                 variant="outline"
                 size="sm"
                 onClick={() => imageInputRef.current?.click()}
-                disabled={isSubmitting || isUploadingImage}>
-                <Plus className="h-4 w-4 mr-2" />
-                {isUploadingImage ? "Uploading..." : "Tambah Gambar"}
+                disabled={isSubmitting || isUploadingImage}
+                className="min-w-36">
+                {isUploadingImage ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {imageUploadProgress > 0
+                      ? `Uploading (${imageUploadProgress}%)`
+                      : "Uploading..."}
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Tambah Gambar
+                  </>
+                )}
               </Button>
             </div>
+            {isUploadingImage && imageUploadProgress > 0 && (
+              <div className="w-full max-w-sm bg-gray-200 rounded-full h-2.5 mt-2">
+                <div
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                  style={{ width: `${imageUploadProgress}%` }}></div>
+              </div>
+            )}
           </div>
 
           {/* --- Video Produk --- */}
@@ -287,12 +311,12 @@ export default function FormUpdateProductMedia({
                 size="sm"
                 onClick={() => videoInputRef.current?.click()}
                 disabled={isSubmitting || isUploadingVideo}
-                className="min-w-32">
+                className="min-w-36">
                 {isUploadingVideo ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {uploadProgress > 0
-                      ? `Uploading (${uploadProgress}%)`
+                    {videoUploadProgress > 0
+                      ? `Uploading (${videoUploadProgress}%)`
                       : "Uploading..."}
                   </>
                 ) : (
@@ -303,11 +327,11 @@ export default function FormUpdateProductMedia({
                 )}
               </Button>
             </div>
-            {isUploadingVideo && uploadProgress > 0 && (
+            {isUploadingVideo && videoUploadProgress > 0 && (
               <div className="w-full max-w-sm bg-gray-200 rounded-full h-2.5 mt-2">
                 <div
                   className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                  style={{ width: `${uploadProgress}%` }}></div>
+                  style={{ width: `${videoUploadProgress}%` }}></div>
               </div>
             )}
           </div>

@@ -738,6 +738,28 @@ export default function ProductFormV2({
                         )}
                       />
 
+                      <FormField
+                        control={form.control}
+                        name="isActive"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Status Tampilkan</FormLabel>
+                            <FormControl>
+                              <div className="flex items-center gap-3 h-10 border rounded-md px-4 bg-white dark:bg-stone-950">
+                                <Switch
+                                  checked={field.value !== false}
+                                  onCheckedChange={field.onChange}
+                                />
+                                <span className="text-xs text-stone-600 truncate">
+                                  {field.value !== false ? "Active (Tampil)" : "Inactive (Sembunyi)"}
+                                </span>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
                       {/* TAGS */}
                       <FormField
                         control={form.control}
@@ -1019,6 +1041,9 @@ export default function ProductFormV2({
                           setTempAttributeSelections(attrs);
                           setTempFullAttrs(full);
                         }}
+                        onAttributeCreated={(attrId) => {
+                          setters.setCreatedAttributeIds((prev) => [...prev, attrId]);
+                        }}
                       />
 
                       <Button
@@ -1220,21 +1245,7 @@ export default function ProductFormV2({
                                                     setMockupSides((prev) =>
                                                       prev.map((m) => {
                                                         if (m.id === item.id) {
-                                                          const updated = { ...m, attributeValueId: targetVal };
-                                                          if (targetVal) {
-                                                            const targetOpt = fullAttributeValuesList.find(o => o.id === targetVal);
-                                                            if (targetOpt) {
-                                                              const parts = targetOpt.rawValue.split("|");
-                                                              const imageUrl = parts[1];
-                                                              if (imageUrl) {
-                                                                updated.url = imageUrl;
-                                                                if (!updated.imageId) {
-                                                                  updated.imageId = `size-default-${targetVal}`;
-                                                                }
-                                                              }
-                                                            }
-                                                          }
-                                                          return updated;
+                                                          return { ...m, attributeValueId: targetVal };
                                                         }
                                                         return m;
                                                       })
