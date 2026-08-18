@@ -43,7 +43,10 @@ export default function FormUpdateAttributes({
     mockupBackImageId: string | null;
   }) => Promise<void>;
   onUpdateMediaMetadata?: (mediaId: string, updates: any) => Promise<void>;
-  onAddImage?: (fileOrUrl: File | string) => Promise<any>;
+  onAddImage?: (
+    fileOrUrl: File | string,
+    onProgress?: (progress: number) => void,
+  ) => Promise<any>;
   onRefresh?: () => Promise<void>;
 }) {
   const [attributeSelections, setAttributeSelections] = useState<
@@ -64,6 +67,7 @@ export default function FormUpdateAttributes({
 
   const [mockupSides, setMockupSides] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgressMap, setUploadProgressMap] = useState<Record<string, number>>({});
   const [isInitialized, setIsInitialized] = useState(false);
   const [prevProductId, setPrevProductId] = useState<string | null>(null);
 
@@ -758,12 +762,19 @@ export default function FormUpdateAttributes({
                                           type="file"
                                           accept="image/*"
                                           className="hidden"
-                                          disabled={isUploading}
+                                          disabled={isUploading || uploadProgressMap[item.id] !== undefined}
                                           onChange={async (e) => {
                                             const file = e.target.files?.[0];
                                             if (file && onAddImage) {
+                                              setIsUploading(true);
+                                              setUploadProgressMap((prev) => ({ ...prev, [item.id]: 0 }));
                                               try {
-                                                const uploadedImg = await onAddImage(file);
+                                                const uploadedImg = await onAddImage(file, (progress: number) => {
+                                                  setUploadProgressMap((prev) => ({
+                                                    ...prev,
+                                                    [item.id]: Math.round(progress),
+                                                  }));
+                                                });
                                                 if (uploadedImg && uploadedImg.id) {
                                                   setMockupSides((prev) =>
                                                     prev.map((m) =>
@@ -779,12 +790,26 @@ export default function FormUpdateAttributes({
                                                 }
                                               } catch (err) {
                                                 console.error("Upload failed in card select", err);
+                                              } finally {
+                                                setIsUploading(false);
+                                                setUploadProgressMap((prev) => {
+                                                  const copy = { ...prev };
+                                                  delete copy[item.id];
+                                                  return copy;
+                                                });
                                               }
                                             }
                                           }}
                                         />
-                                        <span className="flex items-center justify-center h-8 px-2.5 border border-stone-200 dark:border-stone-850 hover:bg-stone-100 dark:hover:bg-stone-900 rounded text-xs font-semibold text-stone-700 dark:text-stone-300">
-                                          Browse
+                                        <span className="flex items-center justify-center h-8 px-2.5 border border-stone-200 dark:border-stone-850 hover:bg-stone-100 dark:hover:bg-stone-900 rounded text-xs font-semibold text-stone-700 dark:text-stone-300 gap-1.5 min-w-16">
+                                          {uploadProgressMap[item.id] !== undefined ? (
+                                            <>
+                                              <Loader2 className="h-3 w-3 animate-spin text-stone-500" />
+                                              <span>{uploadProgressMap[item.id]}%</span>
+                                            </>
+                                          ) : (
+                                            "Browse"
+                                          )}
                                         </span>
                                       </Label>
                                     </div>
@@ -818,35 +843,11 @@ export default function FormUpdateAttributes({
                                        value={item.attributeValueId || "none"}
                                        onValueChange={(val) => {
                                          const targetVal = val === "none" ? null : val;
-                                         
-                                         let resolvedImageId = item.imageId;
-                                         let resolvedUrl = item.url;
-                                         
-                                         if (targetVal) {
-                                           const targetOpt = fullAttributeValuesList.find(o => o.id === targetVal);
-                                           if (targetOpt) {
-                                             const parts = targetOpt.rawValue.split("|");
-                                             const imageUrl = parts[1];
-                                             if (imageUrl) {
-                                               const existingImg = (availableImages || []).find((img: any) => img.url === imageUrl);
-                                               if (existingImg) {
-                                                 resolvedImageId = existingImg.id;
-                                                 resolvedUrl = existingImg.url;
-                                               } else {
-                                                 resolvedImageId = `size-default-${targetVal}`;
-                                                 resolvedUrl = imageUrl;
-                                               }
-                                             }
-                                           }
-                                         }
-
                                          setMockupSides((prev) =>
                                             prev.map((m) =>
                                               m.id === item.id
                                                 ? {
                                                     ...m,
-                                                    imageId: resolvedImageId,
-                                                    url: resolvedUrl,
                                                     attributeValueId: targetVal,
                                                   }
                                                 : m

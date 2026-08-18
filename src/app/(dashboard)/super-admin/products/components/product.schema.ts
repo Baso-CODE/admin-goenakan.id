@@ -58,6 +58,7 @@ export const productSchema = z.object({
   basePrice: z.number().min(0, "Base price must be >= 0"),
   isCustom: z.boolean().optional(),
   isMadeByOrder: z.boolean().optional(),
+  isActive: z.boolean().optional(),
   materialTypeId: z.string().min(1, "Material wajib dipilih"),
   stock: z.number().min(0, "Stock minimal 0").optional().default(0),
   materialType: z.string().optional(),

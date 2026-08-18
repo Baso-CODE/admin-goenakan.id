@@ -16,6 +16,8 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
+  SelectLabel,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -78,10 +80,12 @@ export function AttributeSelector({
   productId,
   value,
   onChange,
+  onAttributeCreated,
 }: {
   productId?: string;
   value?: SelectedAttributeRow[];
   onChange: (v: SelectedAttributeRow[], full: AttributeFromServer[]) => void;
+  onAttributeCreated?: (attributeId: string) => void;
 }) {
   const { fetchApi, status } = useApi();
 
@@ -205,14 +209,11 @@ export function AttributeSelector({
   const fetchAttributes = useCallback(async () => {
     if (status === "loading" || status === "unauthenticated") return;
 
-    if (!productId) {
-      setAvailable([]);
-      return;
-    }
-
     setLoading(true);
     try {
-      const url = `/product-attributes/list?productId=${productId}`;
+      const url = productId
+        ? `/product-attributes/list?productId=${productId}`
+        : `/product-attributes/list`;
       const res = await fetchApi(url);
 
       if (!res.ok) throw new Error();
@@ -570,6 +571,16 @@ export function AttributeSelector({
       return;
     }
     
+    const normalizedName = data.name.trim().toLowerCase();
+    const nameExists = available.some(
+      (a) => a.name.toLowerCase() === normalizedName && a.id !== editingAttributeId
+    );
+
+    if (nameExists) {
+      toast.error(`Attribute dengan nama "${data.name.trim()}" sudah terdaftar.`);
+      return;
+    }
+    
     let valuesToSend = [...data.values];
     if (data.type === "COLOR") {
       const hasCustom = valuesToSend.some(
@@ -631,6 +642,10 @@ export function AttributeSelector({
       const newAttr = await res.json();
       toast.success(`Attribute ${editingAttributeId ? "updated" : "created"} successfully.`);
       
+      if (!editingAttributeId && onAttributeCreated) {
+        onAttributeCreated(newAttr.id);
+      }
+
       if (!productId) {
         setAvailable((prev) => {
           const exists = prev.some((a) => a.id === newAttr.id);
@@ -705,6 +720,11 @@ export function AttributeSelector({
 
       const clonedAttr = await res.json();
       toast.success("Attribute cloned successfully.");
+      
+      if (onAttributeCreated) {
+        onAttributeCreated(clonedAttr.id);
+      }
+
       if (!productId) {
         setAvailable((prev) => [...prev, clonedAttr]);
       } else {
@@ -1067,22 +1087,76 @@ export function AttributeSelector({
                             <SelectValue placeholder="Pilih jenis attribute (e.g., Warna, Ukuran)..." />
                           </SelectTrigger>
                           <SelectContent>
-                             {/* Tampilkan attribute yang sudah dipilih + yang belum dipilih lainnya */}
-                             {unselectedAttributes.map((a) => (
-                               <SelectItem key={a.id} value={a.id}>
-                                 {a.name} ({a.type === "COLOR" ? "Color" : a.type === "SIZE" ? "Size" : a.type === "MOCKUP_SIDE" ? "Mockup Side" : a.type === "MODEL_SHAPE" ? "Model / Shape" : a.type === "PRINT_METHOD" ? "Print Method" : "Text"} - {a.values.length} values)
-                               </SelectItem>
-                             ))}
-                             {attr && (
-                               <SelectItem key={attr.id} value={attr.id}>
-                                 {attr.name} ({attr.type === "COLOR" ? "Color" : attr.type === "SIZE" ? "Size" : attr.type === "MOCKUP_SIDE" ? "Mockup Side" : attr.type === "MODEL_SHAPE" ? "Model / Shape" : attr.type === "PRINT_METHOD" ? "Print Method" : "Text"} - Currently Selected)
-                               </SelectItem>
-                             )}
-                             {unselectedAttributes.length === 0 && !attr && (
-                               <SelectItem value="placeholder-empty" disabled className="text-xs text-stone-500 text-center">
-                                 Belum ada atribut. Silakan Clone atau Buat Baru terlebih dahulu.
-                               </SelectItem>
-                             )}
+                             {(() => {
+                               const combined = [...unselectedAttributes];
+                               if (attr && !combined.some(c => c.id === attr.id)) {
+                                 combined.push(attr);
+                               }
+
+                               if (combined.length === 0) {
+                                 return (
+                                   <SelectItem value="placeholder-empty" disabled className="text-xs text-stone-500 text-center">
+                                     Belum ada atribut. Silakan Clone atau Buat Baru terlebih dahulu.
+                                   </SelectItem>
+                                 );
+                               }
+
+                               // Group by type
+                               const groups: Record<string, typeof combined> = {};
+                               combined.forEach((a) => {
+                                 const typeKey = a.type || "TEXT";
+                                 if (!groups[typeKey]) groups[typeKey] = [];
+                                 groups[typeKey].push(a);
+                               });
+
+                               // Helper to get nice human-readable type labels for SelectLabel
+                               const getTypeLabel = (type: string) => {
+                                 switch (type) {
+                                   case "COLOR":
+                                     return "Color Swatch";
+                                   case "SIZE":
+                                     return "Size / Capacity";
+                                   case "MOCKUP_SIDE":
+                                     return "Mockup Side / Print Position";
+                                   case "MODEL_SHAPE":
+                                     return "Model / Shape";
+                                   case "PRINT_METHOD":
+                                     return "Printing Method";
+                                   case "TEXT":
+                                     return "Text";
+                                   default:
+                                     return type;
+                                 }
+                               };
+
+                               // Sort keys (types) A-Z
+                               const sortedTypes = Object.keys(groups).sort((a, b) => 
+                                 getTypeLabel(a).localeCompare(getTypeLabel(b))
+                               );
+
+                               return sortedTypes.map((type) => {
+                                 // Sort attributes inside this type A-Z by name
+                                 const sortedAttrs = [...groups[type]].sort((a, b) =>
+                                   a.name.localeCompare(b.name)
+                                 );
+
+                                 return (
+                                   <SelectGroup key={type}>
+                                     <SelectLabel className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider bg-stone-50 dark:bg-stone-900/50 px-2 py-1 my-1 rounded-sm">
+                                       {getTypeLabel(type)}
+                                     </SelectLabel>
+                                     {sortedAttrs.map((a) => {
+                                       const isSelected = attr && a.id === attr.id;
+                                       return (
+                                         <SelectItem key={a.id} value={a.id}>
+                                           {a.name} ({a.values?.length || 0} values){isSelected ? " - Selected" : ""}
+                                         </SelectItem>
+                                       );
+                                     })}
+                                   </SelectGroup>
+                                 );
+                               });
+                             })()}
                           </SelectContent>
                         </Select>
 

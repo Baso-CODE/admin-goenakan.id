@@ -19,6 +19,8 @@ import {
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/useApi";
+import { apiUrl } from "@/helper/apiurl";
+import { getSession } from "next-auth/react";
 import FormUpdateAttributes from "../../components/update/AttributesSection";
 import FormProductCore, {
   ProductCoreFormValues,
@@ -403,32 +405,81 @@ export default function EditProductPage() {
     }
   };
 
-  const handleAddImage = async (fileOrUrl: File | string): Promise<any> => {
+  const handleAddImage = async (
+    fileOrUrl: File | string,
+    onProgress?: (progress: number) => void,
+  ): Promise<any> => {
     try {
-      const formData = new FormData();
+      const currentSession = await getSession();
+      const currentToken = currentSession?.user?.accessToken;
+
       if (fileOrUrl instanceof File) {
+        const formData = new FormData();
         formData.append("image", fileOrUrl);
+
+        const uploadData = await new Promise<any>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", `${apiUrl}/products/${id}/image`, true);
+
+          if (currentToken) {
+            xhr.setRequestHeader("Authorization", `Bearer ${currentToken}`);
+          }
+
+          // Track Progress Upload
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const percentComplete = (event.loaded / event.total) * 100;
+              if (onProgress) {
+                onProgress(percentComplete);
+              }
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(JSON.parse(xhr.responseText));
+            } else {
+              try {
+                const errJson = JSON.parse(xhr.responseText);
+                reject(new Error(errJson.message || "Failed to add image"));
+              } catch {
+                reject(new Error(`Gagal upload image: ${xhr.statusText}`));
+              }
+            }
+          };
+
+          xhr.onerror = () => reject(new Error("Network Error saat upload image"));
+          xhr.send(formData);
+        });
+
+        setProductData(uploadData);
+        toast.success("Gambar berhasil ditambahkan!");
+
+        const oldImageIds = new Set((productData?.images || []).map((img: any) => img.id));
+        const newImage = uploadData.images.find((img: any) => !oldImageIds.has(img.id)) || uploadData.images[uploadData.images.length - 1];
+        return newImage;
       } else {
+        const formData = new FormData();
         formData.append("url", fileOrUrl);
+
+        const res = await fetchApi(`/products/${id}/image`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to add image");
+        }
+
+        const updatedProduct = await res.json();
+        setProductData(updatedProduct);
+        toast.success("Gambar berhasil ditambahkan!");
+
+        const oldImageIds = new Set((productData?.images || []).map((img: any) => img.id));
+        const newImage = updatedProduct.images.find((img: any) => !oldImageIds.has(img.id)) || updatedProduct.images[updatedProduct.images.length - 1];
+        return newImage;
       }
-
-      const res = await fetchApi(`/products/${id}/image`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to add image");
-      }
-
-      const updatedProduct = await res.json();
-      setProductData(updatedProduct);
-      toast.success("Gambar berhasil ditambahkan!");
-
-      const oldImageIds = new Set((productData?.images || []).map((img: any) => img.id));
-      const newImage = updatedProduct.images.find((img: any) => !oldImageIds.has(img.id)) || updatedProduct.images[updatedProduct.images.length - 1];
-      return newImage;
     } catch (err) {
       console.error("Error adding image:", err);
       toast.error(

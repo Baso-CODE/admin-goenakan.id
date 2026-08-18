@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -63,6 +64,7 @@ type Product = {
   sku: string;
   basePrice: number;
   isCustom: boolean;
+  isActive?: boolean;
   createdAt: string;
   category?: {
     name?: string;
@@ -114,6 +116,27 @@ export default function ProductsAll() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  const handleToggleActive = async (productId: string, currentStatus: boolean) => {
+    try {
+      const res = await fetchApi(`/products/${productId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ isActive: !currentStatus }),
+      });
+      if (!res.ok) {
+        throw new Error("Gagal mengubah status aktif produk");
+      }
+      toast.success("Status aktif produk berhasil diubah");
+      setProducts((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, isActive: !currentStatus } : p))
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengubah status aktif");
+    }
+  };
 
   // === State Filter Gabungan ===
   const [search, setSearch] = useState("");
@@ -386,6 +409,7 @@ export default function ProductsAll() {
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Base Price</TableHead>
                   <TableHead className="text-center">Type</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-center w-37.5">Actions</TableHead>
                 </TableRow>
@@ -412,6 +436,9 @@ export default function ProductsAll() {
                       <TableCell className="text-center">
                         <Skeleton className="h-5 w-20 mx-auto" />
                       </TableCell>
+                      <TableCell className="text-center">
+                        <Skeleton className="h-5 w-16 mx-auto" />
+                      </TableCell>
                       <TableCell>
                         <Skeleton className="h-4 w-25" />
                       </TableCell>
@@ -426,7 +453,7 @@ export default function ProductsAll() {
                 ) : error ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={8}
                       className="text-center text-red-500 py-6">
                       Error: {error || "Failed to load products."}
                     </TableCell>
@@ -484,6 +511,15 @@ export default function ProductsAll() {
                               Standard
                             </Badge>
                           )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={product.isActive !== false}
+                              onCheckedChange={() => handleToggleActive(product.id, product.isActive !== false)}
+                              className="scale-90"
+                            />
+                          </div>
                         </TableCell>
                         <TableCell>
                           {formatDate(product.createdAt, { style: "relative" })}
@@ -574,7 +610,7 @@ export default function ProductsAll() {
                 ) : (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={8}
                       className="text-center py-6 text-muted-foreground">
                       No products found.
                     </TableCell>
