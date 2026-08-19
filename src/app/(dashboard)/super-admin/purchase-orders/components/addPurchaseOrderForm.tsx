@@ -64,7 +64,7 @@ const baseItemSchema = z.object({
   selectedAttributes: z.record(z.string(), z.string()).optional(),
   orderId: z.string().optional(),
   replacementOrderId: z.string().optional(),
-  quantityOrder: z.number().min(1),
+  quantityOrder: z.number().min(0.01, "Quantity minimal 0.01"),
   quantityStock: z.number().min(0),
   quantityPurchase: z.number().min(0),
   uom: z.string().min(1, "UOM is required"),
@@ -1319,18 +1319,20 @@ export default function AddPurchaseOrderForm() {
                                 <FormControl>
                                   <Input
                                     type="number"
-                                    min={1}
+                                    step="any"
+                                    min={0.01}
                                     {...field}
                                     onChange={(e) => {
-                                      field.onChange(
-                                        e.target.valueAsNumber || 0,
-                                      );
+                                      const val =
+                                        parseFloat(e.target.value) || 0;
+                                      field.onChange(val);
+
                                       if (isProductExpense)
                                         recalculateQtyPurchase(index);
                                       else
                                         form.setValue(
                                           `items.${index}.quantityPurchase`,
-                                          e.target.valueAsNumber || 0,
+                                          val,
                                         );
                                     }}
                                     className="text-center h-10 border-blue-200 bg-blue-50/30"
@@ -1339,7 +1341,6 @@ export default function AddPurchaseOrderForm() {
                               </FormItem>
                             )}
                           />
-
                           {isProductExpense && (
                             <>
                               <FormField

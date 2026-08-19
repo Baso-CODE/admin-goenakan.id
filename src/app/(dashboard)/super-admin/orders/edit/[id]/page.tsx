@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { DatePickerHelper } from "@/helper/datePickerHelper";
+import { useCurrencyConvert } from "@/hooks/use-currency-convert";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -45,6 +46,7 @@ import {
   ChevronsUpDown,
   DollarSign,
   FileText,
+  Layers,
   Loader2,
   PlusCircle,
   Trash2,
@@ -70,6 +72,8 @@ import {
 
 export default function EditOrderForm() {
   const { fetchApi, status } = useApi();
+  const { convert, loading: convertLoading } = useCurrencyConvert();
+
   const params = useParams();
   const router = useRouter();
   const orderId = params.id as string;
@@ -762,7 +766,6 @@ export default function EditOrderForm() {
                 )}
               />
             </div>
-
             {/* === SECTION 5: PRODUCTS === */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
@@ -811,47 +814,76 @@ export default function EditOrderForm() {
               <div className="space-y-4">
                 {fields.map((field, index) => {
                   const currentProductId = watch(`products.${index}.productId`);
-                  const currentVariantId = watch(`products.${index}.variantId`);
                   const currentQty = watch(`products.${index}.quantity`) || 1;
                   const selectedProduct = products.find(
                     (p) => p.id === currentProductId,
                   );
-
-                  const currentSelectedAttrs =
-                    watch(`products.${index}.selectedAttributes`) || {};
                   const subtotal =
                     (watch(`products.${index}.price`) || 0) * currentQty;
 
-                  // ✨ FUNGSI: Penentu Harga Dinamis (Base -> Variant -> Tier)
-                  const resolvePrice = (
+                  // ✨ FUNGSI BARU ASYNC: Perhitungan Harga (Base + Modifier) & Auto-Convert Currency
+                  const updateCalculatedPrice = async (
+                    idx: number,
                     prod: any,
-                    variantId: string,
+                    selectedAttrs: any,
                     qty: number,
                   ) => {
-                    if (!prod) return 0;
-                    let finalPrice = Number(prod.basePrice);
+                    if (!prod) return;
+                    let baseIdr = Number(prod.basePrice || 0);
 
-                    if (variantId && prod.productVariants) {
-                      const variant = prod.productVariants.find(
-                        (v: any) => v.id === variantId,
-                      );
-                      if (variant) finalPrice = Number(variant.price);
-                    }
+                    // 1. Tambah ekstra harga dari atribut yang dipilih (Base Price + Modifiers)
+                    const selectedValIds = Object.values(selectedAttrs);
+                    prod.availableAttributes?.forEach((attr: any) => {
+                      attr.values.forEach((val: any) => {
+                        if (selectedValIds.includes(val.valueId)) {
+                          baseIdr += Number(val.priceModifier || 0);
+                        }
+                      });
+                    });
 
+                    // 2. Timpa dengan Tier Price jika jumlah memenuhi syarat
                     if (prod.priceTiers && prod.priceTiers.length > 0) {
                       const tiers = [...prod.priceTiers].sort(
                         (a, b) => b.minQuantity - a.minQuantity,
                       );
                       const applicableTier = tiers.find(
-                        (tier: any) => qty >= tier.minQuantity,
+                        (tier) => qty >= tier.minQuantity,
                       );
-
                       if (applicableTier) {
-                        finalPrice = Number(applicableTier.price);
+                        // Harga tier menjadi dasar yang baru + ekstra atribut
+                        baseIdr =
+                          Number(applicableTier.price) +
+                          (baseIdr - Number(prod.basePrice || 0));
                       }
                     }
 
-                    return finalPrice;
+                    let finalPrice = baseIdr;
+
+                    // 3. Auto Konversi jika bukan Rupiah (IDR)
+                    if (
+                      selectedCurrencyCode &&
+                      selectedCurrencyCode !== "IDR"
+                    ) {
+                      try {
+                        const result = await convert(
+                          "IDR",
+                          selectedCurrencyCode,
+                          baseIdr,
+                        );
+                        if (result?.success) {
+                          finalPrice = parseFloat(
+                            result.convertedAmount.toFixed(2),
+                          );
+                        }
+                      } catch (error) {
+                        console.error(
+                          "Gagal convert saat memilih atribut:",
+                          error,
+                        );
+                      }
+                    }
+
+                    form.setValue(`products.${idx}.price`, finalPrice);
                   };
 
                   return (
@@ -860,7 +892,7 @@ export default function EditOrderForm() {
                       className={cn(
                         "border rounded-lg bg-white shadow-sm transition-all duration-200",
                         !isPending
-                          ? "opacity-60 pointer-events-none"
+                          ? "opacity-60 pointer-events-none" // 🔒 Kunci form jika tidak Pending
                           : "hover:shadow-md",
                       )}>
                       <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
@@ -925,24 +957,18 @@ export default function EditOrderForm() {
                                                   `products.${index}.selectedAttributes`,
                                                   {},
                                                 );
-
-                                                const hasVariants =
-                                                  p.productVariants?.length > 0;
-                                                form.setValue(
-                                                  `products.${index}.price`,
-                                                  hasVariants
-                                                    ? 0
-                                                    : resolvePrice(
-                                                        p,
-                                                        "",
-                                                        currentQty,
-                                                      ),
-                                                );
-
                                                 setOpenCombobox((prev) => ({
                                                   ...prev,
                                                   [index]: false,
                                                 }));
+
+                                                // Update harga awal & Convert
+                                                updateCalculatedPrice(
+                                                  index,
+                                                  p,
+                                                  {},
+                                                  currentQty,
+                                                );
                                               }}>
                                               <Check
                                                 className={cn(
@@ -1009,22 +1035,17 @@ export default function EditOrderForm() {
                                         field.onChange(newQty);
 
                                         if (selectedProduct) {
-                                          const hasVariants =
-                                            selectedProduct.productVariants
-                                              ?.length > 0;
-                                          if (
-                                            !hasVariants ||
-                                            currentVariantId
-                                          ) {
-                                            form.setValue(
-                                              `products.${index}.price`,
-                                              resolvePrice(
-                                                selectedProduct,
-                                                currentVariantId ?? "",
-                                                newQty,
-                                              ),
-                                            );
-                                          }
+                                          const currentAttrs =
+                                            form.getValues(
+                                              `products.${index}.selectedAttributes`,
+                                            ) || {};
+                                          // Update ulang harga jika kuantitas menyentuh batas Price Tier baru
+                                          updateCalculatedPrice(
+                                            index,
+                                            selectedProduct,
+                                            currentAttrs,
+                                            newQty,
+                                          );
                                         }
                                       }}
                                       className="text-center h-10"
@@ -1099,128 +1120,167 @@ export default function EditOrderForm() {
                         </div>
                       </div>
 
-                      {/* AREA FULL-WIDTH: DYNAMIC ATTRIBUTE SELECTION (Sama seperti Add Order) */}
+                      {/* ✨ AREA FULL-WIDTH: DYNAMIC ATTRIBUTE SELECTION (BERURUTAN/STACK) */}
                       {selectedProduct?.availableAttributes &&
                         selectedProduct.availableAttributes.length > 0 && (
                           <div className="px-4 pb-4">
-                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                              <p className="text-sm font-semibold text-gray-700 mb-3">
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 shadow-inner">
+                              <p className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                                <Layers className="w-4 h-4 text-blue-500" />{" "}
                                 Pilih Varian Produk:
                               </p>
 
-                              <FormField
-                                control={control}
-                                name={`products.${index}.selectedAttributes`}
-                                render={({ field }) => {
-                                  const currentSelectedAttrs =
-                                    field.value || {};
+                              {/* Layout Berurutan (Vertical Stack) */}
+                              <div className="flex flex-col space-y-4">
+                                {selectedProduct.availableAttributes.map(
+                                  (attr: any, attrIdx: number) => {
+                                    const currentSelectedAttrs =
+                                      watch(
+                                        `products.${index}.selectedAttributes`,
+                                      ) || {};
+                                    const selectedValue =
+                                      currentSelectedAttrs[attr.attributeId];
 
-                                  const handleAttributeSelect = (
-                                    attributeId: string,
-                                    valueId: string,
-                                  ) => {
-                                    const newAttrs = {
-                                      ...currentSelectedAttrs,
-                                      [attributeId]: valueId,
-                                    };
+                                    // Mengambil ID opsi yang dipilih di tingkat atribut sebelumnya (untuk filter ketersediaan)
+                                    const prevSelectedIds = Object.values(
+                                      currentSelectedAttrs,
+                                    ).filter(Boolean) as string[];
 
-                                    // 1. Daftarkan perubahan resmi ke React Hook Form
-                                    field.onChange(newAttrs);
+                                    return (
+                                      <div
+                                        key={attr.attributeId}
+                                        className="flex flex-col space-y-2 bg-white p-3 rounded-md border border-slate-200 shadow-sm">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                          Atribut #{attrIdx + 1}:{" "}
+                                          {attr.attributeName}
+                                        </label>
 
-                                    // 2. Logika pencocokan varian & harga
-                                    if (selectedProduct?.productVariants) {
-                                      const selectedValIds =
-                                        Object.values(newAttrs);
-                                      const matchedVariant = [
-                                        ...selectedProduct.productVariants,
-                                      ]
-                                        .sort(
-                                          (a, b) =>
-                                            b.combinationIds.length -
-                                            a.combinationIds.length,
-                                        )
-                                        .find(
-                                          (v) =>
-                                            v.combinationIds.length > 0 &&
-                                            v.combinationIds.every((id) =>
-                                              selectedValIds.includes(id),
-                                            ),
-                                        );
+                                        <div className="flex flex-wrap gap-2">
+                                          {attr.values.map((val: any) => {
+                                            const isSelected =
+                                              selectedValue === val.valueId;
 
-                                      if (matchedVariant) {
-                                        form.setValue(
-                                          `products.${index}.variantId`,
-                                          matchedVariant.id,
-                                        );
-                                        form.setValue(
-                                          `products.${index}.price`,
-                                          resolvePrice(
-                                            selectedProduct,
-                                            matchedVariant.id,
-                                            currentQty,
-                                          ),
-                                        );
-                                      } else {
-                                        form.setValue(
-                                          `products.${index}.variantId`,
-                                          "",
-                                        );
-                                        form.setValue(
-                                          `products.${index}.price`,
-                                          resolvePrice(
-                                            selectedProduct,
-                                            "",
-                                            currentQty,
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  };
+                                            // ✨ FILTER KETERSEDIAAN
+                                            let isAvailable = true;
+                                            if (
+                                              selectedProduct.productVariants &&
+                                              selectedProduct.productVariants
+                                                .length > 0 &&
+                                              attrIdx > 0
+                                            ) {
+                                              const neededIds = [
+                                                ...prevSelectedIds.slice(
+                                                  0,
+                                                  attrIdx,
+                                                ),
+                                                val.valueId,
+                                              ];
+                                              isAvailable =
+                                                selectedProduct.productVariants.some(
+                                                  (v: any) =>
+                                                    neededIds.every((id) =>
+                                                      v.combinationIds.includes(
+                                                        id,
+                                                      ),
+                                                    ),
+                                                );
+                                            }
 
-                                  return (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                      {selectedProduct.availableAttributes.map(
-                                        (attr) => (
-                                          <div
-                                            key={attr.attributeId}
-                                            className="flex flex-col space-y-1.5">
-                                            <label className="text-xs font-medium text-gray-500">
-                                              {attr.attributeName}
-                                            </label>
-                                            <Select
-                                              value={
-                                                currentSelectedAttrs[
-                                                  attr.attributeId
-                                                ] || ""
-                                              }
-                                              onValueChange={(val) =>
-                                                handleAttributeSelect(
-                                                  attr.attributeId,
-                                                  val,
-                                                )
-                                              }>
-                                              <SelectTrigger className="h-9 text-sm bg-white border-gray-300 w-full">
-                                                <SelectValue
-                                                  placeholder={`Pilih ${attr.attributeName}`}
-                                                />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                {attr.values.map((val) => (
-                                                  <SelectItem
-                                                    key={val.valueId}
-                                                    value={val.valueId}>
-                                                    {val.value}
-                                                  </SelectItem>
-                                                ))}
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
-                                        ),
-                                      )}
-                                    </div>
-                                  );
-                                }}
-                              />
+                                            return (
+                                              <button
+                                                type="button"
+                                                key={val.valueId}
+                                                disabled={
+                                                  !isAvailable || !isPending
+                                                } // 🔒 Kunci jika tidak isPending
+                                                onClick={() => {
+                                                  const newAttrs: Record<
+                                                    string,
+                                                    string
+                                                  > = {
+                                                    ...currentSelectedAttrs,
+                                                    [attr.attributeId]:
+                                                      val.valueId,
+                                                  };
+
+                                                  selectedProduct.availableAttributes
+                                                    .slice(attrIdx + 1)
+                                                    .forEach(
+                                                      (nextAttr: any) => {
+                                                        delete newAttrs[
+                                                          nextAttr.attributeId
+                                                        ];
+                                                      },
+                                                    );
+
+                                                  form.setValue(
+                                                    `products.${index}.selectedAttributes`,
+                                                    newAttrs,
+                                                  );
+
+                                                  // Cek & Set Variant ID jika kombinasi sudah lengkap
+                                                  const allVals =
+                                                    Object.values(newAttrs);
+                                                  const matchedVariant =
+                                                    selectedProduct.productVariants?.find(
+                                                      (v: any) =>
+                                                        v.combinationIds
+                                                          .length ===
+                                                          allVals.length &&
+                                                        v.combinationIds.every(
+                                                          (id: string) =>
+                                                            allVals.includes(
+                                                              id,
+                                                            ),
+                                                        ),
+                                                    );
+                                                  form.setValue(
+                                                    `products.${index}.variantId`,
+                                                    matchedVariant?.id || "",
+                                                  );
+
+                                                  // Hitung harga (Base + Modifier) dan auto-convert currency
+                                                  updateCalculatedPrice(
+                                                    index,
+                                                    selectedProduct,
+                                                    newAttrs,
+                                                    currentQty,
+                                                  );
+                                                }}
+                                                className={cn(
+                                                  "relative px-4 py-2 rounded-md text-sm font-medium transition-all duration-200",
+                                                  isSelected
+                                                    ? "bg-blue-600 text-white shadow-md border-transparent"
+                                                    : isAvailable
+                                                      ? "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:border-blue-400"
+                                                      : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60",
+                                                )}>
+                                                {val.value}
+                                                {Number(val.priceModifier) >
+                                                  0 && (
+                                                  <span
+                                                    className={cn(
+                                                      "ml-1.5 text-[10px] font-semibold",
+                                                      isSelected
+                                                        ? "text-blue-200"
+                                                        : "text-emerald-600",
+                                                    )}>
+                                                    (+
+                                                    {Number(
+                                                      val.priceModifier,
+                                                    ).toLocaleString("id-ID")}
+                                                    )
+                                                  </span>
+                                                )}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    );
+                                  },
+                                )}
+                              </div>
                             </div>
                           </div>
                         )}

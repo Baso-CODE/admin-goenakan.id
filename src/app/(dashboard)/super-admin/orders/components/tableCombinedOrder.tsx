@@ -314,11 +314,23 @@ export default function TableCombinedOrder() {
       </Card>
 
       <div className="flex gap-2">
+        {/* Tombol 1: New Order (SALES) */}
         <Link href="/super-admin/orders/add?type=SALES">
           <Button>
             <Plus className="mr-2 h-4 w-4" /> New Order
           </Button>
         </Link>
+
+        {/* Tombol 2: New Sample (SAMPLE) - Ini yang baru kita tambahkan */}
+        <Link href="/super-admin/orders/add?type=SAMPLE">
+          <Button
+            variant="outline"
+            className="text-blue-600 border-blue-200 hover:bg-blue-50">
+            <Plus className="mr-2 h-4 w-4" /> New Sample
+          </Button>
+        </Link>
+
+        {/* Tombol 3: New Replacement */}
         <Link href="/super-admin/replacement-orders/add">
           <Button
             variant="secondary"

@@ -1,12 +1,20 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Resolver, useForm, useWatch } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
 
+import FastCurrencyForm from "@/app/(dashboard)/admin-invoice/currency/components/formCurrencyFast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -23,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useApi } from "@/hooks/useApi";
 
 import {
   ArrowLeftRight,
@@ -32,6 +41,7 @@ import {
   DollarSign,
   FileText,
   Loader2,
+  Plus,
   Receipt,
   Tags,
 } from "lucide-react";
@@ -41,6 +51,12 @@ type CategoryType = {
   id: string;
   name: string;
   type: "INCOME" | "EXPENSE";
+};
+
+type CurrencyType = {
+  code: string;
+  symbol: string;
+  name: string;
 };
 
 // === SCHEMA VALIDASI ===
@@ -53,7 +69,8 @@ const financeTransactionSchema = z.object({
     .number({ message: "Nominal harus berupa angka" })
     .min(1, { message: "Nominal harus lebih dari 0" }),
   categoryId: z.string().min(1, { message: "Kategori wajib dipilih" }),
-  method: z.string().optional(), // Opsional: BANK_TRANSFER, CASH, dll
+  currencyCode: z.string().min(1, { message: "Currency wajib dipilih" }), // ✨ Tambahan validasi Currency
+  method: z.string().optional(),
   referenceNumber: z.string().optional(),
   description: z.string().min(2, { message: "Deskripsi wajib diisi" }),
 });
@@ -65,16 +82,23 @@ export type FinanceTransactionFormValues = z.infer<
 export default function FinanceTransactionForm({
   initialData,
   categories,
+  currencies = [], // ✨ Menerima props currencies
+  setCurrencies, // ✨ Menerima setter currencies untuk fast-create
   onSubmit,
   isLoading = false,
   isSubmitting = false,
 }: {
   initialData?: Partial<FinanceTransactionFormValues>;
-  categories: CategoryType[]; // List kategori dari API
+  categories: CategoryType[];
+  currencies?: CurrencyType[];
+  setCurrencies?: React.Dispatch<React.SetStateAction<any[]>>;
   onSubmit: (data: FinanceTransactionFormValues) => void;
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
+  const { fetchApi, status } = useApi();
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
+
   // === FORM SETUP ===
   const form = useForm<FinanceTransactionFormValues>({
     resolver: zodResolver(
@@ -87,6 +111,7 @@ export default function FinanceTransactionForm({
       type: initialData?.type || "EXPENSE",
       amount: initialData?.amount || 0,
       categoryId: initialData?.categoryId || "",
+      currencyCode: initialData?.currencyCode || "IDR", // ✨ Default IDR
       method: initialData?.method || "",
       referenceNumber: initialData?.referenceNumber || "",
       description: initialData?.description || "",
@@ -103,6 +128,7 @@ export default function FinanceTransactionForm({
         type: initialData.type || "EXPENSE",
         amount: initialData.amount || 0,
         categoryId: initialData.categoryId || "",
+        currencyCode: initialData.currencyCode || "IDR",
         method: initialData.method || "",
         referenceNumber: initialData.referenceNumber || "",
         description: initialData.description || "",
@@ -127,6 +153,34 @@ export default function FinanceTransactionForm({
     }
   }, [selectedType, categories]);
 
+  // Handler untuk menambah currency secara cepat via Modal
+  const handleAddCurrencyFast = async (data: any) => {
+    if (status !== "authenticated") return;
+    try {
+      const res = await fetchApi("/currencies", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal membuat currency");
+      }
+
+      const responseData = await res.json();
+      const newCurrency = responseData.data || responseData;
+
+      if (setCurrencies) {
+        setCurrencies((prev) => [...prev, newCurrency]);
+      }
+      form.setValue("currencyCode", newCurrency.code);
+      setIsCurrencyModalOpen(false);
+      toast.success("Currency berhasil ditambahkan!");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat membuat currency.");
+    }
+  };
+
   const handleSubmit = (values: FinanceTransactionFormValues) => {
     onSubmit(values);
   };
@@ -138,6 +192,16 @@ export default function FinanceTransactionForm({
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       )}
+
+      {/* Modal Tambah Currency Cepat */}
+      <Dialog open={isCurrencyModalOpen} onOpenChange={setIsCurrencyModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tambah Currency Baru</DialogTitle>
+          </DialogHeader>
+          <FastCurrencyForm onSubmit={handleAddCurrencyFast} />
+        </DialogContent>
+      </Dialog>
 
       <CardContent className="pt-6">
         <Form {...form}>
@@ -237,6 +301,53 @@ export default function FinanceTransactionForm({
                 )}
               />
 
+              {/* === Currency (Mata Uang) === */}
+              <FormField
+                control={form.control}
+                name="currencyCode"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-1">
+                    <FormLabel className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      Mata Uang (Currency)
+                    </FormLabel>
+                    <Select
+                      disabled={isLoading || isSubmitting}
+                      onValueChange={(val) => {
+                        if (val === "add_new_currency") {
+                          setIsCurrencyModalOpen(true);
+                        } else {
+                          field.onChange(val);
+                        }
+                      }}
+                      value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih Currency" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {currencies.map((cur) => (
+                          <SelectItem key={cur.code} value={cur.code}>
+                            {cur.code} ({cur.symbol}) - {cur.name}
+                          </SelectItem>
+                        ))}
+                        <div className="h-px bg-stone-200 my-1 mx-2" />
+                        <SelectItem
+                          value="add_new_currency"
+                          className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer">
+                          <div className="flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Buat Currency Baru...
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* === Nominal (Amount) === */}
               <FormField
                 control={form.control}
@@ -245,7 +356,7 @@ export default function FinanceTransactionForm({
                   <FormItem className="md:col-span-1">
                     <FormLabel className="flex items-center gap-2">
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      Nominal (Rp)
+                      Nominal
                     </FormLabel>
                     <FormControl>
                       <Input

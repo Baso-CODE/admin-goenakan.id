@@ -39,6 +39,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  Printer,
   Search,
   Trash2,
   User,
@@ -509,6 +510,20 @@ export default function QuotationsTable() {
                               <Pencil className="h-3.5 w-3.5 text-amber-500" />
                               <span>Edit</span>
                             </DropdownMenuItem>
+
+                            {/* ✨ TAMBAHAN BARU: Menu Print PDF */}
+                            <DropdownMenuItem
+                              onClick={() =>
+                                window.open(
+                                  `/admin-invoice/quotations/print/${quo.id}`,
+                                  "_blank",
+                                )
+                              }
+                              className="cursor-pointer gap-2">
+                              <Printer className="h-3.5 w-3.5 text-indigo-500" />
+                              <span>Print PDF</span>
+                            </DropdownMenuItem>
+                            {/* ================================ */}
 
                             <DropdownMenuSeparator />
 
