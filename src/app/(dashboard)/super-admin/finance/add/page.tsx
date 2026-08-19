@@ -12,55 +12,59 @@ import FinanceTransactionForm, {
 
 export default function AddFinanceTransactionPage() {
   const { fetchApi, status } = useApi();
-
   const router = useRouter();
 
   // State untuk form & data
   const [categories, setCategories] = useState([]);
+  const [currencies, setCurrencies] = useState<any[]>([]);
   const [loadingInit, setLoadingInit] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ==========================================
-  // 1. FETCH KATEGORI UNTUK DROPDOWN
+  // 1. FETCH KATEGORI & CURRENCY UNTUK DROPDOWN
   // ==========================================
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchMasterData = async () => {
       // 🛑 Guard: Tunggu hingga status 'authenticated' agar fetchApi memiliki token
       if (status !== "authenticated") return;
 
       try {
-        //  Gunakan fetchApi (Otomatis handle Base URL dan Token)
-        const res = await fetchApi("/finance/categories?isActive=true");
+        const [resCat, resCur] = await Promise.all([
+          fetchApi("/finance/categories?isActive=true"),
+          fetchApi("/currencies"),
+        ]);
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.message || "Gagal mengambil data kategori");
+        if (!resCat.ok) {
+          throw new Error("Gagal mengambil data kategori");
         }
 
-        const result = await res.json();
-        // Pastikan format dari API sesuai
-        setCategories(result.data || []);
+        const catData = await resCat.json();
+
+        // Ambil data currency (mencegah error jika API gagal)
+        const curData = resCur.ok ? await resCur.json() : { data: [] };
+
+        setCategories(catData.data || []);
+
+        setCurrencies(curData.data || curData || []);
       } catch (error) {
-        console.error("❌ Failed to load categories:", error);
-        toast.error("Gagal memuat list kategori untuk form");
+        console.error("❌ Failed to load master data:", error);
+        toast.error("Gagal memuat data master untuk form");
       } finally {
         setLoadingInit(false);
       }
     };
 
-    fetchCategories();
-  }, [status, fetchApi]); // Tambahkan dependensi lengkap
+    fetchMasterData();
+  }, [status, fetchApi]);
 
   // ==========================================
   // 2. HANDLE SUBMIT TRANSAKSI BARU
   // ==========================================
   const handleAddTransaction = async (data: FinanceTransactionFormValues) => {
-    // 🛑 Guard: Jangan eksekusi jika sesi belum siap
     if (status !== "authenticated") return;
 
     setIsSubmitting(true);
     try {
-      //  Gunakan fetchApi (Otomatis handle Base URL, Token, dan JSON Header)
       const res = await fetchApi("/finance/transactions", {
         method: "POST",
         body: JSON.stringify(data),
@@ -102,16 +106,14 @@ export default function AddFinanceTransactionPage() {
         </div>
       </div>
 
-      {/* Tampilkan Loading Spinner jika kategori belum selesai diambil */}
       {loadingInit ? (
         <div className="flex flex-col items-center justify-center py-20 bg-white rounded-lg border border-dashed">
           <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
           <p className="text-sm text-muted-foreground">
-            Memuat data kategori...
+            Memuat data formulir...
           </p>
         </div>
       ) : categories.length === 0 ? (
-        // Peringatan jika belum ada kategori sama sekali
         <div className="p-6 bg-orange-50 text-orange-800 rounded-lg border border-orange-200">
           <h3 className="font-bold mb-1">Kategori Belum Tersedia!</h3>
           <p className="text-sm mb-4">
@@ -127,6 +129,8 @@ export default function AddFinanceTransactionPage() {
       ) : (
         <FinanceTransactionForm
           categories={categories}
+          currencies={currencies}
+          setCurrencies={setCurrencies}
           onSubmit={handleAddTransaction}
           isSubmitting={isSubmitting}
         />

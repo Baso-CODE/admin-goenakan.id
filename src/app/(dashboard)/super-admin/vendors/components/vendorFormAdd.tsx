@@ -313,7 +313,16 @@ export default function AddVendorForm({
       <CardContent className="pt-6">
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(handleSubmit)}
+            onSubmit={form.handleSubmit(handleSubmit, (errors) => {
+              const firstErrorField = Object.keys(errors)[0];
+              const errorMessage =
+                errors[firstErrorField as keyof typeof errors]?.message;
+
+              toast.error(
+                `Periksa kembali isian Anda: ${errorMessage || "Ada field yang belum sesuai."}`,
+              );
+              console.error("Form Validation Errors:", errors);
+            })}
             className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               {/* === COMPANY NAME === */}

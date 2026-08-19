@@ -491,7 +491,26 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
       </CardHeader>
       <CardContent className="pt-5">
         <Form {...form}>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+          <form
+            onSubmit={handleSubmit(onSubmit, (errors) => {
+              const firstErrorField = Object.keys(
+                errors,
+              )[0] as keyof typeof errors;
+              let errorMessage = errors[firstErrorField]?.message as
+                | string
+                | undefined;
+
+              if (!errorMessage && Array.isArray(errors[firstErrorField])) {
+                errorMessage =
+                  "Mohon lengkapi detail pada daftar item pesanan.";
+              }
+
+              toast.error(
+                `Periksa kembali isian Anda: ${errorMessage || "Ada field yang belum sesuai."}`,
+              );
+              console.error("Form Validation Errors:", errors);
+            })}
+            className="space-y-8">
             {/* === SECTION 1: HEADER PO === */}
             <div
               className={cn(

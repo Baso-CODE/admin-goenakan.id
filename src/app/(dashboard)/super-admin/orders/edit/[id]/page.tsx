@@ -284,6 +284,7 @@ export default function EditOrderForm() {
       setValue("phone", (pic as any).phone);
     }
   }, [selectedPicId, isB2B, availablePics, setValue]);
+
   const onSubmit = async (data: OrderFormValues) => {
     try {
       setSubmitting(true);
@@ -317,6 +318,21 @@ export default function EditOrderForm() {
     }
   };
 
+  const onError = (errors: any) => {
+    // Membaca semua error yang dikembalikan oleh validasi Zod
+    Object.keys(errors).forEach((field) => {
+      const error = errors[field];
+
+      // Jika error berupa teks (misalnya field teks biasa yang kosong)
+      if (error && error.message) {
+        toast.error(`${error.message}`);
+      }
+      // Jika error terjadi di dalam array (seperti form field 'products' yang berlapis)
+      else if (Array.isArray(error)) {
+        toast.error(`Mohon lengkapi detail pada daftar produk (Products).`);
+      }
+    });
+  };
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -336,7 +352,9 @@ export default function EditOrderForm() {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+          <form
+            onSubmit={handleSubmit(onSubmit, onError)}
+            className="space-y-8">
             {/* === SECTION 1: ORDER DETAILS === */}
             <div className="grid grid-cols-1 items-start md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 border rounded-lg bg-gray-50/50">
               <h3 className="col-span-full font-medium text-lg text-gray-700">

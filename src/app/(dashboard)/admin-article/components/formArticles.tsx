@@ -314,7 +314,30 @@ export default function FormArticle({
   }
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+      <form
+        onSubmit={form.handleSubmit(handleSubmit, (errors: any) => {
+          const firstErrorField = Object.keys(errors)[0];
+          let errorMessage = errors[firstErrorField]?.message as
+            | string
+            | undefined;
+
+          if (!errorMessage && typeof errors[firstErrorField] === "object") {
+            const nestedError = Object.values(
+              errors[firstErrorField],
+            )[0] as any;
+            errorMessage =
+              nestedError?.message ||
+              "Mohon lengkapi data yang berbentuk list atau SEO.";
+          }
+
+          // 3. Tampilkan pesan peringatan lewat toast
+          toast.error(
+            `Periksa kembali isian Anda: ${errorMessage || "Ada field yang belum sesuai."}`,
+          );
+
+          console.error("Form Validation Errors:", errors);
+        })}
+        className="space-y-8">
         <Tabs defaultValue="content" className="w-full">
           <TabsList className="mb-6 bg-stone-100 p-1">
             <TabsTrigger value="content" className="font-bold px-8">

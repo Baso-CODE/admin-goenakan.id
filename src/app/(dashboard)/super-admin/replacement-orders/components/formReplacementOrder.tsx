@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 // 1. ZOD SCHEMA (Validasi Standar Enterprise)
 export const replacementSchema = z.object({
@@ -167,7 +168,31 @@ export default function ReplacementOrderForm({
       </CardHeader>
       <CardContent className="pt-6">
         <Form {...form}>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+          <form
+            onSubmit={handleSubmit(onSubmit, (errors) => {
+              // 1. Ambil field pertama yang mengalami error
+              const firstErrorField = Object.keys(
+                errors,
+              )[0] as keyof typeof errors;
+              let errorMessage = errors[firstErrorField]?.message as
+                | string
+                | undefined;
+
+              // 2. Tangani error jika terjadi di dalam tabel 'items' (karena bentuknya array)
+              if (!errorMessage && Array.isArray(errors[firstErrorField])) {
+                errorMessage =
+                  "Mohon lengkapi detail pada daftar barang pengganti (items).";
+              }
+
+              // 3. Tampilkan pesan peringatan lewat toast
+              toast.error(
+                `Periksa kembali isian Anda: ${errorMessage || "Ada field yang belum sesuai."}`,
+              );
+
+              // (Opsional) Cetak di console untuk mempermudah proses debugging saat proses development
+              console.error("Form Validation Errors:", errors);
+            })}
+            className="space-y-8">
             {/* --- SECTION 1: DOKUMEN & KLIEN --- */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border rounded-lg bg-white">
               <h3 className="md:col-span-2 font-semibold text-gray-700 border-b pb-2">
