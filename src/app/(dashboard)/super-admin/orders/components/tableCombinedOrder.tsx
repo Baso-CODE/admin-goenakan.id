@@ -49,6 +49,7 @@ import {
   Plus,
   Search,
 } from "lucide-react";
+import { InvoiceDialogWrapper } from "./helper/invoiceDialogWrapper";
 // import InvoiceDialogWrapper from "./InvoiceDialogWrapper";
 
 // === TYPES ===
@@ -639,12 +640,15 @@ export default function TableCombinedOrder() {
         </div>
       )}
 
-      {/* 
-        Jika kamu menggunakan komponen modal invoice, letakkan di sini:
-        {selectedInvoiceOrderId && (
-          <InvoiceDialogWrapper orderId={selectedInvoiceOrderId} onClose={() => setSelectedInvoiceOrderId(null)} onSuccess={fetchOrders} />
-        )} 
-      */}
+      {selectedInvoiceOrderId && (
+        <InvoiceDialogWrapper
+          orderId={selectedInvoiceOrderId}
+          onClose={() => setSelectedInvoiceOrderId(null)}
+          onSuccess={() => {
+            fetchOrders();
+          }}
+        />
+      )}
     </div>
   );
 }
