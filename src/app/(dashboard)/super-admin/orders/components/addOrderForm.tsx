@@ -1407,6 +1407,7 @@ export default function AddOrderForm() {
                       </div>
 
                       {/* ✨ AREA FULL-WIDTH: DYNAMIC ATTRIBUTE SELECTION (BERURUTAN/STACK) */}
+                      {/* ✨ AREA FULL-WIDTH: DYNAMIC ATTRIBUTE SELECTION (BERURUTAN/STACK) */}
                       {selectedProduct?.availableAttributes &&
                         selectedProduct.availableAttributes.length > 0 && (
                           <div className="px-4 pb-4">
@@ -1420,6 +1421,10 @@ export default function AddOrderForm() {
                               <div className="flex flex-col space-y-4">
                                 {selectedProduct.availableAttributes.map(
                                   (attr: any, attrIdx: number) => {
+                                    // 1. Deteksi apakah atribut ini bertipe custom/bebas
+                                    const isCustomAttr =
+                                      attr.isCustom || attr.type === "CUSTOM";
+
                                     const currentSelectedAttrs =
                                       watch(
                                         `products.${index}.selectedAttributes`,
@@ -1438,7 +1443,12 @@ export default function AddOrderForm() {
                                         className="flex flex-col space-y-2 bg-white p-3 rounded-md border border-slate-200 shadow-sm">
                                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                                           Atribut #{attrIdx + 1}:{" "}
-                                          {attr.attributeName}
+                                          {attr.attributeName}{" "}
+                                          {isCustomAttr && (
+                                            <span className="text-purple-600 font-normal">
+                                              (Bebas)
+                                            </span>
+                                          )}
                                         </label>
 
                                         <div className="flex flex-wrap gap-2">
@@ -1447,29 +1457,34 @@ export default function AddOrderForm() {
                                               selectedValue === val.valueId;
 
                                             let isAvailable = true;
-                                            if (
-                                              selectedProduct.productVariants &&
-                                              selectedProduct.productVariants
-                                                .length > 0 &&
-                                              attrIdx > 0
-                                            ) {
-                                              // Semua ID terpilih dari atribut di atasnya + ID opsi ini
-                                              const neededIds = [
-                                                ...prevSelectedIds.slice(
-                                                  0,
-                                                  attrIdx,
-                                                ),
-                                                val.valueId,
-                                              ];
-                                              isAvailable =
-                                                selectedProduct.productVariants.some(
-                                                  (v: any) =>
-                                                    neededIds.every((id) =>
-                                                      v.combinationIds.includes(
-                                                        id,
+
+                                            // 2. Hanya lakukan validasi ketersediaan varian JIKA BUKAN atribut custom.
+                                            // Jika atribut custom, isAvailable selalu true (tidak disable).
+                                            if (!isCustomAttr) {
+                                              if (
+                                                selectedProduct.productVariants &&
+                                                selectedProduct.productVariants
+                                                  .length > 0 &&
+                                                attrIdx > 0
+                                              ) {
+                                                // Semua ID terpilih dari atribut di atasnya + ID opsi ini
+                                                const neededIds = [
+                                                  ...prevSelectedIds.slice(
+                                                    0,
+                                                    attrIdx,
+                                                  ),
+                                                  val.valueId,
+                                                ];
+                                                isAvailable =
+                                                  selectedProduct.productVariants.some(
+                                                    (v: any) =>
+                                                      neededIds.every((id) =>
+                                                        v.combinationIds.includes(
+                                                          id,
+                                                        ),
                                                       ),
-                                                    ),
-                                                );
+                                                  );
+                                              }
                                             }
 
                                             return (
@@ -1502,18 +1517,39 @@ export default function AddOrderForm() {
                                                     newAttrs,
                                                   );
 
-                                                  // Cek & Set Variant ID jika kombinasi sudah lengkap
-                                                  const allVals =
-                                                    Object.values(newAttrs);
+                                                  // 3. Cek & Set Variant ID hanya dari atribut yang BUKAN custom
+                                                  const nonCustomAttrsObj =
+                                                    Object.fromEntries(
+                                                      Object.entries(
+                                                        newAttrs,
+                                                      ).filter(([key]) => {
+                                                        const foundAttr =
+                                                          selectedProduct.availableAttributes.find(
+                                                            (a: any) =>
+                                                              a.attributeId ===
+                                                              key,
+                                                          );
+                                                        return !(
+                                                          foundAttr?.isCustom ||
+                                                          foundAttr?.type ===
+                                                            "CUSTOM"
+                                                        );
+                                                      }),
+                                                    );
+                                                  const nonCustomVals =
+                                                    Object.values(
+                                                      nonCustomAttrsObj,
+                                                    );
+
                                                   const matchedVariant =
                                                     selectedProduct.productVariants?.find(
                                                       (v: any) =>
                                                         v.combinationIds
                                                           .length ===
-                                                          allVals.length &&
+                                                          nonCustomVals.length &&
                                                         v.combinationIds.every(
                                                           (id: string) =>
-                                                            allVals.includes(
+                                                            nonCustomVals.includes(
                                                               id,
                                                             ),
                                                         ),
@@ -1523,7 +1559,7 @@ export default function AddOrderForm() {
                                                     matchedVariant?.id || "",
                                                   );
 
-                                                  // Hitung harga (Base + Modifier) dan auto-convert currency
+                                                  // Hitung harga (Base + Modifier) dan auto-convert currency (TETAP SEPERTI SEMULA)
                                                   updateCalculatedPrice(
                                                     index,
                                                     selectedProduct,
