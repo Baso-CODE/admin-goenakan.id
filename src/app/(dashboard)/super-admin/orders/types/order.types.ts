@@ -129,6 +129,7 @@ export type AvailableAttribute = {
   attributeId: string;
   attributeName: string;
   attributeType: string;
+  isCustom: boolean;
   values: AttributeValueOption[];
 };
 

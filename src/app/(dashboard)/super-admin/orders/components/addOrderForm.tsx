@@ -665,6 +665,7 @@ export default function AddOrderForm() {
                 </div>
               )}
             </div>
+
             {/* === SECTION 2: DOCUMENT REFERENCES === */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50/50">
               <h3 className="col-span-full font-medium text-lg text-gray-700">
@@ -1120,37 +1121,89 @@ export default function AddOrderForm() {
                     qty: number,
                   ) => {
                     if (!prod) return;
-                    let baseIdr = Number(prod.basePrice || 0);
 
-                    // 1. Tambah ekstra harga dari atribut yang dipilih (Base Price + Modifiers)
+                    // 1. Tentukan Harga Dasar
+                    let baseProductPrice = Number(prod.basePrice || 0);
+
+                    if (
+                      baseProductPrice === 0 &&
+                      prod.productVariants &&
+                      prod.productVariants.length > 0
+                    ) {
+                      baseProductPrice = Number(
+                        prod.productVariants[0].price || 0,
+                      );
+                    }
+
+                    // 2. Cek apakah ada Varian Fisik yang cocok
+                    const nonCustomAttrsObj = Object.fromEntries(
+                      Object.entries(selectedAttrs).filter(([key]) => {
+                        const foundAttr = prod.availableAttributes?.find(
+                          (a: any) => a.attributeId === key,
+                        );
+                        return foundAttr?.isCustom !== true;
+                      }),
+                    );
+
+                    const nonCustomVals = Object.values(nonCustomAttrsObj);
+                    const matchedVariant = prod.productVariants?.find(
+                      (v: any) =>
+                        v.combinationIds &&
+                        v.combinationIds.length === nonCustomVals.length &&
+                        v.combinationIds.length > 0 &&
+                        v.combinationIds.every((id: string) =>
+                          nonCustomVals.includes(id),
+                        ),
+                    );
+
+                    if (matchedVariant && Number(matchedVariant.price) > 0) {
+                      baseProductPrice = Number(matchedVariant.price);
+                    }
+
+                    // 3. Hitung Tambahan Harga (Modifiers)
+                    let totalModifiers = 0;
                     const selectedValIds = Object.values(selectedAttrs);
-                    prod.availableAttributes?.forEach((attr: any) => {
-                      attr.values.forEach((val: any) => {
-                        if (selectedValIds.includes(val.valueId)) {
-                          baseIdr += Number(val.priceModifier || 0);
+
+                    if (
+                      prod.availableAttributes &&
+                      Array.isArray(prod.availableAttributes)
+                    ) {
+                      prod.availableAttributes.forEach((attr: any) => {
+                        if (attr.values && Array.isArray(attr.values)) {
+                          attr.values.forEach((val: any) => {
+                            if (selectedValIds.includes(val.valueId)) {
+                              totalModifiers += Number(val.priceModifier || 0);
+                            }
+                          });
                         }
                       });
-                    });
+                    }
 
-                    // 2. Timpa dengan Tier Price jika jumlah memenuhi syarat
-                    if (prod.priceTiers && prod.priceTiers.length > 0) {
+                    // 4. Totalkan Harga Dasar dengan Tambahan
+                    let baseIdr = baseProductPrice + totalModifiers;
+
+                    // 5. Tier Price (Grosir) - ✨ DENGAN PENGAMAN BARU ✨
+                    if (
+                      prod.priceTiers &&
+                      Array.isArray(prod.priceTiers) &&
+                      prod.priceTiers.length > 0
+                    ) {
                       const tiers = [...prod.priceTiers].sort(
                         (a, b) => b.minQuantity - a.minQuantity,
                       );
                       const applicableTier = tiers.find(
                         (tier) => qty >= tier.minQuantity,
                       );
-                      if (applicableTier) {
-                        // Harga tier menjadi dasar yang baru + ekstra atribut
-                        baseIdr =
-                          Number(applicableTier.price) +
-                          (baseIdr - Number(prod.basePrice || 0));
+
+                      // ✨ PERBAIKAN: Pastikan tier ditemukan DAN harganya lebih dari 0
+                      if (applicableTier && Number(applicableTier.price) > 0) {
+                        baseIdr = Number(applicableTier.price) + totalModifiers;
                       }
                     }
 
                     let finalPrice = baseIdr;
 
-                    // 3. Auto Konversi jika bukan Rupiah (IDR)
+                    // 6. Auto Konversi Currency
                     if (
                       selectedCurrencyCode &&
                       selectedCurrencyCode !== "IDR"
@@ -1174,9 +1227,9 @@ export default function AddOrderForm() {
                       }
                     }
 
+                    // 7. Simpan harga akhir
                     form.setValue(`products.${idx}.price`, finalPrice);
                   };
-
                   return (
                     <div
                       key={field.id}
@@ -1234,6 +1287,10 @@ export default function AddOrderForm() {
                                               key={p.id}
                                               value={`${p.name} ${p.sku}`}
                                               onSelect={() => {
+                                                console.log(
+                                                  "👉 [DEBUG] KLIK PRODUK:",
+                                                  p.name,
+                                                );
                                                 field.onChange(p.id);
                                                 form.setValue(
                                                   `products.${index}.variantId`,
@@ -1407,7 +1464,6 @@ export default function AddOrderForm() {
                       </div>
 
                       {/* ✨ AREA FULL-WIDTH: DYNAMIC ATTRIBUTE SELECTION (BERURUTAN/STACK) */}
-                      {/* ✨ AREA FULL-WIDTH: DYNAMIC ATTRIBUTE SELECTION (BERURUTAN/STACK) */}
                       {selectedProduct?.availableAttributes &&
                         selectedProduct.availableAttributes.length > 0 && (
                           <div className="px-4 pb-4">
@@ -1417,13 +1473,10 @@ export default function AddOrderForm() {
                                 Pilih Varian Produk:
                               </p>
 
-                              {/* Layout Berurutan (Vertical Stack) */}
                               <div className="flex flex-col space-y-4">
                                 {selectedProduct.availableAttributes.map(
                                   (attr: any, attrIdx: number) => {
-                                    // 1. Deteksi apakah atribut ini bertipe custom/bebas
-                                    const isCustomAttr =
-                                      attr.isCustom || attr.type === "CUSTOM";
+                                    const isCustomAttr = attr.isCustom === true;
 
                                     const currentSelectedAttrs =
                                       watch(
@@ -1431,11 +1484,6 @@ export default function AddOrderForm() {
                                       ) || {};
                                     const selectedValue =
                                       currentSelectedAttrs[attr.attributeId];
-
-                                    // Mengambil ID opsi yang dipilih di tingkat atribut sebelumnya (untuk filter ketersediaan)
-                                    const prevSelectedIds = Object.values(
-                                      currentSelectedAttrs,
-                                    ).filter(Boolean) as string[];
 
                                     return (
                                       <div
@@ -1456,52 +1504,32 @@ export default function AddOrderForm() {
                                             const isSelected =
                                               selectedValue === val.valueId;
 
-                                            let isAvailable = true;
-
-                                            // 2. Hanya lakukan validasi ketersediaan varian JIKA BUKAN atribut custom.
-                                            // Jika atribut custom, isAvailable selalu true (tidak disable).
-                                            if (!isCustomAttr) {
-                                              if (
-                                                selectedProduct.productVariants &&
-                                                selectedProduct.productVariants
-                                                  .length > 0 &&
-                                                attrIdx > 0
-                                              ) {
-                                                // Semua ID terpilih dari atribut di atasnya + ID opsi ini
-                                                const neededIds = [
-                                                  ...prevSelectedIds.slice(
-                                                    0,
-                                                    attrIdx,
-                                                  ),
-                                                  val.valueId,
-                                                ];
-                                                isAvailable =
-                                                  selectedProduct.productVariants.some(
-                                                    (v: any) =>
-                                                      neededIds.every((id) =>
-                                                        v.combinationIds.includes(
-                                                          id,
-                                                        ),
-                                                      ),
-                                                  );
-                                              }
-                                            }
-
                                             return (
                                               <button
                                                 type="button"
                                                 key={val.valueId}
-                                                disabled={!isAvailable}
+                                                // onClick sudah dimodifikasi untuk toggle dan clear!
                                                 onClick={() => {
+                                                  // Buat salinan atribut saat ini
                                                   const newAttrs: Record<
                                                     string,
                                                     string
                                                   > = {
                                                     ...currentSelectedAttrs,
-                                                    [attr.attributeId]:
-                                                      val.valueId,
                                                   };
 
+                                                  if (isSelected) {
+                                                    // ✨ FITUR TOGGLE: Jika sudah terpilih, maka batalkan pilihannya (Hapus)
+                                                    delete newAttrs[
+                                                      attr.attributeId
+                                                    ];
+                                                  } else {
+                                                    // ✨ FITUR TOGGLE: Jika belum terpilih, pilih ini
+                                                    newAttrs[attr.attributeId] =
+                                                      val.valueId;
+                                                  }
+
+                                                  // (Opsional UX): Hapus atribut turunan di bawahnya agar kombinasi tetap bersih
                                                   selectedProduct.availableAttributes
                                                     .slice(attrIdx + 1)
                                                     .forEach(
@@ -1517,7 +1545,7 @@ export default function AddOrderForm() {
                                                     newAttrs,
                                                   );
 
-                                                  // 3. Cek & Set Variant ID hanya dari atribut yang BUKAN custom
+                                                  // Cek & Set Variant ID hanya dari atribut yang BUKAN custom
                                                   const nonCustomAttrsObj =
                                                     Object.fromEntries(
                                                       Object.entries(
@@ -1529,13 +1557,13 @@ export default function AddOrderForm() {
                                                               a.attributeId ===
                                                               key,
                                                           );
-                                                        return !(
-                                                          foundAttr?.isCustom ||
-                                                          foundAttr?.type ===
-                                                            "CUSTOM"
+                                                        return (
+                                                          foundAttr?.isCustom !==
+                                                          true
                                                         );
                                                       }),
                                                     );
+
                                                   const nonCustomVals =
                                                     Object.values(
                                                       nonCustomAttrsObj,
@@ -1554,12 +1582,13 @@ export default function AddOrderForm() {
                                                             ),
                                                         ),
                                                     );
+
                                                   form.setValue(
                                                     `products.${index}.variantId`,
                                                     matchedVariant?.id || "",
                                                   );
 
-                                                  // Hitung harga (Base + Modifier) dan auto-convert currency (TETAP SEPERTI SEMULA)
+                                                  // Hitung harga (Base + Modifier) dan auto-convert currency
                                                   updateCalculatedPrice(
                                                     index,
                                                     selectedProduct,
@@ -1567,13 +1596,12 @@ export default function AddOrderForm() {
                                                     currentQty,
                                                   );
                                                 }}
+                                                // Tampilan diperbarui agar tidak ada efek abu-abu disabled
                                                 className={cn(
                                                   "relative px-4 py-2 rounded-md text-sm font-medium transition-all duration-200",
                                                   isSelected
                                                     ? "bg-blue-600 text-white shadow-md border-transparent"
-                                                    : isAvailable
-                                                      ? "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:border-blue-400"
-                                                      : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60",
+                                                    : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:border-blue-400",
                                                 )}>
                                                 {val.value}
                                                 {Number(val.priceModifier) >
