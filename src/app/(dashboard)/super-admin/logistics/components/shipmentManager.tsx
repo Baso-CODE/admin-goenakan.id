@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import {
   CalendarIcon,
+  ExternalLink,
   FileText,
   History,
   MapPin,
@@ -256,6 +257,7 @@ export default function ShipmentManager({
     if (!vendorId) return toast.error("Pilih Vendor");
     if (!origin || !destination) return toast.error("Isi Kota Asal & Tujuan");
     if (status !== "authenticated") return;
+
     try {
       setLoading(true);
 
@@ -263,8 +265,8 @@ export default function ShipmentManager({
         orderId,
         type,
         step: Number(step),
-        vendorId,
-        trackingNumber: trackingNo,
+        vendorId: vendorId || undefined,
+        trackingNumber: trackingNo || undefined,
         method,
         origin,
         destination,
@@ -273,10 +275,11 @@ export default function ShipmentManager({
         items: selectedItems.map((i) => ({
           orderProductId: i.id,
           quantity: Number(i.qty),
-          totalCarton: Number(i.totalCarton),
+          totalCarton: Number(i.totalCarton) || 0,
         })),
         notes: getNotesPayload(),
       };
+
       const res = await fetchApi("/logistics/shipments", {
         method: "POST",
         body: JSON.stringify(payload),
@@ -284,7 +287,15 @@ export default function ShipmentManager({
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to create shipment");
+
+        let errorMessage = "Failed to create shipment";
+        if (Array.isArray(errData.message)) {
+          errorMessage = errData.message.join(", ");
+        } else if (errData.message) {
+          errorMessage = errData.message;
+        }
+
+        throw new Error(errorMessage);
       }
 
       toast.success("Pengiriman berhasil dibuat!");
@@ -301,13 +312,13 @@ export default function ShipmentManager({
       setDate(new Date());
       setStep(1);
       setArrivalDate(undefined);
-    } catch (e) {
-      toast.error("Gagal membuat pengiriman");
+    } catch (e: any) {
+      console.error("❌ Create Shipment Error:", e);
+      toast.error(e.message || "Gagal membuat pengiriman");
     } finally {
       setLoading(false);
     }
   };
-
   // === 2. UPDATE STATUS TRACKING (Add History) ===
   const handleUpdateStatus = async () => {
     if (!updateStatusId) return;
@@ -573,7 +584,22 @@ export default function ShipmentManager({
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                      {/* ✨ LOGIKA BARU: Tombol Tracking URL Vendor */}
+                      {ship.vendor?.trackingUrl && (
+                        <a
+                          href={ship.vendor.trackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-9 gap-2 border-blue-200 text-blue-700 hover:bg-blue-50">
+                            <ExternalLink className="h-3.5 w-3.5" /> Cek Resi
+                          </Button>
+                        </a>
+                      )}
+
                       {type === "OUTBOUND" && (
                         <Link
                           href={`/super-admin/logistics/print/${ship.id}`}

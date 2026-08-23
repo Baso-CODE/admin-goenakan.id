@@ -293,12 +293,15 @@ export default function QuotationPrint() {
                     const itemQty = Number(item.quantity) || 0;
                     const itemPrice = Number(item.unitPrice) || 0;
                     const hasTiers = item.tiers && item.tiers.length > 0;
+                    const basePrice = item.product?.basePrice
+                      ? Number(item.product.basePrice)
+                      : null;
 
                     return (
                       <tr
                         key={item.id || index}
                         className="align-top text-[11px] border-b border-gray-800">
-                        {/* Kolom 1: Product Detail (Hanya Gambar) */}
+                        {/* Kolom 1: Product Detail (Hanya Gambar & Link URL) */}
                         <td className="border-r border-gray-800 p-2 text-center align-middle">
                           {imageUrl ? (
                             <img
@@ -311,6 +314,16 @@ export default function QuotationPrint() {
                             <div className="text-gray-400 italic text-[9px]">
                               No Image
                             </div>
+                          )}
+
+                          {item.product?.slug && (
+                            <a
+                              href={`https://client.goenakan.tech/en/products/${item.product.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-1.5 block text-[9px] text-blue-600 hover:underline">
+                              View Product Page
+                            </a>
                           )}
                         </td>
 
@@ -345,46 +358,25 @@ export default function QuotationPrint() {
                             )}
                           </div>
 
-                          {/* ✨ Tampilkan Semua Atribut & Tandai yang Dipilih dengan Warna */}
+                          {/* ✨ LOGIC BARU: Style diseragamkan (teks biasa), hanya teks "Available in" yang diatur */}
                           {item.product?.availableAttributes?.map(
                             (attr: any, attrIdx: number) => {
-                              // Ekstrak ID yang dipilih klien dari rawAttributes
-                              let selectedIds: string[] = [];
-                              if (
-                                item.rawAttributes &&
-                                item.rawAttributes[attr.attributeId]
-                              ) {
-                                const val =
-                                  item.rawAttributes[attr.attributeId];
-                                selectedIds = Array.isArray(val)
-                                  ? val.map(String)
-                                  : [String(val)];
-                              }
-
                               return (
                                 <div
                                   key={attrIdx}
                                   className="mt-2 text-[10px] text-gray-700">
-                                  Available in {attr.attributeName}:{" "}
-                                  {attr.values.map((v: any, vIdx: number) => {
-                                    const isSelected = selectedIds.includes(
-                                      String(v.valueId),
-                                    );
-                                    return (
-                                      <span key={v.valueId}>
-                                        {isSelected ? (
-                                          <span className="bg-green-200 text-green-800 px-1 py-0.5 rounded font-bold">
-                                            {v.value}
-                                          </span>
-                                        ) : (
-                                          <span>{v.value}</span>
-                                        )}
-                                        {vIdx < attr.values.length - 2 && ", "}
-                                        {vIdx === attr.values.length - 2 &&
-                                          " and "}
-                                      </span>
-                                    );
-                                  })}
+                                  {attr.hasSelection
+                                    ? `${attr.attributeName} : `
+                                    : `Available in ${attr.attributeName} : `}
+
+                                  {attr.values.map((v: any, vIdx: number) => (
+                                    <span key={v.valueId}>
+                                      {v.value}
+                                      {vIdx < attr.values.length - 2 && ", "}
+                                      {vIdx === attr.values.length - 2 &&
+                                        " and "}
+                                    </span>
+                                  ))}
                                 </div>
                               );
                             },
@@ -401,7 +393,7 @@ export default function QuotationPrint() {
                           )}
                         </td>
 
-                        {/* Kolom 3: Qty (Bertingkat / Stacked ke Bawah) */}
+                        {/* Kolom 3: Qty */}
                         <td className="border-r border-gray-800 p-3 text-center align-middle font-medium text-[11px]">
                           {hasTiers ? (
                             <div className="flex flex-col space-y-1.5">
@@ -414,8 +406,18 @@ export default function QuotationPrint() {
                           )}
                         </td>
 
-                        {/* Kolom 4: Unit Price (Bertingkat / Stacked ke Bawah) */}
+                        {/* Kolom 4: Unit Price */}
                         <td className="p-3 text-center align-middle font-medium text-gray-800 text-[11px]">
+                          {basePrice !== null && (
+                            <div className="text-[10px] text-gray-500 mb-1.5 pb-1 border-b border-gray-300">
+                              Start from:
+                              <br />
+                              <span className="font-medium text-gray-800">
+                                {formatDynamicCurrency(basePrice)}
+                              </span>
+                            </div>
+                          )}
+
                           {hasTiers ? (
                             <div className="flex flex-col space-y-1.5">
                               {item.tiers.map((t: any, idx: number) => (

@@ -8,6 +8,10 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import VendorForm, { VendorFormValues } from "../../components/VendorForm";
 
+// ✨ 1. IMPORT KOMPONEN SKELETON SHADCN
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
 export default function EditVendorPage() {
   const { fetchApi, status } = useApi();
 
@@ -15,8 +19,6 @@ export default function EditVendorPage() {
   const router = useRouter();
 
   const [vendorData, setVendorData] = useState<VendorFormValues | undefined>();
-  console.log("ini adalah data vendor data", vendorData);
-
   const [existingItems, setExistingItems] = useState<
     { id: string; name: string }[]
   >([]);
@@ -139,7 +141,7 @@ export default function EditVendorPage() {
         </div>
       </div>
 
-      {/* Form Edit */}
+      {/* Form Edit atau Tampilan Skeleton Loading */}
       {!isLoading && vendorData ? (
         <VendorForm
           initialData={vendorData}
@@ -149,11 +151,69 @@ export default function EditVendorPage() {
           isSubmitting={isSubmitting}
         />
       ) : (
-        <div className="flex items-center justify-center h-40">
-          <span className="text-muted-foreground animate-pulse">
-            Loading form data...
-          </span>
-        </div>
+        /* ✨ 2. SKELETON LOADING UI */
+        <Card>
+          <CardContent className="pt-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              {/* Field 1 & 2 */}
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+
+              {/* Field 3 & 4 */}
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+
+              {/* Tracking Link (Full Width) */}
+              <div className="col-span-1 md:col-span-2 space-y-2">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+
+              {/* Area & Lokasi Box */}
+              <div className="col-span-1 md:col-span-2 space-y-4 border p-4 rounded-lg bg-slate-50/50">
+                <Skeleton className="h-5 w-40" />
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <Skeleton className="h-10 w-full rounded-md" />
+                  <Skeleton className="h-10 w-full rounded-md" />
+                  <Skeleton className="h-10 w-full rounded-md" />
+                </div>
+              </div>
+
+              {/* Full Address */}
+              <div className="col-span-1 md:col-span-2 space-y-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+
+              {/* Type & Category */}
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+            </div>
+
+            {/* Tombol Simpan */}
+            <div className="flex justify-end pt-4">
+              <Skeleton className="h-10 w-32 rounded-md" />
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

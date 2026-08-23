@@ -333,7 +333,12 @@ export default function AddVendorForm({
                   <FormItem>
                     <FormLabel>Company Name *</FormLabel>
                     <FormControl>
-                      <Input {...field} disabled={isLoading || isSubmitting} />
+                      {/* ✨ TAMBAHAN: Placeholder untuk Company Name */}
+                      <Input
+                        {...field}
+                        placeholder="Contoh: PT Goenakan Indonesia"
+                        disabled={isLoading || isSubmitting}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -348,7 +353,12 @@ export default function AddVendorForm({
                   <FormItem>
                     <FormLabel>PIC Name *</FormLabel>
                     <FormControl>
-                      <Input {...field} disabled={isLoading || isSubmitting} />
+                      {/* ✨ TAMBAHAN: Placeholder untuk PIC Name */}
+                      <Input
+                        {...field}
+                        placeholder="Contoh: Budi Santoso"
+                        disabled={isLoading || isSubmitting}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -387,7 +397,8 @@ export default function AddVendorForm({
                       }}>
                       <FormControl className="w-full">
                         <SelectTrigger>
-                          <SelectValue placeholder="Select Platform" />
+                          {/* Placeholder Select sudah ada */}
+                          <SelectValue placeholder="Pilih Platform" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -419,7 +430,12 @@ export default function AddVendorForm({
                   <FormItem>
                     <FormLabel>Contact ID *</FormLabel>
                     <FormControl>
-                      <Input {...field} disabled={isLoading || isSubmitting} />
+                      {/* ✨ TAMBAHAN: Placeholder untuk Contact ID */}
+                      <Input
+                        {...field}
+                        placeholder="Contoh: 081234567890 / @username"
+                        disabled={isLoading || isSubmitting}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -435,7 +451,11 @@ export default function AddVendorForm({
                     <FormItem>
                       <FormLabel>Default Tracking Link</FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        {/* ✨ TAMBAHAN: Placeholder untuk Tracking URL */}
+                        <Input
+                          {...field}
+                          placeholder="Contoh: https://tracking.ekspedisi.com/resi/..."
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -448,6 +468,8 @@ export default function AddVendorForm({
                   Area & Lokasi Vendor
                 </FormLabel>
 
+                {/* Komponen AddressField biasanya mengelola inputnya sendiri, 
+                    namun penggunaannya di sini sudah benar */}
                 <AddressField
                   value={{
                     country: form.watch("country") || "",
@@ -494,7 +516,11 @@ export default function AddVendorForm({
                     <FormItem>
                       <FormLabel>Full Address</FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        {/* ✨ TAMBAHAN: Placeholder untuk Alamat Lengkap */}
+                        <Input
+                          {...field}
+                          placeholder="Contoh: Jl. Jend. Sudirman No 12, Patokan: Sebelah Minimarket"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

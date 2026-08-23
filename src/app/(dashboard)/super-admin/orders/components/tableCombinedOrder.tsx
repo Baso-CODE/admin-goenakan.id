@@ -25,6 +25,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -49,6 +56,7 @@ import {
   Plus,
   Search,
 } from "lucide-react";
+import { PurchaseChannel } from "../types/order.types";
 import { InvoiceDialogWrapper } from "./helper/invoiceDialogWrapper";
 // import InvoiceDialogWrapper from "./InvoiceDialogWrapper";
 
@@ -77,6 +85,8 @@ type CombinedOrder = {
   salesCategory: string;
   salesName: string;
   totalItems: number;
+  purchaseChannel?: string;
+  purchaseChannelId?: string | null;
 };
 
 type Meta = {
@@ -123,11 +133,30 @@ export default function TableCombinedOrder() {
   const [page, setPage] = useState(1);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-
+  const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
+    [],
+  );
+  const [selectedChannelId, setSelectedChannelId] = useState<string>("ALL");
   const [selectedInvoiceOrderId, setSelectedInvoiceOrderId] = useState<
     string | null
   >(null);
 
+  useEffect(() => {
+    const fetchPurchaseChannels = async () => {
+      if (status !== "authenticated") return;
+      try {
+        const res = await fetchApi("/purchase-channels/list");
+        if (res.ok) {
+          const data = await res.json();
+          setPurchaseChannels(Array.isArray(data) ? data : data.data || []);
+        }
+      } catch (error) {
+        console.error("Gagal memuat purchase channels", error);
+      }
+    };
+
+    fetchPurchaseChannels();
+  }, [status, fetchApi]);
   // === FETCH ORDERS ===
   const fetchOrders = async () => {
     if (status !== "authenticated") return;
@@ -143,6 +172,9 @@ export default function TableCombinedOrder() {
         params.append("search", debouncedSearch[0]);
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
+      if (selectedChannelId && selectedChannelId !== "ALL") {
+        params.append("purchaseChannelId", selectedChannelId);
+      }
 
       const res = await fetchApi(`/orders/combined?${params}`);
 
@@ -152,7 +184,6 @@ export default function TableCombinedOrder() {
       }
 
       const result = await res.json();
-      console.log("ini adlah result", result);
 
       setOrders(result.data || []);
       setMeta(result.meta);
@@ -167,8 +198,15 @@ export default function TableCombinedOrder() {
   useEffect(() => {
     fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, startDate, endDate, status, fetchApi]);
-
+  }, [
+    page,
+    debouncedSearch,
+    startDate,
+    endDate,
+    selectedChannelId,
+    status,
+    fetchApi,
+  ]);
   // === HANDLER EXPORT ===
   const handleExport = async () => {
     // Bisa disesuaikan nanti jika ada endpoint export khusus combined
@@ -221,7 +259,32 @@ export default function TableCombinedOrder() {
       {/* Filter & Export Bar */}
       <Card className="p-4 shadow-sm">
         <div className="flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between">
-          <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+          <div className="flex flex-wrap gap-3 w-full lg:w-auto items-center">
+            {/* ✨ 6. TAMBAHKAN ELEMEN DROPDOWN SELECT PURCHASE CHANNEL */}
+            <div className="flex flex-col gap-1.5 w-full sm:w-48">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Purchase Channel
+              </span>
+              <Select
+                value={selectedChannelId}
+                onValueChange={(value) => {
+                  setSelectedChannelId(value);
+                  setPage(1);
+                }}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="All Channels" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Channels</SelectItem>
+                  {purchaseChannels.map((channel) => (
+                    <SelectItem key={channel.id} value={channel.id}>
+                      {channel.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="flex gap-2 w-full sm:w-auto">
               <div className="flex flex-col gap-1.5 w-full sm:w-35">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -349,6 +412,8 @@ export default function TableCombinedOrder() {
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="min-w-30">Type</TableHead>
+                  {/* ✨ TAMBAHAN: Kolom Header Purchase Channel */}
+                  <TableHead className="min-w-35">Purchase Channel</TableHead>
                   <TableHead className="min-w-30">Date</TableHead>
                   <TableHead className="min-w-37.5">Number</TableHead>
                   <TableHead className="min-w-37.5">Customer Name</TableHead>
@@ -360,7 +425,6 @@ export default function TableCombinedOrder() {
                   <TableHead className="text-center min-w-20">Items</TableHead>
                   <TableHead className="min-w-37.5">Sales Rep</TableHead>
 
-                  {/* ✨ KOLOM YANG SEBELUMNYA DIHILANGKAN KINI DIKEMBALIKAN */}
                   <TableHead className="min-w-37.5">Sample Ref</TableHead>
                   <TableHead className="min-w-37.5">Quotation Ref</TableHead>
                   <TableHead className="min-w-37.5">Send to Cust</TableHead>
@@ -381,8 +445,8 @@ export default function TableCombinedOrder() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      {/* Sesuaikan jumlah skeleton dengan jumlah kolom (19 kolom + 1 action) */}
-                      {Array.from({ length: 19 }).map((_, col) => (
+                      {/* Ubah jumlah array skeleton menyesuaikan total kolom (20 kolom + 1 action) */}
+                      {Array.from({ length: 20 }).map((_, col) => (
                         <TableCell key={col}>
                           <Skeleton className="h-5 w-full" />
                         </TableCell>
@@ -395,7 +459,7 @@ export default function TableCombinedOrder() {
                 ) : orders.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={20}
+                      colSpan={21}
                       className="h-24 text-center text-muted-foreground">
                       No orders found matching your filters.
                     </TableCell>
@@ -422,6 +486,13 @@ export default function TableCombinedOrder() {
                               ? "REPLACEMENT"
                               : order.salesCategory}
                           </Badge>
+                        </TableCell>
+
+                        {/* ✨ TAMBAHAN: Kolom Data Purchase Channel */}
+                        <TableCell className="font-medium text-slate-700">
+                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-xs">
+                            {order.purchaseChannel || "-"}
+                          </span>
                         </TableCell>
 
                         {/* DATE */}
@@ -491,7 +562,6 @@ export default function TableCombinedOrder() {
                           {order.salesName}
                         </TableCell>
 
-                        {/* DATA TAMBAHAN YANG DIKEMBALIKAN */}
                         <TableCell className="text-sm font-mono text-gray-500">
                           {order.sampleReference}
                         </TableCell>

@@ -116,7 +116,6 @@ const quotationSchema = z.object({
         productName: z.string().min(1, "Product name is required"),
         description: z.string().optional(),
 
-        // ✨ TAMBAHKAN BARIS INI AGAR QUANTITY IKUT TERVALIDASI DAN TERKIRIM
         quantity: z.coerce.number().min(1, "Quantity minimal 1").default(1),
 
         unitPrice: z.coerce.number().min(0).default(0), // Pastikan juga unitPrice ada
@@ -222,6 +221,7 @@ function OrderSummary({ form, isLoading }: { form: any; isLoading: boolean }) {
     </div>
   );
 }
+
 // ============================================================
 // SUB-COMPONENT: ItemRow Add Quotation
 // ============================================================
@@ -585,7 +585,7 @@ function ItemRow({
         </div>
       </div>
 
-      {/* ✨ AREA FULL-WIDTH: PILIHAN ATRIBUT/VARIAN (GLASSMORPHISM / iPHONE STYLE) */}
+      {/* ✨ AREA FULL-WIDTH: PILIHAN ATRIBUT/VARIAN BERURUTAN VERTIKAL */}
       {!isManualProduct &&
         selectedProduct?.availableAttributes &&
         selectedProduct.availableAttributes.length > 0 && (
@@ -596,12 +596,13 @@ function ItemRow({
                 Varian/Atribut:
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {/* UBAH DARI GRID MENJADI FLEX COLUMN AGAR BERURUTAN KE BAWAH */}
+              <div className="flex flex-col space-y-4">
                 {selectedProduct.availableAttributes.map((attr: any) => (
                   <div
                     key={attr.attributeId}
-                    className="flex flex-col space-y-2">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                    className="flex flex-col space-y-1.5 bg-white/60 p-3 rounded-xl border border-slate-200/60 shadow-xs">
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                       {attr.attributeName}
                     </label>
                     <div className="flex flex-wrap gap-2">

@@ -46,10 +46,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { PurchaseChannel } from "../types/order.types";
 import { InvoiceDialogWrapper } from "./helper/invoiceDialogWrapper";
 
 // === TYPES ===
@@ -76,6 +84,7 @@ type Order = {
   salesCategory: "SALES" | "SAMPLE";
   salesName: string;
   totalItems: number;
+  purchaseChannel?: string;
 };
 
 type Meta = {
@@ -91,6 +100,7 @@ interface OrderExportQuery {
   endDate?: string;
   search?: string;
   salesCategory?: string;
+  purchaseChannelId?: string;
 }
 
 // === UTILS ===
@@ -144,6 +154,30 @@ export default function TableOrder() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
+  // ✨ 2. STATE UNTUK MENYIMPAN DAFTAR PURCHASE CHANNEL
+  const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
+    [],
+  );
+  const [selectedChannelId, setSelectedChannelId] = useState<string>("ALL");
+
+  // ✨ 3. FETCH PURCHASE CHANNELS SAAT HALAMAN DIMUAT
+  useEffect(() => {
+    const fetchPurchaseChannels = async () => {
+      if (status !== "authenticated") return;
+      try {
+        const res = await fetchApi("/purchase-channels/list");
+        if (res.ok) {
+          const data = await res.json();
+          // Menyesuaikan apakah response berupa array langsung atau terbungkus di dalam property .data
+          setPurchaseChannels(Array.isArray(data) ? data : data.data || []);
+        }
+      } catch (error) {
+        console.error("Gagal memuat purchase channels", error);
+      }
+    };
+
+    fetchPurchaseChannels();
+  }, [status, fetchApi]);
   // === FETCH ORDERS ===
   const fetchOrders = async () => {
     if (status !== "authenticated") return;
@@ -159,6 +193,11 @@ export default function TableOrder() {
       if (debouncedSearch) params.append("search", debouncedSearch);
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
+
+      // ✨ 4. MASUKKAN PURCHASE CHANNEL KE PARAMETER URL JIKA DIPILIH DAN BUKAN "ALL"
+      if (selectedChannelId && selectedChannelId !== "ALL") {
+        params.append("purchaseChannelId", selectedChannelId);
+      }
 
       const res = await fetchApi(`/orders/all?${params}`);
 
@@ -180,20 +219,32 @@ export default function TableOrder() {
 
   useEffect(() => {
     fetchOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, startDate, endDate, status, fetchApi]);
+  }, [
+    page,
+    debouncedSearch,
+    startDate,
+    endDate,
+    selectedChannelId,
+    status,
+    fetchApi,
+  ]);
 
   // === HANDLER EXPORT ===
   const handleExport = async () => {
     setExporting(true);
     try {
       const exportFilters: OrderExportQuery = {
-        salesCategory: salesCategory, // Fix export hanya untuk SALES
+        salesCategory: salesCategory,
       };
 
       if (startDate) exportFilters.startDate = startDate;
       if (endDate) exportFilters.endDate = endDate;
       if (debouncedSearch) exportFilters.search = debouncedSearch;
+
+      // ✨ 6. SERTAKAN FILTER CHANNEL PADA EXPORT
+      if (selectedChannelId && selectedChannelId !== "ALL") {
+        exportFilters.purchaseChannelId = selectedChannelId;
+      }
 
       const queryString = new URLSearchParams(
         exportFilters as Record<string, string>,
@@ -297,7 +348,32 @@ export default function TableOrder() {
       {/* Filter & Export Bar */}
       <Card className="p-4 shadow-sm">
         <div className="flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between">
-          <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+          <div className="flex flex-wrap gap-3 w-full lg:w-auto items-center">
+            {/* ✨ 7. TAMBAHKAN DROPDOWN SELECT UNTUK FILTER PURCHASE CHANNEL */}
+            <div className="flex flex-col gap-1.5 w-full sm:w-48">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Purchase Channel
+              </span>
+              <Select
+                value={selectedChannelId}
+                onValueChange={(value) => {
+                  setSelectedChannelId(value);
+                  setPage(1); // Reset ke halaman 1 saat filter diubah
+                }}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="All Channels" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Channels</SelectItem>
+                  {purchaseChannels.map((channel) => (
+                    <SelectItem key={channel.id} value={channel.id}>
+                      {channel.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Filter Date Range */}
             <div className="flex gap-2 w-full sm:w-auto">
               <div className="flex flex-col gap-1.5 w-full sm:w-35">

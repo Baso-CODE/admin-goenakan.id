@@ -658,7 +658,7 @@ function ItemRow({
         </div>
       </div>
 
-      {/* ✨ AREA FULL-WIDTH: PILIHAN ATRIBUT/VARIAN (GLASSMORPHISM / iPHONE STYLE) */}
+      {/* ✨ AREA FULL-WIDTH: PILIHAN ATRIBUT/VARIAN BERURUTAN VERTIKAL */}
       {!isManualProduct &&
         selectedProduct?.availableAttributes &&
         selectedProduct.availableAttributes.length > 0 && (
@@ -669,12 +669,13 @@ function ItemRow({
                 Varian/Atribut:
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {/* ✨ UBAH DARI GRID MENJADI FLEX COLUMN AGAR BERURUTAN KE BAWAH */}
+              <div className="flex flex-col space-y-4">
                 {selectedProduct.availableAttributes.map((attr: any) => (
                   <div
                     key={attr.attributeId}
-                    className="flex flex-col space-y-2">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                    className="flex flex-col space-y-1.5 bg-white/60 p-3 rounded-xl border border-slate-200/60 shadow-xs">
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                       {attr.attributeName}
                     </label>
                     <div className="flex flex-wrap gap-2">
@@ -723,7 +724,6 @@ function ItemRow({
             </div>
           </div>
         )}
-
       {/* --- AREA TIERS --- */}
       <div className="p-3 bg-slate-50/50 border-t">
         <div className="flex items-center justify-between mb-2 px-1">

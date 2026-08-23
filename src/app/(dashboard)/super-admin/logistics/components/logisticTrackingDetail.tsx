@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton"; // ✨ IMPOR SKELETON SHADCN
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/useApi";
 import ProductionTab from "./productionTab";
@@ -34,16 +35,15 @@ export default function LogisticsTrackingDetail() {
 
   const activeTab = searchParams.get("tab") || "production";
 
-  // 2. FUNGSI GANTI TAB (Update URL tanpa reload)
+  // ✨ PERBAIKAN 1: Tambahkan { scroll: false } agar layar tidak loncat saat pindah tab
   const handleTabChange = (value: string) => {
     const newParams = new URLSearchParams(searchParams.toString());
     newParams.set("tab", value);
-    router.replace(`${pathname}?${newParams.toString()}`);
+    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
   };
 
   // FETCH DATA
   const loadData = async () => {
-    // 🛑 Jangan jalan jika sesi belum siap atau ID tidak ada
     if (status !== "authenticated" || !orderId) return;
 
     try {
@@ -72,16 +72,49 @@ export default function LogisticsTrackingDetail() {
 
   useEffect(() => {
     loadData();
-  }, [orderId, status, fetchApi]);
+    // ✨ PERBAIKAN 2: Hapus fetchApi dari array dependensi ini.
+    // Hal ini mencegah React melakukan fetch berulang-ulang saat URL (tab) berubah!
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId, status]);
 
-  if (loading) return <div>Loading Tracking Data...</div>;
+  // ✨ PERBAIKAN 3: SKELETON UI YANG CANTIK
+  if (loading) {
+    return (
+      <div className="space-y-6 mx-auto pb-20">
+        {/* Skeleton Header */}
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10 rounded-md" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-62.5" />
+            <Skeleton className="h-4 w-87.5" />
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Skeleton 4 Kotak Durasi */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-22.5 w-full rounded-lg" />
+          ))}
+        </div>
+
+        {/* Skeleton Tabs dan Kontennya */}
+        <div className="space-y-6 mt-6">
+          <Skeleton className="h-12 w-full rounded-md" />
+          <Skeleton className="h-75 w-full rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
   if (!order) return <div>Order not found</div>;
 
   const productionVendors = vendors.filter((v) => v.type === "PRODUCT");
   const logisticVendors = vendors.filter((v) => v.type === "SERVICE");
 
   return (
-    <div className="space-y-6  mx-auto pb-20">
+    <div className="space-y-6 mx-auto pb-20">
       {/* HEADER */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
