@@ -14,40 +14,46 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton"; // ✨ IMPOR SKELETON SHADCN
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/useApi";
 import ProductionTab from "./productionTab";
 import ShipmentManager from "./shipmentManager";
 
 export default function LogisticsTrackingDetail() {
   const { fetchApi, status } = useApi();
-
   const { orderId } = useParams();
   const router = useRouter();
-
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const [order, setOrder] = useState<any>(null);
 
+  const [order, setOrder] = useState<any>(null);
   const [vendors, setVendors] = useState<any[]>([]);
+
+  // ✨ PERBAIKAN 1: Tambahkan state ini agar skeleton hanya muncul di awal
   const [loading, setLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const activeTab = searchParams.get("tab") || "production";
 
-  // ✨ PERBAIKAN 1: Tambahkan { scroll: false } agar layar tidak loncat saat pindah tab
   const handleTabChange = (value: string) => {
     const newParams = new URLSearchParams(searchParams.toString());
     newParams.set("tab", value);
+    // Mengubah URL tanpa membuat halaman melompat ke atas
     router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
   };
 
-  // FETCH DATA
-  const loadData = async () => {
+  // ✨ PERBAIKAN 2: Sesuaikan fungsi loadData
+  // Kita tambahkan parameter 'isBackgroundUpdate' agar kita bisa mengambil data
+  // tanpa memunculkan loading layar penuh secara mengganggu.
+  const loadData = async (isBackgroundUpdate = false) => {
     if (status !== "authenticated" || !orderId) return;
 
     try {
-      setLoading(true);
+      // Jika ini bukan update latar belakang, baru nyalakan loading
+      if (!isBackgroundUpdate) {
+        setLoading(true);
+      }
 
       const [orderRes, vendorRes] = await Promise.all([
         fetchApi(`/orders/${orderId}/tracking`),
@@ -67,21 +73,20 @@ export default function LogisticsTrackingDetail() {
       toast.error("Gagal memuat data tracking");
     } finally {
       setLoading(false);
+      setIsInitialLoading(false); // Tandai bahwa loading pertama sudah selesai
     }
   };
 
   useEffect(() => {
-    loadData();
-    // ✨ PERBAIKAN 2: Hapus fetchApi dari array dependensi ini.
-    // Hal ini mencegah React melakukan fetch berulang-ulang saat URL (tab) berubah!
+    loadData(false); // Memuat data untuk pertama kalinya
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, status]);
 
-  // ✨ PERBAIKAN 3: SKELETON UI YANG CANTIK
-  if (loading) {
+  // ✨ PERBAIKAN 3: Ubah kondisi render Skeleton
+  // Skeleton hanya muncul jika loading bernilai true DAN ini adalah loading pertama
+  if (loading && isInitialLoading) {
     return (
       <div className="space-y-6 mx-auto pb-20">
-        {/* Skeleton Header */}
         <div className="flex items-center gap-4">
           <Skeleton className="h-10 w-10 rounded-md" />
           <div className="space-y-2">
@@ -89,17 +94,12 @@ export default function LogisticsTrackingDetail() {
             <Skeleton className="h-4 w-87.5" />
           </div>
         </div>
-
         <Separator />
-
-        {/* Skeleton 4 Kotak Durasi */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-22.5 w-full rounded-lg" />
           ))}
         </div>
-
-        {/* Skeleton Tabs dan Kontennya */}
         <div className="space-y-6 mt-6">
           <Skeleton className="h-12 w-full rounded-md" />
           <Skeleton className="h-75 w-full rounded-xl" />
@@ -135,6 +135,7 @@ export default function LogisticsTrackingDetail() {
 
       <Separator />
 
+      {/* DURATION SUMMARY (Tetap sama seperti aslinya) */}
       {order.durationSummary && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
@@ -214,47 +215,51 @@ export default function LogisticsTrackingDetail() {
           </TabsTrigger>
         </TabsList>
 
-        {/* TAB 1: PRODUCTION */}
-        <TabsContent value="production" className="mt-6">
-          <ProductionTab
-            orderId={order.id}
-            products={order.products}
-            vendors={productionVendors}
-            onUpdate={loadData}
-          />
-        </TabsContent>
+        {/* 
+          ✨ PERBAIKAN 4: Menggunakan div dengan class "block" dan "hidden" 
+          Alih-alih menggunakan <TabsContent>, kita menggunakan div HTML murni. 
+          Ini memastikan komponen tidak dihapus dari memori saat tab lain diklik!
+        */}
+        <div className="mt-6">
+          <div className={activeTab === "production" ? "block" : "hidden"}>
+            <ProductionTab
+              orderId={order.id}
+              products={order.products}
+              vendors={productionVendors}
+              onUpdate={() => loadData(true)} // Kirim true agar update berjalan diam-diam
+            />
+          </div>
 
-        {/* TAB 2: INBOUND (Pabrik -> Gudang -> HO) */}
-        <TabsContent value="inbound" className="mt-6">
-          <ShipmentManager
-            type="INBOUND"
-            orderId={order.id}
-            orderInfo={order}
-            shipments={
-              order.shipments?.filter((s: any) => s.type === "INBOUND") || []
-            }
-            products={order.products}
-            couriers={logisticVendors}
-            allVendors={vendors}
-            onUpdate={loadData}
-          />
-        </TabsContent>
+          <div className={activeTab === "inbound" ? "block" : "hidden"}>
+            <ShipmentManager
+              type="INBOUND"
+              orderId={order.id}
+              orderInfo={order}
+              shipments={
+                order.shipments?.filter((s: any) => s.type === "INBOUND") || []
+              }
+              products={order.products}
+              couriers={logisticVendors}
+              allVendors={vendors}
+              onUpdate={() => loadData(true)}
+            />
+          </div>
 
-        {/* TAB 3: OUTBOUND (HO -> Client) */}
-        <TabsContent value="outbound" className="mt-6">
-          <ShipmentManager
-            type="OUTBOUND"
-            orderId={order.id}
-            orderInfo={order}
-            shipments={
-              order.shipments?.filter((s: any) => s.type === "OUTBOUND") || []
-            }
-            products={order.products}
-            couriers={logisticVendors}
-            allVendors={vendors}
-            onUpdate={loadData}
-          />
-        </TabsContent>
+          <div className={activeTab === "outbound" ? "block" : "hidden"}>
+            <ShipmentManager
+              type="OUTBOUND"
+              orderId={order.id}
+              orderInfo={order}
+              shipments={
+                order.shipments?.filter((s: any) => s.type === "OUTBOUND") || []
+              }
+              products={order.products}
+              couriers={logisticVendors}
+              allVendors={vendors}
+              onUpdate={() => loadData(true)}
+            />
+          </div>
+        </div>
       </Tabs>
     </div>
   );
