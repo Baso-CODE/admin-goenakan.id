@@ -23,7 +23,7 @@ import {
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { formatCurrency } from "@/utils/formatCurrency";
-import { FileText, Layers, RefreshCw, Search, Package, ChevronDown, ChevronUp, Coins, TrendingUp, ArrowRight, Check, Loader2 } from "lucide-react";
+import { FileText, Layers, RefreshCw, Search, Package, ChevronDown, ChevronUp, Coins, TrendingUp, ArrowRight, Check, Loader2, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ManagePriceModal } from "./components/ManagePriceModal";
@@ -94,6 +94,7 @@ export type Product = {
   currencyCode?: string | null;
   exchangeRate?: number | string | null;
   additionalFee?: number | string | null;
+  foreignPriceAdjuster?: number | string | null;
   images?: {
     id: string;
     url: string;
@@ -148,7 +149,47 @@ export default function MasterPricingPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
 
+  // Global Foreign Price Adjuster states
+  const [globalForeignPriceAdjuster, setGlobalForeignPriceAdjuster] = useState<number>(0);
+  const [isSavingAdjuster, setIsSavingAdjuster] = useState(false);
+  const [adjusterOpen, setAdjusterOpen] = useState(false);
+
   const debouncedSearch = useDebounce(search, 500);
+
+  const fetchGlobalSettings = async () => {
+    try {
+      const res = await fetchApi("/app-settings");
+      if (res.ok) {
+        const data = await res.json();
+        setGlobalForeignPriceAdjuster(data?.globalForeignPriceAdjuster || 0);
+      }
+    } catch (err) {
+      console.error("Failed to load global app settings", err);
+    }
+  };
+
+  const handleSaveGlobalAdjuster = async () => {
+    setIsSavingAdjuster(true);
+    try {
+      const res = await fetchApi("/app-settings", {
+        method: "PATCH",
+        body: JSON.stringify({
+          globalForeignPriceAdjuster: Number(globalForeignPriceAdjuster) || 0,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to save global adjuster");
+      }
+
+      toast.success("Global foreign price adjuster berhasil diperbarui!");
+    } catch (err: any) {
+      toast.error(err.message || "Gagal memperbarui global adjuster");
+    } finally {
+      setIsSavingAdjuster(false);
+    }
+  };
 
   const fetchCategories = async () => {
     try {
@@ -314,6 +355,7 @@ export default function MasterPricingPage() {
   useEffect(() => {
     fetchCategories();
     fetchCurrencies();
+    fetchGlobalSettings();
   }, [fetchApi]);
 
   useEffect(() => {
@@ -509,6 +551,68 @@ export default function MasterPricingPage() {
                 className="bg-indigo-600 text-white font-semibold hover:bg-indigo-700 h-10 px-5 gap-2 shadow-xs">
                 <TrendingUp className="h-5 w-5" />
                 Preview Adjustments
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Global Foreign Price Adjuster Card */}
+      <Card className="bg-white border-stone-200 shadow-xs overflow-hidden">
+        <button
+          onClick={() => setAdjusterOpen(!adjusterOpen)}
+          className="w-full flex items-center justify-between p-4 font-semibold text-stone-800 hover:bg-stone-50 transition-colors">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-indigo-600" />
+            <span>Global Foreign Price Adjuster</span>
+            <Badge className="bg-stone-100 text-stone-600 font-bold border-stone-200 hover:bg-stone-100 text-[10px]">
+              Currency Adjuster
+            </Badge>
+          </div>
+          {adjusterOpen ? (
+            <ChevronUp className="h-5 w-5 text-stone-500" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-stone-500" />
+          )}
+        </button>
+
+        {adjusterOpen && (
+          <div className="p-4 border-t bg-stone-50/50 space-y-4">
+            <p className="text-xs text-stone-500 leading-relaxed max-w-2xl">
+              Atur persentase penyesuaian harga global untuk pengguna luar negeri. Nilai ini akan berlaku untuk semua produk yang diakses dari luar negeri (berdasarkan deteksi kurs/currency non-IDR), kecuali jika produk tersebut memiliki adjuster khusus sendiri di menu Kelola Master Pricing masing-masing produk.
+            </p>
+            <div className="flex items-end gap-4 max-w-md">
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="globalForeignPriceAdjuster" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                  Adjuster Persentase (%)
+                </Label>
+                <Input
+                  id="globalForeignPriceAdjuster"
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="0"
+                  value={globalForeignPriceAdjuster}
+                  onChange={(e) => setGlobalForeignPriceAdjuster(parseFloat(e.target.value) || 0)}
+                  className="bg-white border-stone-200 font-semibold"
+                />
+              </div>
+              <Button
+                onClick={handleSaveGlobalAdjuster}
+                disabled={isSavingAdjuster}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded shadow-xs gap-1.5 h-10"
+              >
+                {isSavingAdjuster ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Simpan Adjuster
+                  </>
+                )}
               </Button>
             </div>
           </div>

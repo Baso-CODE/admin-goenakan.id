@@ -14,6 +14,7 @@ export interface MockupArea {
   physicalWidth?: number | null;
   physicalHeight?: number | null;
   unit?: "cm" | "mm";
+  rotation?: number | null;
 }
 
 interface MockupAreaSelectorProps {
@@ -94,6 +95,7 @@ export function MockupAreaSelector({ imageUrl, areas = [], onChange }: MockupAre
       physicalWidth: null,
       physicalHeight: null,
       unit: "cm",
+      rotation: 0,
     };
     const updated = [...areas, newArea];
     onChange(updated);
@@ -207,6 +209,7 @@ export function MockupAreaSelector({ imageUrl, areas = [], onChange }: MockupAre
                   width: `${area.width}%`,
                   height: `${area.height}%`,
                   zIndex: isSelected ? 20 : 10,
+                  transform: `rotate(${area.rotation || 0}deg)`,
                 }}
                 className={`border-2 cursor-move flex items-center justify-center transition-all ${
                   isSelected
@@ -246,7 +249,7 @@ export function MockupAreaSelector({ imageUrl, areas = [], onChange }: MockupAre
 
         {/* Tool Control Panel */}
         {activeArea && (
-          <div className="w-full flex flex-col gap-2 p-2 border border-stone-200 dark:border-stone-800 rounded-lg bg-stone-50 dark:bg-stone-900/60 animate-fade-in max-w-xs">
+          <div className="w-full flex flex-col gap-2 p-2 border border-stone-200 dark:border-stone-800 rounded-lg bg-stone-50 dark:bg-stone-900/60 animate-fade-in max-w-md">
             {/* Row 1: Align */}
             <div className="flex items-center justify-between gap-1 flex-wrap">
               <span className="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider ml-1">Align:</span>
@@ -304,7 +307,7 @@ export function MockupAreaSelector({ imageUrl, areas = [], onChange }: MockupAre
             </div>
 
             {/* Row 2: Nudge, Resize, Copy */}
-            <div className="flex items-center justify-between gap-1 flex-wrap border-t border-stone-200/50 dark:border-stone-805/50 pt-1.5">
+            <div className="flex items-center justify-between gap-1 flex-wrap border-t border-stone-200/50 dark:border-stone-800/50 pt-1.5">
               <span className="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider ml-1">Geser:</span>
               <div className="flex items-center gap-0.5">
                 <button
@@ -390,7 +393,8 @@ export function MockupAreaSelector({ imageUrl, areas = [], onChange }: MockupAre
                     id: newId,
                     x: Math.min(100 - activeArea.width, activeArea.x + 3),
                     y: Math.min(100 - activeArea.height, activeArea.y + 3),
-                    label: `${activeArea.label} (Copy)`
+                    label: `${activeArea.label} (Copy)`,
+                    rotation: activeArea.rotation || 0,
                   };
                   onChange([...areas, newArea]);
                   setSelectedId(newId);
@@ -401,6 +405,179 @@ export function MockupAreaSelector({ imageUrl, areas = [], onChange }: MockupAre
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 Duplikat
               </button>
+            </div>
+
+            {/* Slider Posisi X */}
+            <div className="space-y-1 pt-1.5 border-t border-stone-200/50 dark:border-stone-800/50">
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] text-stone-500 dark:text-stone-400 font-bold uppercase tracking-wide">Posisi X (Horiz)</label>
+              </div>
+              <div className="flex gap-2.5 items-center">
+                <input
+                  type="range"
+                  min="0"
+                  max={Math.max(0, 100 - activeArea.width)}
+                  step="0.5"
+                  value={activeArea.x}
+                  onChange={(e) => handleUpdateField(activeArea.id, "x", parseFloat(e.target.value))}
+                  className="flex-1 h-1 bg-stone-200 dark:bg-stone-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+                <div className="w-16 flex items-center border border-stone-300 dark:border-stone-700 rounded bg-white dark:bg-stone-950 px-1 shrink-0">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max={100 - activeArea.width}
+                    value={Math.round(activeArea.x * 10) / 10}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      const maxVal = 100 - activeArea.width;
+                      const clamped = Math.max(0, Math.min(val, maxVal));
+                      handleUpdateField(activeArea.id, "x", clamped);
+                    }}
+                    className="w-8 text-[10px] text-center border-none p-0.5 focus:ring-0 focus:outline-none font-semibold text-stone-700 dark:text-stone-200 bg-transparent"
+                  />
+                  <span className="text-[9px] font-bold text-stone-400 border-l pl-1 ml-0.5">%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Slider Posisi Y */}
+            <div className="space-y-1 pt-0.5">
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] text-stone-500 dark:text-stone-400 font-bold uppercase tracking-wide">Posisi Y (Vert)</label>
+              </div>
+              <div className="flex gap-2.5 items-center">
+                <input
+                  type="range"
+                  min="0"
+                  max={Math.max(0, 100 - activeArea.height)}
+                  step="0.5"
+                  value={activeArea.y}
+                  onChange={(e) => handleUpdateField(activeArea.id, "y", parseFloat(e.target.value))}
+                  className="flex-1 h-1 bg-stone-200 dark:bg-stone-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+                <div className="w-16 flex items-center border border-stone-300 dark:border-stone-700 rounded bg-white dark:bg-stone-950 px-1 shrink-0">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max={100 - activeArea.height}
+                    value={Math.round(activeArea.y * 10) / 10}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      const maxVal = 100 - activeArea.height;
+                      const clamped = Math.max(0, Math.min(val, maxVal));
+                      handleUpdateField(activeArea.id, "y", clamped);
+                    }}
+                    className="w-8 text-[10px] text-center border-none p-0.5 focus:ring-0 focus:outline-none font-semibold text-stone-700 dark:text-stone-200 bg-transparent"
+                  />
+                  <span className="text-[9px] font-bold text-stone-400 border-l pl-1 ml-0.5">%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Slider Lebar W */}
+            <div className="space-y-1 pt-0.5">
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] text-stone-500 dark:text-stone-400 font-bold uppercase tracking-wide">Lebar (W)</label>
+              </div>
+              <div className="flex gap-2.5 items-center">
+                <input
+                  type="range"
+                  min="5"
+                  max={Math.max(5, 100 - activeArea.x)}
+                  step="0.5"
+                  value={activeArea.width}
+                  onChange={(e) => handleUpdateField(activeArea.id, "width", parseFloat(e.target.value))}
+                  className="flex-1 h-1 bg-stone-200 dark:bg-stone-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+                <div className="w-16 flex items-center border border-stone-300 dark:border-stone-700 rounded bg-white dark:bg-stone-950 px-1 shrink-0">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="5"
+                    max={100 - activeArea.x}
+                    value={Math.round(activeArea.width * 10) / 10}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 5;
+                      const maxVal = 100 - activeArea.x;
+                      const clamped = Math.max(5, Math.min(val, maxVal));
+                      handleUpdateField(activeArea.id, "width", clamped);
+                    }}
+                    className="w-8 text-[10px] text-center border-none p-0.5 focus:ring-0 focus:outline-none font-semibold text-stone-700 dark:text-stone-200 bg-transparent"
+                  />
+                  <span className="text-[9px] font-bold text-stone-400 border-l pl-1 ml-0.5">%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Slider Tinggi H */}
+            <div className="space-y-1 pt-0.5">
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] text-stone-500 dark:text-stone-400 font-bold uppercase tracking-wide">Tinggi (H)</label>
+              </div>
+              <div className="flex gap-2.5 items-center">
+                <input
+                  type="range"
+                  min="5"
+                  max={Math.max(5, 100 - activeArea.y)}
+                  step="0.5"
+                  value={activeArea.height}
+                  onChange={(e) => handleUpdateField(activeArea.id, "height", parseFloat(e.target.value))}
+                  className="flex-1 h-1 bg-stone-200 dark:bg-stone-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+                <div className="w-16 flex items-center border border-stone-300 dark:border-stone-700 rounded bg-white dark:bg-stone-950 px-1 shrink-0">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="5"
+                    max={100 - activeArea.y}
+                    value={Math.round(activeArea.height * 10) / 10}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 5;
+                      const maxVal = 100 - activeArea.y;
+                      const clamped = Math.max(5, Math.min(val, maxVal));
+                      handleUpdateField(activeArea.id, "height", clamped);
+                    }}
+                    className="w-8 text-[10px] text-center border-none p-0.5 focus:ring-0 focus:outline-none font-semibold text-stone-700 dark:text-stone-200 bg-transparent"
+                  />
+                  <span className="text-[9px] font-bold text-stone-400 border-l pl-1 ml-0.5">%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Slider Rotasi */}
+            <div className="space-y-1 pt-0.5">
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] text-stone-500 dark:text-stone-400 font-bold uppercase tracking-wide">Rotasi (Derajat)</label>
+              </div>
+              <div className="flex gap-2.5 items-center">
+                <input
+                  type="range"
+                  min="-180"
+                  max="180"
+                  step="1"
+                  value={activeArea.rotation || 0}
+                  onChange={(e) => handleUpdateField(activeArea.id, "rotation", parseInt(e.target.value))}
+                  className="flex-1 h-1 bg-stone-200 dark:bg-stone-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+                <div className="w-16 flex items-center border border-stone-300 dark:border-stone-700 rounded bg-white dark:bg-stone-950 px-1 shrink-0">
+                  <input
+                    type="number"
+                    min="-180"
+                    max="180"
+                    value={activeArea.rotation || 0}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      const clamped = Math.max(-180, Math.min(val, 180));
+                      handleUpdateField(activeArea.id, "rotation", clamped);
+                    }}
+                    className="w-8 text-[10px] text-center border-none p-0.5 focus:ring-0 focus:outline-none font-semibold text-stone-700 dark:text-stone-200 bg-transparent"
+                  />
+                  <span className="text-[9px] font-bold text-stone-400 border-l pl-1 ml-0.5">°</span>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -443,7 +620,7 @@ export function MockupAreaSelector({ imageUrl, areas = [], onChange }: MockupAre
                   onClick={() => setSelectedId(area.id)}
                   className={`border rounded-lg p-3 transition-all cursor-pointer ${
                     isSelected
-                      ? "border-indigo-200 bg-indigo-50/30 dark:border-indigo-900/30 dark:bg-indigo-950/20 shadow-sm"
+                      ? "border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/30 dark:border-indigo-500 dark:ring-2 dark:ring-indigo-500/20 dark:bg-indigo-950/20 shadow-sm"
                       : "border-stone-200 dark:border-stone-800 hover:bg-stone-50/50 dark:hover:bg-stone-900/40"
                   }`}
                 >
@@ -488,6 +665,7 @@ export function MockupAreaSelector({ imageUrl, areas = [], onChange }: MockupAre
                           className="w-full text-xs px-2.5 py-1.5 border border-stone-200 dark:border-stone-800 rounded bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         />
                       </div>
+
 
                       {/* Physical size */}
                       <div>

@@ -46,6 +46,7 @@ export default function FormUpdateAttributes({
   onAddImage?: (
     fileOrUrl: File | string,
     onProgress?: (progress: number) => void,
+    altText?: string,
   ) => Promise<any>;
   onRefresh?: () => Promise<void>;
 }) {
@@ -535,7 +536,7 @@ export default function FormUpdateAttributes({
         // If imageId is a size-default URL placeholder, register it first
         if (isNewImagePlaceholder && onAddImage) {
           try {
-            const uploadedImg = await onAddImage(side.url);
+            const uploadedImg = await onAddImage(side.url, undefined, "Mockup Image");
             if (uploadedImg && uploadedImg.id) {
               currentImageId = uploadedImg.id;
             }
@@ -573,6 +574,7 @@ export default function FormUpdateAttributes({
               attributeValueId: side.attributeValueId || null,
               printSideValueId: side.printSideValueId || null,
               printPositionValueId: side.printPositionValueId || null,
+              altText: "Mockup Image",
             });
           }
 
@@ -588,6 +590,7 @@ export default function FormUpdateAttributes({
               attributeValueId: side.attributeValueId || null,
               printSideValueId: side.printSideValueId || null,
               printPositionValueId: side.printPositionValueId || null,
+              altText: "Mockup Image",
             });
           }
           
@@ -774,7 +777,7 @@ export default function FormUpdateAttributes({
                                                     ...prev,
                                                     [item.id]: Math.round(progress),
                                                   }));
-                                                });
+                                                }, "Mockup Image");
                                                 if (uploadedImg && uploadedImg.id) {
                                                   setMockupSides((prev) =>
                                                     prev.map((m) =>

@@ -408,6 +408,7 @@ export default function EditProductPage() {
   const handleAddImage = async (
     fileOrUrl: File | string,
     onProgress?: (progress: number) => void,
+    altText?: string,
   ): Promise<any> => {
     try {
       const currentSession = await getSession();
@@ -416,6 +417,9 @@ export default function EditProductPage() {
       if (fileOrUrl instanceof File) {
         const formData = new FormData();
         formData.append("image", fileOrUrl);
+        if (altText) {
+          formData.append("altText", altText);
+        }
 
         const uploadData = await new Promise<any>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
@@ -461,6 +465,9 @@ export default function EditProductPage() {
       } else {
         const formData = new FormData();
         formData.append("url", fileOrUrl);
+        if (altText) {
+          formData.append("altText", altText);
+        }
 
         const res = await fetchApi(`/products/${id}/image`, {
           method: "POST",
@@ -1003,7 +1010,8 @@ export default function EditProductPage() {
 
         <TabsContent
           value="identity"
-          className="space-y-6 animate-fade-in focus-visible:outline-none">
+          forceMount
+          className="space-y-6 animate-fade-in focus-visible:outline-none data-[state=inactive]:hidden">
           <FormProductCore
             initialData={productData}
             onSubmit={handleUpdateProduct}
@@ -1013,12 +1021,13 @@ export default function EditProductPage() {
 
         <TabsContent
           value="media"
-          className="space-y-6 animate-fade-in focus-visible:outline-none">
+          forceMount
+          className="space-y-6 animate-fade-in focus-visible:outline-none data-[state=inactive]:hidden">
           <FormUpdateProductMedia
             productId={id as string}
             initialData={productData ? {
               ...productData,
-              images: (productData.images || []).filter((img: any) => !img.attributeValueId)
+              images: (productData.images || []).filter((img: any) => !img.attributeValueId && img.altText !== "Mockup Image")
             } : undefined}
             isSubmitting={isSubmitting}
             onAddImage={handleAddImage}
@@ -1032,7 +1041,8 @@ export default function EditProductPage() {
 
         <TabsContent
           value="pricing"
-          className="space-y-6 animate-fade-in focus-visible:outline-none">
+          forceMount
+          className="space-y-6 animate-fade-in focus-visible:outline-none data-[state=inactive]:hidden">
           <FormUpdatePriceTiers
             initialData={productData}
             isSubmitting={isSubmitting}
@@ -1042,7 +1052,8 @@ export default function EditProductPage() {
 
         <TabsContent
           value="customization"
-          className="space-y-6 animate-fade-in focus-visible:outline-none">
+          forceMount
+          className="space-y-6 animate-fade-in focus-visible:outline-none data-[state=inactive]:hidden">
           <FormUpdateAttributes
             initialData={productData}
             isSubmitting={isSubmitting}

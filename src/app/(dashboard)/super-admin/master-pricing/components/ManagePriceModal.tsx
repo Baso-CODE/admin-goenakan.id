@@ -174,6 +174,7 @@ export function ManagePriceModal({
   const [foreignPrice, setForeignPrice] = useState<number>(0);
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [additionalFee, setAdditionalFee] = useState<number>(0);
+  const [foreignPriceAdjuster, setForeignPriceAdjuster] = useState<number>(0);
   const [tiers, setTiers] = useState<EditableTier[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -268,6 +269,7 @@ export function ManagePriceModal({
       setForeignPrice(Number(product.foreignPrice) || (linkedQuote ? Number(linkedQuote.foreignPrice) : 0));
       setExchangeRate(Number(product.exchangeRate) || (linkedQuote ? Number(linkedQuote.exchangeRate) : 1));
       setAdditionalFee(Number(product.additionalFee) || 0);
+      setForeignPriceAdjuster(Number((product as any).foreignPriceAdjuster) || 0);
       
       const pBase = Number(product.basePrice) || 0;
  
@@ -611,6 +613,7 @@ export function ManagePriceModal({
         currencyCode: currencyCode,
         exchangeRate: currencyCode === "IDR" ? 1 : Number(exchangeRate) || 1,
         additionalFee: Number(additionalFee) || 0,
+        foreignPriceAdjuster: Number(foreignPriceAdjuster) || 0,
         activeVendorPriceRecordId: selectedQuoteId === "NONE" ? null : selectedQuoteId,
         activePriceFreightMode: freightMode,
         priceTiers: tiers.map((t) => ({
@@ -723,6 +726,22 @@ export function ManagePriceModal({
                     value={basePrice}
                     disabled
                     className="bg-stone-50 border-stone-200 mt-1.5 font-bold text-stone-500"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="foreignPriceAdjuster" className="text-xs font-semibold text-stone-600">
+                    Adjuster Persentase Harga Luar Negeri (%)
+                  </Label>
+                  <Input
+                    id="foreignPriceAdjuster"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={foreignPriceAdjuster}
+                    onChange={(e) => setForeignPriceAdjuster(Number(e.target.value) || 0)}
+                    className="bg-white border-stone-200 mt-1.5 font-bold text-stone-850"
+                    placeholder="0"
                   />
                 </div>
               </div>

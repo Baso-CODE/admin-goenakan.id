@@ -106,6 +106,7 @@ export default function AddProductPage() {
               attributeValueId: side.attributeValueId,
               printPositionValueId: side.printPositionValueId,
               printSideValueId: side.printSideValueId,
+              altText: "Mockup Image",
             }),
           });
 
