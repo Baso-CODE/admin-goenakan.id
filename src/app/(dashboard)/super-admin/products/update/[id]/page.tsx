@@ -220,13 +220,31 @@ export default function EditProductPage() {
       printPositionValueId?: string | null;
       printSideValueId?: string | null;
       mockupSideName?: string | null;
+      colorMaskFile?: File | null;
+      deleteColorMask?: boolean;
     },
   ) => {
     setIsSubmitting(true);
     try {
+      // 1. Upload color mask first if present
+      if (updates.colorMaskFile) {
+        const maskFormData = new FormData();
+        maskFormData.append("colorMask", updates.colorMaskFile);
+        const uploadRes = await fetchApi(`/products/image/${mediaId}/color-mask`, {
+          method: "POST",
+          body: maskFormData,
+        });
+        if (!uploadRes.ok) {
+          throw new Error("Failed to upload color mask");
+        }
+      }
+
+      // 2. Perform metadata PATCH update
+      const { colorMaskFile, ...metaUpdates } = updates;
+
       const res = await fetchApi(`/products/image/${mediaId}/seo`, {
         method: "PATCH",
-        body: JSON.stringify(updates),
+        body: JSON.stringify(metaUpdates),
       });
 
       if (!res.ok) {

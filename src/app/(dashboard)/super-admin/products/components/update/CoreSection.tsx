@@ -88,6 +88,7 @@ const FormCoreSchema = z.object({
   mockupAreaY: z.number().optional().nullable(),
   mockupAreaWidth: z.number().optional().nullable(),
   mockupAreaHeight: z.number().optional().nullable(),
+  colorMockupTrigger: z.string().optional(),
 });
 
 export type ProductCoreFormValues = z.infer<typeof FormCoreSchema>;
@@ -152,6 +153,7 @@ export default function FormProductCore({
       mockupAreaY: null,
       mockupAreaWidth: null,
       mockupAreaHeight: null,
+      colorMockupTrigger: "NONE",
     },
   });
 
@@ -201,13 +203,17 @@ export default function FormProductCore({
             fetchedItemCats = dataIC.data || [];
           }
 
-          // B. Ambil data item names secara global
-          try {
-            const resIN = await fetchApi("/item-names?take=500");
-            const dataIN = await resIN.json();
-            fetchedItemNames = dataIN.data || [];
-          } catch (e) {
-            console.error("Gagal mengambil Item Names:", e);
+          // B. Ambil data item names secara spesifik untuk item category ini
+          if (initialData.itemCategoryId) {
+            try {
+              const resIN = await fetchApi(
+                `/item-names?itemCategoryId=${initialData.itemCategoryId}&take=150`,
+              );
+              const dataIN = await resIN.json();
+              fetchedItemNames = dataIN.data || [];
+            } catch (e) {
+              console.error("Gagal mengambil Item Names:", e);
+            }
           }
         }
 
@@ -245,6 +251,7 @@ export default function FormProductCore({
               mockupAreaY: initialData.mockupAreaY ?? null,
               mockupAreaWidth: initialData.mockupAreaWidth ?? null,
               mockupAreaHeight: initialData.mockupAreaHeight ?? null,
+              colorMockupTrigger: initialData.colorMockupTrigger || "NONE",
             });
           }
 
@@ -294,6 +301,16 @@ export default function FormProductCore({
     }
     form.setValue("itemCategoryId", val);
     form.setValue("itemNameId", ""); // Kosongkan cucu
+    setItemNames([]);
+
+    if (!val) return;
+    try {
+      const res = await fetchApi(`/item-names?itemCategoryId=${val}&take=150`);
+      const result = await res.json();
+      setItemNames(result.data || []);
+    } catch (e) {
+      console.error("Gagal memuat item names:", e);
+    }
   };
 
   const handleCategoryAdded = (newCat: any) => {
@@ -919,6 +936,32 @@ export default function FormProductCore({
                         </span>
                       </div>
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="colorMockupTrigger"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Trigger Custom Color</FormLabel>
+                    <Select
+                      value={field.value || "NONE"}
+                      onValueChange={field.onChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="bg-white">
+                          <SelectValue placeholder="Pilih Trigger..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="NONE">Tidak Aktif (Polosan/Statis)</SelectItem>
+                        <SelectItem value="SIZE">Berdasarkan Ukuran / Kapasitas</SelectItem>
+                        <SelectItem value="SHAPE">Berdasarkan Model / Bentuk</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

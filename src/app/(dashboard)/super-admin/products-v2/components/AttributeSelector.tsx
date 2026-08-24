@@ -1817,8 +1817,10 @@ export function ModelShapeValueInput({ value, onChange }: ModelShapeValueInputPr
   const parts = value ? value.split("|") : [];
   const name = parts[0] || "";
   const imageUrl = parts[1] || "";
+  const colorMaskUrl = parts[2] || "";
 
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingMask, setIsUploadingMask] = useState(false);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1843,7 +1845,7 @@ export function ModelShapeValueInput({ value, onChange }: ModelShapeValueInputPr
 
       const data = await res.json();
       const newUrl = data.secure_url;
-      onChange(`${name}|${newUrl}`);
+      onChange(`${name}|${newUrl}|${colorMaskUrl}`);
       toast.success("Gambar model berhasil diunggah!");
     } catch (error) {
       console.error(error);
@@ -1853,69 +1855,156 @@ export function ModelShapeValueInput({ value, onChange }: ModelShapeValueInputPr
     }
   };
 
+  const handleMaskFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingMask(true);
+    try {
+      const CLOUDINARY_CLOUD_NAME = "do9sfnf5k";
+      const CLOUDINARY_UPLOAD_PRESET = "ml_default";
+      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+      const res = await fetch(cloudinaryUrl, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Gagal upload ke Cloudinary");
+
+      const data = await res.json();
+      const newUrl = data.secure_url;
+      onChange(`${name}|${imageUrl}|${newUrl}`);
+      toast.success("Mask warna berhasil diunggah!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal mengunggah mask warna");
+    } finally {
+      setIsUploadingMask(false);
+    }
+  };
+
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value;
-    onChange(imageUrl ? `${newName}|${imageUrl}` : newName);
+    onChange(`${newName}|${imageUrl}|${colorMaskUrl}`);
   };
 
   const handleRemoveImage = () => {
-    onChange(name);
+    onChange(`${name}||${colorMaskUrl}`);
+  };
+
+  const handleRemoveMask = () => {
+    onChange(`${name}|${imageUrl}|`);
   };
 
   return (
-    <div className="flex-1 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+    <div className="flex-1 flex flex-col gap-3 p-2 bg-stone-100/40 dark:bg-stone-850/40 rounded border border-stone-200/60 dark:border-stone-800">
       <Input
         placeholder="Nama Model / Shape (e.g. Oval, Bulat)"
         value={name}
         onChange={handleNameChange}
-        className="flex-1 border-slate-300 text-slate-800 bg-white h-9"
+        className="w-full border-slate-300 text-slate-800 bg-white h-9"
         required
       />
 
-      <div className="flex items-center gap-2 shrink-0">
-        {imageUrl ? (
-          <div className="relative w-9 h-9 border rounded bg-slate-100 flex items-center justify-center overflow-hidden">
-            <img src={imageUrl} alt={name} className="w-full h-full object-cover" />
-            <button
-              type="button"
-              onClick={handleRemoveImage}
-              className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 flex items-center justify-center text-white text-[9px] font-bold transition-opacity"
-            >
-              Hapus
-            </button>
-          </div>
-        ) : (
-          <label className="w-9 h-9 border border-dashed rounded border-slate-300 hover:border-slate-500 bg-white flex items-center justify-center cursor-pointer transition-colors relative">
-            {isUploading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
-            ) : (
-              <div className="flex flex-col items-center justify-center text-stone-400">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-              </div>
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              disabled={isUploading}
-              onChange={handleFileChange}
-            />
-          </label>
-        )}
-        <span className="text-[10px] text-stone-500 max-w-[80px] leading-tight select-none">
-          {imageUrl ? "Gambar Terpilih" : "Unggah Gambar"}
-        </span>
+      <div className="flex flex-wrap gap-4 items-center justify-between">
+        {/* Column 1: Gambar Thumbnail */}
+        <div className="flex items-center gap-2 shrink-0">
+          {imageUrl ? (
+            <div className="relative w-9 h-9 border rounded bg-slate-100 flex items-center justify-center overflow-hidden">
+              <img src={imageUrl} alt={name} className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 flex items-center justify-center text-white text-[9px] font-bold transition-opacity cursor-pointer"
+              >
+                Hapus
+              </button>
+            </div>
+          ) : (
+            <label className="w-9 h-9 border border-dashed rounded border-slate-300 hover:border-slate-500 bg-white flex items-center justify-center cursor-pointer transition-colors relative">
+              {isUploading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+              ) : (
+                <div className="flex flex-col items-center justify-center text-stone-400">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={isUploading}
+                onChange={handleFileChange}
+              />
+            </label>
+          )}
+          <span className="text-[10px] text-stone-500 max-w-[80px] leading-tight select-none">
+            {imageUrl ? "Gambar Terpilih" : "Unggah Gambar"}
+          </span>
+        </div>
+
+        {/* Column 2: Mask Warna */}
+        <div className="flex items-center gap-2 shrink-0">
+          {colorMaskUrl ? (
+            <div className="relative w-9 h-9 border rounded bg-slate-100 flex items-center justify-center overflow-hidden">
+              <img src={colorMaskUrl} alt="Mask" className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={handleRemoveMask}
+                className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 flex items-center justify-center text-white text-[9px] font-bold transition-opacity cursor-pointer"
+              >
+                Hapus
+              </button>
+            </div>
+          ) : (
+            <label className="w-9 h-9 border border-dashed rounded border-slate-300 hover:border-slate-500 bg-white flex items-center justify-center cursor-pointer transition-colors relative">
+              {isUploadingMask ? (
+                <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+              ) : (
+                <div className="flex flex-col items-center justify-center text-stone-400">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                    <path d="M2 17l10 5 10-5" />
+                    <path d="M2 12l10 5 10-5" />
+                  </svg>
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/png"
+                className="hidden"
+                disabled={isUploadingMask}
+                onChange={handleMaskFileChange}
+              />
+            </label>
+          )}
+          <span className="text-[10px] text-stone-500 max-w-[80px] leading-tight select-none font-semibold text-indigo-650">
+            {colorMaskUrl ? "Mask Terpilih" : "Upload Mask"}
+          </span>
+        </div>
       </div>
     </div>
   );

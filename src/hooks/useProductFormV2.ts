@@ -4,7 +4,7 @@ import {
   Category,
   ProductFormValues,
   productSchema,
-} from "@/app/(dashboard)/super-admin/products/components/product.schema";
+} from "@/app/(dashboard)/super-admin/products-v2/components/product.schema";
 import { useApi } from "@/hooks/useApi";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
@@ -88,6 +88,7 @@ export function useProductFormV2(
       mockupAreaWidth: null,
       mockupAreaHeight: null,
       mockupSides: [],
+      colorMockupTrigger: "NONE",
     },
   });
 
