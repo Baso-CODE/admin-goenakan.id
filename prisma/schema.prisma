@@ -713,6 +713,8 @@ model ProductImageMockupArea {
   physicalHeight Float?
   unit           String? @default("cm") // "cm" | "mm"
 
+  rotation       Float?  @default(0)
+
   productImageId String
   productImage   ProductImage @relation(fields: [productImageId], references: [id], onDelete: Cascade)
 

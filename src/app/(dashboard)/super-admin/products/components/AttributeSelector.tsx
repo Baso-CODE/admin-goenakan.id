@@ -920,30 +920,78 @@ export function AttributeSelector({
                         <CommandInput placeholder="Cari atribut untuk di-clone..." />
                         <CommandList>
                           <CommandEmpty>Atribut tidak ditemukan.</CommandEmpty>
-                          <CommandGroup>
-                            {cloneableAttributes.map((attr) => {
-                              const fullText = `${attr.name} (${attr.values.map((v) => v.value).join(", ")})`;
-                              return (
-                                <CommandItem
-                                  key={attr.id}
-                                  value={`${fullText}-${attr.id}`}
-                                  onSelect={() => {
-                                    setSelectedCloneId(attr.id);
-                                    setCloneSelectOpen(false);
-                                  }}>
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      selectedCloneId === attr.id ? "opacity-100" : "opacity-0"
-                                    )}
-                                  />
-                                  <span className="block truncate max-w-[240px] sm:max-w-[340px]" title={fullText}>
-                                    {fullText}
-                                  </span>
-                                </CommandItem>
+                          {(() => {
+                            // Group cloneableAttributes by type
+                            const groups: Record<string, typeof cloneableAttributes> = {};
+                            cloneableAttributes.forEach((attr) => {
+                              const typeKey = attr.type || "TEXT";
+                              if (!groups[typeKey]) groups[typeKey] = [];
+                              groups[typeKey].push(attr);
+                            });
+
+                            // Helper to get nice human-readable type labels
+                            const getTypeLabel = (type: string) => {
+                              switch (type) {
+                                case "COLOR":
+                                  return "Color Swatch";
+                                case "SIZE":
+                                  return "Size / Capacity";
+                                case "MOCKUP_SIDE":
+                                  return "Mockup Side / Print Position";
+                                case "MODEL_SHAPE":
+                                  return "Model / Shape";
+                                case "PRINT_METHOD":
+                                  return "Printing Method";
+                                case "TEXT":
+                                  return "Text";
+                                default:
+                                  return type;
+                              }
+                            };
+
+                            // Sort types A-Z
+                            const sortedTypes = Object.keys(groups).sort((a, b) => 
+                              getTypeLabel(a).localeCompare(getTypeLabel(b))
+                            );
+
+                            return sortedTypes.map((type) => {
+                              const sortedAttrs = [...groups[type]].sort((a, b) =>
+                                a.name.localeCompare(b.name)
                               );
-                            })}
-                          </CommandGroup>
+
+                              return (
+                                <CommandGroup
+                                  key={type}
+                                  heading={getTypeLabel(type)}
+                                  className="px-1.5 py-1"
+                                >
+                                  {sortedAttrs.map((attr) => {
+                                    const fullText = `${attr.name} (${attr.values.map((v) => v.value).join(", ")})`;
+                                    return (
+                                      <CommandItem
+                                        key={attr.id}
+                                        value={`${fullText}-${attr.id}`}
+                                        className="text-xs py-1.5 cursor-pointer"
+                                        onSelect={() => {
+                                          setSelectedCloneId(attr.id);
+                                          setCloneSelectOpen(false);
+                                        }}>
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4 shrink-0",
+                                            selectedCloneId === attr.id ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        <span className="block truncate max-w-[240px] sm:max-w-[340px]" title={fullText}>
+                                          {fullText}
+                                        </span>
+                                      </CommandItem>
+                                    );
+                                  })}
+                                </CommandGroup>
+                              );
+                            });
+                          })()}
                         </CommandList>
                       </Command>
                     </PopoverContent>

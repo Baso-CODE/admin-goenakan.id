@@ -164,6 +164,7 @@ export default function FormProductCore({
     let isMounted = true; // Keamanan agar state tidak bocor jika komponen ditutup
 
     const initializeForm = async () => {
+      if (!initialData) return;
       if (status === "loading" || status === "unauthenticated") return;
       setLoadingData(true);
 
@@ -404,6 +405,61 @@ export default function FormProductCore({
 
     toast.error(`Mohon lengkapi field berikut: ${missingFields.join(", ")}`);
   };
+
+  if (loadingData) {
+    return (
+      <div className="space-y-8 border p-6 rounded-md bg-white shadow-sm animate-pulse">
+        {/* Catatan placeholder */}
+        <div className="h-14 bg-stone-100 rounded-md" />
+
+        {/* Section 1 placeholder */}
+        <div className="space-y-4">
+          <div className="h-6 w-36 bg-stone-200 rounded" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-2 md:col-span-2">
+              <div className="h-4 w-24 bg-stone-200 rounded" />
+              <div className="h-10 bg-stone-100 rounded" />
+            </div>
+            <div className="space-y-2 md:col-span-1">
+              <div className="h-4 w-12 bg-stone-200 rounded" />
+              <div className="h-10 bg-stone-100 rounded" />
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2 placeholder */}
+        <div className="space-y-4">
+          <div className="h-6 w-44 bg-stone-200 rounded" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <div className="h-4 w-20 bg-stone-200 rounded" />
+              <div className="h-10 bg-stone-100 rounded" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-4 w-24 bg-stone-200 rounded" />
+              <div className="h-10 bg-stone-100 rounded" />
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3 placeholder */}
+        <div className="space-y-4">
+          <div className="h-6 w-32 bg-stone-200 rounded" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="space-y-2">
+                <div className="h-4 w-16 bg-stone-200 rounded" />
+                <div className="h-10 bg-stone-100 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Button placeholder */}
+        <div className="h-10 w-28 bg-stone-200 rounded-md" />
+      </div>
+    );
+  }
 
   return (
     <>
