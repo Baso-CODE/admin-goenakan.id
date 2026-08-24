@@ -83,6 +83,7 @@ export const productSchema = z.object({
   mockupAreaWidth: z.number().optional().nullable(),
   mockupAreaHeight: z.number().optional().nullable(),
   mockupSides: z.array(z.any()).optional(),
+  colorMockupTrigger: z.string().optional(),
 });
 
 export type ProductFormValues = z.infer<typeof productSchema> & {

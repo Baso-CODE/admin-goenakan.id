@@ -117,6 +117,16 @@ export default function AddProductPage() {
               body: JSON.stringify({ mockupAreas: side.mockupAreas }),
             });
           }
+
+          // 3. Upload color mask if present
+          if (side.colorMaskFile) {
+            const maskFormData = new FormData();
+            maskFormData.append("colorMask", side.colorMaskFile);
+            await fetchApi(`/products/image/${createdImage.id}/color-mask`, {
+              method: "POST",
+              body: maskFormData,
+            });
+          }
         }
       }
 

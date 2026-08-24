@@ -187,6 +187,7 @@ export default function FormUpdateAttributes({
           printSideValueId: img.printSideValueId || null,
           printPositionValueId: img.printPositionValueId || null,
           url: img.url,
+          colorMaskUrl: img.colorMaskUrl || null,
         }));
 
       const sortedMockupSides = [...initialMockupSides].sort((a, b) => {
@@ -556,7 +557,9 @@ export default function FormUpdateAttributes({
           const hasMetadataChanged = 
             (side.name || null) !== (initialImg.mockupSideName || null) ||
             (side.attributeValueId || null) !== (initialImg.attributeValueId || null) ||
-            (side.printPositionValueId || null) !== (initialImg.printPositionValueId || null);
+            (side.printPositionValueId || null) !== (initialImg.printPositionValueId || null) ||
+            (side.colorMaskFile !== undefined) ||
+            (!side.colorMaskUrl && initialImg.colorMaskUrl);
 
           const initialAreas = initialImg.mockupAreas || [];
           const currentAreas = side.mockupAreas || [];
@@ -575,6 +578,8 @@ export default function FormUpdateAttributes({
               printSideValueId: side.printSideValueId || null,
               printPositionValueId: side.printPositionValueId || null,
               altText: "Mockup Image",
+              colorMaskFile: side.colorMaskFile,
+              deleteColorMask: !side.colorMaskUrl && initialImg.colorMaskUrl ? true : false,
             });
           }
 
@@ -591,6 +596,7 @@ export default function FormUpdateAttributes({
               printSideValueId: side.printSideValueId || null,
               printPositionValueId: side.printPositionValueId || null,
               altText: "Mockup Image",
+              colorMaskFile: side.colorMaskFile,
             });
           }
           
@@ -817,6 +823,8 @@ export default function FormUpdateAttributes({
                                       </Label>
                                     </div>
                                   </div>
+
+
 
                                   <div className="space-y-1">
                                     <Label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">

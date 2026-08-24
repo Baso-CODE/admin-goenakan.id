@@ -760,6 +760,32 @@ export default function ProductFormV2({
                         )}
                       />
 
+                      <FormField
+                        control={form.control}
+                        name="colorMockupTrigger"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Trigger Custom Color</FormLabel>
+                            <Select
+                              value={field.value || "NONE"}
+                              onValueChange={field.onChange}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="bg-white">
+                                  <SelectValue placeholder="Pilih Trigger..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="NONE">Tidak Aktif (Polosan/Statis)</SelectItem>
+                                <SelectItem value="SIZE">Berdasarkan Ukuran / Kapasitas</SelectItem>
+                                <SelectItem value="SHAPE">Berdasarkan Model / Bentuk</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
                       {/* TAGS */}
                       <FormField
                         control={form.control}
@@ -1213,6 +1239,8 @@ export default function ProductFormV2({
                                                   </label>
                                                 </div>
                                               </div>
+
+
 
                                               <div className="space-y-1">
                                                 <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
