@@ -7,7 +7,7 @@ import {
   useRouter,
   useSearchParams,
 } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 // UI
@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/useApi";
 import ProductionTab from "./productionTab";
 import ShipmentManager from "./shipmentManager";
@@ -30,7 +30,6 @@ export default function LogisticsTrackingDetail() {
   const [order, setOrder] = useState<any>(null);
   const [vendors, setVendors] = useState<any[]>([]);
 
-  // ✨ PERBAIKAN 1: Tambahkan state ini agar skeleton hanya muncul di awal
   const [loading, setLoading] = useState(true);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
@@ -39,18 +38,17 @@ export default function LogisticsTrackingDetail() {
   const handleTabChange = (value: string) => {
     const newParams = new URLSearchParams(searchParams.toString());
     newParams.set("tab", value);
-    // Mengubah URL tanpa membuat halaman melompat ke atas
-    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
-  };
 
-  // ✨ PERBAIKAN 2: Sesuaikan fungsi loadData
-  // Kita tambahkan parameter 'isBackgroundUpdate' agar kita bisa mengambil data
-  // tanpa memunculkan loading layar penuh secara mengganggu.
+    window.history.replaceState(
+      null,
+      "",
+      `${pathname}?${newParams.toString()}`,
+    );
+  };
   const loadData = async (isBackgroundUpdate = false) => {
     if (status !== "authenticated" || !orderId) return;
 
     try {
-      // Jika ini bukan update latar belakang, baru nyalakan loading
       if (!isBackgroundUpdate) {
         setLoading(true);
       }
@@ -73,16 +71,27 @@ export default function LogisticsTrackingDetail() {
       toast.error("Gagal memuat data tracking");
     } finally {
       setLoading(false);
-      setIsInitialLoading(false); // Tandai bahwa loading pertama sudah selesai
+      setIsInitialLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData(false); // Memuat data untuk pertama kalinya
+    loadData(false);
   }, [orderId, status]);
 
-  // ✨ PERBAIKAN 3: Ubah kondisi render Skeleton
-  // Skeleton hanya muncul jika loading bernilai true DAN ini adalah loading pertama
+  // ✨ PERBAIKAN UTAMA: Pindahkan useMemo ke ATAS SEBELUM kondisi "if" apa pun!
+  // Ini memastikan urutan pemanggilan Hook selalu konsisten di setiap render.
+  const productionVendors = useMemo(
+    () => vendors.filter((v) => v.type === "PRODUCT"),
+    [vendors],
+  );
+
+  const logisticVendors = useMemo(
+    () => vendors.filter((v) => v.type === "SERVICE"),
+    [vendors],
+  );
+
+  // Kondisi "if" ditaruh setelah seluruh Hook selesai dipanggil
   if (loading && isInitialLoading) {
     return (
       <div className="space-y-6 mx-auto pb-20">
@@ -109,9 +118,6 @@ export default function LogisticsTrackingDetail() {
 
   if (!order) return <div>Order not found</div>;
 
-  const productionVendors = vendors.filter((v) => v.type === "PRODUCT");
-  const logisticVendors = vendors.filter((v) => v.type === "SERVICE");
-
   return (
     <div className="space-y-6 mx-auto pb-20">
       {/* HEADER */}
@@ -134,7 +140,7 @@ export default function LogisticsTrackingDetail() {
 
       <Separator />
 
-      {/* DURATION SUMMARY (Tetap sama seperti aslinya) */}
+      {/* DURATION SUMMARY */}
       {order.durationSummary && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
@@ -214,22 +220,27 @@ export default function LogisticsTrackingDetail() {
           </TabsTrigger>
         </TabsList>
 
-        {/* 
-          ✨ PERBAIKAN 4: Menggunakan div dengan class "block" dan "hidden" 
-          Alih-alih menggunakan <TabsContent>, kita menggunakan div HTML murni. 
-          Ini memastikan komponen tidak dihapus dari memori saat tab lain diklik!
-        */}
         <div className="mt-6">
-          <div className={activeTab === "production" ? "block" : "hidden"}>
+          {/* TAB 1: PRODUCTION */}
+          <TabsContent
+            value="production"
+            forceMount={true}
+            hidden={activeTab !== "production"}
+            className="m-0">
             <ProductionTab
               orderId={order.id}
               products={order.products}
               vendors={productionVendors}
-              onUpdate={() => loadData(true)} // Kirim true agar update berjalan diam-diam
+              onUpdate={() => loadData(true)}
             />
-          </div>
+          </TabsContent>
 
-          <div className={activeTab === "inbound" ? "block" : "hidden"}>
+          {/* TAB 2: INBOUND */}
+          <TabsContent
+            value="inbound"
+            forceMount={true}
+            hidden={activeTab !== "inbound"}
+            className="m-0">
             <ShipmentManager
               type="INBOUND"
               orderId={order.id}
@@ -242,9 +253,14 @@ export default function LogisticsTrackingDetail() {
               allVendors={vendors}
               onUpdate={() => loadData(true)}
             />
-          </div>
+          </TabsContent>
 
-          <div className={activeTab === "outbound" ? "block" : "hidden"}>
+          {/* TAB 3: OUTBOUND */}
+          <TabsContent
+            value="outbound"
+            forceMount={true}
+            hidden={activeTab !== "outbound"}
+            className="m-0">
             <ShipmentManager
               type="OUTBOUND"
               orderId={order.id}
@@ -257,7 +273,7 @@ export default function LogisticsTrackingDetail() {
               allVendors={vendors}
               onUpdate={() => loadData(true)}
             />
-          </div>
+          </TabsContent>
         </div>
       </Tabs>
     </div>
