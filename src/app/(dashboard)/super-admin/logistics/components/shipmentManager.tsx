@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import {
   CalendarIcon,
+  Copy,
   ExternalLink,
   FileText,
   History,
@@ -553,14 +554,35 @@ export default function ShipmentManager({
                         <Badge variant="outline" className="font-mono bg-white">
                           {ship.method}
                         </Badge>
+
+                        {/* ✨ LOGIKA BARU: Tampilan Nomor Resi dengan Tombol Copy */}
                         <h3 className="font-bold text-lg flex items-center gap-2">
                           {ship.trackingNumber || "No Resi"}
+
+                          {/* Menampilkan tombol copy HANYA jika nomor resi tersedia */}
+                          {ship.trackingNumber && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                              onClick={() => {
+                                navigator.clipboard.writeText(
+                                  ship.trackingNumber,
+                                );
+                                toast.success("Nomor resi berhasil disalin!");
+                              }}
+                              title="Copy Nomor Resi">
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+
                           <Badge
                             variant="secondary"
                             className="bg-slate-200 text-slate-700 text-xs">
                             Step {ship.step || 1}
                           </Badge>
                         </h3>
+
                         <Badge
                           className={cn(
                             "ml-2",

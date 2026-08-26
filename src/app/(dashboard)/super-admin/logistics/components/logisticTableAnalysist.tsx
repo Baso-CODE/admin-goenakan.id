@@ -333,7 +333,7 @@ export default function LogisticTableAnalysist() {
 
                       <TableCell className="text-right">
                         <Link
-                          href={`/super-admin/logistics/track/${item.orderId}`}>
+                          href={`/super-admin/logistics/track/${item.orderId}?tab=production`}>
                           <Button
                             variant="outline"
                             size="icon"

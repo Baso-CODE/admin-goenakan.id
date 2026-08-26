@@ -181,7 +181,6 @@ export default function QuotationPrint() {
                 crossOrigin="anonymous"
               />
             </div>
-
             {/* 2. HEADER INFO */}
             <div className="flex justify-between items-start mb-6 text-[12px] text-gray-900">
               <div className="flex flex-col">
@@ -237,7 +236,6 @@ export default function QuotationPrint() {
                 </table>
               </div>
             </div>
-
             {/* 3. CUSTOMER INFO */}
             <div className="mb-8 w-[60%] border border-gray-300 p-4 rounded-sm bg-gray-50/50">
               <h2 className="text-[13px] font-bold text-gray-500 uppercase tracking-wide border-b border-gray-200 pb-1 mb-2">
@@ -271,7 +269,6 @@ export default function QuotationPrint() {
                 </tbody>
               </table>
             </div>
-
             {/* 4. PRODUCT TABLE UTAMA */}
             <div className="mb-8">
               <table className="w-full border-collapse border border-gray-800">
@@ -302,7 +299,7 @@ export default function QuotationPrint() {
                         key={item.id || index}
                         className="align-top text-[11px] border-b border-gray-800">
                         {/* Kolom 1: Product Detail (Hanya Gambar & Link URL) */}
-                        <td className="border-r border-gray-800 p-2 text-center align-middle">
+                        <td className="border-r border-gray-800 p-2 text-center align-top">
                           {imageUrl ? (
                             <img
                               src={imageUrl}
@@ -311,7 +308,7 @@ export default function QuotationPrint() {
                               crossOrigin="anonymous"
                             />
                           ) : (
-                            <div className="text-gray-400 italic text-[9px]">
+                            <div className="text-gray-400 italic text-[9px] mt-8">
                               No Image
                             </div>
                           )}
@@ -328,13 +325,14 @@ export default function QuotationPrint() {
                         </td>
 
                         {/* Kolom 2: Product Specification */}
+                        {/* ✨ PERBAIKAN JARAK: align-top dan class margin diperkecil */}
                         <td className="border-r border-gray-800 p-3 align-top text-gray-800">
-                          <div className="font-bold text-[12px] mb-2">
+                          <div className="font-bold text-[12px] mb-1">
                             {item.productName}
                           </div>
 
                           {/* Spesifikasi (Deskripsi & Customization Manual) */}
-                          <div className="space-y-1 text-[10px]">
+                          <div className="space-y-0.5 text-[10px]">
                             {item.customization &&
                             typeof item.customization === "object" ? (
                               Object.entries(item.customization).map(
@@ -358,13 +356,13 @@ export default function QuotationPrint() {
                             )}
                           </div>
 
-                          {/* ✨ LOGIC BARU: Style diseragamkan (teks biasa), hanya teks "Available in" yang diatur */}
+                          {/* Attributes Available / Selected */}
                           {item.product?.availableAttributes?.map(
                             (attr: any, attrIdx: number) => {
                               return (
                                 <div
                                   key={attrIdx}
-                                  className="mt-2 text-[10px] text-gray-700">
+                                  className="mt-1 text-[10px] text-gray-700">
                                   {attr.hasSelection
                                     ? `${attr.attributeName} : `
                                     : `Available in ${attr.attributeName} : `}
@@ -384,7 +382,7 @@ export default function QuotationPrint() {
 
                           {/* Remarks */}
                           {item.remarks && (
-                            <div className="mt-3 text-[10px] italic text-gray-500 bg-gray-50 p-1.5 rounded">
+                            <div className="mt-2 text-[10px] italic text-gray-500 bg-gray-50 p-1.5 rounded">
                               <span className="font-semibold text-gray-700 not-italic">
                                 Note:{" "}
                               </span>
@@ -394,7 +392,17 @@ export default function QuotationPrint() {
                         </td>
 
                         {/* Kolom 3: Qty */}
-                        <td className="border-r border-gray-800 p-3 text-center align-middle font-medium text-[11px]">
+                        {/* ✨ PERBAIKAN ALIGNMENT: Ubah jadi align-top dan tambahkan elemen transparan pendobrak */}
+                        <td className="border-r border-gray-800 p-3 text-center align-top font-medium text-[11px]">
+                          {/* Elemen invisible untuk menyeimbangkan tinggi "Start from" di sebelahnya */}
+                          {basePrice !== null && item.isPriceStartFrom && (
+                            <div className="text-[10px] mb-1.5 pb-1 border-b border-transparent invisible">
+                              Start from:
+                              <br />
+                              <span>0</span>
+                            </div>
+                          )}
+
                           {hasTiers ? (
                             <div className="flex flex-col space-y-1.5">
                               {item.tiers.map((t: any, idx: number) => (
@@ -407,8 +415,9 @@ export default function QuotationPrint() {
                         </td>
 
                         {/* Kolom 4: Unit Price */}
-                        <td className="p-3 text-center align-middle font-medium text-gray-800 text-[11px]">
-                          {basePrice !== null && (
+                        {/* ✨ PERBAIKAN ALIGNMENT: Ubah jadi align-top */}
+                        <td className="p-3 text-center align-top font-medium text-gray-800 text-[11px]">
+                          {basePrice !== null && item.isPriceStartFrom && (
                             <div className="text-[10px] text-gray-500 mb-1.5 pb-1 border-b border-gray-300">
                               Start from:
                               <br />
@@ -436,7 +445,6 @@ export default function QuotationPrint() {
                 </tbody>
               </table>
             </div>
-
             {/* 5. NOTES */}
             <div className="mb-10">
               <div className="font-bold text-[13px] uppercase mb-2 text-gray-800 border-b border-gray-800 inline-block pb-0.5">

@@ -79,7 +79,6 @@ export default function LogisticsTrackingDetail() {
 
   useEffect(() => {
     loadData(false); // Memuat data untuk pertama kalinya
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, status]);
 
   // ✨ PERBAIKAN 3: Ubah kondisi render Skeleton

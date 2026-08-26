@@ -1,6 +1,5 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Command,
@@ -32,12 +31,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import {
-  Calendar as CalendarIcon,
   Check,
   ChevronsUpDown,
   DollarSign,
@@ -501,39 +500,15 @@ export default function AddPurchaseOrderForm() {
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>PO Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full h-10 pl-3 text-left font-normal bg-white",
-                              !field.value && "text-muted-foreground",
-                            )}>
-                            {field.value ? (
-                              format(new Date(field.value), "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={
-                            field.value ? new Date(field.value) : undefined
-                          }
-                          onSelect={(date) =>
-                            field.onChange(
-                              date ? format(date, "yyyy-MM-dd") : "",
-                            )
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+
+                    <DatePickerHelper
+                      date={field.value ? new Date(field.value) : undefined}
+                      setDate={(date) =>
+                        field.onChange(date ? format(date, "yyyy-MM-dd") : "")
+                      }
+                      placeholder="Pick a date"
+                    />
+
                     <FormMessage />
                   </FormItem>
                 )}

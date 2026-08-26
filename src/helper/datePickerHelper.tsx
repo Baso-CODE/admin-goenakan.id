@@ -33,12 +33,16 @@ export function DatePickerHelper({
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0">
+      {/* Tambahkan kelas w-auto p-3 agar popover memiliki ruang yang pas */}
+      <PopoverContent className="w-auto p-3" align="start">
         <Calendar
           mode="single"
           selected={date}
           onSelect={setDate}
           initialFocus
+          captionLayout="dropdown"
+          fromYear={1970}
+          toYear={2040}
         />
       </PopoverContent>
     </Popover>
