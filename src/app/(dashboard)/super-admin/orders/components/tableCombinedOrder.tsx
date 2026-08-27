@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { ConfirmCancelDialog } from "@/app/(dashboard)/components/confirmCancelDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -55,10 +56,10 @@ import {
   Pencil,
   Plus,
   Search,
+  XCircle, // ✨ Icon untuk menu cancel
 } from "lucide-react";
 import { PurchaseChannel } from "../types/order.types";
 import { InvoiceDialogWrapper } from "./helper/invoiceDialogWrapper";
-// import InvoiceDialogWrapper from "./InvoiceDialogWrapper";
 
 // === TYPES ===
 type CombinedOrder = {
@@ -124,8 +125,6 @@ export default function TableCombinedOrder() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // Filters State
   const [search, setSearch] = useState("");
@@ -140,6 +139,10 @@ export default function TableCombinedOrder() {
   const [selectedInvoiceOrderId, setSelectedInvoiceOrderId] = useState<
     string | null
   >(null);
+
+  // ✨ State tambahan untuk Dialog Cancel Order
+  const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     const fetchPurchaseChannels = async () => {
@@ -157,6 +160,7 @@ export default function TableCombinedOrder() {
 
     fetchPurchaseChannels();
   }, [status, fetchApi]);
+
   // === FETCH ORDERS ===
   const fetchOrders = async () => {
     if (status !== "authenticated") return;
@@ -207,16 +211,33 @@ export default function TableCombinedOrder() {
     status,
     fetchApi,
   ]);
+
   // === HANDLER EXPORT ===
   const handleExport = async () => {
-    // Bisa disesuaikan nanti jika ada endpoint export khusus combined
     toast.info("Fitur export untuk tabel gabungan sedang disiapkan!");
   };
 
-  // === HANDLER DELETE ===
-  const handleDelete = async () => {
-    // Karena bisa berupa order atau replacement, pastikan endpoint delete mendukung ini nanti
-    toast.info("Fitur delete dari tabel gabungan sedang disiapkan!");
+  // === ✨ HANDLER CONFIRM CANCEL ORDER ===
+  const handleConfirmCancel = async () => {
+    if (!cancelOrderId) return;
+
+    try {
+      setIsCancelling(true);
+      const res = await fetchApi(`/orders/${cancelOrderId}/cancel`, {
+        method: "PATCH",
+      });
+
+      if (!res.ok) throw new Error("Gagal membatalkan order");
+
+      toast.success("Order berhasil dibatalkan");
+      setCancelOrderId(null);
+      fetchOrders(); // Muat ulang tabel
+    } catch (error) {
+      console.error(error);
+      toast.error("Terjadi kesalahan saat membatalkan order");
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   // === RENDER ===
@@ -260,7 +281,6 @@ export default function TableCombinedOrder() {
       <Card className="p-4 shadow-sm">
         <div className="flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between">
           <div className="flex flex-wrap gap-3 w-full lg:w-auto items-center">
-            {/* ✨ 6. TAMBAHKAN ELEMEN DROPDOWN SELECT PURCHASE CHANNEL */}
             <div className="flex flex-col gap-1.5 w-full sm:w-48">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Purchase Channel
@@ -378,14 +398,11 @@ export default function TableCombinedOrder() {
       </Card>
 
       <div className="flex gap-2">
-        {/* Tombol 1: New Order (SALES) */}
         <Link href="/super-admin/orders/add?type=SALES">
           <Button>
             <Plus className="mr-2 h-4 w-4" /> New Order
           </Button>
         </Link>
-
-        {/* Tombol 2: New Sample (SAMPLE) - Ini yang baru kita tambahkan */}
         <Link href="/super-admin/orders/add?type=SAMPLE">
           <Button
             variant="outline"
@@ -393,8 +410,6 @@ export default function TableCombinedOrder() {
             <Plus className="mr-2 h-4 w-4" /> New Sample
           </Button>
         </Link>
-
-        {/* Tombol 3: New Replacement */}
         <Link href="/super-admin/replacement-orders/add">
           <Button
             variant="secondary"
@@ -412,7 +427,6 @@ export default function TableCombinedOrder() {
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="min-w-30">Type</TableHead>
-                  {/* ✨ TAMBAHAN: Kolom Header Purchase Channel */}
                   <TableHead className="min-w-35">Purchase Channel</TableHead>
                   <TableHead className="min-w-30">Date</TableHead>
                   <TableHead className="min-w-37.5">Number</TableHead>
@@ -424,7 +438,6 @@ export default function TableCombinedOrder() {
                   </TableHead>
                   <TableHead className="text-center min-w-20">Items</TableHead>
                   <TableHead className="min-w-37.5">Sales Rep</TableHead>
-
                   <TableHead className="min-w-37.5">Sample Ref</TableHead>
                   <TableHead className="min-w-37.5">Quotation Ref</TableHead>
                   <TableHead className="min-w-37.5">Send to Cust</TableHead>
@@ -435,7 +448,6 @@ export default function TableCombinedOrder() {
                   <TableHead className="min-w-37.5">Created Time</TableHead>
                   <TableHead className="min-w-30">Updated By</TableHead>
                   <TableHead className="min-w-37.5">Updated Time</TableHead>
-
                   <TableHead className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] min-w-25">
                     Actions
                   </TableHead>
@@ -445,7 +457,6 @@ export default function TableCombinedOrder() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      {/* Ubah jumlah array skeleton menyesuaikan total kolom (20 kolom + 1 action) */}
                       {Array.from({ length: 20 }).map((_, col) => (
                         <TableCell key={col}>
                           <Skeleton className="h-5 w-full" />
@@ -467,10 +478,10 @@ export default function TableCombinedOrder() {
                 ) : (
                   orders.map((order) => {
                     const isReplacement = order.type === "REPLACEMENT";
+                    const isCancelled = order.status === "CANCELLED";
 
                     return (
                       <TableRow key={order.id} className="hover:bg-muted/5">
-                        {/* BADGE TIPE DATA */}
                         <TableCell>
                           <Badge
                             variant="outline"
@@ -488,14 +499,12 @@ export default function TableCombinedOrder() {
                           </Badge>
                         </TableCell>
 
-                        {/* ✨ TAMBAHAN: Kolom Data Purchase Channel */}
                         <TableCell className="font-medium text-slate-700">
                           <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-xs">
                             {order.purchaseChannel || "-"}
                           </span>
                         </TableCell>
 
-                        {/* DATE */}
                         <TableCell>
                           <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
                             <CalendarIcon className="h-3.5 w-3.5" />
@@ -505,12 +514,10 @@ export default function TableCombinedOrder() {
                           </div>
                         </TableCell>
 
-                        {/* NUMBER */}
                         <TableCell className="font-mono font-medium text-slate-800">
                           {order.orderNumber}
                         </TableCell>
 
-                        {/* CUSTOMER & PIC */}
                         <TableCell className="font-medium text-gray-700">
                           {order.customerName}
                           <br />
@@ -519,7 +526,6 @@ export default function TableCombinedOrder() {
                           </span>
                         </TableCell>
 
-                        {/* STATUS */}
                         <TableCell>
                           <Badge
                             className={cn(
@@ -531,7 +537,6 @@ export default function TableCombinedOrder() {
                           </Badge>
                         </TableCell>
 
-                        {/* PO CUSTOMER */}
                         <TableCell className="text-sm font-mono text-gray-500">
                           {order.clientPoNumber}
                         </TableCell>
@@ -554,7 +559,6 @@ export default function TableCombinedOrder() {
                           )}
                         </TableCell>
 
-                        {/* ITEMS & SALES REP */}
                         <TableCell className="text-center font-medium">
                           {order.totalItems}
                         </TableCell>
@@ -632,7 +636,7 @@ export default function TableCombinedOrder() {
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
                               <DropdownMenuSeparator />
 
-                              {!isReplacement && (
+                              {!isReplacement && !isCancelled && (
                                 <DropdownMenuItem
                                   className="cursor-pointer"
                                   onSelect={() =>
@@ -657,19 +661,34 @@ export default function TableCombinedOrder() {
                                 </Link>
                               </DropdownMenuItem>
 
-                              <DropdownMenuItem
-                                asChild
-                                className="cursor-pointer">
-                                <Link
-                                  href={
-                                    isReplacement
-                                      ? `/super-admin/replacement-orders/edit/${order.id}`
-                                      : `/super-admin/orders/edit/${order.id}`
-                                  }>
-                                  <Pencil className="mr-2 h-4 w-4 text-orange-600" />
-                                  <span>Edit</span>
-                                </Link>
-                              </DropdownMenuItem>
+                              {!isCancelled && (
+                                <DropdownMenuItem
+                                  asChild
+                                  className="cursor-pointer">
+                                  <Link
+                                    href={
+                                      isReplacement
+                                        ? `/super-admin/replacement-orders/edit/${order.id}`
+                                        : `/super-admin/orders/edit/${order.id}`
+                                    }>
+                                    <Pencil className="mr-2 h-4 w-4 text-orange-600" />
+                                    <span>Edit</span>
+                                  </Link>
+                                </DropdownMenuItem>
+                              )}
+
+                              {/* ✨ Opsi menu Cancel Order */}
+                              {!isCancelled && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="cursor-pointer text-red-600 focus:text-red-600"
+                                    onSelect={() => setCancelOrderId(order.id)}>
+                                    <XCircle className="mr-2 h-4 w-4" />
+                                    <span>Cancel Order</span>
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -719,6 +738,14 @@ export default function TableCombinedOrder() {
           }}
         />
       )}
+
+      {/* ✨ DIALOG KONFIRMASI CANCEL ORDER */}
+      <ConfirmCancelDialog
+        isOpen={Boolean(cancelOrderId)}
+        onClose={() => setCancelOrderId(null)}
+        onConfirm={handleConfirmCancel}
+        isLoading={isCancelling}
+      />
     </div>
   );
 }

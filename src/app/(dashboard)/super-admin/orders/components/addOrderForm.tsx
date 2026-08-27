@@ -70,7 +70,6 @@ import PurchaseChannelForm, {
   PurchaseChannelFormValues,
 } from "../../purchase-channel/components/formPurchaseChannel";
 import { OrderFormValues, orderSchema } from "../order-schema";
-import { postOrder } from "../order-service";
 import {
   Currency,
   Product,
@@ -244,28 +243,66 @@ export default function AddOrderForm() {
   const onSubmit = async (data: OrderFormValues) => {
     try {
       setLoading(true);
-      const { phone, ...payload } = data;
+      const { phone, clientPoFile, ...payload } = data;
 
-      if (!payload.referenceQuotationId) delete payload.referenceQuotationId;
-      if (!payload.referenceSampleId) delete payload.referenceSampleId;
+      // 1. Buat FormData baru
+      const formData = new FormData();
 
-      await postOrder(fetchApi, {
-        ...payload,
-        sampleFollowUps: sampleSteps
-          .filter((s) => s.enabled && s.date)
-          .map((s) => ({ name: s.name, date: s.date })),
+      // 2. Masukkan semua data teks/angka ke dalam FormData
+      Object.keys(payload).forEach((key) => {
+        const value = (payload as any)[key];
+        // Jangan masukkan field yang kosong atau field kompleks (products) dulu
+        if (
+          value !== undefined &&
+          value !== null &&
+          value !== "" &&
+          key !== "products"
+        ) {
+          formData.append(key, String(value));
+        }
       });
+
+      // 3. ✨ MASUKKAN FILE JIKA ADA
+      if (clientPoFile instanceof File) {
+        formData.append("clientPoFile", clientPoFile);
+      }
+
+      // 4. Masukkan array products (Ubah jadi JSON string, backend kita sudah siap menerimanya berkat @Transform)
+      formData.append("products", JSON.stringify(payload.products));
+
+      // 5. Masukkan array follow-ups (Jika ada)
+      const followUps = sampleSteps
+        .filter((s) => s.enabled && s.date)
+        .map((s) => ({ name: s.name, date: s.date }));
+
+      if (followUps.length > 0) {
+        formData.append("sampleFollowUps", JSON.stringify(followUps));
+      }
+
+      // 6. Kirim ke API menggunakan fetchApi
+      // Perhatikan: Kita tidak men-set "Content-Type", browser akan otomatis men-setnya menjadi "multipart/form-data"
+      const res = await fetchApi("/orders", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to create order");
+      }
 
       toast.success("Order created successfully");
       form.reset();
       setSampleSteps([]);
+
       if (data.salesCategory === "SAMPLE") {
         router.push("/super-admin/orders?tab=sample");
       } else {
         router.push("/super-admin/orders?tab=all");
       }
-    } catch {
-      toast.error("Failed to create order");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Failed to create order");
     } finally {
       setLoading(false);
     }
@@ -608,23 +645,57 @@ export default function AddOrderForm() {
               />
 
               {salesCategory === "SALES" && (
-                <FormField
-                  control={control}
-                  name="clientPoNumber"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2">
-                      <FormLabel>Client PO Number (Optional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter client PO reference number"
-                          className="h-10"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <>
+                  <FormField
+                    control={control}
+                    name="clientPoNumber"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Client PO Number (Optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter client PO reference number"
+                            className="h-10"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* ✨ TAMBAHAN BARU: INPUT FILE UNTUK PO CLIENT */}
+                  <FormField
+                    control={control}
+                    name="clientPoFile"
+                    render={({ field: { value, onChange, ...fieldProps } }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Client PO Document (PDF/Image)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="file"
+                            accept=".pdf, image/jpeg, image/png, image/webp"
+                            className="h-10 cursor-pointer file:text-blue-600 file:bg-blue-50 file:border-0 file:rounded-md file:px-2 file:py-1 file:mr-3 hover:file:bg-blue-100"
+                            onChange={(event) => {
+                              // Ambil file pertama yang diupload user
+                              const file =
+                                event.target.files && event.target.files[0];
+                              if (file) {
+                                onChange(file); // Simpan objek file ke state react-hook-form
+                              }
+                            }}
+                            {...fieldProps}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs">
+                          Opsional. Format yang didukung: PDF, JPG, PNG
+                          (Maksimal bergantung batas server).
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
               )}
 
               <FormField

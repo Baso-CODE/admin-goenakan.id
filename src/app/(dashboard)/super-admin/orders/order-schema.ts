@@ -10,6 +10,9 @@ export const orderSchema = z.object({
   phone: z.string().optional(),
   shippingAddress: z.string().min(1, "Shipping address required"),
   clientPoNumber: z.string().optional(),
+
+  clientPoFile: z.any().optional(),
+
   remark: z.string().optional(),
   currencyCode: z.string().min(1, "Currency is required"),
   referenceQuotationId: z.string().optional(),
