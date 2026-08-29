@@ -154,13 +154,13 @@ export default function TableOrder() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
-  // ✨ 2. STATE UNTUK MENYIMPAN DAFTAR PURCHASE CHANNEL
+  //  2. STATE UNTUK MENYIMPAN DAFTAR PURCHASE CHANNEL
   const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
     [],
   );
   const [selectedChannelId, setSelectedChannelId] = useState<string>("ALL");
 
-  // ✨ 3. FETCH PURCHASE CHANNELS SAAT HALAMAN DIMUAT
+  //  3. FETCH PURCHASE CHANNELS SAAT HALAMAN DIMUAT
   useEffect(() => {
     const fetchPurchaseChannels = async () => {
       if (status !== "authenticated") return;
@@ -194,7 +194,7 @@ export default function TableOrder() {
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
-      // ✨ 4. MASUKKAN PURCHASE CHANNEL KE PARAMETER URL JIKA DIPILIH DAN BUKAN "ALL"
+      //  4. MASUKKAN PURCHASE CHANNEL KE PARAMETER URL JIKA DIPILIH DAN BUKAN "ALL"
       if (selectedChannelId && selectedChannelId !== "ALL") {
         params.append("purchaseChannelId", selectedChannelId);
       }
@@ -241,7 +241,7 @@ export default function TableOrder() {
       if (endDate) exportFilters.endDate = endDate;
       if (debouncedSearch) exportFilters.search = debouncedSearch;
 
-      // ✨ 6. SERTAKAN FILTER CHANNEL PADA EXPORT
+      //  6. SERTAKAN FILTER CHANNEL PADA EXPORT
       if (selectedChannelId && selectedChannelId !== "ALL") {
         exportFilters.purchaseChannelId = selectedChannelId;
       }
@@ -349,7 +349,7 @@ export default function TableOrder() {
       <Card className="p-4 shadow-sm">
         <div className="flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between">
           <div className="flex flex-wrap gap-3 w-full lg:w-auto items-center">
-            {/* ✨ 7. TAMBAHKAN DROPDOWN SELECT UNTUK FILTER PURCHASE CHANNEL */}
+            {/*  7. TAMBAHKAN DROPDOWN SELECT UNTUK FILTER PURCHASE CHANNEL */}
             <div className="flex flex-col gap-1.5 w-full sm:w-48">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Purchase Channel

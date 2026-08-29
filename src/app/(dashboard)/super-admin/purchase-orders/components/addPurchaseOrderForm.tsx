@@ -196,7 +196,7 @@ export default function AddPurchaseOrderForm() {
     return currentVendor?.vendorItems?.map((vi: any) => vi.item) || [];
   }, [selectedVendorId, vendors, isProductExpense]);
 
-  // ✨ LOGIKA FILTER VENDOR YANG DIPERBAIKI
+  //  LOGIKA FILTER VENDOR YANG DIPERBAIKI
   const filteredVendors = useMemo(() => {
     if (isProductExpense) {
       return vendors.filter((v: any) => v.types && v.types.includes("PRODUCT"));
@@ -280,7 +280,7 @@ export default function AddPurchaseOrderForm() {
           vendorItemId: !isProductExpense
             ? item.vendorItemId || undefined
             : undefined,
-          // ✨ PERBAIKAN: Selalu simpan referensi order ke database meskipun untuk layanan jasa
+          //  PERBAIKAN: Selalu simpan referensi order ke database meskipun untuk layanan jasa
           orderId: poCategory === "SO" ? item.orderId || undefined : undefined,
           replacementOrderId:
             poCategory === "REP"
@@ -758,7 +758,7 @@ export default function AddPurchaseOrderForm() {
                       ? "Item Name & Product"
                       : "Service Name (Vendor Item)"}
                   </div>
-                  {/* ✨ Kolom Header Referensi Ditampilkan Untuk Semua Kategori */}
+                  {/*  Kolom Header Referensi Ditampilkan Untuk Semua Kategori */}
                   <div className="col-span-2">
                     {poCategory === "SO" ? "Reference SO" : "Reference REP"}
                   </div>
@@ -1080,7 +1080,7 @@ export default function AddPurchaseOrderForm() {
                           )}
                         </div>
 
-                        {/* 2. ✨ KOTAK REFERENSI (Tampil untuk Semua Kategori) */}
+                        {/* 2.  KOTAK REFERENSI (Tampil untuk Semua Kategori) */}
                         <div className="lg:col-span-2">
                           <FormItem className="flex flex-col">
                             <FormLabel className="lg:hidden">
@@ -1201,7 +1201,7 @@ export default function AddPurchaseOrderForm() {
                                                 [index]: false,
                                               }));
 
-                                              // ✨ PERBAIKAN: HANYA AUTOFILL JIKA PRODUK
+                                              //  PERBAIKAN: HANYA AUTOFILL JIKA PRODUK
                                               if (isProductExpense) {
                                                 handleAutoFillFromReference(
                                                   "SO",
@@ -1253,7 +1253,7 @@ export default function AddPurchaseOrderForm() {
                                                 [index]: false,
                                               }));
 
-                                              // ✨ PERBAIKAN: HANYA AUTOFILL JIKA PRODUK
+                                              //  PERBAIKAN: HANYA AUTOFILL JIKA PRODUK
                                               if (isProductExpense) {
                                                 handleAutoFillFromReference(
                                                   "REP",

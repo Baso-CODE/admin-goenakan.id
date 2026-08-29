@@ -69,7 +69,7 @@ const financeTransactionSchema = z.object({
     .number({ message: "Nominal harus berupa angka" })
     .min(1, { message: "Nominal harus lebih dari 0" }),
   categoryId: z.string().min(1, { message: "Kategori wajib dipilih" }),
-  currencyCode: z.string().min(1, { message: "Currency wajib dipilih" }), // ✨ Tambahan validasi Currency
+  currencyCode: z.string().min(1, { message: "Currency wajib dipilih" }), //  Tambahan validasi Currency
   method: z.string().optional(),
   referenceNumber: z.string().optional(),
   description: z.string().min(2, { message: "Deskripsi wajib diisi" }),
@@ -82,8 +82,8 @@ export type FinanceTransactionFormValues = z.infer<
 export default function FinanceTransactionForm({
   initialData,
   categories,
-  currencies = [], // ✨ Menerima props currencies
-  setCurrencies, // ✨ Menerima setter currencies untuk fast-create
+  currencies = [], //  Menerima props currencies
+  setCurrencies, //  Menerima setter currencies untuk fast-create
   onSubmit,
   isLoading = false,
   isSubmitting = false,
@@ -111,7 +111,7 @@ export default function FinanceTransactionForm({
       type: initialData?.type || "EXPENSE",
       amount: initialData?.amount || 0,
       categoryId: initialData?.categoryId || "",
-      currencyCode: initialData?.currencyCode || "IDR", // ✨ Default IDR
+      currencyCode: initialData?.currencyCode || "IDR", //  Default IDR
       method: initialData?.method || "",
       referenceNumber: initialData?.referenceNumber || "",
       description: initialData?.description || "",

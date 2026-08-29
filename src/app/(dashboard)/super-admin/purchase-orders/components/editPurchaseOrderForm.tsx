@@ -62,7 +62,7 @@ const baseItemSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
   productId: z.string().optional(),
   variantId: z.string().optional(),
-  vendorItemId: z.string().optional(), // ✨ Untuk menyimpan ID jasa dari vendor
+  vendorItemId: z.string().optional(), //  Untuk menyimpan ID jasa dari vendor
   selectedAttributes: z.record(z.string(), z.string()).optional(),
   orderId: z.string().optional(),
   replacementOrderId: z.string().optional(),
@@ -92,7 +92,7 @@ const purchaseOrderSchema = z
     items: z.array(baseItemSchema).min(1, "Minimal 1 item dibutuhkan"),
   })
   .superRefine((data, ctx) => {
-    // ✨ Validasi Bersyarat: Jika kategori PRODUCT, referensi SO/REP Wajib diisi!
+    //  Validasi Bersyarat: Jika kategori PRODUCT, referensi SO/REP Wajib diisi!
     if (data.expenseCategory === "PRODUCT") {
       data.items.forEach((item, index) => {
         if (!item.orderId && !item.replacementOrderId) {
@@ -132,7 +132,7 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
   const { fetchApi, status } = useApi();
   const router = useRouter();
 
-  // ✨ STATE TAB UTAMA
+  //  STATE TAB UTAMA
   const [poCategory, setPoCategory] = useState<"SO" | "REP">("SO");
 
   const [loading, setLoading] = useState(true);
@@ -174,14 +174,14 @@ export default function EditPurchaseOrderForm({ poId }: { poId: string }) {
 
   const isProductExpense = selectedExpenseCategory === "PRODUCT";
 
-  // ✨ Mengambil daftar service/jasa dari vendor yang dipilih
+  //  Mengambil daftar service/jasa dari vendor yang dipilih
   const availableVendorItems = useMemo(() => {
     if (isProductExpense || !selectedVendorId) return [];
     const currentVendor = vendors.find((v) => v.id === selectedVendorId);
     return currentVendor?.vendorItems?.map((vi: any) => vi.item) || [];
   }, [selectedVendorId, vendors, isProductExpense]);
 
-  // ✨ Filter vendor pintar berdasarkan kategori pengeluaran
+  //  Filter vendor pintar berdasarkan kategori pengeluaran
   const filteredVendors = useMemo(() => {
     if (isProductExpense) {
       return vendors.filter((v: any) => v.types && v.types.includes("PRODUCT"));

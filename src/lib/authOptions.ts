@@ -46,7 +46,7 @@ export const authOptions: NextAuthOptions = {
         // Ambil nama role user (default ke "CUSTOMER" jika tidak ada relasi role)
         const roleName = user.role?.name || "CUSTOMER";
 
-        // ✨ 3. PENCEGAHAN: Blokir jika rolenya adalah CUSTOMER
+        //  3. PENCEGAHAN: Blokir jika rolenya adalah CUSTOMER
         if (roleName === "CUSTOMER") {
           throw new Error(
             "Akses ditolak: Akun customer tidak diizinkan masuk ke panel admin.",

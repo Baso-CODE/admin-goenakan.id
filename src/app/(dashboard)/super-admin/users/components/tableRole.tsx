@@ -235,7 +235,7 @@ export default function TableRole() {
 
                         <TableCell className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)]">
                           <div className="flex items-center justify-center gap-1">
-                            {/* ✨ Tombol Atur Akses / Permissions */}
+                            {/*  Tombol Atur Akses / Permissions */}
                             <Link
                               href={`/super-admin/users/roles/permissions/${role.id}`}>
                               <Button

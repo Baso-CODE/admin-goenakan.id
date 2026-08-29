@@ -56,7 +56,7 @@ import {
   Pencil,
   Plus,
   Search,
-  XCircle, // ✨ Icon untuk menu cancel
+  XCircle, //  Icon untuk menu cancel
 } from "lucide-react";
 import { PurchaseChannel } from "../types/order.types";
 import { InvoiceDialogWrapper } from "./helper/invoiceDialogWrapper";
@@ -140,7 +140,7 @@ export default function TableCombinedOrder() {
     string | null
   >(null);
 
-  // ✨ State tambahan untuk Dialog Cancel Order
+  //  State tambahan untuk Dialog Cancel Order
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
@@ -217,7 +217,7 @@ export default function TableCombinedOrder() {
     toast.info("Fitur export untuk tabel gabungan sedang disiapkan!");
   };
 
-  // === ✨ HANDLER CONFIRM CANCEL ORDER ===
+  // ===  HANDLER CONFIRM CANCEL ORDER ===
   const handleConfirmCancel = async () => {
     if (!cancelOrderId) return;
 
@@ -677,7 +677,7 @@ export default function TableCombinedOrder() {
                                 </DropdownMenuItem>
                               )}
 
-                              {/* ✨ Opsi menu Cancel Order */}
+                              {/*  Opsi menu Cancel Order */}
                               {!isCancelled && (
                                 <>
                                   <DropdownMenuSeparator />
@@ -739,7 +739,7 @@ export default function TableCombinedOrder() {
         />
       )}
 
-      {/* ✨ DIALOG KONFIRMASI CANCEL ORDER */}
+      {/*  DIALOG KONFIRMASI CANCEL ORDER */}
       <ConfirmCancelDialog
         isOpen={Boolean(cancelOrderId)}
         onClose={() => setCancelOrderId(null)}

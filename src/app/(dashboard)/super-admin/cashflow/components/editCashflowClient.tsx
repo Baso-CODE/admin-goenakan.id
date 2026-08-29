@@ -304,7 +304,7 @@ export default function EditCashflowClient() {
       if (!res.ok) throw new Error(`Gagal konversi ke ${newCurrency}`);
       const data = await res.json();
 
-      // ✨ Jika harga awal bukan 0, langsung pakai hasil perhitungan (convertedAmount) dari API!
+      //  Jika harga awal bukan 0, langsung pakai hasil perhitungan (convertedAmount) dari API!
       if (currentPrice > 0) {
         const finalPrice = data.convertedAmount || data.data?.convertedAmount;
 

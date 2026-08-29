@@ -234,7 +234,7 @@ export default function EditOrderForm() {
               price: Number(item.price || 0),
               customization: item.customization || "",
               remarks: item.remarks || "",
-              selectedAttributes: initialAttrs, // ✨ Masukkan ke form
+              selectedAttributes: initialAttrs, //  Masukkan ke form
             };
           }),
         });
@@ -836,7 +836,7 @@ export default function EditOrderForm() {
                   const subtotal =
                     (watch(`products.${index}.price`) || 0) * currentQty;
 
-                  // ✨ FUNGSI BARU: Perhitungan Harga yang sudah diperbaiki (Sama dengan AddOrder)
+                  //  FUNGSI BARU: Perhitungan Harga yang sudah diperbaiki (Sama dengan AddOrder)
                   const updateCalculatedPrice = async (
                     idx: number,
                     prod: any,
@@ -1189,7 +1189,7 @@ export default function EditOrderForm() {
                         </div>
                       </div>
 
-                      {/* ✨ AREA FULL-WIDTH: DYNAMIC ATTRIBUTE SELECTION (BERURUTAN/STACK) */}
+                      {/*  AREA FULL-WIDTH: DYNAMIC ATTRIBUTE SELECTION (BERURUTAN/STACK) */}
                       {selectedProduct?.availableAttributes &&
                         selectedProduct.availableAttributes.length > 0 && (
                           <div className="px-4 pb-4">
@@ -1237,7 +1237,7 @@ export default function EditOrderForm() {
                                                 // 🔒 Hanya disable jika bukan Pending (isAvailable logic dihapus)
                                                 disabled={!isPending}
                                                 onClick={() => {
-                                                  // ✨ FITUR TOGGLE SEPERTI DI ADD ORDER
+                                                  //  FITUR TOGGLE SEPERTI DI ADD ORDER
                                                   const newAttrs: Record<
                                                     string,
                                                     string

@@ -200,7 +200,7 @@ export default function PurchaseOrderPrint() {
                   )}
                 </div>
 
-                {/* ✨ UPDATE: Menampilkan Kontak Secara Dinamis */}
+                {/*  UPDATE: Menampilkan Kontak Secara Dinamis */}
                 <div className="mt-1">
                   {vendorContacts.length > 0 ? (
                     vendorContacts.map((contact: any, idx: number) => (

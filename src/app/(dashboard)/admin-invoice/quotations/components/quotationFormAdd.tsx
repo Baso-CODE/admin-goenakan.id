@@ -275,7 +275,7 @@ function ItemRow({
     }
   }, [imageFile]);
 
-  // ✨ LOGIKA UTAMA YANG SUDAH DIPERBARUI: (Mencegah Harga Dobel & Menjaga Jarak Tiers)
+  //  LOGIKA UTAMA YANG SUDAH DIPERBARUI: (Mencegah Harga Dobel & Menjaga Jarak Tiers)
   const handleAttributeToggle = (attributeId: string, valueId: string) => {
     // 1. Tentukan status baru (toggle)
     const currentArr: string[] = Array.isArray(
@@ -326,7 +326,7 @@ function ItemRow({
 
       if (matchedVariant) {
         matchedVariantId = matchedVariant.id;
-        // ✨ Harga varian tidak lagi ditambahkan di sini agar tidak dobel.
+        //  Harga varian tidak lagi ditambahkan di sini agar tidak dobel.
       }
 
       return { extra, matchedVariantId };
@@ -585,7 +585,7 @@ function ItemRow({
         </div>
       </div>
 
-      {/* ✨ AREA FULL-WIDTH: PILIHAN ATRIBUT/VARIAN BERURUTAN VERTIKAL */}
+      {/*  AREA FULL-WIDTH: PILIHAN ATRIBUT/VARIAN BERURUTAN VERTIKAL */}
       {!isManualProduct &&
         selectedProduct?.availableAttributes &&
         selectedProduct.availableAttributes.length > 0 && (
@@ -1419,7 +1419,7 @@ export default function QuotationAddForm({
                   append({
                     isManualProduct: true,
                     productName: "",
-                    quantity: 1, // ✨ Diperbarui: Memberikan nilai default 1 agar tidak kosong
+                    quantity: 1, //  Diperbarui: Memberikan nilai default 1 agar tidak kosong
                     unitPrice: 0,
                     discount: 0,
                     remarks: "",

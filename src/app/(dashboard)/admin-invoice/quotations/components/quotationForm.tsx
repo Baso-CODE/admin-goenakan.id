@@ -350,7 +350,7 @@ function ItemRow({
     }
   }, [imageFile]);
 
-  // ✨ LOGIKA UTAMA YANG SUDAH DIPERBARUI: (Kalkulasi Tiers Dipertahankan)
+  //  LOGIKA UTAMA YANG SUDAH DIPERBARUI: (Kalkulasi Tiers Dipertahankan)
   const handleAttributeToggle = (attributeId: string, valueId: string) => {
     // 1. Tentukan status baru (toggle)
     const currentArr: string[] = Array.isArray(
@@ -658,7 +658,7 @@ function ItemRow({
         </div>
       </div>
 
-      {/* ✨ AREA FULL-WIDTH: PILIHAN ATRIBUT/VARIAN BERURUTAN VERTIKAL */}
+      {/*  AREA FULL-WIDTH: PILIHAN ATRIBUT/VARIAN BERURUTAN VERTIKAL */}
       {!isManualProduct &&
         selectedProduct?.availableAttributes &&
         selectedProduct.availableAttributes.length > 0 && (
@@ -669,7 +669,7 @@ function ItemRow({
                 Varian/Atribut:
               </p>
 
-              {/* ✨ UBAH DARI GRID MENJADI FLEX COLUMN AGAR BERURUTAN KE BAWAH */}
+              {/*  UBAH DARI GRID MENJADI FLEX COLUMN AGAR BERURUTAN KE BAWAH */}
               <div className="flex flex-col space-y-4">
                 {selectedProduct.availableAttributes.map((attr: any) => (
                   <div
@@ -1003,13 +1003,13 @@ export default function QuotationForm({
           fetchApi("/clients/order"),
           fetchApi("/products/order"),
           fetchApi("/quotation-notes-categories"),
-          fetchApi("/currencies"), // ✨ TAMBAH
+          fetchApi("/currencies"), //  TAMBAH
         ]);
 
         const clientData = resClients.ok ? await resClients.json() : [];
         const productData = resProducts.ok ? await resProducts.json() : [];
         const notesData = resNotes.ok ? await resNotes.json() : [];
-        const currData = resCurr.ok ? await resCurr.json() : []; // ✨ TAMBAH
+        const currData = resCurr.ok ? await resCurr.json() : []; //  TAMBAH
 
         setClients(
           Array.isArray(clientData) ? clientData : clientData.data || [],
@@ -1018,7 +1018,7 @@ export default function QuotationForm({
           Array.isArray(productData) ? productData : productData.data || [],
         );
         setNoteCategories(Array.isArray(notesData) ? notesData : []);
-        setCurrencies(currData.data || currData || []); // ✨ TAMBAH
+        setCurrencies(currData.data || currData || []); //  TAMBAH
 
         if (!resClients.ok || !resProducts.ok || !resNotes.ok || !resCurr.ok) {
           console.warn("Beberapa data Master gagal dimuat sepenuhnya.");
@@ -1069,8 +1069,8 @@ export default function QuotationForm({
         ? new Date(initialData.validUntil)
         : undefined,
       picId: initialData.picId || "",
-      currencyCode: initialData.currencyCode || "IDR", // ✨ TAMBAH
-      paymentTerms: initialData.paymentTerms || "", // ✨ TAMBAH
+      currencyCode: initialData.currencyCode || "IDR", //  TAMBAH
+      paymentTerms: initialData.paymentTerms || "", //  TAMBAH
     };
   }, [initialData]);
 

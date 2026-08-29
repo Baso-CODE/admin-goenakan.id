@@ -32,7 +32,7 @@ export default function OrderPage() {
 
       <Tabs defaultValue={defaultTab} className="w-full min-w-0">
         <div className="flex items-center justify-between mb-4">
-          {/* ✨ UPDATE: Mengubah grid menjadi 4 kolom di layar besar, dan 2 kolom di layar kecil agar responsif */}
+          {/*  UPDATE: Mengubah grid menjadi 4 kolom di layar besar, dan 2 kolom di layar kecil agar responsif */}
           <TabsList className="grid w-full max-w-4xl grid-cols-2 md:grid-cols-4 h-auto gap-2 bg-transparent md:bg-muted p-1">
             <TabsTrigger value="all" className="flex items-center gap-2 py-2">
               <Layers className="h-4 w-4" />

@@ -98,7 +98,7 @@ export default function ClientEditForm() {
 
         if (data.type === "B2B" && data.b2b) {
           setClientType("B2B");
-          // ✨ Ekstrak data brand dari array brandClients (ambil indeks pertama jika ada)
+          //  Ekstrak data brand dari array brandClients (ambil indeks pertama jika ada)
           const brandData = data.b2b.brandClients?.[0] || {};
 
           setFormData({
@@ -113,7 +113,7 @@ export default function ClientEditForm() {
             b2b_email: data.b2b.email || "",
             b2b_website: data.b2b.website || "",
 
-            // ✨ BRAND FIELDS
+            //  BRAND FIELDS
             b2b_brandName: brandData.name || "",
             b2b_brandWebsiteUrl: brandData.websiteUrl || "",
             b2b_brandLogoUrl: brandData.logo || null, // Untuk preview gambar dari DB
@@ -183,7 +183,7 @@ export default function ClientEditForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ✨ Nyalakan loading saat tombol ditekan
+    //  Nyalakan loading saat tombol ditekan
     setIsLoading(true);
 
     try {
@@ -274,7 +274,7 @@ export default function ClientEditForm() {
     } catch (error: any) {
       toast.error(error.message || "Terjadi kesalahan saat update data.");
     } finally {
-      // ✨ MATIKAN LOADING DI SINI (Berhasil maupun Gagal, loading pasti berhenti)
+      //  MATIKAN LOADING DI SINI (Berhasil maupun Gagal, loading pasti berhenti)
       setIsLoading(false);
     }
   };

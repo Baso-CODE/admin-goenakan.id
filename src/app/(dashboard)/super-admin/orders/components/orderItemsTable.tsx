@@ -26,7 +26,7 @@ interface OrderItemsTableProps {
 export function OrderItemsTable({
   products,
   totalAmount,
-  currencyCode, // ✨ Menerima prop
+  currencyCode, //  Menerima prop
 }: OrderItemsTableProps) {
   return (
     <Card className="shadow-sm border-t-4 border-t-primary">
@@ -83,11 +83,11 @@ export function OrderItemsTable({
                   {item.quantity}
                 </TableCell>
                 <TableCell className="text-right text-gray-600">
-                  {/* ✨ Sisipkan currencyCode ke formatCurrency */}
+                  {/*  Sisipkan currencyCode ke formatCurrency */}
                   {formatCurrency(item.unitPrice, currencyCode)}
                 </TableCell>
                 <TableCell className="text-right font-semibold">
-                  {/* ✨ Sisipkan currencyCode ke formatCurrency */}
+                  {/*  Sisipkan currencyCode ke formatCurrency */}
                   {formatCurrency(item.totalPrice, currencyCode)}
                 </TableCell>
               </TableRow>
@@ -102,7 +102,7 @@ export function OrderItemsTable({
                 Grand Total
               </span>
               <span className="text-xl font-bold text-primary">
-                {/* ✨ Sisipkan currencyCode ke formatCurrency */}
+                {/*  Sisipkan currencyCode ke formatCurrency */}
                 {formatCurrency(totalAmount, currencyCode)}
               </span>
             </div>

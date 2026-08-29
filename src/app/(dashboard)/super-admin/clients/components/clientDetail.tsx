@@ -474,7 +474,7 @@ export default function ClientDetail() {
             {client.type}
           </Badge>
 
-          {/* ✨ TAMBAHAN: BADGE STATUS KLIEN */}
+          {/*  TAMBAHAN: BADGE STATUS KLIEN */}
           <Badge
             variant="outline"
             className={`px-3 py-1 text-sm font-semibold flex items-center gap-1 rounded-lg
@@ -507,7 +507,7 @@ export default function ClientDetail() {
           <span className="text-gray-400">•</span>
 
           <span>
-            {/* ✨ TAMBAHAN: MENGGUNAKAN JOINED DATE */}
+            {/*  TAMBAHAN: MENGGUNAKAN JOINED DATE */}
             <span className="font-medium">Tanggal Bergabung: </span>
             {format(displayDate, "dd MMMM yyyy", { locale: id })}
           </span>

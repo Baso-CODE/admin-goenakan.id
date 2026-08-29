@@ -425,7 +425,7 @@ export default function TablePurchaseOrder() {
                         {po.vendorAddress}
                       </TableCell>
 
-                      {/* ✨ LOGIKA CERDAS: Pemisahan Warna Badge Referensi */}
+                      {/*  LOGIKA CERDAS: Pemisahan Warna Badge Referensi */}
                       <TableCell>
                         {po.salesOrderReference !== "-" ? (
                           <div className="flex flex-wrap gap-1">
@@ -535,7 +535,7 @@ export default function TablePurchaseOrder() {
                             </Button>
                           </Link>
 
-                          {/* ✨ Tombol Print (Baru) ✨ */}
+                          {/*  Tombol Print (Baru)  */}
                           <Link
                             href={`/super-admin/purchase-orders/print/${po.id}`}>
                             <Button

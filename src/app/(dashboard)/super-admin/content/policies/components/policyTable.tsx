@@ -445,7 +445,7 @@ export default function PolicyTable() {
                     {/* Actions */}
                     <TableCell className="text-right space-x-2 whitespace-nowrap">
                       <Link
-                        href={`/super-admin/content/policies/edits/${policy.id}`}>
+                        href={`/super-admin/content/policies/edit/${policy.id}`}>
                         <Button variant="outline" size="sm" className="h-8">
                           Edit
                         </Button>

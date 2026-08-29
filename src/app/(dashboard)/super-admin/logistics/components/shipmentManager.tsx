@@ -497,7 +497,7 @@ export default function ShipmentManager({
     setIsOpen(true);
   };
 
-  // ✨ LOGIKA CERDAS 2: Penyesuaian untuk Outbound
+  //  LOGIKA CERDAS 2: Penyesuaian untuk Outbound
   const handleVendorChange = (selectedVendorId: string) => {
     setVendorId(selectedVendorId);
 
@@ -555,7 +555,7 @@ export default function ShipmentManager({
                           {ship.method}
                         </Badge>
 
-                        {/* ✨ LOGIKA BARU: Tampilan Nomor Resi dengan Tombol Copy */}
+                        {/*  LOGIKA BARU: Tampilan Nomor Resi dengan Tombol Copy */}
                         <h3 className="font-bold text-lg flex items-center gap-2">
                           {ship.trackingNumber || "No Resi"}
 
@@ -607,7 +607,7 @@ export default function ShipmentManager({
                     </div>
 
                     <div className="flex gap-2 flex-wrap">
-                      {/* ✨ LOGIKA BARU: Tombol Tracking URL Vendor */}
+                      {/*  LOGIKA BARU: Tombol Tracking URL Vendor */}
                       {ship.vendor?.trackingUrl && (
                         <a
                           href={ship.vendor.trackingUrl}

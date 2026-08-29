@@ -22,21 +22,26 @@ import {
   Check,
   ClipboardList,
   ImageIcon,
+  ImagePlus,
   LayoutTemplate,
   Link as LinkIcon,
   ListOrdered,
   Loader2,
   Type,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 
+// 1. Update Schema Zod
 const heroSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters"),
   altText: z.string().optional(),
   ctaText: z.string().optional(),
   ctaLink: z.string().optional(),
 
-  image: z.any().optional(),
+  imageDesktop: z.any().optional(),
+  imageMobile: z.any().optional(),
+  imageTablet: z.any().optional(),
 
   displayOrder: z.coerce.number().min(0).default(0),
   isActive: z.boolean().default(true),
@@ -50,15 +55,34 @@ export default function HeroForm({
   isLoading = false,
   isSubmitting = false,
 }: {
-  initialData?: HeroFormValues & { imageUrl?: string };
-  onSubmit: (data: HeroFormValues, file?: File) => void;
+  // Update tipe data initialData untuk mengakomodasi gambar baru
+  initialData?: HeroFormValues & {
+    imageUrl?: string;
+    imageMobileUrl?: string;
+    imageTabletUrl?: string | null;
+  };
+  onSubmit: (
+    data: HeroFormValues,
+    files: { desktop?: File; mobile?: File; tablet?: File },
+  ) => void;
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
-  const [preview, setPreview] = useState<string | null>(
+  // 2. State untuk Preview Gambar
+  const [previewDesktop, setPreviewDesktop] = useState<string | null>(
     initialData?.imageUrl || null,
   );
-  const [selectedFile, setSelectedFile] = useState<File | undefined>(undefined);
+  const [previewMobile, setPreviewMobile] = useState<string | null>(
+    initialData?.imageMobileUrl || null,
+  );
+  const [previewTablet, setPreviewTablet] = useState<string | null>(
+    initialData?.imageTabletUrl || null,
+  );
+
+  // 3. State untuk File yang diunggah
+  const [selectedDesktop, setSelectedDesktop] = useState<File | undefined>();
+  const [selectedMobile, setSelectedMobile] = useState<File | undefined>();
+  const [selectedTablet, setSelectedTablet] = useState<File | undefined>();
 
   const form = useForm<HeroFormValues>({
     resolver: zodResolver(heroSchema) as Resolver<HeroFormValues>,
@@ -73,23 +97,27 @@ export default function HeroForm({
     mode: "onBlur",
   });
 
-  // Handle File Change untuk Preview
+  // 4. Handler File Change Dinamis
   const handleFileChange = (
     e: React.ChangeEvent<HTMLInputElement>,
-    fieldChange: (value: any) => void,
+    type: "desktop" | "mobile" | "tablet",
   ) => {
     const file = e.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
-      fieldChange(e.target.files);
-
-      // Buat Preview URL
       const objectUrl = URL.createObjectURL(file);
-      setPreview(objectUrl);
+      if (type === "desktop") {
+        setSelectedDesktop(file);
+        setPreviewDesktop(objectUrl);
+      } else if (type === "mobile") {
+        setSelectedMobile(file);
+        setPreviewMobile(objectUrl);
+      } else if (type === "tablet") {
+        setSelectedTablet(file);
+        setPreviewTablet(objectUrl);
+      }
     }
   };
 
-  // Reset form when initialData loads
   useEffect(() => {
     if (initialData) {
       form.reset({
@@ -100,14 +128,33 @@ export default function HeroForm({
         displayOrder: initialData.displayOrder,
         isActive: initialData.isActive,
       });
-      if (initialData.imageUrl) {
-        setPreview(initialData.imageUrl);
-      }
+      if (initialData.imageUrl) setPreviewDesktop(initialData.imageUrl);
+      if (initialData.imageMobileUrl)
+        setPreviewMobile(initialData.imageMobileUrl);
+      if (initialData.imageTabletUrl)
+        setPreviewTablet(initialData.imageTabletUrl);
     }
   }, [initialData, form]);
 
   const handleSubmit = (values: HeroFormValues) => {
-    onSubmit(values, selectedFile);
+    onSubmit(values, {
+      desktop: selectedDesktop,
+      mobile: selectedMobile,
+      tablet: selectedTablet,
+    });
+  };
+
+  const handleRemoveFile = (type: "desktop" | "mobile" | "tablet") => {
+    if (type === "desktop") {
+      setSelectedDesktop(undefined);
+      setPreviewDesktop(null);
+    } else if (type === "mobile") {
+      setSelectedMobile(undefined);
+      setPreviewMobile(null);
+    } else if (type === "tablet") {
+      setSelectedTablet(undefined);
+      setPreviewTablet(null);
+    }
   };
 
   return (
@@ -125,52 +172,168 @@ export default function HeroForm({
             className="space-y-6 w-full">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* === IMAGE UPLOAD SECTION === */}
-              <div className="col-span-2">
-                <FormField
-                  control={form.control}
-                  name="image"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                        Hero Image {initialData ? "(Optional)" : "(Required)"}
-                      </FormLabel>
-                      <FormControl>
-                        <div className="space-y-4">
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            disabled={isLoading || isSubmitting}
-                            onChange={(e) =>
-                              handleFileChange(e, field.onChange)
-                            }
-                            // Required hanya jika Create mode (tidak ada initialData)
-                            required={!initialData}
-                          />
 
-                          {/* Image Preview Area */}
-                          {preview ? (
-                            <div className="relative w-full h-48 md:h-64 rounded-lg overflow-hidden border border-border">
-                              <Image
-                                src={preview}
-                                alt="Preview"
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-center w-full h-48 bg-muted/50 rounded-lg border border-dashed border-muted-foreground/25">
-                              <p className="text-sm text-muted-foreground">
-                                No image selected
-                              </p>
-                            </div>
-                          )}
+              {/* Desktop Image */}
+              <div className="col-span-2">
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2 mb-2">
+                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                    Desktop Hero Image{" "}
+                    {initialData ? "(Optional)" : "(Required)"}
+                  </FormLabel>
+                  <FormControl>
+                    {previewDesktop ? (
+                      <div className="relative w-full h-48 md:h-64 rounded-xl border border-gray-200 overflow-hidden group shadow-sm">
+                        <Image
+                          src={previewDesktop}
+                          alt="Preview Desktop"
+                          fill
+                          className="object-cover bg-white"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFile("desktop")}
+                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
+                            <X className="w-5 h-5" />
+                          </button>
                         </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-full h-48 md:h-64 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 hover:border-primary transition-all">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <div className="p-3 bg-white rounded-full shadow-sm mb-3">
+                            <ImagePlus className="w-6 h-6 text-gray-400" />
+                          </div>
+                          <p className="mb-1 text-sm text-gray-600">
+                            <span className="font-semibold text-primary">
+                              Klik untuk unggah
+                            </span>{" "}
+                            gambar Desktop
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            SVG, PNG, JPG atau WEBP (Horizontal)
+                          </p>
+                        </div>
+                        <Input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          disabled={isLoading || isSubmitting}
+                          onChange={(e) => handleFileChange(e, "desktop")}
+                        />
+                      </label>
+                    )}
+                  </FormControl>
+                </FormItem>
+              </div>
+
+              {/* Mobile Image */}
+              <div className="col-span-2 md:col-span-1">
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2 mb-2">
+                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                    Mobile Image {initialData ? "(Optional)" : "(Required)"}
+                  </FormLabel>
+                  <FormControl>
+                    {previewMobile ? (
+                      <div className="relative w-full h-64 rounded-xl border border-gray-200 overflow-hidden group shadow-sm aspect-9/16 mx-auto md:mx-0 max-w-662.5">
+                        <Image
+                          src={previewMobile}
+                          alt="Preview Mobile"
+                          fill
+                          className="object-cover bg-white"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFile("mobile")}
+                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 hover:border-primary transition-all">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                          <div className="p-3 bg-white rounded-full shadow-sm mb-3">
+                            <ImagePlus className="w-6 h-6 text-gray-400" />
+                          </div>
+                          <p className="mb-1 text-sm text-gray-600">
+                            <span className="font-semibold text-primary">
+                              Unggah
+                            </span>{" "}
+                            Mobile
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Rasio 9:16 (Vertikal)
+                          </p>
+                        </div>
+                        <Input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          disabled={isLoading || isSubmitting}
+                          onChange={(e) => handleFileChange(e, "mobile")}
+                        />
+                      </label>
+                    )}
+                  </FormControl>
+                </FormItem>
+              </div>
+
+              {/* Tablet Image */}
+              <div className="col-span-2 md:col-span-1">
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2 mb-2">
+                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                    Tablet Image (Optional)
+                  </FormLabel>
+                  <FormControl>
+                    {previewTablet ? (
+                      <div className="relative w-full h-64 rounded-xl border border-gray-200 overflow-hidden group shadow-sm">
+                        <Image
+                          src={previewTablet}
+                          alt="Preview Tablet"
+                          fill
+                          className="object-cover bg-white"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFile("tablet")}
+                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 hover:border-primary transition-all">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                          <div className="p-3 bg-white rounded-full shadow-sm mb-3">
+                            <ImagePlus className="w-6 h-6 text-gray-400" />
+                          </div>
+                          <p className="mb-1 text-sm text-gray-600">
+                            <span className="font-semibold text-primary">
+                              Unggah
+                            </span>{" "}
+                            Tablet
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Opsional (Rasio Persegi/Landscape)
+                          </p>
+                        </div>
+                        <Input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          disabled={isLoading || isSubmitting}
+                          onChange={(e) => handleFileChange(e, "tablet")}
+                        />
+                      </label>
+                    )}
+                  </FormControl>
+                </FormItem>
               </div>
 
               {/* === Title === */}

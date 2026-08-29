@@ -71,12 +71,12 @@ export default function ArticlesSection() {
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
 
-  // ✨ STATE UNTUK NILAI FILTER
+  //  STATE UNTUK NILAI FILTER
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedAuthor, setSelectedAuthor] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
 
-  // ✨ STATE UNTUK DATA MASTER DROPDOWN
+  //  STATE UNTUK DATA MASTER DROPDOWN
   const [categories, setCategories] = useState<any[]>([]);
   const [authors, setAuthors] = useState<any[]>([]);
 
@@ -84,7 +84,7 @@ export default function ArticlesSection() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // ✨ FUNGSI LOAD MASTER DATA (Untuk Dropdown)
+  //  FUNGSI LOAD MASTER DATA (Untuk Dropdown)
   useEffect(() => {
     async function loadFilters() {
       if (status !== "authenticated") return;
@@ -126,7 +126,7 @@ export default function ArticlesSection() {
         params.append("search", debouncedSearch.trim());
       }
 
-      // ✨ Masukkan filter ke dalam parameter API
+      //  Masukkan filter ke dalam parameter API
       if (selectedCategory !== "all")
         params.append("categoryId", selectedCategory);
       if (selectedAuthor !== "all") params.append("authorId", selectedAuthor);
@@ -155,7 +155,7 @@ export default function ArticlesSection() {
     fetchApi,
   ]);
 
-  // ✨ Reset halaman ke 1 jika filter berubah
+  //  Reset halaman ke 1 jika filter berubah
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, selectedCategory, selectedAuthor, selectedStatus]);

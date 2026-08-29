@@ -325,7 +325,7 @@ export default function QuotationPrint() {
                         </td>
 
                         {/* Kolom 2: Product Specification */}
-                        {/* ✨ PERBAIKAN JARAK: align-top dan class margin diperkecil */}
+                        {/*  PERBAIKAN JARAK: align-top dan class margin diperkecil */}
                         <td className="border-r border-gray-800 p-3 align-top text-gray-800">
                           <div className="font-bold text-[12px] mb-1">
                             {item.productName}
@@ -392,7 +392,7 @@ export default function QuotationPrint() {
                         </td>
 
                         {/* Kolom 3: Qty */}
-                        {/* ✨ PERBAIKAN ALIGNMENT: Ubah jadi align-top dan tambahkan elemen transparan pendobrak */}
+                        {/*  PERBAIKAN ALIGNMENT: Ubah jadi align-top dan tambahkan elemen transparan pendobrak */}
                         <td className="border-r border-gray-800 p-3 text-center align-top font-medium text-[11px]">
                           {/* Elemen invisible untuk menyeimbangkan tinggi "Start from" di sebelahnya */}
                           {basePrice !== null && item.isPriceStartFrom && (
@@ -415,7 +415,7 @@ export default function QuotationPrint() {
                         </td>
 
                         {/* Kolom 4: Unit Price */}
-                        {/* ✨ PERBAIKAN ALIGNMENT: Ubah jadi align-top */}
+                        {/*  PERBAIKAN ALIGNMENT: Ubah jadi align-top */}
                         <td className="p-3 text-center align-top font-medium text-gray-800 text-[11px]">
                           {basePrice !== null && item.isPriceStartFrom && (
                             <div className="text-[10px] text-gray-500 mb-1.5 pb-1 border-b border-gray-300">

@@ -262,7 +262,7 @@ export default function AddOrderForm() {
         }
       });
 
-      // 3. ✨ MASUKKAN FILE JIKA ADA
+      // 3.  MASUKKAN FILE JIKA ADA
       if (clientPoFile instanceof File) {
         formData.append("clientPoFile", clientPoFile);
       }
@@ -664,7 +664,7 @@ export default function AddOrderForm() {
                     )}
                   />
 
-                  {/* ✨ TAMBAHAN BARU: INPUT FILE UNTUK PO CLIENT */}
+                  {/*  TAMBAHAN BARU: INPUT FILE UNTUK PO CLIENT */}
                   <FormField
                     control={control}
                     name="clientPoFile"
@@ -1253,7 +1253,7 @@ export default function AddOrderForm() {
                     // 4. Totalkan Harga Dasar dengan Tambahan
                     let baseIdr = baseProductPrice + totalModifiers;
 
-                    // 5. Tier Price (Grosir) - ✨ DENGAN PENGAMAN BARU ✨
+                    // 5. Tier Price (Grosir) -  DENGAN PENGAMAN BARU
                     if (
                       prod.priceTiers &&
                       Array.isArray(prod.priceTiers) &&
@@ -1266,7 +1266,7 @@ export default function AddOrderForm() {
                         (tier) => qty >= tier.minQuantity,
                       );
 
-                      // ✨ PERBAIKAN: Pastikan tier ditemukan DAN harganya lebih dari 0
+                      //  PERBAIKAN: Pastikan tier ditemukan DAN harganya lebih dari 0
                       if (applicableTier && Number(applicableTier.price) > 0) {
                         baseIdr = Number(applicableTier.price) + totalModifiers;
                       }
@@ -1534,7 +1534,7 @@ export default function AddOrderForm() {
                         </div>
                       </div>
 
-                      {/* ✨ AREA FULL-WIDTH: DYNAMIC ATTRIBUTE SELECTION (BERURUTAN/STACK) */}
+                      {/*  AREA FULL-WIDTH: DYNAMIC ATTRIBUTE SELECTION (BERURUTAN/STACK) */}
                       {selectedProduct?.availableAttributes &&
                         selectedProduct.availableAttributes.length > 0 && (
                           <div className="px-4 pb-4">
@@ -1590,12 +1590,12 @@ export default function AddOrderForm() {
                                                   };
 
                                                   if (isSelected) {
-                                                    // ✨ FITUR TOGGLE: Jika sudah terpilih, maka batalkan pilihannya (Hapus)
+                                                    //  FITUR TOGGLE: Jika sudah terpilih, maka batalkan pilihannya (Hapus)
                                                     delete newAttrs[
                                                       attr.attributeId
                                                     ];
                                                   } else {
-                                                    // ✨ FITUR TOGGLE: Jika belum terpilih, pilih ini
+                                                    //  FITUR TOGGLE: Jika belum terpilih, pilih ini
                                                     newAttrs[attr.attributeId] =
                                                       val.valueId;
                                                   }

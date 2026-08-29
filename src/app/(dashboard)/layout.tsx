@@ -30,7 +30,7 @@ export default async function DashboardGuardLayout({
     return <DashboardLayoutClient>{children}</DashboardLayoutClient>;
   }
 
-  // ✨ OTOMATIS ALGORITMIK: Menerjemahkan URL secara dinamis tanpa hardcode
+  //  OTOMATIS ALGORITMIK: Menerjemahkan URL secara dinamis tanpa hardcode
   const inferredPermission = getPermissionFromUrlDynamically(currentPath);
 
   if (inferredPermission) {
@@ -44,7 +44,7 @@ export default async function DashboardGuardLayout({
   return <DashboardLayoutClient>{children}</DashboardLayoutClient>;
 }
 
-// ✨ HELPER DINAMIS: Mengubah URL apa saja menjadi format permission secara otomatis
+//  HELPER DINAMIS: Mengubah URL apa saja menjadi format permission secara otomatis
 function getPermissionFromUrlDynamically(url: string): string | null {
   // 1. Pecah URL berdasarkan garis miring (/), lalu ambil segmen yang valid
   const segments = url.split("/").filter(Boolean);

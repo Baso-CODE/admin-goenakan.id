@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/table";
 import { useApi } from "@/hooks/useApi";
 import { FollowUpStepperDialog } from "./followUpStepperDialog";
-// ✨ PASTIKAN KAMU MENG-IMPORT FUNGSI FORMAT CURRENCY DARI UTILS JIKA ADA
+//  PASTIKAN KAMU MENG-IMPORT FUNGSI FORMAT CURRENCY DARI UTILS JIKA ADA
 // import { formatCurrency } from "@/lib/utils";
 
 // === TYPES ===
@@ -74,8 +74,8 @@ type QuotationItem = {
   id: string;
   productName: string;
   description: string | null;
-  quantity: number; // ✨ Qty utama ada di sini sekarang
-  unitPrice: string | number; // ✨ Harga utama ada di sini
+  quantity: number; //  Qty utama ada di sini sekarang
+  unitPrice: string | number; //  Harga utama ada di sini
   discount?: string | number;
   variant?: {
     variantName: string;
@@ -99,7 +99,7 @@ type QuotationDetail = {
   date: string;
   validUntil: string | null;
   status: string;
-  currencyCode: string; // ✨ Mengambil kode currency dari database
+  currencyCode: string; //  Mengambil kode currency dari database
   subTotal: string | number;
   discountAmount: string | number;
   totalAmount: string | number;
@@ -376,7 +376,7 @@ export default function QuotationDetail() {
                             </div>
                           )}
 
-                          {/* ✨ PERBAIKAN: TAMPILAN HARGA GROSIR YANG LEBIH CLEAN & PROPER */}
+                          {/*  PERBAIKAN: TAMPILAN HARGA GROSIR YANG LEBIH CLEAN & PROPER */}
                           {item.tiers && item.tiers.length > 1 && (
                             <div className="mt-4 rounded-md border border-slate-200 bg-white overflow-hidden max-w-sm">
                               {/* Header Mini Tabel */}
@@ -449,7 +449,7 @@ export default function QuotationDetail() {
               </div>
               <div className="flex justify-between text-sm text-red-600">
                 <span>Diskon</span>
-                {/* ✨ Memastikan diskon diformat dengan benar */}
+                {/*  Memastikan diskon diformat dengan benar */}
                 <span>- {formatDynamicCurrency(data.discountAmount || 0)}</span>
               </div>
               <Separator />

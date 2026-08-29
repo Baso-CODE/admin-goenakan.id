@@ -37,7 +37,7 @@ import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 
-// ✨ UPDATE: Sesuaikan tipe data dengan kembalian API terbaru
+//  UPDATE: Sesuaikan tipe data dengan kembalian API terbaru
 type Invoice = {
   id: string;
   invoiceDate: string;
@@ -63,7 +63,7 @@ type Meta = {
 };
 
 // === UTILS ===
-// ✨ UPDATE: Buat formatter menerima parameter currencyCode secara dinamis
+//  UPDATE: Buat formatter menerima parameter currencyCode secara dinamis
 const formatCurrency = (amount: number, currencyCode: string = "IDR") => {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -434,7 +434,7 @@ export default function InvoicesPage() {
                         {inv.invoiceNumber}
                       </TableCell>
                       <TableCell className="font-mono text-sm text-muted-foreground">
-                        {/* ✨ UPDATE: Memanggil data orderNumber terbaru */}
+                        {/*  UPDATE: Memanggil data orderNumber terbaru */}
                         {inv.orderNumber}
                       </TableCell>
                       <TableCell className="font-medium text-gray-700">
@@ -448,7 +448,7 @@ export default function InvoicesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-semibold text-gray-900">
-                        {/* ✨ UPDATE: Mengirimkan nominal beserta currencyCode-nya */}
+                        {/*  UPDATE: Mengirimkan nominal beserta currencyCode-nya */}
                         {formatCurrency(inv.totalAmount, inv.currencyCode)}
                       </TableCell>
                       <TableCell className="text-center">

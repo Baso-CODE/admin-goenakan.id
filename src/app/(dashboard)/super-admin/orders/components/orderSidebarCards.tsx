@@ -164,7 +164,7 @@ export function VendorsCard({ vendors }: VendorsCardProps) {
                   </Badge>
                 </div>
 
-                {/* ✨ PERBAIKAN LAYOUT BOX KONTAK */}
+                {/*  PERBAIKAN LAYOUT BOX KONTAK */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-xs text-muted-foreground bg-gray-50 p-3 rounded-lg border border-gray-100/80">
                   {/* Nama PIC */}
                   <div className="flex items-center gap-2 shrink-0">

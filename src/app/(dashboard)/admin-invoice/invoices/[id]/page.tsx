@@ -232,7 +232,7 @@ export default function InvoiceDetailPage() {
   const createdDate = new Date(invoice.createdAt);
   const displayInvoiceNo = invoice.invoiceNumber || `INV/${invoice.id}`;
 
-  // ✨ UPDATE: Ambil mata uang dari relasi order (default IDR jika kosong)
+  //  UPDATE: Ambil mata uang dari relasi order (default IDR jika kosong)
   const currency = invoice.order?.currencyCode || "IDR";
 
   const getStatusColor = (status: string) => {
@@ -442,7 +442,7 @@ export default function InvoiceDetailPage() {
                     <td className="align-top text-left py-0.5">
                       <div className="flex">
                         <span className="w-3 mr-1">:</span>
-                        {/* ✨ UPDATE: Menggunakan variabel dinamis */}
+                        {/*  UPDATE: Menggunakan variabel dinamis */}
                         <div className="flex-1">{currency}</div>
                       </div>
                     </td>
@@ -608,7 +608,7 @@ export default function InvoiceDetailPage() {
                       <td className="border border-[#94a3b8] py-2">
                         {item.quantity}
                       </td>
-                      {/* ✨ UPDATE: Format currency menyertakan kode mata uang */}
+                      {/*  UPDATE: Format currency menyertakan kode mata uang */}
                       <td className="border border-[#94a3b8] py-2 text-right px-2">
                         {formatCurrency(Number(item.price), currency)}
                       </td>

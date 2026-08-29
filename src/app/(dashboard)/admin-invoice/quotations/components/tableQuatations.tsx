@@ -171,7 +171,7 @@ export default function QuotationsTable() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
-  // ✨ State untuk delete dialog
+  //  State untuk delete dialog
   const [deleteTarget, setDeleteTarget] = useState<Quotation | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -200,7 +200,7 @@ export default function QuotationsTable() {
     fetchQuotations();
   }, [fetchQuotations]);
 
-  // ✨ Handler delete
+  //  Handler delete
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -511,7 +511,7 @@ export default function QuotationsTable() {
                               <span>Edit</span>
                             </DropdownMenuItem>
 
-                            {/* ✨ TAMBAHAN BARU: Menu Print PDF */}
+                            {/*  TAMBAHAN BARU: Menu Print PDF */}
                             <DropdownMenuItem
                               onClick={() =>
                                 window.open(

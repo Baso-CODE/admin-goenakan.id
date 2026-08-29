@@ -369,7 +369,7 @@ export default function VendorForm({
                   <FormItem>
                     <FormLabel>Company Name *</FormLabel>
                     <FormControl>
-                      {/* ✨ TAMBAHAN: Placeholder untuk Company Name */}
+                      {/*  TAMBAHAN: Placeholder untuk Company Name */}
                       <Input
                         {...field}
                         placeholder="Contoh: PT Goenakan Indonesia"
@@ -389,7 +389,7 @@ export default function VendorForm({
                   <FormItem>
                     <FormLabel>PIC Name *</FormLabel>
                     <FormControl>
-                      {/* ✨ TAMBAHAN: Placeholder untuk PIC Name */}
+                      {/*  TAMBAHAN: Placeholder untuk PIC Name */}
                       <Input
                         {...field}
                         placeholder="Contoh: Budi Santoso"
@@ -464,7 +464,7 @@ export default function VendorForm({
                   <FormItem>
                     <FormLabel>Contact ID *</FormLabel>
                     <FormControl>
-                      {/* ✨ TAMBAHAN: Placeholder untuk Contact ID */}
+                      {/*  TAMBAHAN: Placeholder untuk Contact ID */}
                       <Input
                         {...field}
                         placeholder="Contoh: 081234567890 / @username"
@@ -485,7 +485,7 @@ export default function VendorForm({
                     <FormItem>
                       <FormLabel>Default Tracking Link</FormLabel>
                       <FormControl>
-                        {/* ✨ TAMBAHAN: Placeholder untuk Tracking URL */}
+                        {/*  TAMBAHAN: Placeholder untuk Tracking URL */}
                         <Input
                           {...field}
                           placeholder="Contoh: https://tracking.ekspedisi.com/resi/..."
@@ -547,7 +547,7 @@ export default function VendorForm({
                     <FormItem>
                       <FormLabel>Full Address</FormLabel>
                       <FormControl>
-                        {/* ✨ TAMBAHAN: Placeholder untuk Alamat Lengkap */}
+                        {/*  TAMBAHAN: Placeholder untuk Alamat Lengkap */}
                         <Input
                           {...field}
                           placeholder="Contoh: Jl. Jend. Sudirman No 12, Patokan: Sebelah Minimarket"
