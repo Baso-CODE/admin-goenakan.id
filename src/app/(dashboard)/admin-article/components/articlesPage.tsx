@@ -92,7 +92,7 @@ export default function ArticlesSection() {
         // Sesuaikan endpoint /users dengan API kamu yang mengembalikan list author
         const [catRes, authRes] = await Promise.all([
           fetchApi("/article-categories/list"),
-          fetchApi("/users/authors"),
+          fetchApi("/articles/authors"),
         ]);
 
         if (catRes.ok) {

@@ -5,8 +5,6 @@ import { comparePassword } from "./argon";
 import { prisma } from "./prisma";
 
 export const authOptions: NextAuthOptions = {
-  // adapter: PrismaAdapter(prisma),
-
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -19,7 +17,7 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email dan password wajib diisi");
         }
 
-        // ✨ PERUBAHAN: Include relasi role dan permissions dari database
+        // 1. Cari user beserta data role dan permissions dari database
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
           include: {
@@ -35,6 +33,7 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email tidak ditemukan");
         }
 
+        // 2. Validasi kecocokan password
         const isValid = await comparePassword(
           credentials.password,
           user.password,
@@ -44,6 +43,16 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Password salah");
         }
 
+        // Ambil nama role user (default ke "CUSTOMER" jika tidak ada relasi role)
+        const roleName = user.role?.name || "CUSTOMER";
+
+        // ✨ 3. PENCEGAHAN: Blokir jika rolenya adalah CUSTOMER
+        if (roleName === "CUSTOMER") {
+          throw new Error(
+            "Akses ditolak: Akun customer tidak diizinkan masuk ke panel admin.",
+          );
+        }
+
         const userPermissions =
           user.role?.permissions?.map((p) => p.name) || [];
 
@@ -51,7 +60,7 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role?.name || "CUSTOMER",
+          role: roleName,
           roleId: user.roleId,
           permissions: userPermissions,
         };
