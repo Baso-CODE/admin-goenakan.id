@@ -37,6 +37,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AddItemNameModal } from "./addItemNameModal";
 import { EditItemNameModal } from "./editItemNameModal";
+import { Switch } from "@/components/ui/switch";
 
 type ItemName = {
   id: string;
@@ -44,6 +45,7 @@ type ItemName = {
   code: string;
   slug: string;
   description?: string;
+  isActive?: boolean;
   createdAt: string;
   itemCategoryId: string;
   itemCategory: {
@@ -159,6 +161,28 @@ export default function ItemNames() {
       toast.error(error.message);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleToggleActive = async (id: string, currentStatus: boolean) => {
+    try {
+      const res = await fetchApi(`/item-names/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ isActive: !currentStatus }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal mengubah status aktif item name");
+      }
+      toast.success("Status aktif item name berhasil diubah");
+      setItemNames((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, isActive: !currentStatus } : c)),
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengubah status aktif");
     }
   };
 
@@ -321,11 +345,12 @@ export default function ItemNames() {
             <TableHeader className="bg-[oklch(0.95_0.02_85)]">
               <TableRow>
                 <TableHead className="w-[20%]">Parent Hierarchy</TableHead>
-                <TableHead className="w-[20%]">Item Name</TableHead>
+                <TableHead className="w-[18%]">Item Name</TableHead>
                 <TableHead className="w-[10%]">Code</TableHead>
-                <TableHead className="w-[20%]">Description</TableHead>
-                <TableHead className="w-[15%]">Created</TableHead>
-                <TableHead className="text-right w-[15%]">Actions</TableHead>
+                <TableHead className="w-[18%]">Description</TableHead>
+                <TableHead className="text-center w-[10%]">Active</TableHead>
+                <TableHead className="w-[12%]">Created</TableHead>
+                <TableHead className="text-right w-[12%]">Actions</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -333,7 +358,7 @@ export default function ItemNames() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 6 }).map((_, j) => (
+                    {Array.from({ length: 7 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-5 w-full" />
                       </TableCell>
@@ -371,6 +396,17 @@ export default function ItemNames() {
                         </span>
                       )}
                     </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex justify-center">
+                        <Switch
+                          checked={item.isActive !== false}
+                          onCheckedChange={() =>
+                            handleToggleActive(item.id, item.isActive !== false)
+                          }
+                          className="scale-90"
+                        />
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm">
                       {formatDate(item.createdAt, { style: "datetime" })}
                     </TableCell>
@@ -398,7 +434,7 @@ export default function ItemNames() {
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={7}
                     className="text-center py-10 text-muted-foreground italic">
                     Belum ada data item name ditemukan.
                   </TableCell>

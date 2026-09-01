@@ -1215,6 +1215,8 @@ export default function EditProductPage() {
                                     <ModelShapeValueInput
                                       value={inlineInputValue}
                                       onChange={(val) => setInlineInputValue(val)}
+                                      placeholder={attr.type === "SIZE" ? "Nama Ukuran (e.g. 500ml, XL)" : "Nama Model / Shape (e.g. Oval, Bulat)"}
+                                      type={attr.type}
                                     />
                                   ) : (
                                     <Input

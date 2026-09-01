@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/useApi";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -45,6 +46,7 @@ export function AddItemCategoryModal({
   const [name, setName] = useState("");
   const [productCategoryId, setProductCategoryId] = useState(parentCategoryId);
   const [description, setDescription] = useState("");
+  const [isActive, setIsActive] = useState(true);
 
   // Sync state ketika prop berubah atau modal dibuka
   useEffect(() => {
@@ -81,7 +83,7 @@ export function AddItemCategoryModal({
     try {
       const res = await fetchApi("/item-categories", {
         method: "POST",
-        body: JSON.stringify({ name, productCategoryId, description }),
+        body: JSON.stringify({ name, productCategoryId, description, isActive }),
       });
 
       if (!res.ok) {
@@ -108,6 +110,7 @@ export function AddItemCategoryModal({
   const handleClose = () => {
     setName("");
     setDescription("");
+    setIsActive(true);
     // productCategoryId tidak direset agar tetap sinkron dengan form di background
     onClose();
   };
@@ -154,6 +157,19 @@ export function AddItemCategoryModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Opsional..."
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">Status Aktif</Label>
+              <p className="text-xs text-muted-foreground">
+                Tampilkan item category ini di sisi publik (storefront).
+              </p>
+            </div>
+            <Switch
+              checked={isActive}
+              onCheckedChange={setIsActive}
             />
           </div>
 

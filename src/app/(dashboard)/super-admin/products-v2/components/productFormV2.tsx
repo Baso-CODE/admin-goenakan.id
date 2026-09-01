@@ -48,7 +48,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useProductFormV2 } from "@/hooks/useProductFormV2";
 import { cn } from "@/lib/utils";
-import { Check, ChevronsUpDown, Loader2, RefreshCw, X, Layers, PlusCircle, Trash2, Plus, ChevronDown } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, RefreshCw, X, Layers, PlusCircle, Trash2, Plus, ChevronDown, Info } from "lucide-react";
 import { AddItemCategoryModal } from "../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../item-names-product/components/addItemNameModal";
 import CreateCategoryModal from "../../product-categories/components/createCategoryModal";
@@ -781,6 +781,14 @@ export default function ProductFormV2({
                                 <SelectItem value="SHAPE">Berdasarkan Model / Bentuk</SelectItem>
                               </SelectContent>
                             </Select>
+                            {field.value && field.value !== "NONE" && (
+                              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5 flex items-start gap-1">
+                                <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                                <span>
+                                  Mask warna akan diambil dari opsi atribut <strong>{field.value === "SIZE" ? "Ukuran / Kapasitas" : "Model / Bentuk"}</strong>. Pastikan mask yang diunggah berupa <strong>PNG transparent outline</strong>.
+                                </span>
+                              </p>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1623,6 +1631,8 @@ export default function ProductFormV2({
                                     <ModelShapeValueInput
                                       value={inlineInputValue}
                                       onChange={(val) => setInlineInputValue(val)}
+                                      placeholder={attr.type === "SIZE" ? "Nama Ukuran (e.g. 500ml, XL)" : "Nama Model / Shape (e.g. Oval, Bulat)"}
+                                      type={attr.type}
                                     />
                                   ) : (
                                     <Input

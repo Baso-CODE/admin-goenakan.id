@@ -20,6 +20,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "../../components/confirmDeleteDialog";
+import { Switch } from "@/components/ui/switch";
 
 type ProductCategories = {
   id: string;
@@ -28,6 +29,7 @@ type ProductCategories = {
   name_id?: string;
   name_en?: string;
   slug: string;
+  isActive?: boolean;
   createdAt: string;
 };
 
@@ -136,6 +138,33 @@ const ProductCategoriesPage = () => {
       );
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleToggleActive = async (
+    categoryId: string,
+    currentStatus: boolean,
+  ) => {
+    try {
+      const res = await fetchApi(`/product-categories/${categoryId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ isActive: !currentStatus }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal mengubah status aktif kategori");
+      }
+      toast.success("Status aktif kategori berhasil diubah");
+      setCategories((prev) =>
+        prev.map((c) =>
+          c.id === categoryId ? { ...c, isActive: !currentStatus } : c,
+        ),
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengubah status aktif");
     }
   };
 
@@ -290,8 +319,9 @@ const ProductCategoriesPage = () => {
                 <TableHead className="w-[15%]">Category Name (EN)</TableHead>
                 {/*  BARU: Kolom Code */}
                 <TableHead className="w-[10%]">Code</TableHead>
-                <TableHead className="w-[20%]">Slug</TableHead>
-                <TableHead className="w-[20%]">Created</TableHead>
+                <TableHead className="w-[15%]">Slug</TableHead>
+                <TableHead className="w-[10%] text-center">Active</TableHead>
+                <TableHead className="w-[15%]">Created</TableHead>
                 <TableHead className="w-[20%]">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -315,6 +345,11 @@ const ProductCategoriesPage = () => {
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
                     <TableCell>
+                      <div className="flex justify-center">
+                        <Skeleton className="h-5 w-9 rounded-full" />
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       <Skeleton className="h-4 w-2/3" />
                     </TableCell>
                     <TableCell>
@@ -329,7 +364,7 @@ const ProductCategoriesPage = () => {
                 /* Error State */
                 <TableRow>
                   <TableCell
-                    colSpan={6} //  UPDATE: Ubah ke 6
+                    colSpan={7}
                     className="text-center text-red-500 py-6">
                     Error: {"Failed to load categories."}
                   </TableCell>
@@ -358,6 +393,17 @@ const ProductCategoriesPage = () => {
                     <TableCell className="text-xs font-mono text-muted-foreground">
                       {data.slug}
                     </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex justify-center">
+                        <Switch
+                          checked={data.isActive !== false}
+                          onCheckedChange={() =>
+                            handleToggleActive(data.id, data.isActive !== false)
+                          }
+                          className="scale-90"
+                        />
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm">
                       {formatDate(data.createdAt, { style: "relative" })}
                     </TableCell>
@@ -384,7 +430,7 @@ const ProductCategoriesPage = () => {
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={6} //  UPDATE: Ubah ke 6
+                    colSpan={7} //  UPDATE: Ubah ke 6
                     className="text-center py-6 text-muted-foreground">
                     No categories found.
                   </TableCell>

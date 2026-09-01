@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/useApi";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -52,6 +53,7 @@ export function AddItemNameModal({
   const [description, setDescription] = useState("");
   const [selectedPC, setSelectedPC] = useState(parentCategoryId);
   const [itemCategoryId, setItemCategoryId] = useState(parentItemCategoryId);
+  const [isActive, setIsActive] = useState(true);
 
   // Sync state ketika prop berubah atau modal dibuka
   useEffect(() => {
@@ -75,7 +77,7 @@ export function AddItemNameModal({
     try {
       const res = await fetchApi("/item-names", {
         method: "POST",
-        body: JSON.stringify({ name, itemCategoryId, description }),
+        body: JSON.stringify({ name, itemCategoryId, description, isActive }),
       });
 
       if (!res.ok) {
@@ -97,12 +99,13 @@ export function AddItemNameModal({
   const handleClose = () => {
     setName("");
     setDescription("");
+    setIsActive(true);
     onClose();
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-106.25">
+      <DialogContent className="sm:max-w-108.25">
         <DialogHeader>
           <DialogTitle>Add New Item Name</DialogTitle>
         </DialogHeader>
@@ -110,7 +113,10 @@ export function AddItemNameModal({
           <div className="space-y-2">
             <Label>1. Product Category</Label>
             <Select
-              onValueChange={setSelectedPC}
+              onValueChange={(val) => {
+                setSelectedPC(val);
+                setItemCategoryId(""); // Reset pilihan anak jika induk berubah
+              }}
               value={selectedPC}
               disabled={!!parentCategoryId}>
               <SelectTrigger>
@@ -140,11 +146,13 @@ export function AddItemNameModal({
                 <SelectValue placeholder="Pilih Item Category..." />
               </SelectTrigger>
               <SelectContent>
-                {itemCategories.map((ic) => (
-                  <SelectItem key={ic.id} value={ic.id}>
-                    {ic.name} {ic.code && `(${ic.code})`}
-                  </SelectItem>
-                ))}
+                {itemCategories
+                  .filter((ic) => ic.productCategoryId === selectedPC)
+                  .map((ic) => (
+                    <SelectItem key={ic.id} value={ic.id}>
+                      {ic.name} {ic.code && `(${ic.code})`}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -165,6 +173,16 @@ export function AddItemNameModal({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Opsional..."
             />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">Status Aktif</Label>
+              <p className="text-xs text-muted-foreground">
+                Tampilkan item name ini di sisi publik (storefront).
+              </p>
+            </div>
+            <Switch checked={isActive} onCheckedChange={setIsActive} />
           </div>
 
           <DialogFooter>

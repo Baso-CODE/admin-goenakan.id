@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/useApi";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -46,6 +47,7 @@ export function EditItemNameModal({
   const [description, setDescription] = useState("");
   const [selectedPC, setSelectedPC] = useState("");
   const [itemCategoryId, setItemCategoryId] = useState("");
+  const [isActive, setIsActive] = useState(true);
 
   // 1. Fetch Product Categories
   useEffect(() => {
@@ -75,6 +77,7 @@ export function EditItemNameModal({
       const pcId = initialData.itemCategory?.productCategoryId || "";
       setSelectedPC(pcId);
       setItemCategoryId(initialData.itemCategoryId || "");
+      setIsActive(initialData.isActive !== false);
     }
   }, [initialData, isOpen]);
 
@@ -110,7 +113,7 @@ export function EditItemNameModal({
     try {
       const res = await fetchApi(`/item-names/${initialData.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ name, itemCategoryId, description }),
+        body: JSON.stringify({ name, itemCategoryId, description, isActive }),
       });
 
       if (!res.ok) {
@@ -185,6 +188,19 @@ export function EditItemNameModal({
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">Status Aktif</Label>
+              <p className="text-xs text-muted-foreground">
+                Tampilkan item name ini di sisi publik (storefront).
+              </p>
+            </div>
+            <Switch
+              checked={isActive}
+              onCheckedChange={setIsActive}
             />
           </div>
 

@@ -37,6 +37,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AddItemCategoryModal } from "./addItemCategoryModal";
 import { EditItemCategoryModal } from "./editItemCategoryModal";
+import { Switch } from "@/components/ui/switch";
 
 type ItemCategory = {
   id: string;
@@ -44,6 +45,7 @@ type ItemCategory = {
   code: string;
   slug: string;
   description?: string;
+  isActive?: boolean;
   createdAt: string;
   productCategory: {
     name_id: string;
@@ -137,6 +139,28 @@ export default function ItemCategories() {
       toast.error(error.message);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleToggleActive = async (id: string, currentStatus: boolean) => {
+    try {
+      const res = await fetchApi(`/item-categories/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ isActive: !currentStatus }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal mengubah status aktif item category");
+      }
+      toast.success("Status aktif item category berhasil diubah");
+      setCategories((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, isActive: !currentStatus } : c)),
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengubah status aktif");
     }
   };
 
@@ -309,17 +333,20 @@ export default function ItemCategories() {
                 <TableHead className=" text-foreground w-[20%]">
                   Parent Category
                 </TableHead>
-                <TableHead className=" text-foreground w-[20%]">
+                <TableHead className=" text-foreground w-[18%]">
                   Item Category Name
                 </TableHead>
                 <TableHead className=" text-foreground w-[10%]">Code</TableHead>
-                <TableHead className=" text-foreground w-[20%]">
+                <TableHead className=" text-foreground w-[18%]">
                   Description
                 </TableHead>
-                <TableHead className=" text-foreground w-[15%]">
+                <TableHead className=" text-foreground text-center w-[10%]">
+                  Active
+                </TableHead>
+                <TableHead className=" text-foreground w-[12%]">
                   Created
                 </TableHead>
-                <TableHead className=" text-foreground text-right w-[15%]">
+                <TableHead className=" text-foreground text-right w-[12%]">
                   Actions
                 </TableHead>
               </TableRow>
@@ -329,7 +356,7 @@ export default function ItemCategories() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 6 }).map((_, j) => (
+                    {Array.from({ length: 7 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-5 w-full" />
                       </TableCell>
@@ -366,6 +393,18 @@ export default function ItemCategories() {
                       )}
                     </TableCell>
 
+                    <TableCell className="text-center">
+                      <div className="flex justify-center">
+                        <Switch
+                          checked={item.isActive !== false}
+                          onCheckedChange={() =>
+                            handleToggleActive(item.id, item.isActive !== false)
+                          }
+                          className="scale-90"
+                        />
+                      </div>
+                    </TableCell>
+
                     <TableCell className="text-sm">
                       {formatDate(item.createdAt, { style: "datetime" })}
                     </TableCell>
@@ -394,7 +433,7 @@ export default function ItemCategories() {
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={7}
                     className="text-center py-10 text-muted-foreground italic">
                     Belum ada data item category ditemukan.
                   </TableCell>

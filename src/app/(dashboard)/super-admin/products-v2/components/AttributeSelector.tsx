@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { useApi } from "@/hooks/useApi";
-import { ArrowDown, ArrowUp, GripVertical, ListChecks, Loader2, Plus, Trash2, Pencil, Check, ChevronsUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical, ListChecks, Loader2, Plus, Trash2, Pencil, Check, ChevronsUpDown, Info } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -1544,6 +1544,18 @@ function LocalFieldArrayEditor({
 
   return (
     <div className="space-y-4">
+      {(currentLocalType === "MODEL_SHAPE" || currentLocalType === "SIZE") && (
+        <div className="flex items-start gap-2 p-2.5 rounded-md bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/50 text-xs text-amber-800 dark:text-amber-300">
+          <Info className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <div>
+            <p className="font-semibold">Ketentuan Mask Warna ({currentLocalType === "SIZE" ? "Ukuran / Kapasitas" : "Model / Bentuk"}):</p>
+            <p className="text-[11px] text-amber-700 dark:text-amber-300/90 mt-0.5 leading-relaxed">
+              Mask warna yang diunggah wajib berupa file <strong>PNG dengan outline/latar transparan (transparent outline)</strong>. Area berwarna/outline pada gambar mask ini akan diwarnai secara dinamis saat customer memilih varian warna di katalog.
+            </p>
+          </div>
+        </div>
+      )}
+
       {visibleFields.map(({ field, index }) => {
         const valuePath = `values.${index}`;
         const valValue = localForm.watch(`${valuePath}.value`) || "";
@@ -1555,6 +1567,8 @@ function LocalFieldArrayEditor({
                 <ModelShapeValueInput
                   value={valValue}
                   onChange={(newVal) => localForm.setValue(`${valuePath}.value`, newVal)}
+                  placeholder={currentLocalType === "SIZE" ? "Nama Ukuran (e.g. 500ml, XL)" : "Nama Model / Shape (e.g. Oval, Bulat)"}
+                  type={currentLocalType}
                 />
               ) : currentLocalType === "COLOR" ? (
                 <ColorValueInput
@@ -1715,6 +1729,15 @@ function LocalSubValuesEditor({
   return (
     <div className="space-y-2 mt-2">
       <Label className="text-xs font-semibold text-stone-500">Values</Label>
+
+      {(type === "MODEL_SHAPE" || type === "SIZE") && (
+        <div className="flex items-start gap-2 p-2 rounded-md bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/50 text-xs text-amber-800 dark:text-amber-300 mb-2">
+          <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <p className="text-[11px] text-amber-700 dark:text-amber-300/90 leading-relaxed">
+            Mask warna wajib berupa file <strong>PNG transparent outline</strong> agar warna produk dapat berganti otomatis di katalog.
+          </p>
+        </div>
+      )}
       
       {visibleFields.map(({ field, index }) => {
         const valuePath = `${subAttrPath}.values.${index}`;
@@ -1727,6 +1750,8 @@ function LocalSubValuesEditor({
                 <ModelShapeValueInput
                   value={valValue}
                   onChange={(newVal) => form.setValue(`${valuePath}.value`, newVal)}
+                  placeholder={type === "SIZE" ? "Nama Ukuran (e.g. 500ml, XL)" : "Nama Model / Shape (e.g. Oval, Bulat)"}
+                  type={type}
                 />
               ) : type === "COLOR" ? (
                 <ColorValueInput
@@ -1811,9 +1836,16 @@ function LocalSubValuesEditor({
 export interface ModelShapeValueInputProps {
   value: string;
   onChange: (val: string) => void;
+  placeholder?: string;
+  type?: "SIZE" | "MODEL_SHAPE" | string;
 }
 
-export function ModelShapeValueInput({ value, onChange }: ModelShapeValueInputProps) {
+export function ModelShapeValueInput({
+  value,
+  onChange,
+  placeholder = "Nama Opsi (e.g. 500ml, Oval, Bulat)",
+  type,
+}: ModelShapeValueInputProps) {
   const parts = value ? value.split("|") : [];
   const name = parts[0] || "";
   const imageUrl = parts[1] || "";
@@ -1902,9 +1934,9 @@ export function ModelShapeValueInput({ value, onChange }: ModelShapeValueInputPr
   };
 
   return (
-    <div className="flex-1 flex flex-col gap-3 p-2 bg-stone-100/40 dark:bg-stone-850/40 rounded border border-stone-200/60 dark:border-stone-800">
+    <div className="flex-1 flex flex-col gap-2.5 p-2.5 bg-stone-100/40 dark:bg-stone-850/40 rounded border border-stone-200/60 dark:border-stone-800">
       <Input
-        placeholder="Nama Model / Shape (e.g. Oval, Bulat)"
+        placeholder={placeholder}
         value={name}
         onChange={handleNameChange}
         className="w-full border-slate-300 text-slate-800 bg-white h-9"
@@ -1954,9 +1986,14 @@ export function ModelShapeValueInput({ value, onChange }: ModelShapeValueInputPr
               />
             </label>
           )}
-          <span className="text-[10px] text-stone-500 max-w-[80px] leading-tight select-none">
-            {imageUrl ? "Gambar Terpilih" : "Unggah Gambar"}
-          </span>
+          <div className="flex flex-col max-w-[100px]">
+            <span className="text-[10px] text-stone-600 dark:text-stone-300 font-medium leading-tight select-none">
+              {imageUrl ? "Gambar Terpilih" : "Unggah Gambar"}
+            </span>
+            <span className="text-[9px] text-stone-400 leading-tight select-none">
+              Preview opsi
+            </span>
+          </div>
         </div>
 
         {/* Column 2: Mask Warna */}
@@ -1973,11 +2010,14 @@ export function ModelShapeValueInput({ value, onChange }: ModelShapeValueInputPr
               </button>
             </div>
           ) : (
-            <label className="w-9 h-9 border border-dashed rounded border-slate-300 hover:border-slate-500 bg-white flex items-center justify-center cursor-pointer transition-colors relative">
+            <label
+              title="Unggah file PNG dengan background transparan (transparent outline)"
+              className="w-9 h-9 border border-dashed rounded border-indigo-300 hover:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/40 flex items-center justify-center cursor-pointer transition-colors relative"
+            >
               {isUploadingMask ? (
-                <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+                <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
               ) : (
-                <div className="flex flex-col items-center justify-center text-stone-400">
+                <div className="flex flex-col items-center justify-center text-indigo-500">
                   <svg
                     width="14"
                     height="14"
@@ -2001,10 +2041,23 @@ export function ModelShapeValueInput({ value, onChange }: ModelShapeValueInputPr
               />
             </label>
           )}
-          <span className="text-[10px] text-stone-500 max-w-[80px] leading-tight select-none font-semibold text-indigo-650">
-            {colorMaskUrl ? "Mask Terpilih" : "Upload Mask"}
-          </span>
+          <div className="flex flex-col max-w-[130px]">
+            <span className="text-[10px] text-indigo-700 dark:text-indigo-400 font-semibold leading-tight select-none">
+              {colorMaskUrl ? "Mask Terpilih" : "Upload Mask Warna"}
+            </span>
+            <span className="text-[9px] text-amber-600 dark:text-amber-400 font-medium leading-tight select-none">
+              Wajib outline transparan (.png)
+            </span>
+          </div>
         </div>
+      </div>
+
+      {/* Information Callout */}
+      <div className="flex items-start gap-1.5 px-2 py-1.5 rounded bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/40 text-[10px] text-amber-800 dark:text-amber-300 leading-tight">
+        <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+        <span>
+          <strong>Ketentuan Mask:</strong> File harus berupa <strong>PNG transparent outline</strong> (latar belakang transparan). Area outline/objek pada gambar ini yang akan diwarnai secara dinamis sesuai pilihan warna produk.
+        </span>
       </div>
     </div>
   );
