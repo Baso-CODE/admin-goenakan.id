@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/useApi";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -30,6 +31,7 @@ interface ItemCategoryData {
   description?: string;
   // Memastikan kita mendapatkan ID parent untuk pre-fill dropdown
   productCategoryId?: string;
+  isActive?: boolean;
 }
 
 interface EditItemCategoryModalProps {
@@ -53,6 +55,7 @@ export function EditItemCategoryModal({
   const [name, setName] = useState("");
   const [productCategoryId, setProductCategoryId] = useState("");
   const [description, setDescription] = useState("");
+  const [isActive, setIsActive] = useState(true);
 
   // 1. Ambil data Product Category untuk Dropdown
   useEffect(() => {
@@ -81,6 +84,7 @@ export function EditItemCategoryModal({
       // Jika dari backend productCategoryId tersedia, set nilainya.
       // Jika backend hanya mengirim relasi, pastikan Anda menyesuaikannya.
       setProductCategoryId(initialData.productCategoryId || "");
+      setIsActive(initialData.isActive !== false);
     }
   }, [initialData, isOpen]);
 
@@ -97,7 +101,7 @@ export function EditItemCategoryModal({
       // Mengirim request PATCH/PUT ke endpoint dengan ID spesifik
       const res = await fetchApi(`/item-categories/${initialData.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ name, productCategoryId, description }),
+        body: JSON.stringify({ name, productCategoryId, description, isActive }),
       });
 
       if (!res.ok) {
@@ -155,6 +159,19 @@ export function EditItemCategoryModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Opsional..."
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">Status Aktif</Label>
+              <p className="text-xs text-muted-foreground">
+                Tampilkan item category ini di sisi publik (storefront).
+              </p>
+            </div>
+            <Switch
+              checked={isActive}
+              onCheckedChange={setIsActive}
             />
           </div>
 

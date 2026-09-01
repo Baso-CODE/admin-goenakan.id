@@ -17,12 +17,14 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Box, ClipboardList, Loader2, TextQuote } from "lucide-react";
 
 // === SCHEMA ===
 const materialTypeSchema = z.object({
   name: z.string().min(2, { message: "Nama material minimal 2 karakter." }),
   description: z.string().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export type MaterialTypeFormValues = z.infer<typeof materialTypeSchema>;
@@ -43,6 +45,7 @@ export default function MaterialTypeForm({
     defaultValues: {
       name: initialData?.name || "",
       description: initialData?.description || "",
+      isActive: initialData?.isActive !== undefined ? initialData.isActive : true,
     },
   });
 
@@ -51,6 +54,7 @@ export default function MaterialTypeForm({
       form.reset({
         name: initialData.name || "",
         description: initialData.description || "",
+        isActive: initialData.isActive !== undefined ? initialData.isActive : true,
       });
     }
   }, [initialData, form]);
@@ -108,6 +112,31 @@ export default function MaterialTypeForm({
                       />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* === Active Status === */}
+              <FormField
+                control={form.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border bg-white p-4 shadow-sm">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base font-semibold">
+                        Status Material
+                      </FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        Jika dinonaktifkan, material ini tidak akan ditampilkan di sisi klien (storefront).
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value ?? true}
+                        onCheckedChange={field.onChange}
+                        disabled={isLoading || isSubmitting}
+                      />
+                    </FormControl>
                   </FormItem>
                 )}
               />

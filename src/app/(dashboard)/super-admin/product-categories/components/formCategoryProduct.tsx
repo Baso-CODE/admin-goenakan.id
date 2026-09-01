@@ -16,6 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { ClipboardList, Globe, ImageIcon, Loader2, Tag, X } from "lucide-react";
 import Image from "next/image";
 
@@ -26,6 +27,7 @@ const productCategorySchema = z.object({
     .min(2, { message: "Nama Kategori (ID) minimal 2 karakter." }),
   name_en: z.string().optional(),
   image: z.any().optional(), // Menampung file gambar
+  isActive: z.boolean().optional(),
 });
 
 export type ProductCategoryFormValues = z.infer<typeof productCategorySchema>;
@@ -48,6 +50,7 @@ export default function ProductCategoryForm({
     defaultValues: {
       name_id: initialData?.name_id || initialData?.name || "",
       name_en: initialData?.name_en || "",
+      isActive: initialData?.isActive !== undefined ? initialData.isActive : true,
     },
   });
 
@@ -56,6 +59,7 @@ export default function ProductCategoryForm({
       form.reset({
         name_id: initialData.name_id || initialData.name || "",
         name_en: initialData.name_en || "",
+        isActive: initialData.isActive !== undefined ? initialData.isActive : true,
       });
       if (initialData.image) setPreview(initialData.image);
     }
@@ -83,6 +87,7 @@ export default function ProductCategoryForm({
     if (values.image instanceof File) {
       formData.append("image", values.image);
     }
+    formData.append("isActive", String(values.isActive ?? true));
     onSubmit(formData);
   };
 
@@ -193,6 +198,31 @@ export default function ProductCategoryForm({
                       </FormControl>
                     </div>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* === Active Status === */}
+              <FormField
+                control={form.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base font-semibold">
+                        Status Kategori
+                      </FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        Jika dinonaktifkan, kategori dan produk di dalamnya tidak akan ditampilkan di sisi klien (storefront).
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value ?? true}
+                        onCheckedChange={field.onChange}
+                        disabled={isLoading || isSubmitting}
+                      />
+                    </FormControl>
                   </FormItem>
                 )}
               />

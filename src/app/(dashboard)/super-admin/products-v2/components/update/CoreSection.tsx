@@ -48,7 +48,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
-import { Check, CheckCheck, ChevronsUpDown, Plus, RefreshCw, X } from "lucide-react";
+import { Check, CheckCheck, ChevronsUpDown, Plus, RefreshCw, X, Info } from "lucide-react";
 import { AddItemCategoryModal } from "../../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../../item-names-product/components/addItemNameModal";
 import CreateCategoryModal from "../../../product-categories/components/createCategoryModal";
@@ -963,6 +963,14 @@ export default function FormProductCore({
                       </SelectContent>
                     </Select>
                     <FormMessage />
+                    {field.value && field.value !== "NONE" && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5 flex items-start gap-1">
+                        <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        <span>
+                          Mask warna akan diambil dari opsi atribut <strong>{field.value === "SIZE" ? "Ukuran / Kapasitas" : "Model / Bentuk"}</strong>. Pastikan mask yang diunggah berupa <strong>PNG transparent outline</strong>.
+                        </span>
+                      </p>
+                    )}
                   </FormItem>
                 )}
               />

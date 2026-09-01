@@ -36,6 +36,7 @@ import {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 
 type MaterialType = {
   id: string;
@@ -43,6 +44,7 @@ type MaterialType = {
   code: string;
   slug: string;
   description?: string;
+  isActive?: boolean;
   createdAt: string;
 };
 
@@ -127,6 +129,28 @@ export default function MaterialTypes() {
       toast.error(error.message);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleToggleActive = async (id: string, currentStatus: boolean) => {
+    try {
+      const res = await fetchApi(`/material-types/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ isActive: !currentStatus }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal mengubah status aktif material");
+      }
+      toast.success("Status aktif material berhasil diubah");
+      setMaterials((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, isActive: !currentStatus } : c)),
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengubah status aktif");
     }
   };
 
@@ -302,6 +326,9 @@ export default function MaterialTypes() {
                 {/*  TAMBAH KOLOM HEADER */}
                 <TableHead className=" text-foreground">Slug</TableHead>
                 <TableHead className=" text-foreground">Description</TableHead>
+                <TableHead className=" text-foreground text-center">
+                  Active
+                </TableHead>
                 <TableHead className=" text-foreground">Created</TableHead>
                 <TableHead className=" text-foreground text-right">
                   Actions
@@ -313,8 +340,7 @@ export default function MaterialTypes() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {/*  UPDATE: Panjang array jadi 6 karena kolom bertambah */}
-                    {Array.from({ length: 6 }).map((_, j) => (
+                    {Array.from({ length: 7 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-5 w-full" />
                       </TableCell>
@@ -345,6 +371,17 @@ export default function MaterialTypes() {
                         </span>
                       )}
                     </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex justify-center">
+                        <Switch
+                          checked={item.isActive !== false}
+                          onCheckedChange={() =>
+                            handleToggleActive(item.id, item.isActive !== false)
+                          }
+                          className="scale-90"
+                        />
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm">
                       {formatDate(item.createdAt, { style: "datetime" })}
                     </TableCell>
@@ -370,9 +407,9 @@ export default function MaterialTypes() {
                 ))
               ) : (
                 <TableRow>
-                  {/*  UPDATE: colSpan jadi 6 agar pesan berada di tengah tabel */}
+                  {/*  UPDATE: colSpan jadi 7 agar pesan berada di tengah tabel */}
                   <TableCell
-                    colSpan={6}
+                    colSpan={7}
                     className="text-center py-10 text-muted-foreground italic">
                     Belum ada data material ditemukan.
                   </TableCell>
