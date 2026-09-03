@@ -272,6 +272,7 @@ export default function AddVendorForm({
       toast.error(err.message || "Terjadi kesalahan.");
     }
   };
+
   const handleSubmit = (values: AddVendorFormValues) => {
     const payload = {
       ...values,
@@ -372,32 +373,19 @@ export default function AddVendorForm({
                 render={({ field }) => (
                   <FormItem className="w-full">
                     <FormLabel>Platform *</FormLabel>
-
-                    {/* MODAL PLATFORM */}
-                    <Dialog
-                      open={isPlatformModalOpen}
-                      onOpenChange={setIsPlatformModalOpen}>
-                      <DialogContent className="">
-                        <DialogHeader>
-                          <DialogTitle>Tambah Platform Baru</DialogTitle>
-                        </DialogHeader>
-                        <ContactPlatformForm onSubmit={handleAddPlatformFast} />
-                      </DialogContent>
-                    </Dialog>
-
+                    {/* ✨ PERBAIKAN: Dialog modal sudah dipindahkan ke luar form */}
                     <Select
                       value={field.value}
                       disabled={isLoading || isSubmitting}
                       onValueChange={(val) => {
                         if (val === "add_new_platform") {
                           setIsPlatformModalOpen(true);
-                        } else {
-                          field.onChange(val);
+                          return;
                         }
+                        field.onChange(val);
                       }}>
                       <FormControl className="w-full">
                         <SelectTrigger>
-                          {/* Placeholder Select sudah ada */}
                           <SelectValue placeholder="Pilih Platform" />
                         </SelectTrigger>
                       </FormControl>
@@ -798,6 +786,14 @@ export default function AddVendorForm({
           </form>
         </Form>
       </CardContent>
+      <Dialog open={isPlatformModalOpen} onOpenChange={setIsPlatformModalOpen}>
+        <DialogContent className="">
+          <DialogHeader>
+            <DialogTitle>Tambah Platform Baru</DialogTitle>
+          </DialogHeader>
+          <ContactPlatformForm onSubmit={handleAddPlatformFast} />
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

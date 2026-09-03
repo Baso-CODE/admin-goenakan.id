@@ -408,18 +408,6 @@ export default function VendorForm({
                 render={({ field }) => (
                   <FormItem className="w-full">
                     <FormLabel>Platform *</FormLabel>
-                    {/* MODAL PLATFORM */}
-                    <Dialog
-                      open={isPlatformModalOpen}
-                      onOpenChange={setIsPlatformModalOpen}>
-                      <DialogContent className="sm:max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle>Tambah Platform Baru</DialogTitle>
-                        </DialogHeader>
-                        <ContactPlatformForm onSubmit={handleAddPlatformFast} />
-                      </DialogContent>
-                    </Dialog>
-
                     <Select
                       onValueChange={(val) => {
                         if (val === "add_new_platform") {
@@ -848,6 +836,15 @@ export default function VendorForm({
           </form>
         </Form>
       </CardContent>
+
+      <Dialog open={isPlatformModalOpen} onOpenChange={setIsPlatformModalOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Tambah Platform Baru</DialogTitle>
+          </DialogHeader>
+          <ContactPlatformForm onSubmit={handleAddPlatformFast} />
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
