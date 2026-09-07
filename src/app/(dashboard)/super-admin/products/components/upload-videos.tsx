@@ -37,6 +37,11 @@ export function UploadVideos({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  // Drag and Drop State
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isDraggingOverZone, setIsDraggingOverZone] = useState(false);
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVideoItem, setSelectedVideoItem] = useState<VideoItem | null>(
@@ -60,8 +65,6 @@ export function UploadVideos({
 
   // 2. Sync State Lokal ke React Hook Form (RHF)
   useEffect(() => {
-    // Kita hanya kirim metadata (URL, publicId, dll) ke form
-    // Backend TIDAK butuh file binary lagi
     const formValue = videoItems.map(({ tempId, ...rest }) => rest);
 
     form.setValue(metadataName, formValue, {
@@ -103,43 +106,113 @@ export function UploadVideos({
     }
   };
 
-  // === HANDLER PILIH FILE ===
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+  const processIncomingVideoFiles = async (files: FileList | File[]) => {
     if (!files || files.length === 0) return;
 
-    if (videoItems.length + files.length > max) {
+    const newFiles = Array.from(files).filter((file) =>
+      file.type.startsWith("video/"),
+    );
+    if (newFiles.length === 0) return;
+
+    if (videoItems.length + newFiles.length > max) {
       alert(`Maksimal ${max} video.`);
       return;
     }
 
     setIsUploading(true);
-    setUploadProgress(0); // Reset progress (bisa dikembangkan nanti)
+    setUploadProgress(0);
 
-    // Upload Paralel (Semua file sekaligus) - Jauh lebih cepat
-    const promises = Array.from(files).map((file) => uploadToCloudinary(file));
+    const promises = newFiles.map((file) => uploadToCloudinary(file));
     const results = await Promise.all(promises);
 
-    // Ambil yang sukses saja
     const successItems = results.filter((item) => item !== null) as VideoItem[];
 
-    if (successItems.length < files.length) {
+    if (successItems.length < newFiles.length) {
       alert("Beberapa video gagal diupload.");
     }
 
     setVideoItems((prev) => [...prev, ...successItems]);
     setIsUploading(false);
 
-    // Reset input agar bisa pilih file yang sama lagi kalau mau
     if (inputRef.current) inputRef.current.value = "";
+  };
+
+  // === HANDLER PILIH FILE ===
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      await processIncomingVideoFiles(e.target.files);
+    }
+  };
+
+  // Dropzone drag from OS handlers
+  const handleZoneDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes("Files")) {
+      setIsDraggingOverZone(true);
+    }
+  };
+
+  const handleZoneDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOverZone(false);
+  };
+
+  const handleZoneDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOverZone(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await processIncomingVideoFiles(e.dataTransfer.files);
+    }
+  };
+
+  // Drag & drop item reorder handlers
+  const handleItemDragStart = (e: React.DragEvent, index: number) => {
+    e.stopPropagation();
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", `${index}`);
+  };
+
+  const handleItemDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleItemDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const reordered = [...videoItems];
+    const [moved] = reordered.splice(draggedIndex, 1);
+    reordered.splice(dropIndex, 0, moved);
+
+    setVideoItems(reordered);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleItemDragEnd = (e: React.DragEvent) => {
+    e.stopPropagation();
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   // === HANDLER DELETE ===
   const handleRemove = (tempId: string) => {
     setVideoItems((prev) => prev.filter((item) => item.tempId !== tempId));
-    // Note: Video di Cloudinary tidak langsung terhapus, tapi nanti di backend
-    // kita hanya simpan array URL yang baru. Cloudinary akan punya sampah file,
-    // tapi itu urusan maintenance nanti.
   };
 
   // === HANDLER MODAL & FEATURED ===
@@ -172,7 +245,7 @@ export function UploadVideos({
           item.tempId === tempId
             ? isFeatured
             : isFeatured
-              ? false // Unset yang lain jika ada yang baru diset true
+              ? false
               : item.isFeatured,
       })),
     );
@@ -186,51 +259,91 @@ export function UploadVideos({
         render={() => (
           <FormItem className="space-y-4">
             <FormLabel className="text-md font-semibold flex items-center justify-between">
-              {label}
-              <span className="text-sm font-normal text-gray-500">
-                (Max: {max}, Direct Upload)
+              <span>{label}</span>
+              <span className="text-xs font-normal text-stone-500">
+                (Tersimpan: {videoItems.length} / Max: {max} video • Geser untuk atur urutan)
               </span>
             </FormLabel>
 
-            <div className="flex flex-wrap gap-3 p-3 border border-dashed rounded-lg bg-gray-50 min-h-24">
+            <div
+              onDragOver={handleZoneDragOver}
+              onDragLeave={handleZoneDragLeave}
+              onDrop={handleZoneDrop}
+              className={`flex flex-wrap gap-3 p-3 border-2 border-dashed rounded-lg transition-colors min-h-28 ${
+                isDraggingOverZone
+                  ? "border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/30"
+                  : "border-stone-200 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-900/50"
+              }`}>
               {/* LIST VIDEO */}
-              {videoItems.map((item) => (
-                <div
-                  key={item.tempId}
-                  className="relative w-40 h-24 border border-indigo-300 rounded-md overflow-hidden bg-black group shadow-sm">
-                  <video
-                    src={item.url}
-                    className="w-full h-full object-cover"
-                  />
+              {videoItems.map((item, index) => {
+                const isItemDragged = draggedIndex === index;
+                const isItemOver = dragOverIndex === index;
 
-                  {/* Badge Featured */}
-                  {item.isFeatured && (
-                    <div className="absolute top-0 left-0 bg-indigo-600 p-1 rounded-br-md z-10">
-                      <Star className="h-3 w-3 fill-white text-white" />
+                return (
+                  <div
+                    key={item.tempId}
+                    draggable={true}
+                    onDragStart={(e) => handleItemDragStart(e, index)}
+                    onDragOver={(e) => handleItemDragOver(e, index)}
+                    onDrop={(e) => handleItemDrop(e, index)}
+                    onDragEnd={handleItemDragEnd}
+                    className={`relative w-40 h-24 border rounded-lg overflow-hidden bg-black group shadow-sm cursor-grab active:cursor-grabbing transition-all select-none ${
+                      isItemDragged
+                        ? "opacity-30 scale-95 border-dashed border-indigo-400"
+                        : isItemOver
+                          ? "border-indigo-500 ring-2 ring-indigo-400 scale-105"
+                          : "border-stone-300 dark:border-stone-700 hover:shadow-md"
+                    }`}>
+                    <video
+                      src={item.url}
+                      className="w-full h-full object-cover pointer-events-none"
+                    />
+
+                    {/* Badge Nomor Urut */}
+                    <div
+                      className={`absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-bold z-10 shadow-sm ${
+                        index === 0
+                          ? "bg-indigo-600 text-white"
+                          : "bg-black/60 text-white backdrop-blur-xs"
+                      }`}>
+                      #{index + 1}
                     </div>
-                  )}
 
-                  {/* Action Buttons (Hover) */}
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-2">
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="secondary"
-                      className="h-7 w-7"
-                      onClick={() => handleOpenModal(item)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="destructive"
-                      className="h-7 w-7"
-                      onClick={() => handleRemove(item.tempId)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {/* Badge Featured */}
+                    {item.isFeatured && (
+                      <div className="absolute top-1 right-1 bg-amber-500 p-1 rounded z-10 shadow-sm">
+                        <Star className="h-3 w-3 fill-white text-white" />
+                      </div>
+                    )}
+
+                    {/* Action Buttons (Hover) */}
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-2 z-20">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="secondary"
+                        className="h-7 w-7 bg-white text-gray-800 hover:bg-gray-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenModal(item);
+                        }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="destructive"
+                        className="h-7 w-7"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemove(item.tempId);
+                        }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {/* INPUT FILE HIDDEN */}
               <input
@@ -246,9 +359,9 @@ export function UploadVideos({
               {videoItems.length < max && (
                 <div
                   onClick={() => !isUploading && inputRef.current?.click()}
-                  className={`w-40 h-24 border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors ${
+                  className={`w-40 h-24 border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-lg flex flex-col items-center justify-center text-stone-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20 cursor-pointer transition-all ${
                     isUploading
-                      ? "opacity-70 cursor-not-allowed bg-gray-100"
+                      ? "opacity-70 cursor-not-allowed bg-stone-100"
                       : ""
                   }`}>
                   {isUploading ? (
@@ -261,7 +374,7 @@ export function UploadVideos({
                   ) : (
                     <>
                       <Plus className="h-5 w-5" />
-                      <span className="text-xs mt-1">Add Video</span>
+                      <span className="text-[11px] font-medium mt-1">Tambah Video</span>
                     </>
                   )}
                 </div>
