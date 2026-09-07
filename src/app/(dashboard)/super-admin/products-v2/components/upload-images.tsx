@@ -85,8 +85,9 @@ export function UploadImages({
   const processIncomingFiles = (files: FileList | File[]) => {
     if (!files || files.length === 0) return;
 
-    const newFiles = Array.from(files).filter((file) =>
-      file.type.startsWith("image/"),
+    const newFiles = Array.from(files).filter(
+      (file) =>
+        file.type.startsWith("image/") || /\.(heic|heif)$/i.test(file.name),
     );
     if (newFiles.length === 0) return;
 
@@ -339,7 +340,7 @@ export function UploadImages({
               {/* Input File Hidden */}
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
                 multiple
                 ref={inputRef}
                 className="hidden"
