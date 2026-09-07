@@ -44,14 +44,23 @@ interface FormUpdateProductMediaProps {
     file: File,
     onProgress?: (progress: number) => void,
   ) => Promise<void>;
+  onAddMultipleImages?: (
+    files: File[],
+    onProgress?: (progress: number) => void,
+  ) => Promise<void>;
   onDeleteImage: (mediaId: string) => Promise<void>;
   onAddVideo: (
     file: File,
     onProgress?: (progress: number) => void,
   ) => Promise<void>;
+  onAddMultipleVideos?: (
+    files: File[],
+    onProgress?: (progress: number) => void,
+  ) => Promise<void>;
   onDeleteVideo: (mediaId: string) => Promise<void>;
   onUpdateMediaMetadata: (mediaId: string, updates: any) => Promise<void>;
   onUpdateVideoMetadata: (mediaId: string, updates: any) => Promise<void>;
+  onReorderMedia?: (type: "image" | "video", orderedIds: string[]) => Promise<void>;
 }
 
 function ExistingMediaDisplay({
@@ -59,68 +68,188 @@ function ExistingMediaDisplay({
   type,
   onDelete,
   onEdit,
+  onReorder,
+  onFilesDrop,
   isSubmitting,
 }: {
   media: ProductMedia[];
   type: "image" | "video";
   onDelete: (mediaId: string) => Promise<void>;
   onEdit: (item: any) => void;
+  onReorder?: (orderedIds: string[]) => void;
+  onFilesDrop?: (files: File[]) => void;
   isSubmitting: boolean;
 }) {
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isDraggingOverZone, setIsDraggingOverZone] = useState(false);
+
+  // OS file drop handlers
+  const handleZoneDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes("Files")) {
+      setIsDraggingOverZone(true);
+    }
+  };
+
+  const handleZoneDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOverZone(false);
+  };
+
+  const handleZoneDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOverZone(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0 && onFilesDrop) {
+      const files = Array.from(e.dataTransfer.files).filter((f) =>
+        type === "image" ? f.type.startsWith("image/") : f.type.startsWith("video/"),
+      );
+      if (files.length > 0) {
+        onFilesDrop(files);
+      }
+    }
+  };
+
+  // Item drag & drop reorder handlers
+  const handleItemDragStart = (e: React.DragEvent, index: number) => {
+    e.stopPropagation();
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", `${index}`);
+  };
+
+  const handleItemDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleItemDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const reordered = [...media];
+    const [moved] = reordered.splice(draggedIndex, 1);
+    reordered.splice(dropIndex, 0, moved);
+
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+
+    if (onReorder) {
+      onReorder(reordered.map((m) => m.id));
+    }
+  };
+
+  const handleItemDragEnd = (e: React.DragEvent) => {
+    e.stopPropagation();
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-4 border rounded-lg bg-gray-50/50 min-h-30">
-      {media.map((m) => (
-        <div
-          key={m.id}
-          // PERBAIKAN 1: Tambahkan 'group' di sini
-          className="group relative aspect-square rounded-lg overflow-hidden border bg-white shadow-sm hover:shadow-md transition-all">
-          {type === "image" ? (
-            <Image src={m.url} alt="img" fill className="object-cover" />
-          ) : (
-            // PERBAIKAN 3: Video tanpa controls agar overlay hover bekerja
-            <video
-              src={m.url}
-              className="w-full h-full object-cover"
-              muted
-              playsInline
-            />
-          )}
+    <div
+      onDragOver={handleZoneDragOver}
+      onDragLeave={handleZoneDragLeave}
+      onDrop={handleZoneDrop}
+      className={`grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-4 border-2 border-dashed rounded-lg transition-colors min-h-36 ${
+        isDraggingOverZone
+          ? "border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/30"
+          : "border-stone-200 dark:border-stone-800 bg-gray-50/50"
+      }`}>
+      {media.map((m, index) => {
+        const isItemDragged = draggedIndex === index;
+        const isItemOver = dragOverIndex === index;
 
-          {m.isFeatured && (
-            <div className="absolute top-0 left-0 bg-yellow-500 p-1.5 rounded-br-lg z-20 shadow-sm">
-              <Star className="h-3.5 w-3.5 fill-white text-white" />
+        return (
+          <div
+            key={m.id}
+            draggable={!isSubmitting}
+            onDragStart={(e) => handleItemDragStart(e, index)}
+            onDragOver={(e) => handleItemDragOver(e, index)}
+            onDrop={(e) => handleItemDrop(e, index)}
+            onDragEnd={handleItemDragEnd}
+            className={`group relative aspect-square rounded-lg overflow-hidden border bg-white shadow-sm hover:shadow-md transition-all select-none cursor-grab active:cursor-grabbing ${
+              isItemDragged
+                ? "opacity-30 scale-95 border-dashed border-indigo-400"
+                : isItemOver
+                  ? "border-indigo-500 ring-2 ring-indigo-400 scale-105"
+                  : "border-stone-200 dark:border-stone-700"
+            }`}>
+            {type === "image" ? (
+              <Image src={m.url} alt="img" fill className="object-cover pointer-events-none" />
+            ) : (
+              <video
+                src={m.url}
+                className="w-full h-full object-cover pointer-events-none"
+                muted
+                playsInline
+              />
+            )}
+
+            {/* Badge Nomor Urut */}
+            <div
+              className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold z-20 shadow-sm ${
+                index === 0
+                  ? "bg-indigo-600 text-white"
+                  : "bg-black/60 text-white backdrop-blur-xs"
+              }`}>
+              #{index + 1}
             </div>
-          )}
 
-          <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-30">
-            <Button
-              type="button"
-              size="icon"
-              variant="secondary"
-              className="h-8 w-8 rounded-full bg-white hover:bg-gray-100 text-gray-700 shadow-md"
-              onClick={() => onEdit(m)}
-              disabled={isSubmitting}
-              title="Edit Detail SEO">
-              <Pencil className="h-4 w-4" />
-            </Button>
+            {m.isFeatured && (
+              <div className="absolute top-1.5 right-1.5 bg-yellow-500 p-1.5 rounded-lg z-20 shadow-sm">
+                <Star className="h-3.5 w-3.5 fill-white text-white" />
+              </div>
+            )}
 
-            <Button
-              type="button"
-              size="icon"
-              variant="destructive"
-              className="h-8 w-8 rounded-full shadow-md"
-              onClick={() => onDelete(m.id)}
-              disabled={isSubmitting}
-              title="Hapus Media">
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-30">
+              <Button
+                type="button"
+                size="icon"
+                variant="secondary"
+                className="h-8 w-8 rounded-full bg-white hover:bg-gray-100 text-gray-700 shadow-md"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(m);
+                }}
+                disabled={isSubmitting}
+                title="Edit Detail SEO">
+                <Pencil className="h-4 w-4" />
+              </Button>
+
+              <Button
+                type="button"
+                size="icon"
+                variant="destructive"
+                className="h-8 w-8 rounded-full shadow-md"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(m.id);
+                }}
+                disabled={isSubmitting}
+                title="Hapus Media">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {media.length === 0 && (
-        <div className="col-span-full flex flex-col items-center justify-center h-full text-muted-foreground italic text-sm">
-          <p>Belum ada {type === "image" ? "gambar" : "video"} produk.</p>
+        <div className="col-span-full flex flex-col items-center justify-center h-full text-muted-foreground italic text-sm py-6">
+          <p>Belum ada {type === "image" ? "gambar" : "video"} produk. Tarik file dari komputer ke sini atau klik Tambah.</p>
         </div>
       )}
     </div>
@@ -131,11 +260,14 @@ export default function FormUpdateProductMedia({
   initialData,
   isSubmitting,
   onAddImage,
+  onAddMultipleImages,
   onDeleteImage,
   onAddVideo,
+  onAddMultipleVideos,
   onDeleteVideo,
   onUpdateMediaMetadata,
   onUpdateVideoMetadata,
+  onReorderMedia,
 }: FormUpdateProductMediaProps) {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
@@ -183,17 +315,23 @@ export default function FormUpdateProductMedia({
     }
   };
 
-  const handleVideoFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const processVideoFiles = async (files: File[]) => {
+    if (!files || files.length === 0) return;
 
     setIsUploadingVideo(true);
     setVideoUploadProgress(0);
 
     try {
-      await onAddVideo(file, (progress) => {
-        setVideoUploadProgress(Math.round(progress));
-      });
+      if (files.length > 1 && onAddMultipleVideos) {
+        await onAddMultipleVideos(files, (p) => setVideoUploadProgress(Math.round(p)));
+      } else {
+        for (let i = 0; i < files.length; i++) {
+          await onAddVideo(files[i], (p) => {
+            const total = ((i + p / 100) / files.length) * 100;
+            setVideoUploadProgress(Math.round(total));
+          });
+        }
+      }
     } catch (error) {
       console.error("Video upload failed", error);
     } finally {
@@ -205,16 +343,29 @@ export default function FormUpdateProductMedia({
     }
   };
 
-  const handleImageFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleVideoFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      await processVideoFiles(Array.from(e.target.files));
+    }
+  };
+
+  const processImageFiles = async (files: File[]) => {
+    if (!files || files.length === 0) return;
 
     setIsUploadingImage(true);
     setImageUploadProgress(0);
+
     try {
-      await onAddImage(file, (progress) => {
-        setImageUploadProgress(Math.round(progress));
-      });
+      if (files.length > 1 && onAddMultipleImages) {
+        await onAddMultipleImages(files, (p) => setImageUploadProgress(Math.round(p)));
+      } else {
+        for (let i = 0; i < files.length; i++) {
+          await onAddImage(files[i], (p) => {
+            const total = ((i + p / 100) / files.length) * 100;
+            setImageUploadProgress(Math.round(total));
+          });
+        }
+      }
     } catch (error) {
       console.error("Image upload failed", error);
     } finally {
@@ -223,6 +374,12 @@ export default function FormUpdateProductMedia({
       if (imageInputRef.current) {
         imageInputRef.current.value = "";
       }
+    }
+  };
+
+  const handleImageFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      await processImageFiles(Array.from(e.target.files));
     }
   };
 
@@ -235,7 +392,12 @@ export default function FormUpdateProductMedia({
         <CardContent className="space-y-6">
           {/* --- Gambar Produk --- */}
           <div>
-            <h3 className="text-lg font-medium mb-1">Gambar Produk</h3>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-lg font-medium">Gambar Produk</h3>
+              <span className="text-xs text-stone-500 font-normal">
+                Geser kartu untuk mengubah urutan (Tersimpan otomatis)
+              </span>
+            </div>
             <p className="text-xs text-stone-500 mb-3">
               Setiap gambar yang berhasil diunggah akan otomatis dikonversi ke format <strong>.webp</strong> untuk mengoptimalkan performa pemuatan halaman.
             </p>
@@ -244,12 +406,15 @@ export default function FormUpdateProductMedia({
               type="image"
               onDelete={onDeleteImage}
               onEdit={handleOpenModal}
+              onReorder={(newIds) => onReorderMedia?.("image", newIds)}
+              onFilesDrop={processImageFiles}
               isSubmitting={isSubmitting}
             />
              <div className="mt-3 flex gap-2 items-center">
               <Input
                 type="file"
                 accept="image/*"
+                multiple
                 ref={imageInputRef}
                 onChange={handleImageFileChange}
                 disabled={isSubmitting || isUploadingImage}
@@ -288,18 +453,26 @@ export default function FormUpdateProductMedia({
 
           {/* --- Video Produk --- */}
           <div>
-            <h3 className="text-lg font-medium mb-2">Video Produk</h3>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-lg font-medium">Video Produk</h3>
+              <span className="text-xs text-stone-500 font-normal">
+                Geser kartu untuk mengubah urutan (Tersimpan otomatis)
+              </span>
+            </div>
             <ExistingMediaDisplay
               media={initialData?.videos || []}
               type="video"
               onDelete={onDeleteVideo}
               isSubmitting={isSubmitting}
               onEdit={handleOpenVideoModal}
+              onReorder={(newIds) => onReorderMedia?.("video", newIds)}
+              onFilesDrop={processVideoFiles}
             />
             <div className="mt-3 flex gap-2 items-center">
               <Input
                 type="file"
-                accept="video/mp4,video/quicktime"
+                accept="video/mp4,video/quicktime,video/webm"
+                multiple
                 ref={videoInputRef}
                 onChange={handleVideoFileChange}
                 disabled={isSubmitting || isUploadingVideo}
@@ -338,24 +511,32 @@ export default function FormUpdateProductMedia({
         </CardContent>
       </Card>
 
+      {/* Modal Edit Metadata Gambar */}
       {isModalOpen && selectedMedia && (
         <ImageDetailModalCore
           tempId={selectedMedia.id as any}
           imageMeta={{
             ...selectedMedia,
             isNew: false,
+            altText: selectedMedia.altText || "",
+            isFeatured: selectedMedia.isFeatured || false,
           }}
           onClose={handleCloseModal}
           setImageMetaField={handleModalUpdateMeta}
           setFeaturedImage={handleModalSetFeatured}
         />
       )}
+
+      {/* Modal Edit Metadata Video */}
       {isVideoModalOpen && selectedVideo && (
         <VideoDetailModalCore
           tempId={selectedVideo.id}
           videoMeta={{
             ...selectedVideo,
             isNew: false,
+            title: selectedVideo.title || "",
+            altText: selectedVideo.altText || "",
+            isFeatured: selectedVideo.isFeatured || false,
           }}
           onClose={() => {
             setIsVideoModalOpen(false);

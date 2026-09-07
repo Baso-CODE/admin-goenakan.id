@@ -514,6 +514,107 @@ export default function EditProductPage() {
     }
   };
 
+  const handleAddMultipleImages = async (
+    files: File[],
+    onProgress?: (progress: number) => void,
+  ): Promise<void> => {
+    try {
+      const currentSession = await getSession();
+      const currentToken = currentSession?.user?.accessToken;
+
+      const formData = new FormData();
+      files.forEach((file) => formData.append("images", file));
+
+      const uploadData = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${apiUrl}/products/${id}/images`, true);
+
+        if (currentToken) {
+          xhr.setRequestHeader("Authorization", `Bearer ${currentToken}`);
+        }
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = (event.loaded / event.total) * 100;
+            if (onProgress) {
+              onProgress(percentComplete);
+            }
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            try {
+              const errJson = JSON.parse(xhr.responseText);
+              reject(new Error(errJson.message || "Failed to add images"));
+            } catch {
+              reject(new Error(`Gagal upload images: ${xhr.statusText}`));
+            }
+          }
+        };
+
+        xhr.onerror = () => reject(new Error("Network Error saat upload images"));
+        xhr.send(formData);
+      });
+
+      setProductData(uploadData);
+      toast.success(`${files.length} gambar berhasil ditambahkan!`);
+    } catch (err) {
+      console.error("Error adding multiple images:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Gagal menambahkan gambar",
+      );
+      throw err;
+    }
+  };
+
+  const handleReorderMedia = async (
+    type: "image" | "video",
+    orderedIds: string[],
+  ): Promise<void> => {
+    const previousProductData = productData;
+
+    // Optimistic Update
+    setProductData((prev: any) => {
+      if (!prev) return prev;
+      if (type === "image") {
+        const map = new Map((prev.images || []).map((img: any) => [img.id, img]));
+        const reordered = orderedIds.map((imgId) => map.get(imgId)).filter(Boolean);
+        return { ...prev, images: reordered };
+      } else {
+        const map = new Map((prev.videos || []).map((vid: any) => [vid.id, vid]));
+        const reordered = orderedIds.map((vidId) => map.get(vidId)).filter(Boolean);
+        return { ...prev, videos: reordered };
+      }
+    });
+
+    try {
+      const res = await fetchApi(`/products/${id}/media-order`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, orderedIds }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || "Failed to save media order");
+      }
+
+      const updated = await res.json();
+      setProductData(updated);
+      toast.success(`Urutan ${type === "image" ? "gambar" : "video"} berhasil diperbarui!`);
+    } catch (err) {
+      console.error("Error reordering media:", err);
+      // Rollback
+      setProductData(previousProductData);
+      toast.error(
+        err instanceof Error ? err.message : "Gagal memperbarui urutan media",
+      );
+    }
+  };
+
   const handleAddVideo = async (
     file: File,
     onProgress?: (progress: number) => void,
@@ -1049,11 +1150,13 @@ export default function EditProductPage() {
             } : undefined}
             isSubmitting={isSubmitting}
             onAddImage={handleAddImage}
+            onAddMultipleImages={handleAddMultipleImages}
             onDeleteImage={handleDeleteImage}
             onAddVideo={handleAddVideo}
             onDeleteVideo={handleDeleteVideo}
             onUpdateMediaMetadata={handleUpdateMediaMetadata}
             onUpdateVideoMetadata={handleUpdateVideoMetadata}
+            onReorderMedia={handleReorderMedia}
           />
         </TabsContent>
 
