@@ -106,7 +106,9 @@ function ExistingMediaDisplay({
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0 && onFilesDrop) {
       const files = Array.from(e.dataTransfer.files).filter((f) =>
-        type === "image" ? f.type.startsWith("image/") : f.type.startsWith("video/"),
+        type === "image"
+          ? f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name)
+          : f.type.startsWith("video/"),
       );
       if (files.length > 0) {
         onFilesDrop(files);
@@ -413,7 +415,7 @@ export default function FormUpdateProductMedia({
              <div className="mt-3 flex gap-2 items-center">
               <Input
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
                 multiple
                 ref={imageInputRef}
                 onChange={handleImageFileChange}
