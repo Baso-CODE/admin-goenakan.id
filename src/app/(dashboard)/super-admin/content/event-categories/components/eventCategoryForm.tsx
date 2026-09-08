@@ -28,8 +28,10 @@ import { useEffect, useRef, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 
+// 1. ✨ UPDATE ZOD SCHEMA: Mendukung title_id dan title_en
 const eventCategorySchema = z.object({
-  title: z.string().min(2, "Category title must be at least 2 characters"),
+  title_id: z.string().min(2, "Judul kategori (ID) minimal 2 karakter"),
+  title_en: z.string().optional(),
   image: z.any().optional(),
   displayOrder: z.coerce.number().min(0).default(0),
   orderCount: z.coerce.number().min(0).default(0),
@@ -60,7 +62,8 @@ export default function EventCategoryForm({
       eventCategorySchema,
     ) as Resolver<EventCategoryFormValues>,
     defaultValues: {
-      title: "",
+      title_id: "",
+      title_en: "",
       displayOrder: 0,
       orderCount: 0,
       isActive: true,
@@ -70,7 +73,8 @@ export default function EventCategoryForm({
   useEffect(() => {
     if (initialData) {
       form.reset({
-        title: initialData.title,
+        title_id: initialData.title_id || initialData.title || "",
+        title_en: initialData.title_en || "",
         displayOrder: initialData.displayOrder || 0,
         orderCount: initialData.orderCount || 0,
         isActive: initialData.isActive ?? true,
@@ -98,7 +102,12 @@ export default function EventCategoryForm({
   const handleSubmit = (values: EventCategoryFormValues) => {
     const formData = new FormData();
 
-    formData.append("title", values.title);
+    // ✨ Kirim data bilingual ke backend
+    formData.append("title_id", values.title_id);
+    if (values.title_en) {
+      formData.append("title_en", values.title_en);
+    }
+
     formData.append("displayOrder", String(values.displayOrder));
     formData.append("orderCount", String(values.orderCount));
     formData.append("isActive", String(values.isActive));
@@ -185,16 +194,40 @@ export default function EventCategoryForm({
                 />
               </div>
 
-              {/* === Title / Category Name === */}
+              {/* === Title (Bahasa Indonesia) === */}
               <div className="col-span-1">
                 <FormField
                   control={form.control}
-                  name="title"
+                  name="title_id"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-2">
                         <Tag className="h-4 w-4 text-muted-foreground" />
-                        Category Title *
+                        Category Title (ID) *
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="cth. Pernikahan, Perusahaan..."
+                          className="h-10"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* === Title (Bahasa Inggris) === */}
+              <div className="col-span-1">
+                <FormField
+                  control={form.control}
+                  name="title_en"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Tag className="h-4 w-4 text-muted-foreground" />
+                        Category Title (EN) (Optional)
                       </FormLabel>
                       <FormControl>
                         <Input
@@ -269,13 +302,11 @@ export default function EventCategoryForm({
                   name="isActive"
                   render={({ field }) => (
                     <FormItem>
-                      {/*  LABEL BAYANGAN: Memastikan strukturnya sejajar 100% dengan Display Order */}
                       <FormLabel className="flex items-center gap-2 opacity-0 select-none pointer-events-none">
                         <ListOrdered className="h-4 w-4" />
                         Status
                       </FormLabel>
 
-                      {/*  KOTAK H-10: Memastikan tingginya sama persis dengan kotak Input */}
                       <div
                         className="flex flex-row items-center gap-3 px-3 h-10 border rounded-md bg-stone-50 hover:bg-stone-100 transition-colors shadow-sm cursor-pointer"
                         onClick={() => field.onChange(!field.value)}>
@@ -283,7 +314,7 @@ export default function EventCategoryForm({
                           <Checkbox
                             checked={field.value}
                             onCheckedChange={field.onChange}
-                            className="pointer-events-none" // Biar div yg nangkep klik
+                            className="pointer-events-none"
                           />
                         </FormControl>
                         <span className="text-sm font-medium cursor-pointer text-stone-700">
@@ -291,7 +322,6 @@ export default function EventCategoryForm({
                         </span>
                       </div>
 
-                      {/*  DESKRIPSI: Dipindah ke bawah agar sama seperti Ordered Times */}
                       <FormDescription className="text-[10px]">
                         Visible on the website.
                       </FormDescription>

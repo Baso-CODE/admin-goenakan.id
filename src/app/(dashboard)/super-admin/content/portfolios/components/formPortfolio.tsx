@@ -40,10 +40,13 @@ import { useEffect, useRef, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 
+// 1. ✨ UPDATE ZOD SCHEMA: Mendukung title_id, title_en, dan description_en
 const portfolioSchema = z.object({
-  title: z.string().min(2, "Project title must be at least 2 characters"),
+  title_id: z.string().min(2, "Judul portofolio (ID) minimal 2 karakter"),
+  title_en: z.string().optional(),
   clientName: z.string().min(2, "Client name is required"),
   description: z.string().optional(),
+  description_en: z.string().optional(),
   image: z.any().optional(),
   displayOrder: z.coerce.number().min(0).default(0),
   isActive: z.boolean().default(true),
@@ -73,7 +76,6 @@ export default function PortfolioForm({
     [],
   );
 
-  // === STATE FOR PREVIEW & FILE ===
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -81,9 +83,11 @@ export default function PortfolioForm({
   const form = useForm<PortfolioFormValues>({
     resolver: zodResolver(portfolioSchema) as Resolver<PortfolioFormValues>,
     defaultValues: {
-      title: "",
+      title_id: "",
+      title_en: "",
       clientName: "",
       description: "",
+      description_en: "",
       displayOrder: 0,
       isActive: true,
       orderQuantity: 0,
@@ -92,7 +96,6 @@ export default function PortfolioForm({
     },
   });
 
-  // Fetch Category List untuk Dropdown
   useEffect(() => {
     const loadCategories = async () => {
       try {
@@ -113,9 +116,11 @@ export default function PortfolioForm({
         : "";
 
       form.reset({
-        title: initialData.title,
+        title_id: initialData.title_id || initialData.title || "",
+        title_en: initialData.title_en || "",
         clientName: initialData.clientName || "",
         description: initialData.description || "",
+        description_en: initialData.description_en || "",
         displayOrder: initialData.displayOrder || 0,
         isActive: initialData.isActive ?? true,
         orderQuantity: initialData.orderQuantity || 0,
@@ -145,15 +150,20 @@ export default function PortfolioForm({
   const handleSubmit = (values: PortfolioFormValues) => {
     const formData = new FormData();
 
-    formData.append("title", values.title);
+    // ✨ Kirim data bilingual ke FormData
+    formData.append("title_id", values.title_id);
+    if (values.title_en) formData.append("title_en", values.title_en);
+
     formData.append("clientName", values.clientName);
     formData.append("displayOrder", String(values.displayOrder));
     formData.append("isActive", String(values.isActive));
-
-    //  Append Data Baru
     formData.append("orderQuantity", String(values.orderQuantity));
+
     if (values.description) formData.append("description", values.description);
+    if (values.description_en)
+      formData.append("description_en", values.description_en);
     if (values.projectDate) formData.append("projectDate", values.projectDate);
+
     if (values.eventCategoryId && values.eventCategoryId !== "none") {
       formData.append("eventCategoryId", values.eventCategoryId);
     }
@@ -240,16 +250,40 @@ export default function PortfolioForm({
                 />
               </div>
 
-              {/* === Title / Project Name === */}
+              {/* === Title (Bahasa Indonesia) === */}
               <div className="col-span-1">
                 <FormField
                   control={form.control}
-                  name="title"
+                  name="title_id"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-2">
                         <Type className="h-4 w-4 text-muted-foreground" />
-                        Project Title *
+                        Project Title (ID) *
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-10"
+                          placeholder="cth. GIFT SET"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* === Title (Bahasa Inggris) === */}
+              <div className="col-span-1">
+                <FormField
+                  control={form.control}
+                  name="title_en"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Type className="h-4 w-4 text-muted-foreground" />
+                        Project Title (EN) (Optional)
                       </FormLabel>
                       <FormControl>
                         <Input
@@ -367,7 +401,6 @@ export default function PortfolioForm({
                         Project Date (Optional)
                       </FormLabel>
                       <FormControl>
-                        {/* Menggunakan input date bawaan HTML agar lebih simpel */}
                         <Input type="date" className="h-10" {...field} />
                       </FormControl>
                       <FormMessage />
@@ -392,30 +425,6 @@ export default function PortfolioForm({
                           type="number"
                           min={0}
                           className="h-10"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* === Description (Optional) === */}
-              <div className="col-span-1">
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        <AlignLeft className="h-4 w-4 text-muted-foreground" />
-                        Short Description
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          className="h-10"
-                          placeholder="Brief details..."
                           {...field}
                         />
                       </FormControl>
@@ -453,6 +462,54 @@ export default function PortfolioForm({
                       <FormDescription className="text-[10px]">
                         Visible on the website.
                       </FormDescription>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* === Description (Bahasa Indonesia) === */}
+              <div className="col-span-1">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <AlignLeft className="h-4 w-4 text-muted-foreground" />
+                        Short Description (ID)
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-10"
+                          placeholder="Detail singkat..."
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* === Description (Bahasa Inggris) === */}
+              <div className="col-span-1">
+                <FormField
+                  control={form.control}
+                  name="description_en"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <AlignLeft className="h-4 w-4 text-muted-foreground" />
+                        Short Description (EN) (Optional)
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-10"
+                          placeholder="Brief details..."
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />

@@ -30,9 +30,7 @@ import {
   Type,
   X,
 } from "lucide-react";
-import Image from "next/image";
 
-// 1. Update Schema Zod
 const heroSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters"),
   altText: z.string().optional(),
@@ -55,7 +53,6 @@ export default function HeroForm({
   isLoading = false,
   isSubmitting = false,
 }: {
-  // Update tipe data initialData untuk mengakomodasi gambar baru
   initialData?: HeroFormValues & {
     imageUrl?: string;
     imageMobileUrl?: string;
@@ -68,7 +65,6 @@ export default function HeroForm({
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
-  // 2. State untuk Preview Gambar
   const [previewDesktop, setPreviewDesktop] = useState<string | null>(
     initialData?.imageUrl || null,
   );
@@ -79,7 +75,6 @@ export default function HeroForm({
     initialData?.imageTabletUrl || null,
   );
 
-  // 3. State untuk File yang diunggah
   const [selectedDesktop, setSelectedDesktop] = useState<File | undefined>();
   const [selectedMobile, setSelectedMobile] = useState<File | undefined>();
   const [selectedTablet, setSelectedTablet] = useState<File | undefined>();
@@ -97,7 +92,9 @@ export default function HeroForm({
     mode: "onBlur",
   });
 
-  // 4. Handler File Change Dinamis
+  const { isSubmitting: formIsSubmitting } = form.formState;
+  const isCurrentlySubmitting = isLoading || isSubmitting || formIsSubmitting;
+
   const handleFileChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     type: "desktop" | "mobile" | "tablet",
@@ -137,7 +134,7 @@ export default function HeroForm({
   }, [initialData, form]);
 
   const handleSubmit = (values: HeroFormValues) => {
-    onSubmit(values, {
+    return onSubmit(values, {
       desktop: selectedDesktop,
       mobile: selectedMobile,
       tablet: selectedTablet,
@@ -159,7 +156,7 @@ export default function HeroForm({
 
   return (
     <Card className="w-full relative">
-      {isLoading && (
+      {isCurrentlySubmitting && (
         <div className="absolute inset-0 bg-background/80 z-10 flex items-center justify-center rounded-lg">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
@@ -171,9 +168,7 @@ export default function HeroForm({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-6 w-full">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* === IMAGE UPLOAD SECTION === */}
-
-              {/* Desktop Image */}
+              {/* === Desktop Image === */}
               <div className="col-span-2">
                 <FormItem>
                   <FormLabel className="flex items-center gap-2 mb-2">
@@ -183,18 +178,20 @@ export default function HeroForm({
                   </FormLabel>
                   <FormControl>
                     {previewDesktop ? (
-                      <div className="relative w-full h-48 md:h-64 rounded-xl border border-gray-200 overflow-hidden group shadow-sm">
-                        <Image
+                      // ✨ UPDATE: Wadah dinamis dengan flexbox agar gambar berada di tengah
+                      <div className="relative w-full rounded-xl border border-gray-200 overflow-hidden group shadow-sm bg-stone-50 flex items-center justify-center p-2 min-h-[150px]">
+                        {/* ✨ UPDATE: Menggunakan tag img standar agar aspek rasio terjaga dan tidak terpotong */}
+                        <img
                           src={previewDesktop}
                           alt="Preview Desktop"
-                          fill
-                          className="object-cover bg-white"
+                          className="w-auto h-auto max-h-[400px] object-contain rounded-md"
                         />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm rounded-xl">
                           <button
                             type="button"
                             onClick={() => handleRemoveFile("desktop")}
-                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
+                            disabled={isCurrentlySubmitting}
+                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110 disabled:opacity-50">
                             <X className="w-5 h-5" />
                           </button>
                         </div>
@@ -212,14 +209,14 @@ export default function HeroForm({
                             gambar Desktop
                           </p>
                           <p className="text-xs text-gray-400">
-                            SVG, PNG, JPG atau WEBP (Horizontal)
+                            SVG, PNG, JPG atau WEBP (Landscape direkomendasikan)
                           </p>
                         </div>
                         <Input
                           type="file"
                           className="hidden"
                           accept="image/*"
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                           onChange={(e) => handleFileChange(e, "desktop")}
                         />
                       </label>
@@ -228,7 +225,7 @@ export default function HeroForm({
                 </FormItem>
               </div>
 
-              {/* Mobile Image */}
+              {/* === Mobile Image === */}
               <div className="col-span-2 md:col-span-1">
                 <FormItem>
                   <FormLabel className="flex items-center gap-2 mb-2">
@@ -237,18 +234,18 @@ export default function HeroForm({
                   </FormLabel>
                   <FormControl>
                     {previewMobile ? (
-                      <div className="relative w-full h-64 rounded-xl border border-gray-200 overflow-hidden group shadow-sm aspect-9/16 mx-auto md:mx-0 max-w-662.5">
-                        <Image
+                      <div className="relative w-full rounded-xl border border-gray-200 overflow-hidden group shadow-sm bg-stone-50 flex items-center justify-center p-2 min-h-[150px]">
+                        <img
                           src={previewMobile}
                           alt="Preview Mobile"
-                          fill
-                          className="object-cover bg-white"
+                          className="w-auto h-auto max-h-[400px] object-contain rounded-md"
                         />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm rounded-xl">
                           <button
                             type="button"
                             onClick={() => handleRemoveFile("mobile")}
-                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
+                            disabled={isCurrentlySubmitting}
+                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110 disabled:opacity-50">
                             <X className="w-5 h-5" />
                           </button>
                         </div>
@@ -266,14 +263,14 @@ export default function HeroForm({
                             Mobile
                           </p>
                           <p className="text-xs text-gray-400">
-                            Rasio 9:16 (Vertikal)
+                            Rasio 9:16 (Vertikal direkomendasikan)
                           </p>
                         </div>
                         <Input
                           type="file"
                           className="hidden"
                           accept="image/*"
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                           onChange={(e) => handleFileChange(e, "mobile")}
                         />
                       </label>
@@ -282,7 +279,7 @@ export default function HeroForm({
                 </FormItem>
               </div>
 
-              {/* Tablet Image */}
+              {/* === Tablet Image === */}
               <div className="col-span-2 md:col-span-1">
                 <FormItem>
                   <FormLabel className="flex items-center gap-2 mb-2">
@@ -291,18 +288,18 @@ export default function HeroForm({
                   </FormLabel>
                   <FormControl>
                     {previewTablet ? (
-                      <div className="relative w-full h-64 rounded-xl border border-gray-200 overflow-hidden group shadow-sm">
-                        <Image
+                      <div className="relative w-full rounded-xl border border-gray-200 overflow-hidden group shadow-sm bg-stone-50 flex items-center justify-center p-2 min-h-[150px]">
+                        <img
                           src={previewTablet}
                           alt="Preview Tablet"
-                          fill
-                          className="object-cover bg-white"
+                          className="w-auto h-auto max-h-[400px] object-contain rounded-md"
                         />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm rounded-xl">
                           <button
                             type="button"
                             onClick={() => handleRemoveFile("tablet")}
-                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
+                            disabled={isCurrentlySubmitting}
+                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110 disabled:opacity-50">
                             <X className="w-5 h-5" />
                           </button>
                         </div>
@@ -327,7 +324,7 @@ export default function HeroForm({
                           type="file"
                           className="hidden"
                           accept="image/*"
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                           onChange={(e) => handleFileChange(e, "tablet")}
                         />
                       </label>
@@ -352,7 +349,7 @@ export default function HeroForm({
                           placeholder="Ex: Where Ideas Become Reality"
                           {...field}
                           value={field.value ?? ""}
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                         />
                       </FormControl>
                       <FormMessage />
@@ -377,7 +374,7 @@ export default function HeroForm({
                           placeholder="Describe the image for SEO..."
                           {...field}
                           value={field.value ?? ""}
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                         />
                       </FormControl>
                       <FormMessage />
@@ -402,7 +399,7 @@ export default function HeroForm({
                           placeholder="Ex: Shop Now"
                           {...field}
                           value={field.value ?? ""}
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                         />
                       </FormControl>
                       <FormMessage />
@@ -427,7 +424,7 @@ export default function HeroForm({
                           placeholder="Ex: /products/custom"
                           {...field}
                           value={field.value ?? ""}
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                         />
                       </FormControl>
                       <FormMessage />
@@ -452,7 +449,7 @@ export default function HeroForm({
                           type="number"
                           min={0}
                           placeholder="0"
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                           {...field}
                           value={field.value ?? ""}
                           onChange={(e) => field.onChange(e.target.value)}
@@ -478,7 +475,7 @@ export default function HeroForm({
                         <Checkbox
                           checked={field.value}
                           onCheckedChange={field.onChange}
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
@@ -499,8 +496,8 @@ export default function HeroForm({
                 type="submit"
                 className="w-full md:w-auto cursor-pointer"
                 variant="default"
-                disabled={isLoading || isSubmitting}>
-                {isSubmitting ? (
+                disabled={isCurrentlySubmitting}>
+                {isCurrentlySubmitting ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <ClipboardList className="h-4 w-4 mr-2" />
