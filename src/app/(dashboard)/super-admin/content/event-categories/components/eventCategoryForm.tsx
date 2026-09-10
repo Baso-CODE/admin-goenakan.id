@@ -28,7 +28,6 @@ import { useEffect, useRef, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 
-// 1. ✨ UPDATE ZOD SCHEMA: Mendukung title_id dan title_en
 const eventCategorySchema = z.object({
   title_id: z.string().min(2, "Judul kategori (ID) minimal 2 karakter"),
   title_en: z.string().optional(),
@@ -102,7 +101,6 @@ export default function EventCategoryForm({
   const handleSubmit = (values: EventCategoryFormValues) => {
     const formData = new FormData();
 
-    // ✨ Kirim data bilingual ke backend
     formData.append("title_id", values.title_id);
     if (values.title_en) {
       formData.append("title_en", values.title_en);
@@ -154,7 +152,8 @@ export default function EventCategoryForm({
                                 src={preview}
                                 alt="Preview"
                                 fill
-                                className="object-cover"
+                                // ✨ PERUBAHAN: Menggunakan object-contain agar rasio portrait/landscape asli terjaga
+                                className="object-contain p-2"
                               />
                               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                 <p className="text-white font-medium flex items-center gap-2">

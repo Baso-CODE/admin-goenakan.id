@@ -40,7 +40,6 @@ import { useEffect, useRef, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 
-// 1. ✨ UPDATE ZOD SCHEMA: Mendukung title_id, title_en, dan description_en
 const portfolioSchema = z.object({
   title_id: z.string().min(2, "Judul portofolio (ID) minimal 2 karakter"),
   title_en: z.string().optional(),
@@ -72,9 +71,13 @@ export default function PortfolioForm({
   isSubmitting = false,
 }: PortfolioFormProps) {
   const { fetchApi } = useApi();
-  const [categories, setCategories] = useState<{ id: string; title: string }[]>(
-    [],
-  );
+
+  console.log("ini adlah inital data", initialData);
+
+  // Sesuaikan tipe categories agar mengenali title_id atau title jika ada
+  const [categories, setCategories] = useState<
+    { id: string; title?: string; title_id?: string }[]
+  >([]);
 
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | undefined>(undefined);
@@ -92,10 +95,11 @@ export default function PortfolioForm({
       isActive: true,
       orderQuantity: 0,
       projectDate: "",
-      eventCategoryId: "",
+      eventCategoryId: "none",
     },
   });
 
+  // 1. Fetch Category List
   useEffect(() => {
     const loadCategories = async () => {
       try {
@@ -109,11 +113,15 @@ export default function PortfolioForm({
     loadCategories();
   }, [fetchApi]);
 
+  // 2. ✨ Gabungkan initialData & categories agar form reset terpanggil setelah kategori siap
   useEffect(() => {
     if (initialData) {
       const formattedDate = initialData.projectDate
         ? new Date(initialData.projectDate).toISOString().split("T")[0]
         : "";
+
+      const extractedCategoryId =
+        initialData.eventCategoryId || initialData.eventCategory?.id || "none";
 
       form.reset({
         title_id: initialData.title_id || initialData.title || "",
@@ -125,14 +133,14 @@ export default function PortfolioForm({
         isActive: initialData.isActive ?? true,
         orderQuantity: initialData.orderQuantity || 0,
         projectDate: formattedDate,
-        eventCategoryId: initialData.eventCategoryId || "",
+        eventCategoryId: extractedCategoryId,
       });
 
       if (initialData.image) {
         setPreview(initialData.image);
       }
     }
-  }, [initialData, form]);
+  }, [initialData, categories, form]); // 👈 categories dimasukkan ke dependency array di sini
 
   const handleFileChange = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -150,7 +158,6 @@ export default function PortfolioForm({
   const handleSubmit = (values: PortfolioFormValues) => {
     const formData = new FormData();
 
-    // ✨ Kirim data bilingual ke FormData
     formData.append("title_id", values.title_id);
     if (values.title_en) formData.append("title_en", values.title_en);
 
@@ -210,7 +217,8 @@ export default function PortfolioForm({
                                 src={preview}
                                 alt="Preview"
                                 fill
-                                className="object-cover"
+                                // ✨ PERUBAHAN: object-cover diganti menjadi object-contain
+                                className="object-contain p-2"
                               />
                               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                 <p className="text-white font-medium flex items-center gap-2">
@@ -349,7 +357,7 @@ export default function PortfolioForm({
                           </SelectItem>
                           {categories.map((cat) => (
                             <SelectItem key={cat.id} value={cat.id}>
-                              {cat.title}
+                              {cat.title_id || cat.title}
                             </SelectItem>
                           ))}
                         </SelectContent>
