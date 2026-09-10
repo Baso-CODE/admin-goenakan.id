@@ -22,13 +22,12 @@ import {
   Check,
   ClipboardList,
   ImageIcon,
-  ImagePlus,
   LayoutTemplate,
   Link as LinkIcon,
   ListOrdered,
   Loader2,
   Type,
-  X,
+  UploadCloud,
 } from "lucide-react";
 
 const heroSchema = z.object({
@@ -177,50 +176,42 @@ export default function HeroForm({
                     {initialData ? "(Optional)" : "(Required)"}
                   </FormLabel>
                   <FormControl>
-                    {previewDesktop ? (
-                      // ✨ UPDATE: Wadah dinamis dengan flexbox agar gambar berada di tengah
-                      <div className="relative w-full rounded-xl border border-gray-200 overflow-hidden group shadow-sm bg-stone-50 flex items-center justify-center p-2 min-h-[150px]">
-                        {/* ✨ UPDATE: Menggunakan tag img standar agar aspek rasio terjaga dan tidak terpotong */}
-                        <img
-                          src={previewDesktop}
-                          alt="Preview Desktop"
-                          className="w-auto h-auto max-h-[400px] object-contain rounded-md"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm rounded-xl">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveFile("desktop")}
-                            disabled={isCurrentlySubmitting}
-                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110 disabled:opacity-50">
-                            <X className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <label className="flex flex-col items-center justify-center w-full h-48 md:h-64 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 hover:border-primary transition-all">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <div className="p-3 bg-white rounded-full shadow-sm mb-3">
-                            <ImagePlus className="w-6 h-6 text-gray-400" />
+                    <label className="relative w-full h-48 md:h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden group block">
+                      {previewDesktop ? (
+                        <>
+                          <img
+                            src={previewDesktop}
+                            alt="Preview Desktop"
+                            className="w-full h-full object-contain p-2"
+                          />
+                          {/*  Efek Hover "Change Image" yang baru */}
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <p className="text-white font-medium flex items-center gap-2">
+                              <UploadCloud className="h-5 w-5" /> Change Image
+                            </p>
                           </div>
-                          <p className="mb-1 text-sm text-gray-600">
-                            <span className="font-semibold text-primary">
-                              Klik untuk unggah
-                            </span>{" "}
-                            gambar Desktop
-                          </p>
-                          <p className="text-xs text-gray-400">
+                        </>
+                      ) : (
+                        <div className="text-center space-y-2 p-4">
+                          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
+                            <UploadCloud className="h-6 w-6 text-stone-400" />
+                          </div>
+                          <div className="text-sm font-medium text-stone-700">
+                            Klik untuk unggah gambar Desktop
+                          </div>
+                          <p className="text-xs text-stone-500">
                             SVG, PNG, JPG atau WEBP (Landscape direkomendasikan)
                           </p>
                         </div>
-                        <Input
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          disabled={isCurrentlySubmitting}
-                          onChange={(e) => handleFileChange(e, "desktop")}
-                        />
-                      </label>
-                    )}
+                      )}
+                      <Input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        disabled={isCurrentlySubmitting}
+                        onChange={(e) => handleFileChange(e, "desktop")}
+                      />
+                    </label>
                   </FormControl>
                 </FormItem>
               </div>
@@ -233,48 +224,41 @@ export default function HeroForm({
                     Mobile Image {initialData ? "(Optional)" : "(Required)"}
                   </FormLabel>
                   <FormControl>
-                    {previewMobile ? (
-                      <div className="relative w-full rounded-xl border border-gray-200 overflow-hidden group shadow-sm bg-stone-50 flex items-center justify-center p-2 min-h-[150px]">
-                        <img
-                          src={previewMobile}
-                          alt="Preview Mobile"
-                          className="w-auto h-auto max-h-[400px] object-contain rounded-md"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm rounded-xl">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveFile("mobile")}
-                            disabled={isCurrentlySubmitting}
-                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110 disabled:opacity-50">
-                            <X className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 hover:border-primary transition-all">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
-                          <div className="p-3 bg-white rounded-full shadow-sm mb-3">
-                            <ImagePlus className="w-6 h-6 text-gray-400" />
+                    <label className="relative w-full h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden group block">
+                      {previewMobile ? (
+                        <>
+                          <img
+                            src={previewMobile}
+                            alt="Preview Mobile"
+                            className="w-full h-full object-contain p-2"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <p className="text-white font-medium flex items-center gap-2">
+                              <UploadCloud className="h-5 w-5" /> Change Image
+                            </p>
                           </div>
-                          <p className="mb-1 text-sm text-gray-600">
-                            <span className="font-semibold text-primary">
-                              Unggah
-                            </span>{" "}
-                            Mobile
-                          </p>
-                          <p className="text-xs text-gray-400">
+                        </>
+                      ) : (
+                        <div className="text-center space-y-2 p-4">
+                          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
+                            <UploadCloud className="h-6 w-6 text-stone-400" />
+                          </div>
+                          <div className="text-sm font-medium text-stone-700">
+                            Klik untuk unggah gambar Mobile
+                          </div>
+                          <p className="text-xs text-stone-500">
                             Rasio 9:16 (Vertikal direkomendasikan)
                           </p>
                         </div>
-                        <Input
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          disabled={isCurrentlySubmitting}
-                          onChange={(e) => handleFileChange(e, "mobile")}
-                        />
-                      </label>
-                    )}
+                      )}
+                      <Input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        disabled={isCurrentlySubmitting}
+                        onChange={(e) => handleFileChange(e, "mobile")}
+                      />
+                    </label>
                   </FormControl>
                 </FormItem>
               </div>
@@ -287,48 +271,41 @@ export default function HeroForm({
                     Tablet Image (Optional)
                   </FormLabel>
                   <FormControl>
-                    {previewTablet ? (
-                      <div className="relative w-full rounded-xl border border-gray-200 overflow-hidden group shadow-sm bg-stone-50 flex items-center justify-center p-2 min-h-[150px]">
-                        <img
-                          src={previewTablet}
-                          alt="Preview Tablet"
-                          className="w-auto h-auto max-h-[400px] object-contain rounded-md"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm rounded-xl">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveFile("tablet")}
-                            disabled={isCurrentlySubmitting}
-                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110 disabled:opacity-50">
-                            <X className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 hover:border-primary transition-all">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
-                          <div className="p-3 bg-white rounded-full shadow-sm mb-3">
-                            <ImagePlus className="w-6 h-6 text-gray-400" />
+                    <label className="relative w-full h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden group block">
+                      {previewTablet ? (
+                        <>
+                          <img
+                            src={previewTablet}
+                            alt="Preview Tablet"
+                            className="w-full h-full object-contain p-2"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <p className="text-white font-medium flex items-center gap-2">
+                              <UploadCloud className="h-5 w-5" /> Change Image
+                            </p>
                           </div>
-                          <p className="mb-1 text-sm text-gray-600">
-                            <span className="font-semibold text-primary">
-                              Unggah
-                            </span>{" "}
-                            Tablet
-                          </p>
-                          <p className="text-xs text-gray-400">
+                        </>
+                      ) : (
+                        <div className="text-center space-y-2 p-4">
+                          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
+                            <UploadCloud className="h-6 w-6 text-stone-400" />
+                          </div>
+                          <div className="text-sm font-medium text-stone-700">
+                            Klik untuk unggah gambar Tablet
+                          </div>
+                          <p className="text-xs text-stone-500">
                             Opsional (Rasio Persegi/Landscape)
                           </p>
                         </div>
-                        <Input
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          disabled={isCurrentlySubmitting}
-                          onChange={(e) => handleFileChange(e, "tablet")}
-                        />
-                      </label>
-                    )}
+                      )}
+                      <Input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        disabled={isCurrentlySubmitting}
+                        onChange={(e) => handleFileChange(e, "tablet")}
+                      />
+                    </label>
                   </FormControl>
                 </FormItem>
               </div>

@@ -27,14 +27,13 @@ import {
   CalendarIcon,
   Check,
   ClipboardList,
-  ImagePlus,
   Laptop,
   LayoutTemplate,
   Link as LinkIcon,
   Loader2,
   Smartphone,
   Type,
-  X,
+  UploadCloud,
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -166,7 +165,6 @@ export default function PopupBannerForm({
             {/* === IMAGES SECTION (GRID) === */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* 1. DESKTOP IMAGE */}
-              {/* 1. DESKTOP IMAGE */}
               <div className="col-span-1">
                 <FormField
                   control={form.control}
@@ -175,66 +173,52 @@ export default function PopupBannerForm({
                     <FormItem>
                       <FormLabel className="flex items-center gap-2 mb-2">
                         <Laptop className="h-4 w-4 text-blue-600" />
-                        Desktop Image
+                        Desktop Image{" "}
                         {initialData ? "(Optional)" : "(Required)"}
                       </FormLabel>
                       <FormControl>
-                        <div className="space-y-3">
+                        <label className="relative w-full h-48 border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden group block rounded-xl shadow-sm">
                           {desktopPreview ? (
                             // === TAMPILAN PREVIEW DESKTOP ===
-                            <div className="relative w-full h-40 bg-slate-100 rounded-xl overflow-hidden border border-border group shadow-sm">
+                            <>
                               <Image
                                 src={desktopPreview}
                                 alt="Desktop Preview"
                                 fill
-                                className="object-cover"
+                                className="object-contain p-2"
                               />
-                              {/* Overlay Hapus */}
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    field.onChange(undefined);
-                                    //  Pastikan Anda memanggil fungsi untuk mereset state preview Anda di sini
-                                    // contoh: setDesktopPreview(null);
-                                  }}
-                                  className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
-                                  <X className="w-5 h-5" />
-                                </button>
+                              {/*  Overlay Change Image */}
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm rounded-xl">
+                                <p className="text-white font-medium flex items-center gap-2">
+                                  <UploadCloud className="h-5 w-5" /> Change
+                                  Image
+                                </p>
                               </div>
-                            </div>
+                            </>
                           ) : (
                             // === AREA UPLOAD DESKTOP ===
-                            <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 border-gray-300 hover:border-blue-400 transition-all">
-                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                <div className="p-3 bg-white rounded-full shadow-sm mb-3">
-                                  <ImagePlus className="w-6 h-6 text-gray-400" />
-                                </div>
-                                <p className="mb-1 text-sm text-gray-600">
-                                  <span className="font-semibold text-blue-600">
-                                    Klik untuk unggah
-                                  </span>{" "}
-                                  Desktop Image
-                                </p>
-                                <p className="text-xs text-gray-400">
-                                  Format Landscape (16:9)
-                                </p>
+                            <div className="text-center space-y-2 p-4">
+                              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
+                                <UploadCloud className="h-6 w-6 text-stone-400" />
                               </div>
-                              <Input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                disabled={isLoading || isSubmitting}
-                                onChange={(e) =>
-                                  handleFileChange(e, "desktop", field.onChange)
-                                }
-                                // RHF / Browser kadang menolak submit jika input type file hidden & required.
-                                // Sebaiknya validasi required diatasi oleh skema Zod (form.handleSubmit).
-                                // required={!initialData}
-                              />
-                            </label>
+                              <div className="text-sm font-medium text-stone-700">
+                                Klik untuk unggah Desktop Image
+                              </div>
+                              <p className="text-xs text-stone-500">
+                                Format Landscape (16:9)
+                              </p>
+                            </div>
                           )}
-                        </div>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={isLoading || isSubmitting}
+                            onChange={(e) =>
+                              handleFileChange(e, "desktop", field.onChange)
+                            }
+                          />
+                        </label>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -254,60 +238,48 @@ export default function PopupBannerForm({
                         Mobile Image {initialData ? "(Optional)" : "(Required)"}
                       </FormLabel>
                       <FormControl>
-                        <div className="space-y-3">
+                        <label className="relative w-full h-48 border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden group block rounded-xl shadow-sm">
                           {mobilePreview ? (
                             // === TAMPILAN PREVIEW MOBILE ===
-                            <div className="relative w-32 mx-auto h-40 bg-slate-100 rounded-xl overflow-hidden border border-border group shadow-sm">
+                            <>
                               <Image
                                 src={mobilePreview}
                                 alt="Mobile Preview"
                                 fill
-                                className="object-cover"
+                                className="object-contain p-2"
                               />
-                              {/* Overlay Hapus */}
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    field.onChange(undefined);
-                                    //  Pastikan Anda memanggil fungsi untuk mereset state preview Anda di sini
-                                    // contoh: setMobilePreview(null);
-                                  }}
-                                  className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
-                                  <X className="w-5 h-5" />
-                                </button>
+                              {/*  Overlay Change Image */}
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm rounded-xl">
+                                <p className="text-white font-medium flex items-center gap-2">
+                                  <UploadCloud className="h-5 w-5" /> Change
+                                  Image
+                                </p>
                               </div>
-                            </div>
+                            </>
                           ) : (
                             // === AREA UPLOAD MOBILE ===
-                            <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 border-gray-300 hover:border-purple-400 transition-all">
-                              <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
-                                <div className="p-3 bg-white rounded-full shadow-sm mb-3">
-                                  <ImagePlus className="w-6 h-6 text-gray-400" />
-                                </div>
-                                <p className="mb-1 text-sm text-gray-600">
-                                  <span className="font-semibold text-purple-600">
-                                    Klik unggah
-                                  </span>{" "}
-                                  Mobile
-                                </p>
-                                <p className="text-xs text-gray-400">
-                                  Format Portrait (9:16)
-                                </p>
+                            <div className="text-center space-y-2 p-4">
+                              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
+                                <UploadCloud className="h-6 w-6 text-stone-400" />
                               </div>
-                              <Input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                disabled={isLoading || isSubmitting}
-                                onChange={(e) =>
-                                  handleFileChange(e, "mobile", field.onChange)
-                                }
-                                // required={!initialData}
-                              />
-                            </label>
+                              <div className="text-sm font-medium text-stone-700">
+                                Klik untuk unggah Mobile Image
+                              </div>
+                              <p className="text-xs text-stone-500">
+                                Format Portrait (9:16)
+                              </p>
+                            </div>
                           )}
-                        </div>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={isLoading || isSubmitting}
+                            onChange={(e) =>
+                              handleFileChange(e, "mobile", field.onChange)
+                            }
+                          />
+                        </label>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

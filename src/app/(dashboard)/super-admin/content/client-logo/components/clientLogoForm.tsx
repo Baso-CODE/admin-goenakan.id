@@ -22,6 +22,7 @@ import {
   ListOrdered,
   Loader2,
   Type,
+  UploadCloud,
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -144,38 +145,49 @@ export default function ClientLogoForm({
                         Brand Logo {initialData ? "(Optional)" : "(Required) *"}
                       </FormLabel>
                       <FormControl>
-                        <div className="flex flex-col sm:flex-row gap-4 items-start">
-                          <div className="flex-1 w-full space-y-3">
-                            <Input
-                              type="file"
-                              accept="image/*"
-                              disabled={isLoading || isSubmitting}
-                              onChange={(e) =>
-                                handleFileChange(e, field.onChange)
-                              }
-                              required={!initialData}
-                            />
-                            <p className="text-[10px] text-muted-foreground">
-                              Recommended: PNG/SVG transparent background. Max
-                              2MB.
-                            </p>
-                          </div>
-
-                          <div className="relative w-32 h-20 shrink-0 bg-stone-50 rounded border border-dashed flex items-center justify-center">
-                            {preview ? (
+                        {/* Wadah label interaktif bergaya modern dengan garis putus-putus stone */}
+                        <label className="relative w-full h-48 sm:h-56 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden group block shadow-sm">
+                          {preview ? (
+                            // === TAMPILAN PREVIEW LOGO DENGAN EFEK HOVER CHANGE IMAGE ===
+                            <>
                               <Image
                                 src={preview}
                                 alt="Logo Preview"
                                 fill
-                                className="object-contain p-2"
+                                className="object-contain p-4"
                               />
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground uppercase">
-                                No Logo
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                <p className="text-white font-medium flex items-center gap-2">
+                                  <UploadCloud className="h-5 w-5" /> Change
+                                  Image
+                                </p>
+                              </div>
+                            </>
+                          ) : (
+                            // === AREA KOSONG UNTUK UGGAH LOGO ===
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center p-4 space-y-2">
+                              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
+                                <UploadCloud className="h-6 w-6 text-stone-400" />
+                              </div>
+                              <div className="text-sm font-medium text-stone-700">
+                                Klik untuk unggah Brand Logo
+                              </div>
+                              <p className="text-xs text-stone-500">
+                                Recommended: PNG/SVG transparent background. Max
+                                2MB.
+                              </p>
+                            </div>
+                          )}
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={isLoading || isSubmitting}
+                            onChange={(e) =>
+                              handleFileChange(e, field.onChange)
+                            }
+                          />
+                        </label>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

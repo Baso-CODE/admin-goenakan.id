@@ -113,7 +113,7 @@ export default function PortfolioForm({
     loadCategories();
   }, [fetchApi]);
 
-  // 2. ✨ Gabungkan initialData & categories agar form reset terpanggil setelah kategori siap
+  // 2.  Gabungkan initialData & categories agar form reset terpanggil setelah kategori siap
   useEffect(() => {
     if (initialData) {
       const formattedDate = initialData.projectDate
@@ -217,7 +217,6 @@ export default function PortfolioForm({
                                 src={preview}
                                 alt="Preview"
                                 fill
-                                // ✨ PERUBAHAN: object-cover diganti menjadi object-contain
                                 className="object-contain p-2"
                               />
                               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

@@ -39,7 +39,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-// ✨ UPDATE TIPE DATA BILINGUAL
+//  UPDATE TIPE DATA BILINGUAL
 type Portfolio = {
   id: string;
   title_id: string;
