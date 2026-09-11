@@ -13,6 +13,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { ImageCropper } from "@/helper/image-cropper";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ClipboardList,
@@ -24,7 +25,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -54,7 +55,6 @@ export default function EventCategoryForm({
 }: EventCategoryFormProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | undefined>(undefined);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<EventCategoryFormValues>({
     resolver: zodResolver(
@@ -85,17 +85,12 @@ export default function EventCategoryForm({
     }
   }, [initialData, form]);
 
-  const handleFileChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    fieldChange: (value: any) => void,
-  ) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      fieldChange(file);
-      const objectUrl = URL.createObjectURL(file);
-      setPreview(objectUrl);
-    }
+  // ✨ Handle File Change disesuaikan untuk menerima File langsung dari Cropper
+  const handleFileChange = (file: File, fieldChange: (value: any) => void) => {
+    setSelectedFile(file);
+    fieldChange(file);
+    const objectUrl = URL.createObjectURL(file);
+    setPreview(objectUrl);
   };
 
   const handleSubmit = (values: EventCategoryFormValues) => {
@@ -131,7 +126,7 @@ export default function EventCategoryForm({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-6 w-full">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* === MODERN IMAGE UPLOAD SECTION === */}
+              {/* === MODERN IMAGE CROP UPLOAD SECTION === */}
               <div className="col-span-1 md:col-span-2">
                 <FormField
                   control={form.control}
@@ -143,49 +138,43 @@ export default function EventCategoryForm({
                         Category Image {initialData ? "(Optional)" : "*"}
                       </FormLabel>
                       <FormControl>
-                        <div
-                          onClick={() => fileInputRef.current?.click()}
-                          className="relative w-full h-48 sm:h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden group">
-                          {preview ? (
-                            <>
-                              <Image
-                                src={preview}
-                                alt="Preview"
-                                fill
-                                //  PERUBAHAN: Menggunakan object-contain agar rasio portrait/landscape asli terjaga
-                                className="object-contain p-2"
-                              />
-                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <p className="text-white font-medium flex items-center gap-2">
-                                  <UploadCloud className="h-5 w-5" /> Change
-                                  Image
+                        <ImageCropper
+                          aspectRatio={1 / 1}
+                          disabled={isLoading || isSubmitting}
+                          onCropComplete={(file) =>
+                            handleFileChange(file, field.onChange)
+                          }>
+                          <div className="relative w-full h-48 sm:h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden group">
+                            {preview ? (
+                              <>
+                                <Image
+                                  src={preview}
+                                  alt="Preview"
+                                  fill
+                                  className="object-contain p-2"
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <p className="text-white font-medium flex items-center gap-2">
+                                    <UploadCloud className="h-5 w-5" /> Change
+                                    Image
+                                  </p>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="text-center space-y-2 p-4">
+                                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border">
+                                  <UploadCloud className="h-6 w-6 text-stone-400" />
+                                </div>
+                                <div className="text-sm font-medium text-stone-700">
+                                  Click to upload image
+                                </div>
+                                <p className="text-xs text-stone-500">
+                                  Otomatis potong ke format Persegi (Square 1:1)
                                 </p>
                               </div>
-                            </>
-                          ) : (
-                            <div className="text-center space-y-2 p-4">
-                              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border">
-                                <UploadCloud className="h-6 w-6 text-stone-400" />
-                              </div>
-                              <div className="text-sm font-medium text-stone-700">
-                                Click to upload image
-                              </div>
-                              <p className="text-xs text-stone-500">
-                                PNG, JPG up to 5MB
-                              </p>
-                            </div>
-                          )}
-                          <Input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            disabled={isLoading || isSubmitting}
-                            onChange={(e) =>
-                              handleFileChange(e, field.onChange)
-                            }
-                          />
-                        </div>
+                            )}
+                          </div>
+                        </ImageCropper>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

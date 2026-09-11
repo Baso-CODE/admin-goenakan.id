@@ -27,6 +27,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { DatePickerHelper } from "@/helper/datePickerHelper";
+import { ImageCropper } from "@/helper/image-cropper";
 import { useApi } from "@/hooks/useApi";
 import { format } from "date-fns";
 import { ChevronLeft, ClipboardList, ImagePlus, Trash2, X } from "lucide-react";
@@ -679,6 +680,7 @@ export default function ClientAddForm({
                 </TabsContent>
 
                 {/* TAB 4: BRAND (B2B Only) */}
+                {/* TAB 4: BRAND (B2B Only) */}
                 <TabsContent
                   value="brand"
                   className="space-y-6"
@@ -710,6 +712,8 @@ export default function ClientAddForm({
                         onChange={handleChange}
                       />
                     </div>
+
+                    {/* === BAGIAN UPLOAD & CROP LOGO BRAND === */}
                     <div className="space-y-2 md:col-span-2">
                       <Label>Logo Brand</Label>
                       {formData.b2b_brandLogoFile ? (
@@ -736,35 +740,32 @@ export default function ClientAddForm({
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center w-full max-w-md">
-                          <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 hover:border-primary transition-all">
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                              <div className="p-3 bg-white rounded-full shadow-sm mb-3">
-                                <ImagePlus className="w-6 h-6 text-gray-400" />
+                        <div className="w-full max-w-md">
+                          <ImageCropper
+                            aspectRatio={1 / 1}
+                            onCropComplete={(croppedFile) =>
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                b2b_brandLogoFile: croppedFile,
+                              }))
+                            }>
+                            <div className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 hover:border-primary transition-all">
+                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <div className="p-3 bg-white rounded-full shadow-sm mb-3">
+                                  <ImagePlus className="w-6 h-6 text-gray-400" />
+                                </div>
+                                <p className="mb-1 text-sm text-gray-600">
+                                  <span className="font-semibold text-primary">
+                                    Klik untuk unggah & crop
+                                  </span>{" "}
+                                  logo
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  Format Persegi (Rasio 1:1)
+                                </p>
                               </div>
-                              <p className="mb-1 text-sm text-gray-600">
-                                <span className="font-semibold text-primary">
-                                  Klik untuk unggah
-                                </span>{" "}
-                                gambar
-                              </p>
-                              <p className="text-xs text-gray-400">
-                                SVG, PNG, JPG atau WEBP
-                              </p>
                             </div>
-                            <input
-                              type="file"
-                              className="hidden"
-                              accept="image/*"
-                              onChange={(e) =>
-                                setFormData((prev: any) => ({
-                                  ...prev,
-                                  b2b_brandLogoFile:
-                                    e.target.files?.[0] || null,
-                                }))
-                              }
-                            />
-                          </label>
+                          </ImageCropper>
                         </div>
                       )}
                     </div>

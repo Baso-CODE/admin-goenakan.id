@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { ImageCropper } from "@/helper/image-cropper";
 import {
   Check,
   ClipboardList,
@@ -95,25 +96,21 @@ export default function HeroForm({
   const isCurrentlySubmitting = isLoading || isSubmitting || formIsSubmitting;
 
   const handleFileChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
+    file: File,
     type: "desktop" | "mobile" | "tablet",
   ) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const objectUrl = URL.createObjectURL(file);
-      if (type === "desktop") {
-        setSelectedDesktop(file);
-        setPreviewDesktop(objectUrl);
-      } else if (type === "mobile") {
-        setSelectedMobile(file);
-        setPreviewMobile(objectUrl);
-      } else if (type === "tablet") {
-        setSelectedTablet(file);
-        setPreviewTablet(objectUrl);
-      }
+    const objectUrl = URL.createObjectURL(file);
+    if (type === "desktop") {
+      setSelectedDesktop(file);
+      setPreviewDesktop(objectUrl);
+    } else if (type === "mobile") {
+      setSelectedMobile(file);
+      setPreviewMobile(objectUrl);
+    } else if (type === "tablet") {
+      setSelectedTablet(file);
+      setPreviewTablet(objectUrl);
     }
   };
-
   useEffect(() => {
     if (initialData) {
       form.reset({
@@ -168,6 +165,7 @@ export default function HeroForm({
             className="space-y-6 w-full">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* === Desktop Image === */}
+              {/* === Desktop Image (Rasio 16:9) === */}
               <div className="col-span-2">
                 <FormItem>
                   <FormLabel className="flex items-center gap-2 mb-2">
@@ -176,47 +174,47 @@ export default function HeroForm({
                     {initialData ? "(Optional)" : "(Required)"}
                   </FormLabel>
                   <FormControl>
-                    <label className="relative w-full h-48 md:h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden group block">
-                      {previewDesktop ? (
-                        <>
-                          <img
-                            src={previewDesktop}
-                            alt="Preview Desktop"
-                            className="w-full h-full object-contain p-2"
-                          />
-                          {/*  Efek Hover "Change Image" yang baru */}
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <p className="text-white font-medium flex items-center gap-2">
-                              <UploadCloud className="h-5 w-5" /> Change Image
+                    {/* ✨ Bungkus dengan ImageCropper, atur rasio 16/9 */}
+                    <ImageCropper
+                      aspectRatio={16 / 9}
+                      disabled={isCurrentlySubmitting}
+                      onCropComplete={(file) =>
+                        handleFileChange(file, "desktop")
+                      }>
+                      <div className="relative w-full h-48 md:h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors flex flex-col items-center justify-center overflow-hidden group">
+                        {previewDesktop ? (
+                          <>
+                            <img
+                              src={previewDesktop}
+                              alt="Preview Desktop"
+                              className="w-full h-full object-contain p-2"
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <p className="text-white font-medium flex items-center gap-2">
+                                <UploadCloud className="h-5 w-5" /> Change Image
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center space-y-2 p-4">
+                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
+                              <UploadCloud className="h-6 w-6 text-stone-400" />
+                            </div>
+                            <div className="text-sm font-medium text-stone-700">
+                              Klik untuk unggah gambar Desktop
+                            </div>
+                            <p className="text-xs text-stone-500">
+                              Otomatis potong ke format Landscape (16:9)
                             </p>
                           </div>
-                        </>
-                      ) : (
-                        <div className="text-center space-y-2 p-4">
-                          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
-                            <UploadCloud className="h-6 w-6 text-stone-400" />
-                          </div>
-                          <div className="text-sm font-medium text-stone-700">
-                            Klik untuk unggah gambar Desktop
-                          </div>
-                          <p className="text-xs text-stone-500">
-                            SVG, PNG, JPG atau WEBP (Landscape direkomendasikan)
-                          </p>
-                        </div>
-                      )}
-                      <Input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        disabled={isCurrentlySubmitting}
-                        onChange={(e) => handleFileChange(e, "desktop")}
-                      />
-                    </label>
+                        )}
+                      </div>
+                    </ImageCropper>
                   </FormControl>
                 </FormItem>
               </div>
 
-              {/* === Mobile Image === */}
+              {/* === Mobile Image (Rasio 9:16) === */}
               <div className="col-span-2 md:col-span-1">
                 <FormItem>
                   <FormLabel className="flex items-center gap-2 mb-2">
@@ -224,46 +222,47 @@ export default function HeroForm({
                     Mobile Image {initialData ? "(Optional)" : "(Required)"}
                   </FormLabel>
                   <FormControl>
-                    <label className="relative w-full h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden group block">
-                      {previewMobile ? (
-                        <>
-                          <img
-                            src={previewMobile}
-                            alt="Preview Mobile"
-                            className="w-full h-full object-contain p-2"
-                          />
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <p className="text-white font-medium flex items-center gap-2">
-                              <UploadCloud className="h-5 w-5" /> Change Image
+                    {/* ✨ Bungkus dengan ImageCropper, atur rasio 9/16 */}
+                    <ImageCropper
+                      aspectRatio={9 / 16}
+                      disabled={isCurrentlySubmitting}
+                      onCropComplete={(file) =>
+                        handleFileChange(file, "mobile")
+                      }>
+                      <div className="relative w-full h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors flex flex-col items-center justify-center overflow-hidden group">
+                        {previewMobile ? (
+                          <>
+                            <img
+                              src={previewMobile}
+                              alt="Preview Mobile"
+                              className="w-full h-full object-contain p-2"
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <p className="text-white font-medium flex items-center gap-2">
+                                <UploadCloud className="h-5 w-5" /> Change Image
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center space-y-2 p-4">
+                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
+                              <UploadCloud className="h-6 w-6 text-stone-400" />
+                            </div>
+                            <div className="text-sm font-medium text-stone-700">
+                              Klik untuk unggah gambar Mobile
+                            </div>
+                            <p className="text-xs text-stone-500">
+                              Otomatis potong ke format Portrait (9:16)
                             </p>
                           </div>
-                        </>
-                      ) : (
-                        <div className="text-center space-y-2 p-4">
-                          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
-                            <UploadCloud className="h-6 w-6 text-stone-400" />
-                          </div>
-                          <div className="text-sm font-medium text-stone-700">
-                            Klik untuk unggah gambar Mobile
-                          </div>
-                          <p className="text-xs text-stone-500">
-                            Rasio 9:16 (Vertikal direkomendasikan)
-                          </p>
-                        </div>
-                      )}
-                      <Input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        disabled={isCurrentlySubmitting}
-                        onChange={(e) => handleFileChange(e, "mobile")}
-                      />
-                    </label>
+                        )}
+                      </div>
+                    </ImageCropper>
                   </FormControl>
                 </FormItem>
               </div>
 
-              {/* === Tablet Image === */}
+              {/* === Tablet Image (Rasio Persegi 1:1) === */}
               <div className="col-span-2 md:col-span-1">
                 <FormItem>
                   <FormLabel className="flex items-center gap-2 mb-2">
@@ -271,41 +270,42 @@ export default function HeroForm({
                     Tablet Image (Optional)
                   </FormLabel>
                   <FormControl>
-                    <label className="relative w-full h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden group block">
-                      {previewTablet ? (
-                        <>
-                          <img
-                            src={previewTablet}
-                            alt="Preview Tablet"
-                            className="w-full h-full object-contain p-2"
-                          />
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <p className="text-white font-medium flex items-center gap-2">
-                              <UploadCloud className="h-5 w-5" /> Change Image
+                    {/* ✨ Bungkus dengan ImageCropper, atur rasio 1/1 (Bisa diganti 4/3) */}
+                    <ImageCropper
+                      aspectRatio={1 / 1}
+                      disabled={isCurrentlySubmitting}
+                      onCropComplete={(file) =>
+                        handleFileChange(file, "tablet")
+                      }>
+                      <div className="relative w-full h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors flex flex-col items-center justify-center overflow-hidden group">
+                        {previewTablet ? (
+                          <>
+                            <img
+                              src={previewTablet}
+                              alt="Preview Tablet"
+                              className="w-full h-full object-contain p-2"
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <p className="text-white font-medium flex items-center gap-2">
+                                <UploadCloud className="h-5 w-5" /> Change Image
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center space-y-2 p-4">
+                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
+                              <UploadCloud className="h-6 w-6 text-stone-400" />
+                            </div>
+                            <div className="text-sm font-medium text-stone-700">
+                              Klik untuk unggah gambar Tablet
+                            </div>
+                            <p className="text-xs text-stone-500">
+                              Otomatis potong ke format Persegi (1:1)
                             </p>
                           </div>
-                        </>
-                      ) : (
-                        <div className="text-center space-y-2 p-4">
-                          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
-                            <UploadCloud className="h-6 w-6 text-stone-400" />
-                          </div>
-                          <div className="text-sm font-medium text-stone-700">
-                            Klik untuk unggah gambar Tablet
-                          </div>
-                          <p className="text-xs text-stone-500">
-                            Opsional (Rasio Persegi/Landscape)
-                          </p>
-                        </div>
-                      )}
-                      <Input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        disabled={isCurrentlySubmitting}
-                        onChange={(e) => handleFileChange(e, "tablet")}
-                      />
-                    </label>
+                        )}
+                      </div>
+                    </ImageCropper>
                   </FormControl>
                 </FormItem>
               </div>

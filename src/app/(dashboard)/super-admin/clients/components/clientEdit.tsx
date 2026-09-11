@@ -33,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 
+import { ImageCropper } from "@/helper/image-cropper";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -683,35 +684,32 @@ export default function ClientEditForm() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center w-full max-w-md">
-                          <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 hover:border-primary transition-all">
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                              <div className="p-3 bg-white rounded-full shadow-sm mb-3">
-                                <ImagePlus className="w-6 h-6 text-gray-400" />
+                        <div className="w-full max-w-md">
+                          <ImageCropper
+                            aspectRatio={1 / 1}
+                            onCropComplete={(croppedFile) =>
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                b2b_brandLogoFile: croppedFile,
+                              }))
+                            }>
+                            <div className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 hover:border-primary transition-all">
+                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <div className="p-3 bg-white rounded-full shadow-sm mb-3">
+                                  <ImagePlus className="w-6 h-6 text-gray-400" />
+                                </div>
+                                <p className="mb-1 text-sm text-gray-600">
+                                  <span className="font-semibold text-primary">
+                                    Klik untuk unggah & crop
+                                  </span>{" "}
+                                  gambar baru
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  Format Persegi (Rasio 1:1)
+                                </p>
                               </div>
-                              <p className="mb-1 text-sm text-gray-600">
-                                <span className="font-semibold text-primary">
-                                  Klik untuk unggah
-                                </span>{" "}
-                                gambar baru
-                              </p>
-                              <p className="text-xs text-gray-400">
-                                SVG, PNG, JPG atau WEBP
-                              </p>
                             </div>
-                            <input
-                              type="file"
-                              className="hidden"
-                              accept="image/*"
-                              onChange={(e) =>
-                                setFormData((prev: any) => ({
-                                  ...prev,
-                                  b2b_brandLogoFile:
-                                    e.target.files?.[0] || null,
-                                }))
-                              }
-                            />
-                          </label>
+                          </ImageCropper>
                         </div>
                       )}
                     </div>
