@@ -96,7 +96,13 @@ export default function SidebarRole({ ...props }) {
         title: "Orders & Dashboard",
         url: "#",
         icon: ListOrdered,
-        items: [{ title: "All Orders List", url: "/super-admin/orders" }],
+        items: [
+          { title: "All Orders List", url: "/super-admin/orders" },
+          {
+            title: "Sample History",
+            url: "/super-admin/sample-history",
+          },
+        ],
       },
       {
         title: "Cashflow & Invoicing",

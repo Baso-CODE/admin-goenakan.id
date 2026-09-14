@@ -48,7 +48,15 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
-import { Check, CheckCheck, ChevronsUpDown, Plus, RefreshCw, X, Info } from "lucide-react";
+import {
+  Check,
+  CheckCheck,
+  ChevronsUpDown,
+  Info,
+  Plus,
+  RefreshCw,
+  X,
+} from "lucide-react";
 import { AddItemCategoryModal } from "../../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../../item-names-product/components/addItemNameModal";
 import CreateCategoryModal from "../../../product-categories/components/createCategoryModal";
@@ -65,6 +73,7 @@ const FormCoreSchema = z.object({
   ),
   isCustom: z.boolean().optional(),
   isMadeByOrder: z.boolean().optional(),
+  isSample: z.boolean().optional().default(false), // ✨ TAMBAHAN BARU: Field isSample
   materialTypeId: z.string().min(1, "Material wajib dipilih").optional(),
   stock: z.preprocess(
     (v) => Number(v),
@@ -124,7 +133,7 @@ export default function FormProductCore({
   const [isItemNameModalOpen, setIsItemNameModalOpen] = useState(false);
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
   const [isSubmittingMaterial, setIsSubmittingMaterial] = useState(false);
-  
+
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [itemCategoryOpen, setItemCategoryOpen] = useState(false);
   const [itemNameOpen, setItemNameOpen] = useState(false);
@@ -140,6 +149,7 @@ export default function FormProductCore({
       stock: 0,
       isCustom: false,
       isMadeByOrder: false,
+      isSample: false, // ✨ TAMBAHAN BARU: Default nilai isSample
       materialTypeId: "",
       categoryId: "",
       itemCategoryId: "",
@@ -163,7 +173,7 @@ export default function FormProductCore({
 
   //  1. INITIALIZATION API FETCH (Tanpa Race Condition)
   useEffect(() => {
-    let isMounted = true; // Keamanan agar state tidak bocor jika komponen ditutup
+    let isMounted = true;
 
     const initializeForm = async () => {
       if (!initialData) return;
@@ -171,7 +181,6 @@ export default function FormProductCore({
       setLoadingData(true);
 
       try {
-        // A. Ambil data Master (Category Induk, Tag, Material)
         const [catRes, tagRes, matRes, tagCatRes] = await Promise.all([
           fetchApi("/product-categories/list"),
           fetchApi("/product-tags/list"),
@@ -190,7 +199,6 @@ export default function FormProductCore({
         setMaterialTypes(mats || []);
         setTagCategories(Array.isArray(tagCatsData) ? tagCatsData : []);
 
-        // B. Jika Mode Edit, ambil data turunannya
         let fetchedItemCats: any[] = [];
         let fetchedItemNames: any[] = [];
 
@@ -203,7 +211,6 @@ export default function FormProductCore({
             fetchedItemCats = dataIC.data || [];
           }
 
-          // B. Ambil data item names secara spesifik untuk item category ini
           if (initialData.itemCategoryId) {
             try {
               const resIN = await fetchApi(
@@ -219,11 +226,9 @@ export default function FormProductCore({
 
         if (!isMounted) return;
 
-        // Simpan ke state
         setItemCategories(fetchedItemCats);
         setItemNames(fetchedItemNames);
 
-        // C. Kunci Utama: Beri React waktu (50ms) untuk menggambar <SelectItem> ke layar, baru jalankan reset()
         setTimeout(() => {
           if (!isMounted) return;
 
@@ -236,6 +241,7 @@ export default function FormProductCore({
               stock: initialData.stock || 0,
               isCustom: initialData.isCustom || false,
               isMadeByOrder: initialData.isMadeByOrder || false,
+              isSample: initialData.isSample || false, // ✨ TAMBAHAN BARU: Reset nilai isSample dari data edit
               materialTypeId: initialData.materialTypeId || "",
               categoryId: initialData.categoryId || "",
               itemCategoryId: initialData.itemCategoryId || "",
@@ -255,7 +261,7 @@ export default function FormProductCore({
             });
           }
 
-          setLoadingData(false); // Buka kunci form
+          setLoadingData(false);
         }, 50);
       } catch (error) {
         toast.error("Gagal memuat data awal.");
@@ -268,18 +274,16 @@ export default function FormProductCore({
     return () => {
       isMounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, fetchApi, initialData]); // Dibatasi ketat hanya render saat data inisialisasi masuk
+  }, [status, fetchApi, initialData]);
 
-  //  2. FUNGSI HANDLER MANUAL UNTUK DROPDOWN (Lebih stabil dari useEffect)
   const handleCategoryChange = async (val: string) => {
     if (val === "ADD_NEW_CATEGORY") {
       setIsCategoryModalOpen(true);
       return;
     }
     form.setValue("categoryId", val);
-    form.setValue("itemCategoryId", ""); // Kosongkan anak
-    form.setValue("itemNameId", ""); // Kosongkan cucu
+    form.setValue("itemCategoryId", "");
+    form.setValue("itemNameId", "");
     setItemCategories([]);
 
     if (!val) return;
@@ -300,7 +304,7 @@ export default function FormProductCore({
       return;
     }
     form.setValue("itemCategoryId", val);
-    form.setValue("itemNameId", ""); // Kosongkan cucu
+    form.setValue("itemNameId", "");
     setItemNames([]);
 
     if (!val) return;
@@ -330,7 +334,6 @@ export default function FormProductCore({
     setItemNames((prev) => [...prev, newVal]);
     form.setValue("itemNameId", String(newVal.id));
 
-    // Auto-prefix product name with newly created item name
     let currentName = form.getValues("name") || "";
     if (!currentName.startsWith(newVal.name)) {
       currentName = currentName ? `${newVal.name} ${currentName}` : newVal.name;
@@ -358,7 +361,6 @@ export default function FormProductCore({
     }
   };
 
-  // 3. Fungsi Generate SKU
   const handleGenerateSku = async () => {
     const vals = form.getValues();
     if (
@@ -426,10 +428,7 @@ export default function FormProductCore({
   if (loadingData) {
     return (
       <div className="space-y-8 border p-6 rounded-md bg-white shadow-sm animate-pulse">
-        {/* Catatan placeholder */}
         <div className="h-14 bg-stone-100 rounded-md" />
-
-        {/* Section 1 placeholder */}
         <div className="space-y-4">
           <div className="h-6 w-36 bg-stone-200 rounded" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -443,36 +442,6 @@ export default function FormProductCore({
             </div>
           </div>
         </div>
-
-        {/* Section 2 placeholder */}
-        <div className="space-y-4">
-          <div className="h-6 w-44 bg-stone-200 rounded" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <div className="h-4 w-20 bg-stone-200 rounded" />
-              <div className="h-10 bg-stone-100 rounded" />
-            </div>
-            <div className="space-y-2">
-              <div className="h-4 w-24 bg-stone-200 rounded" />
-              <div className="h-10 bg-stone-100 rounded" />
-            </div>
-          </div>
-        </div>
-
-        {/* Section 3 placeholder */}
-        <div className="space-y-4">
-          <div className="h-6 w-32 bg-stone-200 rounded" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="space-y-2">
-                <div className="h-4 w-16 bg-stone-200 rounded" />
-                <div className="h-10 bg-stone-100 rounded" />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Button placeholder */}
         <div className="h-10 w-28 bg-stone-200 rounded-md" />
       </div>
     );
@@ -484,7 +453,6 @@ export default function FormProductCore({
         <form
           onSubmit={form.handleSubmit(onSubmit, onInvalid)}
           className="space-y-8 border p-6 rounded-md bg-white shadow-sm">
-          {/* Keterangan Konfigurasi Dasar */}
           <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-md text-sm flex items-start gap-2">
             <span className="font-semibold text-blue-905 shrink-0">
               Catatan:
@@ -565,7 +533,13 @@ export default function FormProductCore({
                             disabled={loadingData}
                             className="w-full justify-between bg-white text-left font-normal border-stone-200 h-10">
                             {field.value
-                              ? categories.find((c) => String(c.id) === String(field.value))?.name_id || categories.find((c) => String(c.id) === String(field.value))?.name || "Pilih Kategori"
+                              ? categories.find(
+                                  (c) => String(c.id) === String(field.value),
+                                )?.name_id ||
+                                categories.find(
+                                  (c) => String(c.id) === String(field.value),
+                                )?.name ||
+                                "Pilih Kategori"
                               : "Pilih Kategori"}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -575,7 +549,9 @@ export default function FormProductCore({
                         <Command>
                           <CommandInput placeholder="Cari kategori..." />
                           <CommandList>
-                            <CommandEmpty>Kategori tidak ditemukan.</CommandEmpty>
+                            <CommandEmpty>
+                              Kategori tidak ditemukan.
+                            </CommandEmpty>
                             <CommandGroup>
                               {categories.map((cat) => (
                                 <CommandItem
@@ -588,10 +564,13 @@ export default function FormProductCore({
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      String(field.value) === String(cat.id) ? "opacity-100" : "opacity-0"
+                                      String(field.value) === String(cat.id)
+                                        ? "opacity-100"
+                                        : "opacity-0",
                                     )}
                                   />
-                                  {cat.name_id || cat.name} {cat.code && `(${cat.code})`}
+                                  {cat.name_id || cat.name}{" "}
+                                  {cat.code && `(${cat.code})`}
                                 </CommandItem>
                               ))}
                             </CommandGroup>
@@ -622,7 +601,9 @@ export default function FormProductCore({
                 render={({ field }) => (
                   <FormItem className="flex flex-col justify-end">
                     <FormLabel className="mb-2">Item Category</FormLabel>
-                    <Popover open={itemCategoryOpen} onOpenChange={setItemCategoryOpen}>
+                    <Popover
+                      open={itemCategoryOpen}
+                      onOpenChange={setItemCategoryOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
@@ -631,7 +612,9 @@ export default function FormProductCore({
                             disabled={loadingData || !selectedCategoryId}
                             className="w-full justify-between bg-white text-left font-normal border-stone-200 h-10">
                             {field.value
-                              ? itemCategories.find((ic) => String(ic.id) === String(field.value))?.name || "Pilih Sub Kategori"
+                              ? itemCategories.find(
+                                  (ic) => String(ic.id) === String(field.value),
+                                )?.name || "Pilih Sub Kategori"
                               : "Pilih Sub Kategori"}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -641,7 +624,9 @@ export default function FormProductCore({
                         <Command>
                           <CommandInput placeholder="Cari sub kategori..." />
                           <CommandList>
-                            <CommandEmpty>Sub kategori tidak ditemukan.</CommandEmpty>
+                            <CommandEmpty>
+                              Sub kategori tidak ditemukan.
+                            </CommandEmpty>
                             <CommandGroup>
                               {itemCategories.map((ic) => (
                                 <CommandItem
@@ -654,7 +639,9 @@ export default function FormProductCore({
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      String(field.value) === String(ic.id) ? "opacity-100" : "opacity-0"
+                                      String(field.value) === String(ic.id)
+                                        ? "opacity-100"
+                                        : "opacity-0",
                                     )}
                                   />
                                   {ic.name}
@@ -697,7 +684,10 @@ export default function FormProductCore({
                             disabled={loadingData}
                             className="w-full justify-between bg-white text-left font-normal border-stone-200 h-10">
                             {field.value
-                              ? itemNames.find((inm) => String(inm.id) === String(field.value))?.name || "Pilih Nama Item"
+                              ? itemNames.find(
+                                  (inm) =>
+                                    String(inm.id) === String(field.value),
+                                )?.name || "Pilih Nama Item"
                               : "Pilih Nama Item"}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -707,7 +697,9 @@ export default function FormProductCore({
                         <Command>
                           <CommandInput placeholder="Cari nama item..." />
                           <CommandList>
-                            <CommandEmpty>Nama item tidak ditemukan.</CommandEmpty>
+                            <CommandEmpty>
+                              Nama item tidak ditemukan.
+                            </CommandEmpty>
                             <CommandGroup>
                               {itemNames.map((inm) => (
                                 <CommandItem
@@ -716,23 +708,38 @@ export default function FormProductCore({
                                   onSelect={() => {
                                     const val = String(inm.id);
                                     const oldVal = form.getValues("itemNameId");
-                                    const oldItem = itemNames.find((i) => String(i.id) === String(oldVal));
-                                    let currentName = form.getValues("name") || "";
-                                    
-                                    if (oldItem && currentName.startsWith(oldItem.name)) {
-                                      currentName = currentName.replace(oldItem.name, inm.name);
-                                    } else if (!currentName.startsWith(inm.name)) {
-                                      currentName = currentName ? `${inm.name} ${currentName}` : inm.name;
+                                    const oldItem = itemNames.find(
+                                      (i) => String(i.id) === String(oldVal),
+                                    );
+                                    let currentName =
+                                      form.getValues("name") || "";
+
+                                    if (
+                                      oldItem &&
+                                      currentName.startsWith(oldItem.name)
+                                    ) {
+                                      currentName = currentName.replace(
+                                        oldItem.name,
+                                        inm.name,
+                                      );
+                                    } else if (
+                                      !currentName.startsWith(inm.name)
+                                    ) {
+                                      currentName = currentName
+                                        ? `${inm.name} ${currentName}`
+                                        : inm.name;
                                     }
                                     form.setValue("name", currentName);
-                                    
+
                                     field.onChange(val);
                                     setItemNameOpen(false);
                                   }}>
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      String(field.value) === String(inm.id) ? "opacity-100" : "opacity-0"
+                                      String(field.value) === String(inm.id)
+                                        ? "opacity-100"
+                                        : "opacity-0",
                                     )}
                                   />
                                   {inm.name}
@@ -775,7 +782,10 @@ export default function FormProductCore({
                             disabled={loadingData}
                             className="w-full justify-between bg-white text-left font-normal border-stone-200 h-10">
                             {field.value
-                              ? materialTypes.find((mat) => String(mat.id) === String(field.value))?.name || "Pilih Material"
+                              ? materialTypes.find(
+                                  (mat) =>
+                                    String(mat.id) === String(field.value),
+                                )?.name || "Pilih Material"
                               : "Pilih Material"}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -785,7 +795,9 @@ export default function FormProductCore({
                         <Command>
                           <CommandInput placeholder="Cari material..." />
                           <CommandList>
-                            <CommandEmpty>Material tidak ditemukan.</CommandEmpty>
+                            <CommandEmpty>
+                              Material tidak ditemukan.
+                            </CommandEmpty>
                             <CommandGroup>
                               {materialTypes.map((mat) => (
                                 <CommandItem
@@ -798,7 +810,9 @@ export default function FormProductCore({
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      String(field.value) === String(mat.id) ? "opacity-100" : "opacity-0"
+                                      String(field.value) === String(mat.id)
+                                        ? "opacity-100"
+                                        : "opacity-0",
                                     )}
                                   />
                                   {mat.name}
@@ -833,7 +847,8 @@ export default function FormProductCore({
             <h3 className="text-lg font-semibold tracking-tight border-b pb-2">
               Harga, Stok & Label
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {/* Diubah menjadi md:grid-cols-5 agar muat menampung 5 tombol pilihan */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
               <FormField
                 control={form.control}
                 name="basePrice"
@@ -941,25 +956,55 @@ export default function FormProductCore({
                 )}
               />
 
+              {/* ✨ TAMBAHAN BARU: Field isSample */}
+              <FormField
+                control={form.control}
+                name="isSample"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Produk Sampel?</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-3 h-10 border rounded-md px-4 bg-white">
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                        <span
+                          className="text-xs text-stone-600 truncate"
+                          title="Tandai produk ini sebagai sampel yang dapat dipinjamkan">
+                          Ya, ini Sampel
+                        </span>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="colorMockupTrigger"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-5">
                     <FormLabel>Trigger Custom Color</FormLabel>
                     <Select
                       value={field.value || "NONE"}
-                      onValueChange={field.onChange}
-                    >
+                      onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger className="bg-white">
                           <SelectValue placeholder="Pilih Trigger..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="NONE">Tidak Aktif (Polosan/Statis)</SelectItem>
-                        <SelectItem value="SIZE">Berdasarkan Ukuran / Kapasitas</SelectItem>
-                        <SelectItem value="SHAPE">Berdasarkan Model / Bentuk</SelectItem>
+                        <SelectItem value="NONE">
+                          Tidak Aktif (Polosan/Statis)
+                        </SelectItem>
+                        <SelectItem value="SIZE">
+                          Berdasarkan Ukuran / Kapasitas
+                        </SelectItem>
+                        <SelectItem value="SHAPE">
+                          Berdasarkan Model / Bentuk
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -967,7 +1012,14 @@ export default function FormProductCore({
                       <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5 flex items-start gap-1">
                         <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                         <span>
-                          Mask warna akan diambil dari opsi atribut <strong>{field.value === "SIZE" ? "Ukuran / Kapasitas" : "Model / Bentuk"}</strong>. Pastikan mask yang diunggah berupa <strong>PNG transparent outline</strong>.
+                          Mask warna akan diambil dari opsi atribut{" "}
+                          <strong>
+                            {field.value === "SIZE"
+                              ? "Ukuran / Kapasitas"
+                              : "Model / Bentuk"}
+                          </strong>
+                          . Pastikan mask yang diunggah berupa{" "}
+                          <strong>PNG transparent outline</strong>.
                         </span>
                       </p>
                     )}
@@ -981,7 +1033,7 @@ export default function FormProductCore({
                 render={({ field }) => {
                   const selectedTags = field.value || [];
                   return (
-                    <FormItem className="md:col-span-4">
+                    <FormItem className="md:col-span-5">
                       <div className="flex items-center justify-between">
                         <FormLabel>Product Tags</FormLabel>
                         <Button
@@ -995,7 +1047,6 @@ export default function FormProductCore({
                         </Button>
                       </div>
 
-                      {/* Category Quick-Select Pills */}
                       {Array.isArray(tagCategories) &&
                         tagCategories.length > 0 && (
                           <div className="flex flex-wrap gap-2 items-center mb-3 mt-1.5 p-2 bg-slate-50 dark:bg-stone-900 rounded-md border border-slate-100 dark:border-stone-800">
@@ -1021,7 +1072,6 @@ export default function FormProductCore({
                                   type="button"
                                   onClick={() => {
                                     if (isAllSelected) {
-                                      // Deselect all
                                       field.onChange(
                                         selectedTags.filter(
                                           (id: string) =>
@@ -1029,7 +1079,6 @@ export default function FormProductCore({
                                         ),
                                       );
                                     } else {
-                                      // Select all (union)
                                       field.onChange(
                                         Array.from(
                                           new Set([
@@ -1258,7 +1307,6 @@ export default function FormProductCore({
         </DialogContent>
       </Dialog>
 
-      {/* Tag Category Manager Modal */}
       <TagCategoryManagerModal
         isOpen={isTagCategoryModalOpen}
         onClose={() => setIsTagCategoryModalOpen(false)}
