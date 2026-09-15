@@ -1005,6 +1005,7 @@ export default function FormArticle({
                         <SimpleEditor
                           value={field.value}
                           onChange={field.onChange}
+                          minHeight="50vh"
                         />
                       </div>
                     </FormControl>

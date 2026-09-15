@@ -154,6 +154,7 @@ export default function BestPriceItemForm({
                         <SimpleEditor
                           value={field.value ?? ""}
                           onChange={field.onChange}
+                          minHeight="250px"
                         />
                       </div>
                     </FormControl>
@@ -197,6 +198,7 @@ export default function BestPriceItemForm({
                         <SimpleEditor
                           value={field.value ?? ""}
                           onChange={field.onChange}
+                          minHeight="250px"
                         />
                       </div>
                     </FormControl>

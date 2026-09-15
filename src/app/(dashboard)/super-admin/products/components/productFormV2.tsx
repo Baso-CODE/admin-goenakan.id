@@ -1,5 +1,6 @@
 "use client";
 
+import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,7 +45,6 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { useProductFormV2 } from "@/hooks/useProductFormV2";
 import { cn } from "@/lib/utils";
 import { parseColorValue } from "@/utils/colorConverter";
@@ -1225,13 +1225,13 @@ export default function ProductFormV2({
                           control={form.control}
                           name="description"
                           render={({ field }) => (
-                            <FormItem className="col-span-2 md:col-span-4">
+                            <FormItem className="col-span-2 md:col-span-4 z-10">
                               <FormLabel>Deskripsi Produk</FormLabel>
                               <FormControl>
-                                <Textarea
-                                  rows={4}
-                                  placeholder="Jelaskan detail produk..."
-                                  {...field}
+                                <SimpleEditor
+                                  value={field.value || ""}
+                                  onChange={field.onChange}
+                                  minHeight="250px"
                                 />
                               </FormControl>
                               <FormMessage />

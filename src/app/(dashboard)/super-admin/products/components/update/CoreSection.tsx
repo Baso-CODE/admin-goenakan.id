@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -18,6 +17,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
+import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { Badge } from "@/components/ui/badge";
 import {
   Command,
@@ -1241,13 +1241,13 @@ export default function FormProductCore({
                 control={form.control}
                 name="description"
                 render={({ field }) => (
-                  <FormItem className="col-span-2 md:col-span-4">
+                  <FormItem className="col-span-2 md:col-span-4 z-10">
                     <FormLabel>Deskripsi Produk</FormLabel>
                     <FormControl>
-                      <Textarea
-                        rows={4}
-                        placeholder="Jelaskan detail produk..."
-                        {...field}
+                      <SimpleEditor
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        minHeight="150px"
                       />
                     </FormControl>
                     <FormMessage />

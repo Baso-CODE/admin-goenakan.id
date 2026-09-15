@@ -175,6 +175,7 @@ export default function FaqItemForm({
                         <SimpleEditor
                           value={field.value ?? ""}
                           onChange={field.onChange}
+                          minHeight="250px"
                         />
                       </div>
                     </FormControl>
@@ -216,6 +217,7 @@ export default function FaqItemForm({
                         <SimpleEditor
                           value={field.value ?? ""}
                           onChange={field.onChange}
+                          minHeight="250px"
                         />
                       </div>
                     </FormControl>

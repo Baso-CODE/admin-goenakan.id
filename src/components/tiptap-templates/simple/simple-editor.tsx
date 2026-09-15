@@ -192,6 +192,7 @@ const CustomResizableImage = BaseImage.extend({
 interface SimpleEditorProps {
   value?: string;
   onChange?: (value: string) => void;
+  minHeight?: string;
 }
 
 // ─── KOMPONEN TOMBOL TABEL KHUSUS ───
@@ -472,7 +473,11 @@ const ImageControls = () => {
 };
 
 // ─── MAIN EDITOR COMPONENT ───
-export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
+export function SimpleEditor({
+  value = "",
+  onChange,
+  minHeight = "150px",
+}: SimpleEditorProps) {
   const { fetchApi, status } = useApi();
   const isMobile = useIsBreakpoint();
   const { height } = useWindowSize();
@@ -524,8 +529,10 @@ export function SimpleEditor({ value = "", onChange }: SimpleEditorProps) {
         autocorrect: "off",
         autocapitalize: "off",
         "aria-label": "Main content area, start typing to enter text.",
+
         class:
-          "simple-editor min-h-[400px] outline-none px-4 py-6 prose max-w-none prose-sm sm:prose-base",
+          "simple-editor outline-none prose max-w-none prose-sm sm:prose-base",
+        style: `min-height: ${minHeight};`,
       },
     },
     extensions: [
