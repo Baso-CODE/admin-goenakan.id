@@ -291,6 +291,10 @@ export default function SidebarRole({ ...props }) {
             title: "Event Categories",
             url: "/super-admin/content/event-categories",
           },
+          {
+            title: "Success Stories",
+            url: "/super-admin/content/sucess-stories",
+          },
         ],
       },
       {
