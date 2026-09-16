@@ -86,7 +86,7 @@ export default function FaqTable() {
 
   // === STATE FILTER ===
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
 
   // Filter Khusus

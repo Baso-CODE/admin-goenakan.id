@@ -52,7 +52,7 @@ export default function TableRole() {
 
   // Filters State
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
 
   // === FETCH ROLES ===

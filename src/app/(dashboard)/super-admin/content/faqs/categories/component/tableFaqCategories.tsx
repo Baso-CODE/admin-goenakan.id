@@ -64,7 +64,7 @@ export default function FaqCategoryTable() {
 
   // Search State
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
 
   // Export State

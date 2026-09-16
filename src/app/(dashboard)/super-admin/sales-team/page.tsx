@@ -81,7 +81,7 @@ const Sales = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
 

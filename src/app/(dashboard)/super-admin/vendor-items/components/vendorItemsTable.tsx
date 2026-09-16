@@ -71,7 +71,7 @@ const VendorItemsTable = () => {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);

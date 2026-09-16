@@ -151,7 +151,7 @@ export default function ProductsAll() {
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
 
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
 
   // === Fetch Categories ===
   const fetchCategories = async () => {

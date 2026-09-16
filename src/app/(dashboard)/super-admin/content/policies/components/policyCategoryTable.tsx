@@ -68,7 +68,7 @@ export default function PolicyCategoryTable() {
 
   // Search State
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
 
   // Export & Delete State

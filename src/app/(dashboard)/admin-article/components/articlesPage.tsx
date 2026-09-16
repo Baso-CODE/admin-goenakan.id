@@ -68,7 +68,7 @@ export default function ArticlesSection() {
   const [loading, setLoading] = useState(false);
 
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
 
   //  STATE UNTUK NILAI FILTER

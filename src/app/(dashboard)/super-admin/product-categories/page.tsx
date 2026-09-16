@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -20,7 +21,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "../../components/confirmDeleteDialog";
-import { Switch } from "@/components/ui/switch";
 
 type ProductCategories = {
   id: string;
@@ -57,7 +57,7 @@ const ProductCategoriesPage = () => {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
 
   // --- STATE UNTUK DELETE ---
@@ -155,7 +155,9 @@ const ProductCategoriesPage = () => {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Gagal mengubah status aktif kategori");
+        throw new Error(
+          errData.message || "Gagal mengubah status aktif kategori",
+        );
       }
       toast.success("Status aktif kategori berhasil diubah");
       setCategories((prev) =>

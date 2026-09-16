@@ -80,7 +80,7 @@ export default function PortfolioTable() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
 

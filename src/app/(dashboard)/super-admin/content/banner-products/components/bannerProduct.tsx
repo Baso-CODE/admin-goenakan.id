@@ -58,7 +58,7 @@ export default function BannerProductTable() {
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
 
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
 
   // === FETCH DATA ===
   const fetchBanners = async () => {

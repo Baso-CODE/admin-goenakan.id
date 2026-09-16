@@ -11,6 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -37,7 +38,6 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AddItemNameModal } from "./addItemNameModal";
 import { EditItemNameModal } from "./editItemNameModal";
-import { Switch } from "@/components/ui/switch";
 
 type ItemName = {
   id: string;
@@ -72,7 +72,7 @@ export default function ItemNames() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
 
   // --- MODAL STATE ---
@@ -175,7 +175,9 @@ export default function ItemNames() {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Gagal mengubah status aktif item name");
+        throw new Error(
+          errData.message || "Gagal mengubah status aktif item name",
+        );
       }
       toast.success("Status aktif item name berhasil diubah");
       setItemNames((prev) =>

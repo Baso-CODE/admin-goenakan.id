@@ -167,7 +167,7 @@ export default function QuotationsTable() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 

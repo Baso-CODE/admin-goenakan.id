@@ -680,7 +680,6 @@ export default function ClientAddForm({
                 </TabsContent>
 
                 {/* TAB 4: BRAND (B2B Only) */}
-                {/* TAB 4: BRAND (B2B Only) */}
                 <TabsContent
                   value="brand"
                   className="space-y-6"

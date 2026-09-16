@@ -17,7 +17,7 @@ import {
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
-import { ArrowDown, ArrowUp, FileDown, Loader2, Search } from "lucide-react";
+import { FileDown, Loader2, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -72,7 +72,7 @@ export default function ProductAttributesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -119,7 +119,10 @@ export default function ProductAttributesPage() {
     }
   };
 
-  const handleMoveAttribute = async (index: number, direction: "up" | "down") => {
+  const handleMoveAttribute = async (
+    index: number,
+    direction: "up" | "down",
+  ) => {
     const targetIndex = direction === "up" ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= attributes.length) return;
 
@@ -127,7 +130,7 @@ export default function ProductAttributesPage() {
     const temp = updatedAttributes[index];
     updatedAttributes[index] = updatedAttributes[targetIndex];
     updatedAttributes[targetIndex] = temp;
-    
+
     setAttributes(updatedAttributes);
 
     try {
@@ -402,7 +405,16 @@ export default function ProductAttributesPage() {
                         {attr.name}
                         {attr.parentValue && (
                           <div className="text-xs text-muted-foreground mt-0.5 font-normal">
-                            Sub-attribute of: <span className="font-semibold text-stone-600">{attr.parentValue.attribute.name}</span> → <span className="font-semibold text-stone-600">{attr.parentValue.value.includes("|") ? attr.parentValue.value.split("|")[0] : attr.parentValue.value}</span>
+                            Sub-attribute of:{" "}
+                            <span className="font-semibold text-stone-600">
+                              {attr.parentValue.attribute.name}
+                            </span>{" "}
+                            →{" "}
+                            <span className="font-semibold text-stone-600">
+                              {attr.parentValue.value.includes("|")
+                                ? attr.parentValue.value.split("|")[0]
+                                : attr.parentValue.value}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -410,7 +422,9 @@ export default function ProductAttributesPage() {
 
                     {/* TYPE */}
                     <TableCell>
-                      <Badge variant="secondary" className="uppercase font-mono text-xs">
+                      <Badge
+                        variant="secondary"
+                        className="uppercase font-mono text-xs">
                         {attr.type}
                       </Badge>
                     </TableCell>
@@ -418,11 +432,15 @@ export default function ProductAttributesPage() {
                     {/* SCOPE */}
                     <TableCell>
                       {attr.productId && attr.product ? (
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        <Badge
+                          variant="outline"
+                          className="bg-blue-50 text-blue-700 border-blue-200">
                           Local: {attr.product.name}
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="bg-stone-50 text-stone-700 border-stone-200">
+                        <Badge
+                          variant="outline"
+                          className="bg-stone-50 text-stone-700 border-stone-200">
                           Global
                         </Badge>
                       )}
@@ -433,7 +451,9 @@ export default function ProductAttributesPage() {
                       <div className="flex flex-wrap gap-1">
                         {attr.values.length > 0 ? (
                           attr.values.map((value) => {
-                            const valStr = value.value.includes("|") ? value.value.split("|")[0] : value.value;
+                            const valStr = value.value.includes("|")
+                              ? value.value.split("|")[0]
+                              : value.value;
                             return (
                               <Badge key={value.id} variant="secondary">
                                 {valStr}
@@ -457,7 +477,10 @@ export default function ProductAttributesPage() {
                     <TableCell className="space-x-2">
                       <Link
                         href={`/super-admin/product-attributes/edit/${attr.id}`}>
-                        <Button variant="outline" size="sm" className="cursor-pointer">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="cursor-pointer">
                           Edit
                         </Button>
                       </Link>

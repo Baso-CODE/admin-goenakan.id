@@ -2,7 +2,6 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -27,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -117,7 +117,10 @@ export default function ProductsAll() {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  const handleToggleActive = async (productId: string, currentStatus: boolean) => {
+  const handleToggleActive = async (
+    productId: string,
+    currentStatus: boolean,
+  ) => {
     try {
       const res = await fetchApi(`/products/${productId}`, {
         method: "PATCH",
@@ -131,7 +134,9 @@ export default function ProductsAll() {
       }
       toast.success("Status aktif produk berhasil diubah");
       setProducts((prev) =>
-        prev.map((p) => (p.id === productId ? { ...p, isActive: !currentStatus } : p))
+        prev.map((p) =>
+          p.id === productId ? { ...p, isActive: !currentStatus } : p,
+        ),
       );
     } catch (err: any) {
       toast.error(err.message || "Gagal mengubah status aktif");
@@ -146,7 +151,7 @@ export default function ProductsAll() {
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
 
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
 
   // === Fetch Categories ===
   const fetchCategories = async () => {
@@ -516,7 +521,12 @@ export default function ProductsAll() {
                           <div className="flex justify-center">
                             <Switch
                               checked={product.isActive !== false}
-                              onCheckedChange={() => handleToggleActive(product.id, product.isActive !== false)}
+                              onCheckedChange={() =>
+                                handleToggleActive(
+                                  product.id,
+                                  product.isActive !== false,
+                                )
+                              }
                               className="scale-90"
                             />
                           </div>

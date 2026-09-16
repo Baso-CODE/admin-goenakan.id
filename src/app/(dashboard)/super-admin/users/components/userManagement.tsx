@@ -51,7 +51,7 @@ export default function UserManagementPage() {
   const [search, setSearch] = useState<string>("");
 
   // Jika backend belum pakai pagination, kita pakai pencarian di sisi client (Client-side filtering)
-  const debouncedSearch = useDebounce(search, 300);
+  const debouncedSearch = useDebounce(search, 800);
 
   // === FETCH DATA DARI BACKEND ===
   const fetchUsers = async () => {

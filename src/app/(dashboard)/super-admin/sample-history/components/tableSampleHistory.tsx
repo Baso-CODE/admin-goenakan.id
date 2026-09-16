@@ -91,7 +91,7 @@ export default function TableSampleHistory() {
 
   // Filters
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
 
@@ -308,7 +308,7 @@ export default function TableSampleHistory() {
                         <div className="flex items-center justify-center gap-2">
                           {/* Tombol Lihat Detail */}
                           <Link
-                            href={`/super-admin/orders/sample-history/${history.id}`}>
+                            href={`/super-admin/sample-history/${history.id}`}>
                             <Button
                               size="sm"
                               variant="ghost"

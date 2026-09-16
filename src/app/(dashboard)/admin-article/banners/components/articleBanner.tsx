@@ -57,7 +57,7 @@ const ArticleBanners = () => {
 
   // Pencarian berdasarkan Judul Artikel
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
 
   // --- STATE UNTUK DELETE ---
