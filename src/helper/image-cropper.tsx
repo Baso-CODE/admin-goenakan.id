@@ -8,23 +8,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-// ✨ Import createImage dari utility
 import getCroppedImg, { createImage } from "@/lib/cropImage";
-import React, { useCallback, useRef, useState } from "react";
-import Cropper from "react-easy-crop";
-// ✨ Import ikon pendukung
 import {
   FlipHorizontal,
   FlipVertical,
   RotateCcw,
   RotateCw,
 } from "lucide-react";
+import React, { useCallback, useRef, useState } from "react";
+import Cropper from "react-easy-crop";
 
 interface ImageCropperProps {
   children: React.ReactNode;
   aspectRatio: number;
   onCropComplete: (croppedFile: File) => void;
   disabled?: boolean;
+  allowVideo?: boolean;
 }
 
 export function ImageCropper({
@@ -32,11 +31,12 @@ export function ImageCropper({
   aspectRatio,
   onCropComplete,
   disabled = false,
+  allowVideo = false,
 }: ImageCropperProps) {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0); // ✨ State baru untuk Rotasi
+  const [rotation, setRotation] = useState(0);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   const [isCropping, setIsCropping] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -52,10 +52,16 @@ export function ImageCropper({
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
+
+      if (file.type.startsWith("video/")) {
+        onCropComplete(file);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      // Jika file gambar, jalankan cropper seperti biasa
       const imageDataUrl = URL.createObjectURL(file);
       setImageSrc(imageDataUrl);
-
-      // ✨ Reset state saat gambar baru dipilih
       setRotation(0);
       setZoom(1);
       setIsOpen(true);
@@ -70,7 +76,6 @@ export function ImageCropper({
     [],
   );
 
-  // ✨ Fungsi untuk Membalik Gambar (Flip)
   const flipImage = async (direction: "horizontal" | "vertical") => {
     if (!imageSrc) return;
     try {
@@ -82,7 +87,6 @@ export function ImageCropper({
       canvas.width = image.width;
       canvas.height = image.height;
 
-      // Logika pembalikan menggunakan skala negatif
       if (direction === "horizontal") {
         ctx.translate(image.width, 0);
         ctx.scale(-1, 1);
@@ -92,8 +96,6 @@ export function ImageCropper({
       }
 
       ctx.drawImage(image, 0, 0);
-
-      // Update imageSrc dengan versi yang sudah dibalik
       const newImageSrc = canvas.toDataURL("image/png");
       setImageSrc(newImageSrc);
     } catch (e) {
@@ -109,7 +111,7 @@ export function ImageCropper({
       const croppedFile = await getCroppedImg(
         imageSrc,
         croppedAreaPixels,
-        rotation, // ✨ Kirim parameter rotasi ke utility
+        rotation,
         `cropped-${Date.now()}.webp`,
       );
       onCropComplete(croppedFile);
@@ -130,7 +132,7 @@ export function ImageCropper({
         {children}
         <input
           type="file"
-          accept="image/*"
+          accept={allowVideo ? "image/*,video/*" : "image/*"}
           ref={fileInputRef}
           onChange={onFileChange}
           className="hidden"
@@ -139,12 +141,11 @@ export function ImageCropper({
       </div>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-[650px] h-[85vh] flex flex-col p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-162.5 h-[85vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="p-4 bg-white z-10 shadow-sm border-b">
             <DialogTitle>Sesuaikan Gambar</DialogTitle>
           </DialogHeader>
 
-          {/* ✨ Toolbar Rotasi & Flip */}
           <div className="flex items-center justify-center gap-2 p-3 bg-stone-50 z-10">
             <Button
               type="button"
@@ -181,14 +182,13 @@ export function ImageCropper({
             </Button>
           </div>
 
-          {/* Area Crop */}
           <div className="relative flex-1 bg-stone-900">
             {imageSrc && (
               <Cropper
                 image={imageSrc}
                 crop={crop}
                 zoom={zoom}
-                rotation={rotation} // ✨ Kirim rotasi ke cropper
+                rotation={rotation}
                 aspect={aspectRatio}
                 onCropChange={setCrop}
                 onCropComplete={onCropCompleteCallback}

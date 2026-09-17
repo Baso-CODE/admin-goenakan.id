@@ -14,9 +14,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { formatDate } from "@/utils/formatDate";
+import { format } from "date-fns"; // ✨ TAMBAHAN: Untuk mengubah format Date ke string
 import { FileDown, Loader2, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -56,7 +58,7 @@ type Meta = {
   total: number;
 };
 
-// Interface untuk Query Export (sesuai kebutuhan backend)
+// Interface untuk Query Export
 interface AttributeExportQuery {
   startDate?: string;
   endDate?: string;
@@ -66,11 +68,12 @@ interface AttributeExportQuery {
 export default function ProductAttributesPage() {
   const { fetchApi, status } = useApi();
 
-  // --- STATE UNTUK TABLE ---
+  // --- STATE UNTUK TABLE & SEARCH UTAMA ---
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
@@ -78,10 +81,14 @@ export default function ProductAttributesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // --- STATE BARU UNTUK EXPORT FILTER ---
-  const [exportStartDate, setExportStartDate] = useState<string>("");
-  const [exportEndDate, setExportEndDate] = useState<string>("");
-  const [exportSearch, setExportSearch] = useState<string>("");
+  // --- STATE UNTUK EXPORT FILTER ---
+  // ✨ UBAH: Tipe state diubah menjadi Date | undefined agar cocok dengan DatePickerHelper
+  const [exportStartDate, setExportStartDate] = useState<Date | undefined>(
+    undefined,
+  );
+  const [exportEndDate, setExportEndDate] = useState<Date | undefined>(
+    undefined,
+  );
   const [exporting, setExporting] = useState<boolean>(false);
 
   // --- FUNGSI FETCH DATA (Untuk Tabel) ---
@@ -119,39 +126,6 @@ export default function ProductAttributesPage() {
     }
   };
 
-  const handleMoveAttribute = async (
-    index: number,
-    direction: "up" | "down",
-  ) => {
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= attributes.length) return;
-
-    const updatedAttributes = [...attributes];
-    const temp = updatedAttributes[index];
-    updatedAttributes[index] = updatedAttributes[targetIndex];
-    updatedAttributes[targetIndex] = temp;
-
-    setAttributes(updatedAttributes);
-
-    try {
-      await Promise.all([
-        fetchApi(`/product-attributes/${updatedAttributes[index].id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ position: index }),
-        }),
-        fetchApi(`/product-attributes/${updatedAttributes[targetIndex].id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ position: targetIndex }),
-        }),
-      ]);
-      toast.success("Attribute order updated!");
-    } catch (err) {
-      console.error("❌ Failed to move attribute:", err);
-      toast.error("Failed to persist attribute order.");
-      fetchAttributes();
-    }
-  };
-
   useEffect(() => {
     fetchAttributes();
   }, [page, debouncedSearch, status, fetchApi]);
@@ -172,7 +146,7 @@ export default function ProductAttributesPage() {
 
       toast.success("Product Attribute berhasil dihapus!");
       setDeleteId(null);
-      fetchAttributes(); // Refresh data
+      fetchAttributes();
     } catch (error: any) {
       console.error("❌ Delete Error:", error);
       toast.error(
@@ -184,17 +158,17 @@ export default function ProductAttributesPage() {
     }
   };
 
-  // --- FUNGSI HANDLE EXPORT (Implementasi Baru) ---
+  // --- FUNGSI HANDLE EXPORT ---
   const handleExportAttributes = async () => {
     setExporting(true);
     try {
-      // 1. Ambil Token Autentikasi
-
-      // 2. Kumpulkan Filter
+      // ✨ UBAH: Memformat objek Date kembali menjadi string (YYYY-MM-DD) agar bisa dibaca backend
       const exportFilters: AttributeExportQuery = {
-        ...(exportStartDate && { startDate: exportStartDate }),
-        ...(exportEndDate && { endDate: exportEndDate }),
-        ...(exportSearch.trim() && { search: exportSearch.trim() }),
+        ...(exportStartDate && {
+          startDate: format(exportStartDate, "yyyy-MM-dd"),
+        }),
+        ...(exportEndDate && { endDate: format(exportEndDate, "yyyy-MM-dd") }),
+        ...(search.trim() && { search: search.trim() }),
       };
 
       const queryString = new URLSearchParams(
@@ -216,7 +190,6 @@ export default function ProductAttributesPage() {
         );
       }
 
-      // 3. Proses File Binary (Blob)
       const blob = await response.blob();
       const contentDisposition = response.headers.get("Content-Disposition");
 
@@ -246,15 +219,10 @@ export default function ProductAttributesPage() {
       setExporting(false);
     }
   };
-  // --- END FUNGSI HANDLE EXPORT ---
-
-  useEffect(() => {
-    fetchAttributes();
-  }, [page, debouncedSearch]);
 
   return (
     <div className="space-y-4 w-auto mx-auto ">
-      {/* ================= HEADER & SEARCH/FILTER TABLE ================= */}
+      {/* ================= HEADER & SEARCH UTAMA ================= */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <CardTitle className="text-xl font-semibold">
@@ -267,7 +235,10 @@ export default function ProductAttributesPage() {
               <Input
                 placeholder="Search attribute..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
                 className="pl-8"
               />
             </div>
@@ -275,50 +246,34 @@ export default function ProductAttributesPage() {
         </CardHeader>
       </Card>
 
-      {/* ================= FILTER DAN EXPORT BARU ================= */}
+      {/* ================= FILTER TANGGAL EXPORT ================= */}
       <Card className="p-4">
         <div className="flex flex-wrap items-end gap-4">
           <h3 className="w-full text-sm font-semibold text-muted-foreground">
             Export Filter (opsional, berdasarkan Created Date):
           </h3>
 
-          {/* Filter Search (untuk Export) */}
-          <div className="flex flex-col">
-            <label className="text-xs font-medium text-muted-foreground mb-1">
-              Search (Export)
-            </label>
-            <Input
-              type="text"
-              placeholder="Search by name/slug..."
-              value={exportSearch}
-              onChange={(e) => setExportSearch(e.target.value)}
-              className="w-50"
-            />
-          </div>
-
-          {/* Filter Tanggal Mulai (Untuk Export) */}
+          {/* Filter Tanggal Mulai Menggunakan DatePickerHelper */}
           <div className="flex flex-col">
             <label className="text-xs font-medium text-muted-foreground mb-1">
               Start Date
             </label>
-            <Input
-              type="date"
-              value={exportStartDate}
-              onChange={(e) => setExportStartDate(e.target.value)}
-              className="w-37.5"
+            <DatePickerHelper
+              date={exportStartDate}
+              setDate={setExportStartDate}
+              placeholder="Pilih Start Date"
             />
           </div>
 
-          {/* Filter Tanggal Akhir (Untuk Export) */}
+          {/* Filter Tanggal Akhir Menggunakan DatePickerHelper */}
           <div className="flex flex-col">
             <label className="text-xs font-medium text-muted-foreground mb-1">
               End Date
             </label>
-            <Input
-              type="date"
-              value={exportEndDate}
-              onChange={(e) => setExportEndDate(e.target.value)}
-              className="w-37.5"
+            <DatePickerHelper
+              date={exportEndDate}
+              setDate={setExportEndDate}
+              placeholder="Pilih End Date"
             />
           </div>
 
@@ -332,7 +287,7 @@ export default function ProductAttributesPage() {
           {/* Tombol Export */}
           <Button
             size="sm"
-            className="gap-2 bg-green-600 hover:bg-green-700"
+            className="gap-2 bg-green-600 hover:bg-green-700 cursor-pointer"
             onClick={handleExportAttributes}
             disabled={exporting}>
             {exporting ? (
@@ -344,7 +299,6 @@ export default function ProductAttributesPage() {
           </Button>
         </div>
       </Card>
-      {/* ================= END FILTER DAN EXPORT BARU ================= */}
 
       {/* ================= TABLE ================= */}
       <Card className="w-full">

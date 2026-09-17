@@ -7,13 +7,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+// Komponen dan tipe data form yang sudah disederhanakan sebelumnya
 import SuccessStoryForm, { SuccessStoryFormValues } from "./successStoryForm";
 
 export default function AddSuccessStory() {
   const { fetchApi, status } = useApi();
-
   const router = useRouter();
-
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddStory = async (
@@ -25,7 +24,6 @@ export default function AddSuccessStory() {
   ): Promise<void> => {
     if (status !== "authenticated") {
       toast.error("Sesi login tidak valid. Silakan login kembali.");
-
       return;
     }
 
@@ -34,7 +32,6 @@ export default function AddSuccessStory() {
     }
 
     setIsSubmitting(true);
-
     console.time("🌐 CREATE_SUCCESS_STORY_REQUEST");
 
     try {
@@ -43,7 +40,6 @@ export default function AddSuccessStory() {
        * VALIDASI
        * ==========================================
        */
-
       if (!data.heroImageUrl) {
         throw new Error("Mohon unggah Hero Image terlebih dahulu.");
       }
@@ -51,14 +47,9 @@ export default function AddSuccessStory() {
       console.log("📤 Mengirim Success Story ke backend", {
         titleId: data.titleId,
         clientId: data.clientId,
-
         hasHeroImage: Boolean(data.heroImageUrl),
-
         hasMedia1: Boolean(data.media1Url),
-
         hasMedia2: Boolean(data.media2Url),
-
-        useAutoTranslate: data.useAutoTranslate,
       });
 
       /*
@@ -66,13 +57,8 @@ export default function AddSuccessStory() {
        * REQUEST API
        * ==========================================
        */
-
       const controller = new AbortController();
-
-      /*
-       * Create database seharusnya cepat.
-       * 30 detik sudah sangat longgar.
-       */
+      // Timeout 30 detik
       const timeoutId = setTimeout(() => {
         controller.abort();
       }, 30_000);
@@ -82,13 +68,10 @@ export default function AddSuccessStory() {
       try {
         res = await fetchApi("/success-story", {
           method: "POST",
-
           headers: {
             "Content-Type": "application/json",
           },
-
           body: JSON.stringify(data),
-
           signal: controller.signal,
         });
       } finally {
@@ -100,10 +83,8 @@ export default function AddSuccessStory() {
        * HANDLE ERROR RESPONSE
        * ==========================================
        */
-
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
-
         console.error("❌ Create Success Story API Error:", {
           status: res.status,
           body: errData,
@@ -115,9 +96,7 @@ export default function AddSuccessStory() {
       }
 
       const result = await res.json().catch(() => null);
-
       console.log("✅ Success Story berhasil dibuat:", result);
-
       toast.success("Success Story berhasil dibuat!");
 
       /*
@@ -125,9 +104,8 @@ export default function AddSuccessStory() {
        * NAVIGASI
        * ==========================================
        */
-
-      router.push("/super-admin/success-story");
-
+      // Rute sudah dirapikan agar konsisten
+      router.push("/super-admin/success-stories");
       router.refresh();
     } catch (error) {
       console.error("❌ Create Success Story Error:", error);
@@ -136,7 +114,6 @@ export default function AddSuccessStory() {
         toast.error(
           "Request terlalu lama. Server tidak memberikan response dalam 30 detik.",
         );
-
         return;
       }
 
@@ -146,16 +123,10 @@ export default function AddSuccessStory() {
           : "Terjadi kesalahan saat menyimpan data.",
       );
 
-      /*
-       * Penting.
-       *
-       * Throw kembali supaya SuccessStoryForm tahu
-       * bahwa onSubmit gagal.
-       */
+      // Melempar error ke komponen form agar tombol tidak tertahan dalam state loading
       throw error;
     } finally {
       console.timeEnd("🌐 CREATE_SUCCESS_STORY_REQUEST");
-
       setIsSubmitting(false);
     }
   };
@@ -163,17 +134,8 @@ export default function AddSuccessStory() {
   return (
     <div className="space-y-4 mx-auto">
       <Link
-        href="/super-admin/success-story"
-        className="
-          inline-flex
-          items-center
-          text-sm
-          font-medium
-          text-muted-foreground
-          hover:text-primary
-          mb-2
-          transition-colors
-        ">
+        href="/super-admin/success-stories"
+        className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-primary mb-2 transition-colors">
         <ChevronLeft className="w-4 h-4 mr-1" />
         Kembali ke Daftar
       </Link>
