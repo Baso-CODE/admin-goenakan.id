@@ -2293,7 +2293,72 @@ export default function ProductFormV2({
               })()}
             </div>
 
-      <AddTagModal
+            <DialogFooter className="mt-6 gap-2">
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => setters.setIsGenModalOpen(false)}
+                className="font-bold text-xs uppercase">
+                Batal
+              </Button>
+              <Button
+                type="button"
+                onClick={handlers.handleConfirmVariantGeneration}
+                className="bg-primary hover:bg-primary/90 text-white font-bold text-xs uppercase">
+                Generate Varian Terpilih
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <CreateCategoryModal
+          isOpen={state.isCategoryModalOpen}
+          onClose={() => setters.setIsCategoryModalOpen(false)}
+          onSuccess={(newCat) => {
+            setters.setCategories((p) => [...p, newCat]);
+            form.setValue("categoryId", newCat.id);
+            form.setValue("itemCategoryId", "");
+            form.setValue("itemNameId", "");
+          }}
+        />
+        <AddItemCategoryModal
+          isOpen={state.isItemCategoryModalOpen}
+          onClose={() => setters.setIsItemCategoryModalOpen(false)}
+          parentCategoryId={state.selectedCategoryId}
+          onSuccess={(newCat) => {
+            setters.setItemCategories((p) => [...p, newCat]);
+            form.setValue("itemCategoryId", newCat.id);
+            form.setValue("itemNameId", "");
+          }}
+        />
+        <AddItemNameModal
+          isOpen={state.isItemNameModalOpen}
+          onClose={() => setters.setIsItemNameModalOpen(false)}
+          parentCategoryId={state.selectedCategoryId}
+          parentItemCategoryId={state.selectedItemCategoryId}
+          productCategories={state.categories}
+          itemCategories={state.itemCategories}
+          onSuccess={(newName) => {
+            setters.setItemNames((p) => [...p, newName]);
+
+            const oldVal = form.getValues("itemNameId");
+            const oldItem = state.itemNames.find((inm) => inm.id === oldVal);
+
+            let currentName = form.getValues("name") || "";
+            if (oldItem && currentName.startsWith(oldItem.name)) {
+              currentName = currentName.replace(oldItem.name, newName.name);
+            } else if (!currentName.startsWith(newName.name)) {
+              currentName = currentName
+                ? `${newName.name} ${currentName}`
+                : newName.name;
+            }
+            form.setValue("name", currentName);
+
+            form.setValue("itemNameId", newName.id);
+          }}
+        />
+
+        <AddTagModal
         isOpen={isAddTagModalOpen}
         onClose={() => setIsAddTagModalOpen(false)}
         onSuccess={(newTag) => {
