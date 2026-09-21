@@ -59,6 +59,7 @@ import {
 } from "lucide-react";
 import { AddItemCategoryModal } from "../../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../../item-names-product/components/addItemNameModal";
+import { AddTagModal } from "../../../product-tags/components/addTagModal";
 import CreateCategoryModal from "../../../product-categories/components/createCategoryModal";
 import MaterialTypeForm from "../../../product-materials/components/materialTypeForm";
 import { TagCategoryManagerModal } from "../TagCategoryManagerModal";
@@ -132,6 +133,7 @@ export default function FormProductCore({
   const [isItemCategoryModalOpen, setIsItemCategoryModalOpen] = useState(false);
   const [isItemNameModalOpen, setIsItemNameModalOpen] = useState(false);
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
+  const [isAddTagModalOpen, setIsAddTagModalOpen] = useState(false);
   const [isSubmittingMaterial, setIsSubmittingMaterial] = useState(false);
 
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -1192,6 +1194,18 @@ export default function FormProductCore({
                                   );
                                 })}
                               </CommandGroup>
+                              <div className="h-px bg-stone-100 my-1" />
+                              <CommandGroup>
+                                <CommandItem
+                                  value="ADD_NEW_PRODUCT_TAG"
+                                  onSelect={() => {
+                                    setTagSearchOpen(false);
+                                    setIsAddTagModalOpen(true);
+                                  }}
+                                  className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                  + Tambah Tag Baru
+                                </CommandItem>
+                              </CommandGroup>
                             </CommandList>
                           </Command>
                         </PopoverContent>
@@ -1317,6 +1331,21 @@ export default function FormProductCore({
         }}
         onTagCreated={(newTag) => {
           setTags((prev) => [...prev, newTag]);
+        }}
+      />
+
+      <AddTagModal
+        isOpen={isAddTagModalOpen}
+        onClose={() => setIsAddTagModalOpen(false)}
+        onSuccess={(newTag) => {
+          setTags((prev: any[]) => {
+            if (prev.some((t) => t.id === newTag.id)) return prev;
+            return [...prev, newTag];
+          });
+          const currentTags = form.getValues("tagIds") || [];
+          if (!currentTags.includes(newTag.id)) {
+            form.setValue("tagIds", [...currentTags, newTag.id]);
+          }
         }}
       />
     </>

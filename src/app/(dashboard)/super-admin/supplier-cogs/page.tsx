@@ -234,6 +234,11 @@ export default function SupplierCogsCalculatorPage() {
   const [cogsStatus, setCogsStatus] = useState<"EXISTING" | "POTENTIAL">("POTENTIAL");
   const [potentialProductType, setPotentialProductType] = useState<"NEW" | "EXISTING">("NEW");
   const [productSelectOpen, setProductSelectOpen] = useState(false);
+  const [vendorSelectOpen, setVendorSelectOpen] = useState(false);
+  const [serviceVendorSelectOpen, setServiceVendorSelectOpen] = useState(false);
+  const [platformSelectOpen, setPlatformSelectOpen] = useState(false);
+  const [currencySelectOpen, setCurrencySelectOpen] = useState(false);
+  const [roundUpSelectOpen, setRoundUpSelectOpen] = useState(false);
   const [historyStatusFilter, setHistoryStatusFilter] = useState<"ALL" | "EXISTING" | "POTENTIAL">("ALL");
   const [historyTypeFilter, setHistoryTypeFilter] = useState<"ALL" | "BORONGAN" | "RESMI">("ALL");
 
@@ -2289,52 +2294,89 @@ export default function SupplierCogsCalculatorPage() {
                     <Label className="text-xs font-bold uppercase text-stone-600">
                       Supplier / Vendor Product
                     </Label>
-                    <Select
-                      value={selectedVendorId}
-                      onValueChange={(val) => {
-                        setSelectedVendorId(val);
-                        if (val && val !== "none") {
-                          const vend = vendors.find((v) => v.id === val);
-                          if (vend) {
-                            if (vend.picName) {
-                              setSupplierContactName(vend.picName);
-                            }
-                            if (vend.contacts && vend.contacts.length > 0) {
-                              const primary = vend.contacts.find((c: any) => c.isPrimary) || vend.contacts[0];
-                              if (primary) {
-                                if (primary.contactId) {
-                                  setSupplierContactLink(primary.contactId);
-                                }
-                                if (primary.platform && primary.platform.name) {
-                                  const platformName = primary.platform.name;
-                                  const matchedPlat = ["1688", "Alibaba", "WeChat", "Taobao", "Made-In-China", "WhatsApp", "Lokal / Indonesia"].find(
-                                    (plat) => plat.toLowerCase() === platformName.toLowerCase()
-                                  );
-                                  setSupplierPlatform(matchedPlat || platformName);
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="bg-stone-50 border-stone-300 w-full max-w-full overflow-hidden">
-                        <SelectValue placeholder="Pilih Supplier Product" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">-- Tanpa Vendor Product --</SelectItem>
-                        {productVendors.map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
-                            <div className="flex items-center justify-between w-full gap-2">
-                              <span>{v.companyName}</span>
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 uppercase ml-2">
-                                Product
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={vendorSelectOpen} onOpenChange={setVendorSelectOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="bg-stone-50 border-stone-300 w-full justify-between font-normal text-stone-850 max-w-full overflow-hidden h-10">
+                          <span className="truncate text-left flex-1 min-w-0 pr-2">
+                            {selectedVendorId && selectedVendorId !== "none"
+                              ? productVendors.find((v) => v.id === selectedVendorId)?.companyName || "Pilih Supplier Product"
+                              : "Pilih Supplier Product"}
+                          </span>
+                          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] max-w-[calc(100vw-40px)] p-0 bg-white border border-stone-250 shadow-md">
+                        <Command>
+                          <CommandInput placeholder="Cari supplier / vendor product..." />
+                          <CommandList>
+                            <CommandEmpty>Vendor tidak ditemukan.</CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                value="-- Tanpa Vendor Product -- none"
+                                onSelect={() => {
+                                  setSelectedVendorId("none");
+                                  setVendorSelectOpen(false);
+                                }}>
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    !selectedVendorId || selectedVendorId === "none" ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <span className="text-stone-500 italic">-- Tanpa Vendor Product --</span>
+                              </CommandItem>
+                              {productVendors.map((v) => {
+                                const isSelected = selectedVendorId === v.id;
+                                const searchVal = `${v.companyName} ${v.picName || ""}`;
+                                return (
+                                  <CommandItem
+                                    key={v.id}
+                                    value={searchVal}
+                                    onSelect={() => {
+                                      setSelectedVendorId(v.id);
+                                      if (v.picName) {
+                                        setSupplierContactName(v.picName);
+                                      }
+                                      if (v.contacts && v.contacts.length > 0) {
+                                        const primary = v.contacts.find((c: any) => c.isPrimary) || v.contacts[0];
+                                        if (primary) {
+                                          if (primary.contactId) {
+                                            setSupplierContactLink(primary.contactId);
+                                          }
+                                          if (primary.platform && primary.platform.name) {
+                                            const platformName = primary.platform.name;
+                                            const matchedPlat = ["1688", "Alibaba", "WeChat", "Taobao", "Made-In-China", "WhatsApp", "Lokal / Indonesia"].find(
+                                              (plat) => plat.toLowerCase() === platformName.toLowerCase()
+                                            );
+                                            setSupplierPlatform(matchedPlat || platformName);
+                                          }
+                                        }
+                                      }
+                                      setVendorSelectOpen(false);
+                                    }}>
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4 shrink-0",
+                                        isSelected ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <div className="flex items-center justify-between w-full gap-2 min-w-0">
+                                      <span className="truncate">{v.companyName}</span>
+                                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 uppercase shrink-0">
+                                        Product
+                                      </span>
+                                    </div>
+                                  </CommandItem>
+                                );
+                              })}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   {/* Service Vendor */}
@@ -2342,24 +2384,71 @@ export default function SupplierCogsCalculatorPage() {
                     <Label className="text-xs font-bold uppercase text-stone-600">
                       Vendor Ekspedisi / Service (Opsional)
                     </Label>
-                    <Select value={selectedServiceVendorId} onValueChange={setSelectedServiceVendorId}>
-                      <SelectTrigger className="bg-stone-50 border-stone-300 w-full max-w-full overflow-hidden">
-                        <SelectValue placeholder="Pilih Vendor Service (Opsional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">-- Tanpa Vendor Service --</SelectItem>
-                        {serviceVendors.map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
-                            <div className="flex items-center justify-between w-full gap-2">
-                              <span>{v.companyName}</span>
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 uppercase ml-2">
-                                Service
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={serviceVendorSelectOpen} onOpenChange={setServiceVendorSelectOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="bg-stone-50 border-stone-300 w-full justify-between font-normal text-stone-850 max-w-full overflow-hidden h-10">
+                          <span className="truncate text-left flex-1 min-w-0 pr-2">
+                            {selectedServiceVendorId && selectedServiceVendorId !== "none"
+                              ? serviceVendors.find((v) => v.id === selectedServiceVendorId)?.companyName || "Pilih Vendor Service (Opsional)"
+                              : "Pilih Vendor Service (Opsional)"}
+                          </span>
+                          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] max-w-[calc(100vw-40px)] p-0 bg-white border border-stone-250 shadow-md">
+                        <Command>
+                          <CommandInput placeholder="Cari vendor service..." />
+                          <CommandList>
+                            <CommandEmpty>Vendor tidak ditemukan.</CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                value="-- Tanpa Vendor Service -- none"
+                                onSelect={() => {
+                                  setSelectedServiceVendorId("none");
+                                  setServiceVendorSelectOpen(false);
+                                }}>
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    !selectedServiceVendorId || selectedServiceVendorId === "none" ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <span className="text-stone-500 italic">-- Tanpa Vendor Service --</span>
+                              </CommandItem>
+                              {serviceVendors.map((v) => {
+                                const isSelected = selectedServiceVendorId === v.id;
+                                const searchVal = `${v.companyName} ${v.picName || ""}`;
+                                return (
+                                  <CommandItem
+                                    key={v.id}
+                                    value={searchVal}
+                                    onSelect={() => {
+                                      setSelectedServiceVendorId(v.id);
+                                      setServiceVendorSelectOpen(false);
+                                    }}>
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4 shrink-0",
+                                        isSelected ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <div className="flex items-center justify-between w-full gap-2 min-w-0">
+                                      <span className="truncate">{v.companyName}</span>
+                                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 uppercase shrink-0">
+                                        Service
+                                      </span>
+                                    </div>
+                                  </CommandItem>
+                                );
+                              })}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
 
@@ -2406,39 +2495,62 @@ export default function SupplierCogsCalculatorPage() {
                         </DialogContent>
                       </Dialog>
 
-                      <Select
-                        value={supplierPlatform}
-                        onValueChange={(val) => {
-                          if (val === "add_new_platform") {
-                            setIsPlatformModalOpen(true);
-                          } else {
-                            setSupplierPlatform(val);
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="bg-stone-50 border-stone-300">
-                          <SelectValue placeholder="Pilih Platform" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {uniquePlatformList.map((plat) => (
-                            <SelectItem key={plat} value={plat}>
-                              {plat}
-                            </SelectItem>
-                          ))}
-
-                          <div className="h-px bg-stone-200 my-1 mx-2" />
-                          <SelectItem
-                            value="add_new_platform"
-                            textValue="Buat Platform Baru"
-                            className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Plus className="w-4 h-4" />
-                              Buat Platform Baru...
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Popover open={platformSelectOpen} onOpenChange={setPlatformSelectOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="bg-stone-50 border-stone-300 w-full justify-between font-normal text-stone-850 h-10">
+                            <span className="truncate text-left flex-1 min-w-0 pr-2">
+                              {supplierPlatform || "Pilih Platform"}
+                            </span>
+                            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] max-w-[calc(100vw-40px)] p-0 bg-white border border-stone-250 shadow-md">
+                          <Command>
+                            <CommandInput placeholder="Cari platform..." />
+                            <CommandList>
+                              <CommandEmpty>Platform tidak ditemukan.</CommandEmpty>
+                              <CommandGroup>
+                                {uniquePlatformList.map((plat) => {
+                                  const isSelected = supplierPlatform === plat;
+                                  return (
+                                    <CommandItem
+                                      key={plat}
+                                      value={plat}
+                                      onSelect={() => {
+                                        setSupplierPlatform(plat);
+                                        setPlatformSelectOpen(false);
+                                      }}>
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4 shrink-0",
+                                          isSelected ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <span>{plat}</span>
+                                    </CommandItem>
+                                  );
+                                })}
+                              </CommandGroup>
+                              <div className="h-px bg-stone-100 my-1" />
+                              <CommandGroup>
+                                <CommandItem
+                                  value="add_new_platform Buat Platform Baru"
+                                  onSelect={() => {
+                                    setPlatformSelectOpen(false);
+                                    setIsPlatformModalOpen(true);
+                                  }}
+                                  className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer text-xs">
+                                  <Plus className="w-4 h-4 mr-2" />
+                                  Buat Platform Baru...
+                                </CommandItem>
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
 
                     <div className="space-y-1.5">
@@ -2482,45 +2594,71 @@ export default function SupplierCogsCalculatorPage() {
                       </DialogContent>
                     </Dialog>
 
-                    <Select
-                      onValueChange={(val) => {
-                        if (val === "add_new_currency") {
-                          setIsCurrencyModalOpen(true);
-                        } else {
-                          setCurrency(val);
-                          const foundMaster = masterCurrencies.find((c) => c.code === val);
-                          if (foundMaster && foundMaster.rate) {
-                            setExchangeRate(Number(foundMaster.rate));
-                          } else {
-                            setExchangeRate(ratesData[val] || (val === "RMB" ? 2250 : val === "USD" ? 16200 : 1));
-                          }
-                        }
-                      }}
-                      value={currency}
-                    >
-                      <SelectTrigger className="bg-stone-50 border-stone-300">
-                        <SelectValue placeholder="Pilih Currency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {masterCurrencies.map((cur) => (
-                          <SelectItem key={cur.code} value={cur.code}>
-                            {cur.code} ({cur.symbol || "$"}) - {cur.name || cur.code}
-                          </SelectItem>
-                        ))}
-
-                        <div className="h-px bg-stone-200 my-1 mx-2" />
-                        <SelectItem
-                          value="add_new_currency"
-                          textValue="Buat Currency Baru"
-                          className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Plus className="w-4 h-4" />
-                            Buat Currency Baru...
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Popover open={currencySelectOpen} onOpenChange={setCurrencySelectOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="bg-stone-50 border-stone-300 w-full justify-between font-normal text-stone-850 h-10">
+                          <span className="truncate text-left flex-1 min-w-0 pr-2">
+                            {(() => {
+                              const found = masterCurrencies.find((c) => c.code === currency);
+                              return found ? `${found.code} (${found.symbol || "$"}) - ${found.name || found.code}` : currency || "Pilih Currency";
+                            })()}
+                          </span>
+                          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] max-w-[calc(100vw-40px)] p-0 bg-white border border-stone-250 shadow-md">
+                        <Command>
+                          <CommandInput placeholder="Cari currency / mata uang..." />
+                          <CommandList>
+                            <CommandEmpty>Mata uang tidak ditemukan.</CommandEmpty>
+                            <CommandGroup>
+                              {masterCurrencies.map((cur) => {
+                                const isSelected = currency === cur.code;
+                                const label = `${cur.code} (${cur.symbol || "$"}) - ${cur.name || cur.code}`;
+                                return (
+                                  <CommandItem
+                                    key={cur.code}
+                                    value={label}
+                                    onSelect={() => {
+                                      setCurrency(cur.code);
+                                      if (cur.rate) {
+                                        setExchangeRate(Number(cur.rate));
+                                      } else {
+                                        setExchangeRate(ratesData[cur.code] || (cur.code === "RMB" ? 2250 : cur.code === "USD" ? 16200 : 1));
+                                      }
+                                      setCurrencySelectOpen(false);
+                                    }}>
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4 shrink-0",
+                                        isSelected ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <span>{label}</span>
+                                  </CommandItem>
+                                );
+                              })}
+                            </CommandGroup>
+                            <div className="h-px bg-stone-100 my-1" />
+                            <CommandGroup>
+                              <CommandItem
+                                value="add_new_currency Buat Currency Baru"
+                                onSelect={() => {
+                                  setCurrencySelectOpen(false);
+                                  setIsCurrencyModalOpen(true);
+                                }}
+                                className="text-blue-600 font-semibold focus:text-blue-800 focus:bg-blue-50 cursor-pointer text-xs">
+                                <Plus className="w-4 h-4 mr-2" />
+                                Buat Currency Baru...
+                              </CommandItem>
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   {calculationMode !== "VARIABLE" && (
@@ -2960,19 +3098,54 @@ export default function SupplierCogsCalculatorPage() {
 
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase text-stone-600">Pembulatan Harga</Label>
-                    <Select
-                      value={String(roundUpTo)}
-                      onValueChange={(val) => setRoundUpTo(Number(val))}
-                    >
-                      <SelectTrigger className="bg-stone-50 border-stone-300 w-full">
-                        <SelectValue placeholder="Pilih Pembulatan" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Tanpa Pembulatan</SelectItem>
-                        <SelectItem value="100">Ratusan (Rp 100)</SelectItem>
-                        <SelectItem value="1000">Ribuan (Rp 1.000)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Popover open={roundUpSelectOpen} onOpenChange={setRoundUpSelectOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="bg-stone-50 border-stone-300 w-full justify-between font-normal text-stone-850 h-10">
+                          <span className="truncate text-left flex-1 min-w-0 pr-2">
+                            {roundUpTo === 1000
+                              ? "Ribuan (Rp 1.000)"
+                              : roundUpTo === 100
+                              ? "Ratusan (Rp 100)"
+                              : "Tanpa Pembulatan"}
+                          </span>
+                          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] max-w-[calc(100vw-40px)] p-0 bg-white border border-stone-250 shadow-md">
+                        <Command>
+                          <CommandInput placeholder="Cari pembulatan..." />
+                          <CommandList>
+                            <CommandEmpty>Opsi tidak ditemukan.</CommandEmpty>
+                            <CommandGroup>
+                              {[
+                                { value: "1", label: "Tanpa Pembulatan" },
+                                { value: "100", label: "Ratusan (Rp 100)" },
+                                { value: "1000", label: "Ribuan (Rp 1.000)" },
+                              ].map((opt) => (
+                                <CommandItem
+                                  key={opt.value}
+                                  value={opt.label}
+                                  onSelect={() => {
+                                    setRoundUpTo(Number(opt.value));
+                                    setRoundUpSelectOpen(false);
+                                  }}>
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4 shrink-0",
+                                      String(roundUpTo) === opt.value ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <span>{opt.label}</span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
 

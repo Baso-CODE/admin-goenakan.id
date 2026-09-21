@@ -63,6 +63,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AddItemCategoryModal } from "../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../item-names-product/components/addItemNameModal";
+import { AddTagModal } from "../../product-tags/components/addTagModal";
 import CreateCategoryModal from "../../product-categories/components/createCategoryModal";
 import MaterialTypeForm from "../../product-materials/components/materialTypeForm";
 import { AttributeSelector, ModelShapeValueInput } from "./AttributeSelector";
@@ -102,9 +103,8 @@ export default function ProductFormV2({
 
   const [previewUrl, setPreviewUrl] = useState<string | undefined>();
   const [isTagCategoryModalOpen, setIsTagCategoryModalOpen] = useState(false);
-  const [tempAttributeSelections, setTempAttributeSelections] = useState<any[]>(
-    [],
-  );
+  const [isAddTagModalOpen, setIsAddTagModalOpen] = useState(false);
+  const [tempAttributeSelections, setTempAttributeSelections] = useState<any[]>([]);
   const [tempFullAttrs, setTempFullAttrs] = useState<any[]>([]);
   const [globalStock, setGlobalStock] = useState<string>("");
   const [inlineInputAttrId, setInlineInputAttrId] = useState<string | null>(
@@ -484,15 +484,13 @@ export default function ProductFormV2({
                                       <div className="h-px bg-stone-100 my-1" />
                                       <CommandGroup>
                                         <CommandItem
-                                          value="ADD_NEW_CATEGORY"
+                                          value="ADD_NEW_PRODUCT_TAG"
                                           onSelect={() => {
-                                            setCategoryOpen(false);
-                                            setters.setIsCategoryModalOpen(
-                                              true,
-                                            );
+                                            setters.setTagSearchOpen(false);
+                                            setIsAddTagModalOpen(true);
                                           }}
                                           className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                                          + Kategori Baru
+                                          + Tambah Tag Baru
                                         </CommandItem>
                                       </CommandGroup>
                                     </CommandList>
@@ -2295,116 +2293,36 @@ export default function ProductFormV2({
               })()}
             </div>
 
-            <DialogFooter className="mt-6 gap-2">
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => setters.setIsGenModalOpen(false)}
-                className="font-bold text-xs uppercase">
-                Batal
-              </Button>
-              <Button
-                type="button"
-                onClick={handlers.handleConfirmVariantGeneration}
-                className="bg-primary hover:bg-primary/90 text-white font-bold text-xs uppercase">
-                Generate Varian Terpilih
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+      <AddTagModal
+        isOpen={isAddTagModalOpen}
+        onClose={() => setIsAddTagModalOpen(false)}
+        onSuccess={(newTag) => {
+          setters.setTags((prev: any[]) => {
+            if (prev.some((t) => t.id === newTag.id)) return prev;
+            return [...prev, newTag];
+          });
+          const currentTags = form.getValues("tagIds") || [];
+          if (!currentTags.includes(newTag.id)) {
+            form.setValue("tagIds", [...currentTags, newTag.id]);
+          }
+        }}
+      />
 
-        <CreateCategoryModal
-          isOpen={state.isCategoryModalOpen}
-          onClose={() => setters.setIsCategoryModalOpen(false)}
-          onSuccess={(newCat) => {
-            setters.setCategories((p) => [...p, newCat]);
-            form.setValue("categoryId", newCat.id);
-            form.setValue("itemCategoryId", "");
-            form.setValue("itemNameId", "");
-          }}
-        />
-        <AddItemCategoryModal
-          isOpen={state.isItemCategoryModalOpen}
-          onClose={() => setters.setIsItemCategoryModalOpen(false)}
-          parentCategoryId={state.selectedCategoryId}
-          onSuccess={(newCat) => {
-            setters.setItemCategories((p) => [...p, newCat]);
-            form.setValue("itemCategoryId", newCat.id);
-            form.setValue("itemNameId", "");
-          }}
-        />
-        <AddItemNameModal
-          isOpen={state.isItemNameModalOpen}
-          onClose={() => setters.setIsItemNameModalOpen(false)}
-          parentCategoryId={state.selectedCategoryId}
-          parentItemCategoryId={state.selectedItemCategoryId}
-          productCategories={state.categories}
-          itemCategories={state.itemCategories}
-          onSuccess={(newName) => {
-            setters.setItemNames((p) => [...p, newName]);
-
-            const oldVal = form.getValues("itemNameId");
-            const oldItem = state.itemNames.find((inm) => inm.id === oldVal);
-
-            let currentName = form.getValues("name") || "";
-            if (oldItem && currentName.startsWith(oldItem.name)) {
-              currentName = currentName.replace(oldItem.name, newName.name);
-            } else if (!currentName.startsWith(newName.name)) {
-              currentName = currentName
-                ? `${newName.name} ${currentName}`
-                : newName.name;
-            }
-            form.setValue("name", currentName);
-
-            form.setValue("itemNameId", newName.id);
-          }}
-        />
-
-        <Dialog
-          open={state.isTagModalOpen}
-          onOpenChange={setters.setIsTagModalOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Tambah Tags Baru</DialogTitle>
-              <DialogDescription>Pisahkan dengan koma ( , )</DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-              <Input
-                value={state.bulkTagInput}
-                onChange={(e) => setters.setBulkTagInput(e.target.value)}
-                disabled={state.isSubmittingTags}
-              />
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setters.setIsTagModalOpen(false)}>
-                Batal
-              </Button>
-              <Button
-                onClick={handlers.handleBulkCreateTags}
-                disabled={state.isSubmittingTags}>
-                {state.isSubmittingTags ? "Menyimpan..." : "Simpan"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog
-          open={state.isMaterialModalOpen}
-          onOpenChange={setters.setIsMaterialModalOpen}>
-          <DialogContent className="sm:max-w-140 bg-[oklch(0.98_0.02_90)]">
-            <DialogHeader>
-              <DialogTitle>Tambah Material Baru</DialogTitle>
-            </DialogHeader>
-            <div className="mt-2">
-              <MaterialTypeForm
-                onSubmit={handlers.handleAddMaterialSubmit}
-                isSubmitting={state.isSubmittingMaterial}
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
+      <Dialog
+        open={state.isMaterialModalOpen}
+        onOpenChange={setters.setIsMaterialModalOpen}>
+        <DialogContent className="sm:max-w-140 bg-[oklch(0.98_0.02_90)]">
+          <DialogHeader>
+            <DialogTitle>Tambah Material Baru</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">
+            <MaterialTypeForm
+              onSubmit={handlers.handleAddMaterialSubmit}
+              isSubmitting={state.isSubmittingMaterial}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
       </Card>
 
       {/* Mockup area selector modal */}
