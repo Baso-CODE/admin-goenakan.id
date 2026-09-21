@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { ImageCropper } from "@/helper/image-cropper";
 import {
   Check,
   ClipboardList,
@@ -27,8 +28,8 @@ import {
   ListOrdered,
   Loader2,
   Type,
+  UploadCloud,
 } from "lucide-react";
-import Image from "next/image";
 
 const heroSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters"),
@@ -36,7 +37,9 @@ const heroSchema = z.object({
   ctaText: z.string().optional(),
   ctaLink: z.string().optional(),
 
-  image: z.any().optional(),
+  imageDesktop: z.any().optional(),
+  imageMobile: z.any().optional(),
+  imageTablet: z.any().optional(),
 
   displayOrder: z.coerce.number().min(0).default(0),
   isActive: z.boolean().default(true),
@@ -50,15 +53,31 @@ export default function HeroForm({
   isLoading = false,
   isSubmitting = false,
 }: {
-  initialData?: HeroFormValues & { imageUrl?: string };
-  onSubmit: (data: HeroFormValues, file?: File) => void;
+  initialData?: HeroFormValues & {
+    imageUrl?: string;
+    imageMobileUrl?: string;
+    imageTabletUrl?: string | null;
+  };
+  onSubmit: (
+    data: HeroFormValues,
+    files: { desktop?: File; mobile?: File; tablet?: File },
+  ) => void;
   isLoading?: boolean;
   isSubmitting?: boolean;
 }) {
-  const [preview, setPreview] = useState<string | null>(
+  const [previewDesktop, setPreviewDesktop] = useState<string | null>(
     initialData?.imageUrl || null,
   );
-  const [selectedFile, setSelectedFile] = useState<File | undefined>(undefined);
+  const [previewMobile, setPreviewMobile] = useState<string | null>(
+    initialData?.imageMobileUrl || null,
+  );
+  const [previewTablet, setPreviewTablet] = useState<string | null>(
+    initialData?.imageTabletUrl || null,
+  );
+
+  const [selectedDesktop, setSelectedDesktop] = useState<File | undefined>();
+  const [selectedMobile, setSelectedMobile] = useState<File | undefined>();
+  const [selectedTablet, setSelectedTablet] = useState<File | undefined>();
 
   const form = useForm<HeroFormValues>({
     resolver: zodResolver(heroSchema) as Resolver<HeroFormValues>,
@@ -73,23 +92,25 @@ export default function HeroForm({
     mode: "onBlur",
   });
 
-  // Handle File Change untuk Preview
-  const handleFileChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    fieldChange: (value: any) => void,
-  ) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      fieldChange(e.target.files);
+  const { isSubmitting: formIsSubmitting } = form.formState;
+  const isCurrentlySubmitting = isLoading || isSubmitting || formIsSubmitting;
 
-      // Buat Preview URL
-      const objectUrl = URL.createObjectURL(file);
-      setPreview(objectUrl);
+  const handleFileChange = (
+    file: File,
+    type: "desktop" | "mobile" | "tablet",
+  ) => {
+    const objectUrl = URL.createObjectURL(file);
+    if (type === "desktop") {
+      setSelectedDesktop(file);
+      setPreviewDesktop(objectUrl);
+    } else if (type === "mobile") {
+      setSelectedMobile(file);
+      setPreviewMobile(objectUrl);
+    } else if (type === "tablet") {
+      setSelectedTablet(file);
+      setPreviewTablet(objectUrl);
     }
   };
-
-  // Reset form when initialData loads
   useEffect(() => {
     if (initialData) {
       form.reset({
@@ -100,19 +121,38 @@ export default function HeroForm({
         displayOrder: initialData.displayOrder,
         isActive: initialData.isActive,
       });
-      if (initialData.imageUrl) {
-        setPreview(initialData.imageUrl);
-      }
+      if (initialData.imageUrl) setPreviewDesktop(initialData.imageUrl);
+      if (initialData.imageMobileUrl)
+        setPreviewMobile(initialData.imageMobileUrl);
+      if (initialData.imageTabletUrl)
+        setPreviewTablet(initialData.imageTabletUrl);
     }
   }, [initialData, form]);
 
   const handleSubmit = (values: HeroFormValues) => {
-    onSubmit(values, selectedFile);
+    return onSubmit(values, {
+      desktop: selectedDesktop,
+      mobile: selectedMobile,
+      tablet: selectedTablet,
+    });
+  };
+
+  const handleRemoveFile = (type: "desktop" | "mobile" | "tablet") => {
+    if (type === "desktop") {
+      setSelectedDesktop(undefined);
+      setPreviewDesktop(null);
+    } else if (type === "mobile") {
+      setSelectedMobile(undefined);
+      setPreviewMobile(null);
+    } else if (type === "tablet") {
+      setSelectedTablet(undefined);
+      setPreviewTablet(null);
+    }
   };
 
   return (
     <Card className="w-full relative">
-      {isLoading && (
+      {isCurrentlySubmitting && (
         <div className="absolute inset-0 bg-background/80 z-10 flex items-center justify-center rounded-lg">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
@@ -124,53 +164,150 @@ export default function HeroForm({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-6 w-full">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* === IMAGE UPLOAD SECTION === */}
+              {/* === Desktop Image === */}
+              {/* === Desktop Image (Rasio 16:9) === */}
               <div className="col-span-2">
-                <FormField
-                  control={form.control}
-                  name="image"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                        Hero Image {initialData ? "(Optional)" : "(Required)"}
-                      </FormLabel>
-                      <FormControl>
-                        <div className="space-y-4">
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            disabled={isLoading || isSubmitting}
-                            onChange={(e) =>
-                              handleFileChange(e, field.onChange)
-                            }
-                            // Required hanya jika Create mode (tidak ada initialData)
-                            required={!initialData}
-                          />
-
-                          {/* Image Preview Area */}
-                          {preview ? (
-                            <div className="relative w-full h-48 md:h-64 rounded-lg overflow-hidden border border-border">
-                              <Image
-                                src={preview}
-                                alt="Preview"
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-center w-full h-48 bg-muted/50 rounded-lg border border-dashed border-muted-foreground/25">
-                              <p className="text-sm text-muted-foreground">
-                                No image selected
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2 mb-2">
+                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                    Desktop Hero Image{" "}
+                    {initialData ? "(Optional)" : "(Required)"}
+                  </FormLabel>
+                  <FormControl>
+                    {/* ✨ Bungkus dengan ImageCropper, atur rasio 16/9 */}
+                    <ImageCropper
+                      aspectRatio={16 / 9}
+                      disabled={isCurrentlySubmitting}
+                      onCropComplete={(file) =>
+                        handleFileChange(file, "desktop")
+                      }>
+                      <div className="relative w-full h-48 md:h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors flex flex-col items-center justify-center overflow-hidden group">
+                        {previewDesktop ? (
+                          <>
+                            <img
+                              src={previewDesktop}
+                              alt="Preview Desktop"
+                              className="w-full h-full object-contain p-2"
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <p className="text-white font-medium flex items-center gap-2">
+                                <UploadCloud className="h-5 w-5" /> Change Image
                               </p>
                             </div>
-                          )}
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                          </>
+                        ) : (
+                          <div className="text-center space-y-2 p-4">
+                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
+                              <UploadCloud className="h-6 w-6 text-stone-400" />
+                            </div>
+                            <div className="text-sm font-medium text-stone-700">
+                              Klik untuk unggah gambar Desktop
+                            </div>
+                            <p className="text-xs text-stone-500">
+                              Otomatis potong ke format Landscape (16:9)
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </ImageCropper>
+                  </FormControl>
+                </FormItem>
+              </div>
+
+              {/* === Mobile Image (Rasio 9:16) === */}
+              <div className="col-span-2 md:col-span-1">
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2 mb-2">
+                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                    Mobile Image {initialData ? "(Optional)" : "(Required)"}
+                  </FormLabel>
+                  <FormControl>
+                    {/* ✨ Bungkus dengan ImageCropper, atur rasio 9/16 */}
+                    <ImageCropper
+                      aspectRatio={9 / 16}
+                      disabled={isCurrentlySubmitting}
+                      onCropComplete={(file) =>
+                        handleFileChange(file, "mobile")
+                      }>
+                      <div className="relative w-full h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors flex flex-col items-center justify-center overflow-hidden group">
+                        {previewMobile ? (
+                          <>
+                            <img
+                              src={previewMobile}
+                              alt="Preview Mobile"
+                              className="w-full h-full object-contain p-2"
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <p className="text-white font-medium flex items-center gap-2">
+                                <UploadCloud className="h-5 w-5" /> Change Image
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center space-y-2 p-4">
+                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
+                              <UploadCloud className="h-6 w-6 text-stone-400" />
+                            </div>
+                            <div className="text-sm font-medium text-stone-700">
+                              Klik untuk unggah gambar Mobile
+                            </div>
+                            <p className="text-xs text-stone-500">
+                              Otomatis potong ke format Portrait (9:16)
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </ImageCropper>
+                  </FormControl>
+                </FormItem>
+              </div>
+
+              {/* === Tablet Image (Rasio Persegi 1:1) === */}
+              <div className="col-span-2 md:col-span-1">
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2 mb-2">
+                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                    Tablet Image (Optional)
+                  </FormLabel>
+                  <FormControl>
+                    {/* ✨ Bungkus dengan ImageCropper, atur rasio 1/1 (Bisa diganti 4/3) */}
+                    <ImageCropper
+                      aspectRatio={1 / 1}
+                      disabled={isCurrentlySubmitting}
+                      onCropComplete={(file) =>
+                        handleFileChange(file, "tablet")
+                      }>
+                      <div className="relative w-full h-64 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors flex flex-col items-center justify-center overflow-hidden group">
+                        {previewTablet ? (
+                          <>
+                            <img
+                              src={previewTablet}
+                              alt="Preview Tablet"
+                              className="w-full h-full object-contain p-2"
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <p className="text-white font-medium flex items-center gap-2">
+                                <UploadCloud className="h-5 w-5" /> Change Image
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center space-y-2 p-4">
+                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200">
+                              <UploadCloud className="h-6 w-6 text-stone-400" />
+                            </div>
+                            <div className="text-sm font-medium text-stone-700">
+                              Klik untuk unggah gambar Tablet
+                            </div>
+                            <p className="text-xs text-stone-500">
+                              Otomatis potong ke format Persegi (1:1)
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </ImageCropper>
+                  </FormControl>
+                </FormItem>
               </div>
 
               {/* === Title === */}
@@ -189,7 +326,7 @@ export default function HeroForm({
                           placeholder="Ex: Where Ideas Become Reality"
                           {...field}
                           value={field.value ?? ""}
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                         />
                       </FormControl>
                       <FormMessage />
@@ -214,7 +351,7 @@ export default function HeroForm({
                           placeholder="Describe the image for SEO..."
                           {...field}
                           value={field.value ?? ""}
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                         />
                       </FormControl>
                       <FormMessage />
@@ -239,7 +376,7 @@ export default function HeroForm({
                           placeholder="Ex: Shop Now"
                           {...field}
                           value={field.value ?? ""}
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                         />
                       </FormControl>
                       <FormMessage />
@@ -264,7 +401,7 @@ export default function HeroForm({
                           placeholder="Ex: /products/custom"
                           {...field}
                           value={field.value ?? ""}
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                         />
                       </FormControl>
                       <FormMessage />
@@ -289,7 +426,7 @@ export default function HeroForm({
                           type="number"
                           min={0}
                           placeholder="0"
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                           {...field}
                           value={field.value ?? ""}
                           onChange={(e) => field.onChange(e.target.value)}
@@ -315,7 +452,7 @@ export default function HeroForm({
                         <Checkbox
                           checked={field.value}
                           onCheckedChange={field.onChange}
-                          disabled={isLoading || isSubmitting}
+                          disabled={isCurrentlySubmitting}
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
@@ -336,8 +473,8 @@ export default function HeroForm({
                 type="submit"
                 className="w-full md:w-auto cursor-pointer"
                 variant="default"
-                disabled={isLoading || isSubmitting}>
-                {isSubmitting ? (
+                disabled={isCurrentlySubmitting}>
+                {isCurrentlySubmitting ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <ClipboardList className="h-4 w-4 mr-2" />

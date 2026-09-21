@@ -9,6 +9,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Printer,
   Search,
   ShoppingBag,
 } from "lucide-react";
@@ -38,6 +39,7 @@ import {
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/utils/formatCurrency";
 import Link from "next/link";
 
 // === TYPES ===
@@ -76,15 +78,6 @@ interface PurchaseOrderExportQuery {
   search?: string;
 }
 
-// === UTILS ===
-const formatCurrency = (amount: number, currencyCode: string = "IDR") => {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: currencyCode,
-    minimumFractionDigits: 0,
-  }).format(amount);
-};
-
 // Warna untuk Purchase Order Status
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -114,7 +107,7 @@ export default function TablePurchaseOrder() {
 
   // Filters State
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
 
   const [startDate, setStartDate] = useState<string>("");
@@ -135,7 +128,6 @@ export default function TablePurchaseOrder() {
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
-      // Pastikan endpoint ini sesuai dengan path router backend kamu
       const res = await fetchApi(`/purchase-orders/all?${params}`);
 
       if (!res.ok) {
@@ -173,12 +165,9 @@ export default function TablePurchaseOrder() {
         exportFilters as Record<string, string>,
       ).toString();
 
-      // Pastikan backend memiliki route export ini jika tombol ini digunakan
       const response = await fetchApi(
         `/purchase-orders/export/excel?${queryString}`,
-        {
-          method: "GET",
-        },
+        { method: "GET" },
       );
 
       if (!response.ok) {
@@ -364,7 +353,10 @@ export default function TablePurchaseOrder() {
                   <TableHead className="min-w-37.5">Expense Category</TableHead>
                   <TableHead className="min-w-37.5">Vendor Name</TableHead>
                   <TableHead className="min-w-50">Vendor Address</TableHead>
+
+                  {/* Di sini Kolom SO / Sample Ref */}
                   <TableHead className="min-w-37.5">SO / Sample Ref</TableHead>
+
                   <TableHead className="min-w-20">Currency</TableHead>
                   <TableHead className="text-right min-w-37.5">
                     Total Amount
@@ -432,9 +424,42 @@ export default function TablePurchaseOrder() {
                         title={po.vendorAddress}>
                         {po.vendorAddress}
                       </TableCell>
-                      <TableCell className="text-sm font-mono text-gray-500">
-                        {po.salesOrderReference}
+
+                      {/*  LOGIKA CERDAS: Pemisahan Warna Badge Referensi */}
+                      <TableCell>
+                        {po.salesOrderReference !== "-" ? (
+                          <div className="flex flex-wrap gap-1">
+                            {po.salesOrderReference
+                              .split(", ")
+                              .map((ref, idx) => {
+                                // Cek jika referensi mengandung kata REP atau awalan khusus replacementmu
+                                const isReplacement =
+                                  ref.toUpperCase().includes("REP") ||
+                                  ref.toUpperCase().includes("RN");
+
+                                return (
+                                  <Badge
+                                    key={idx}
+                                    variant="outline"
+                                    className={cn(
+                                      "text-xs font-mono tracking-tight",
+                                      isReplacement
+                                        ? "bg-orange-50 text-orange-700 border-orange-200" // Warna untuk Replacement
+                                        : "bg-blue-50 text-blue-700 border-blue-200", // Warna untuk Order Biasa
+                                    )}>
+                                    {ref}
+                                  </Badge>
+                                );
+                              })}
+                          </div>
+                        ) : (
+                          <span className="text-sm font-mono text-gray-400">
+                            -
+                          </span>
+                        )}
                       </TableCell>
+                      {/* ================================================ */}
+
                       <TableCell className="text-sm font-semibold text-gray-600">
                         {po.currency}
                       </TableCell>
@@ -486,24 +511,39 @@ export default function TablePurchaseOrder() {
 
                       <TableCell className="text-center sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)]">
                         <div className="flex items-center justify-center gap-2">
-                          {/* Sesuaikan href dengan routing untuk view / edit PO */}
+                          {/* Tombol View */}
                           <Link
                             href={`/super-admin/purchase-orders/detail/${po.id}`}>
                             <Button
                               variant="ghost"
                               size="icon"
+                              title="View Detail"
                               className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
                               <Eye className="h-4 w-4" />
                             </Button>
                           </Link>
 
+                          {/* Tombol Edit */}
                           <Link
                             href={`/super-admin/purchase-orders/edit/${po.id}`}>
                             <Button
                               variant="ghost"
                               size="icon"
+                              title="Edit PO"
                               className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50">
                               <Pencil className="h-4 w-4" />
+                            </Button>
+                          </Link>
+
+                          {/*  Tombol Print (Baru)  */}
+                          <Link
+                            href={`/super-admin/purchase-orders/print/${po.id}`}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Print PO"
+                              className="h-8 w-8 text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                              <Printer className="h-4 w-4" />
                             </Button>
                           </Link>
                         </div>

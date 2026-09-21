@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -18,6 +17,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
+import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { Badge } from "@/components/ui/badge";
 import {
   Command,
@@ -48,7 +48,15 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
-import { Check, CheckCheck, ChevronsUpDown, Plus, RefreshCw, X, Info } from "lucide-react";
+import {
+  Check,
+  CheckCheck,
+  ChevronsUpDown,
+  Info,
+  Plus,
+  RefreshCw,
+  X,
+} from "lucide-react";
 import { AddItemCategoryModal } from "../../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../../item-names-product/components/addItemNameModal";
 import CreateCategoryModal from "../../../product-categories/components/createCategoryModal";
@@ -124,7 +132,7 @@ export default function FormProductCore({
   const [isItemNameModalOpen, setIsItemNameModalOpen] = useState(false);
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
   const [isSubmittingMaterial, setIsSubmittingMaterial] = useState(false);
-  
+
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [itemCategoryOpen, setItemCategoryOpen] = useState(false);
   const [itemNameOpen, setItemNameOpen] = useState(false);
@@ -565,7 +573,13 @@ export default function FormProductCore({
                             disabled={loadingData}
                             className="w-full justify-between bg-white text-left font-normal border-stone-200 h-10">
                             {field.value
-                              ? categories.find((c) => String(c.id) === String(field.value))?.name_id || categories.find((c) => String(c.id) === String(field.value))?.name || "Pilih Kategori"
+                              ? categories.find(
+                                  (c) => String(c.id) === String(field.value),
+                                )?.name_id ||
+                                categories.find(
+                                  (c) => String(c.id) === String(field.value),
+                                )?.name ||
+                                "Pilih Kategori"
                               : "Pilih Kategori"}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -575,7 +589,9 @@ export default function FormProductCore({
                         <Command>
                           <CommandInput placeholder="Cari kategori..." />
                           <CommandList>
-                            <CommandEmpty>Kategori tidak ditemukan.</CommandEmpty>
+                            <CommandEmpty>
+                              Kategori tidak ditemukan.
+                            </CommandEmpty>
                             <CommandGroup>
                               {categories.map((cat) => (
                                 <CommandItem
@@ -588,10 +604,13 @@ export default function FormProductCore({
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      String(field.value) === String(cat.id) ? "opacity-100" : "opacity-0"
+                                      String(field.value) === String(cat.id)
+                                        ? "opacity-100"
+                                        : "opacity-0",
                                     )}
                                   />
-                                  {cat.name_id || cat.name} {cat.code && `(${cat.code})`}
+                                  {cat.name_id || cat.name}{" "}
+                                  {cat.code && `(${cat.code})`}
                                 </CommandItem>
                               ))}
                             </CommandGroup>
@@ -622,7 +641,9 @@ export default function FormProductCore({
                 render={({ field }) => (
                   <FormItem className="flex flex-col justify-end">
                     <FormLabel className="mb-2">Item Category</FormLabel>
-                    <Popover open={itemCategoryOpen} onOpenChange={setItemCategoryOpen}>
+                    <Popover
+                      open={itemCategoryOpen}
+                      onOpenChange={setItemCategoryOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
@@ -631,7 +652,9 @@ export default function FormProductCore({
                             disabled={loadingData || !selectedCategoryId}
                             className="w-full justify-between bg-white text-left font-normal border-stone-200 h-10">
                             {field.value
-                              ? itemCategories.find((ic) => String(ic.id) === String(field.value))?.name || "Pilih Sub Kategori"
+                              ? itemCategories.find(
+                                  (ic) => String(ic.id) === String(field.value),
+                                )?.name || "Pilih Sub Kategori"
                               : "Pilih Sub Kategori"}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -641,7 +664,9 @@ export default function FormProductCore({
                         <Command>
                           <CommandInput placeholder="Cari sub kategori..." />
                           <CommandList>
-                            <CommandEmpty>Sub kategori tidak ditemukan.</CommandEmpty>
+                            <CommandEmpty>
+                              Sub kategori tidak ditemukan.
+                            </CommandEmpty>
                             <CommandGroup>
                               {itemCategories.map((ic) => (
                                 <CommandItem
@@ -654,7 +679,9 @@ export default function FormProductCore({
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      String(field.value) === String(ic.id) ? "opacity-100" : "opacity-0"
+                                      String(field.value) === String(ic.id)
+                                        ? "opacity-100"
+                                        : "opacity-0",
                                     )}
                                   />
                                   {ic.name}
@@ -697,7 +724,10 @@ export default function FormProductCore({
                             disabled={loadingData}
                             className="w-full justify-between bg-white text-left font-normal border-stone-200 h-10">
                             {field.value
-                              ? itemNames.find((inm) => String(inm.id) === String(field.value))?.name || "Pilih Nama Item"
+                              ? itemNames.find(
+                                  (inm) =>
+                                    String(inm.id) === String(field.value),
+                                )?.name || "Pilih Nama Item"
                               : "Pilih Nama Item"}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -707,7 +737,9 @@ export default function FormProductCore({
                         <Command>
                           <CommandInput placeholder="Cari nama item..." />
                           <CommandList>
-                            <CommandEmpty>Nama item tidak ditemukan.</CommandEmpty>
+                            <CommandEmpty>
+                              Nama item tidak ditemukan.
+                            </CommandEmpty>
                             <CommandGroup>
                               {itemNames.map((inm) => (
                                 <CommandItem
@@ -716,23 +748,38 @@ export default function FormProductCore({
                                   onSelect={() => {
                                     const val = String(inm.id);
                                     const oldVal = form.getValues("itemNameId");
-                                    const oldItem = itemNames.find((i) => String(i.id) === String(oldVal));
-                                    let currentName = form.getValues("name") || "";
-                                    
-                                    if (oldItem && currentName.startsWith(oldItem.name)) {
-                                      currentName = currentName.replace(oldItem.name, inm.name);
-                                    } else if (!currentName.startsWith(inm.name)) {
-                                      currentName = currentName ? `${inm.name} ${currentName}` : inm.name;
+                                    const oldItem = itemNames.find(
+                                      (i) => String(i.id) === String(oldVal),
+                                    );
+                                    let currentName =
+                                      form.getValues("name") || "";
+
+                                    if (
+                                      oldItem &&
+                                      currentName.startsWith(oldItem.name)
+                                    ) {
+                                      currentName = currentName.replace(
+                                        oldItem.name,
+                                        inm.name,
+                                      );
+                                    } else if (
+                                      !currentName.startsWith(inm.name)
+                                    ) {
+                                      currentName = currentName
+                                        ? `${inm.name} ${currentName}`
+                                        : inm.name;
                                     }
                                     form.setValue("name", currentName);
-                                    
+
                                     field.onChange(val);
                                     setItemNameOpen(false);
                                   }}>
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      String(field.value) === String(inm.id) ? "opacity-100" : "opacity-0"
+                                      String(field.value) === String(inm.id)
+                                        ? "opacity-100"
+                                        : "opacity-0",
                                     )}
                                   />
                                   {inm.name}
@@ -775,7 +822,10 @@ export default function FormProductCore({
                             disabled={loadingData}
                             className="w-full justify-between bg-white text-left font-normal border-stone-200 h-10">
                             {field.value
-                              ? materialTypes.find((mat) => String(mat.id) === String(field.value))?.name || "Pilih Material"
+                              ? materialTypes.find(
+                                  (mat) =>
+                                    String(mat.id) === String(field.value),
+                                )?.name || "Pilih Material"
                               : "Pilih Material"}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -785,7 +835,9 @@ export default function FormProductCore({
                         <Command>
                           <CommandInput placeholder="Cari material..." />
                           <CommandList>
-                            <CommandEmpty>Material tidak ditemukan.</CommandEmpty>
+                            <CommandEmpty>
+                              Material tidak ditemukan.
+                            </CommandEmpty>
                             <CommandGroup>
                               {materialTypes.map((mat) => (
                                 <CommandItem
@@ -798,7 +850,9 @@ export default function FormProductCore({
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      String(field.value) === String(mat.id) ? "opacity-100" : "opacity-0"
+                                      String(field.value) === String(mat.id)
+                                        ? "opacity-100"
+                                        : "opacity-0",
                                     )}
                                   />
                                   {mat.name}
@@ -949,17 +1003,22 @@ export default function FormProductCore({
                     <FormLabel>Trigger Custom Color</FormLabel>
                     <Select
                       value={field.value || "NONE"}
-                      onValueChange={field.onChange}
-                    >
+                      onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger className="bg-white">
                           <SelectValue placeholder="Pilih Trigger..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="NONE">Tidak Aktif (Polosan/Statis)</SelectItem>
-                        <SelectItem value="SIZE">Berdasarkan Ukuran / Kapasitas</SelectItem>
-                        <SelectItem value="SHAPE">Berdasarkan Model / Bentuk</SelectItem>
+                        <SelectItem value="NONE">
+                          Tidak Aktif (Polosan/Statis)
+                        </SelectItem>
+                        <SelectItem value="SIZE">
+                          Berdasarkan Ukuran / Kapasitas
+                        </SelectItem>
+                        <SelectItem value="SHAPE">
+                          Berdasarkan Model / Bentuk
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -967,7 +1026,14 @@ export default function FormProductCore({
                       <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5 flex items-start gap-1">
                         <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                         <span>
-                          Mask warna akan diambil dari opsi atribut <strong>{field.value === "SIZE" ? "Ukuran / Kapasitas" : "Model / Bentuk"}</strong>. Pastikan mask yang diunggah berupa <strong>PNG transparent outline</strong>.
+                          Mask warna akan diambil dari opsi atribut{" "}
+                          <strong>
+                            {field.value === "SIZE"
+                              ? "Ukuran / Kapasitas"
+                              : "Model / Bentuk"}
+                          </strong>
+                          . Pastikan mask yang diunggah berupa{" "}
+                          <strong>PNG transparent outline</strong>.
                         </span>
                       </p>
                     )}
@@ -1192,13 +1258,13 @@ export default function FormProductCore({
                 control={form.control}
                 name="description"
                 render={({ field }) => (
-                  <FormItem className="col-span-2 md:col-span-4">
+                  <FormItem className="col-span-2 md:col-span-4 z-10">
                     <FormLabel>Deskripsi Produk</FormLabel>
                     <FormControl>
-                      <Textarea
-                        rows={4}
-                        placeholder="Jelaskan detail produk..."
-                        {...field}
+                      <SimpleEditor
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        minHeight="150px"
                       />
                     </FormControl>
                     <FormMessage />

@@ -272,6 +272,7 @@ export default function AddVendorForm({
       toast.error(err.message || "Terjadi kesalahan.");
     }
   };
+
   const handleSubmit = (values: AddVendorFormValues) => {
     const payload = {
       ...values,
@@ -313,7 +314,16 @@ export default function AddVendorForm({
       <CardContent className="pt-6">
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(handleSubmit)}
+            onSubmit={form.handleSubmit(handleSubmit, (errors) => {
+              const firstErrorField = Object.keys(errors)[0];
+              const errorMessage =
+                errors[firstErrorField as keyof typeof errors]?.message;
+
+              toast.error(
+                `Periksa kembali isian Anda: ${errorMessage || "Ada field yang belum sesuai."}`,
+              );
+              console.error("Form Validation Errors:", errors);
+            })}
             className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               {/* === COMPANY NAME === */}
@@ -324,7 +334,12 @@ export default function AddVendorForm({
                   <FormItem>
                     <FormLabel>Company Name *</FormLabel>
                     <FormControl>
-                      <Input {...field} disabled={isLoading || isSubmitting} />
+                      {/*  TAMBAHAN: Placeholder untuk Company Name */}
+                      <Input
+                        {...field}
+                        placeholder="Contoh: PT Goenakan Indonesia"
+                        disabled={isLoading || isSubmitting}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -339,7 +354,12 @@ export default function AddVendorForm({
                   <FormItem>
                     <FormLabel>PIC Name *</FormLabel>
                     <FormControl>
-                      <Input {...field} disabled={isLoading || isSubmitting} />
+                      {/*  TAMBAHAN: Placeholder untuk PIC Name */}
+                      <Input
+                        {...field}
+                        placeholder="Contoh: Budi Santoso"
+                        disabled={isLoading || isSubmitting}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -353,32 +373,20 @@ export default function AddVendorForm({
                 render={({ field }) => (
                   <FormItem className="w-full">
                     <FormLabel>Platform *</FormLabel>
-
-                    {/* MODAL PLATFORM */}
-                    <Dialog
-                      open={isPlatformModalOpen}
-                      onOpenChange={setIsPlatformModalOpen}>
-                      <DialogContent className="">
-                        <DialogHeader>
-                          <DialogTitle>Tambah Platform Baru</DialogTitle>
-                        </DialogHeader>
-                        <ContactPlatformForm onSubmit={handleAddPlatformFast} />
-                      </DialogContent>
-                    </Dialog>
-
+                    {/*  PERBAIKAN: Dialog modal sudah dipindahkan ke luar form */}
                     <Select
                       value={field.value}
                       disabled={isLoading || isSubmitting}
                       onValueChange={(val) => {
                         if (val === "add_new_platform") {
                           setIsPlatformModalOpen(true);
-                        } else {
-                          field.onChange(val);
+                          return;
                         }
+                        field.onChange(val);
                       }}>
                       <FormControl className="w-full">
                         <SelectTrigger>
-                          <SelectValue placeholder="Select Platform" />
+                          <SelectValue placeholder="Pilih Platform" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -410,7 +418,12 @@ export default function AddVendorForm({
                   <FormItem>
                     <FormLabel>Contact ID *</FormLabel>
                     <FormControl>
-                      <Input {...field} disabled={isLoading || isSubmitting} />
+                      {/*  TAMBAHAN: Placeholder untuk Contact ID */}
+                      <Input
+                        {...field}
+                        placeholder="Contoh: 081234567890 / @username"
+                        disabled={isLoading || isSubmitting}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -426,7 +439,11 @@ export default function AddVendorForm({
                     <FormItem>
                       <FormLabel>Default Tracking Link</FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        {/*  TAMBAHAN: Placeholder untuk Tracking URL */}
+                        <Input
+                          {...field}
+                          placeholder="Contoh: https://tracking.ekspedisi.com/resi/..."
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -439,6 +456,8 @@ export default function AddVendorForm({
                   Area & Lokasi Vendor
                 </FormLabel>
 
+                {/* Komponen AddressField biasanya mengelola inputnya sendiri, 
+                    namun penggunaannya di sini sudah benar */}
                 <AddressField
                   value={{
                     country: form.watch("country") || "",
@@ -485,7 +504,11 @@ export default function AddVendorForm({
                     <FormItem>
                       <FormLabel>Full Address</FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        {/*  TAMBAHAN: Placeholder untuk Alamat Lengkap */}
+                        <Input
+                          {...field}
+                          placeholder="Contoh: Jl. Jend. Sudirman No 12, Patokan: Sebelah Minimarket"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -763,6 +786,14 @@ export default function AddVendorForm({
           </form>
         </Form>
       </CardContent>
+      <Dialog open={isPlatformModalOpen} onOpenChange={setIsPlatformModalOpen}>
+        <DialogContent className="">
+          <DialogHeader>
+            <DialogTitle>Tambah Platform Baru</DialogTitle>
+          </DialogHeader>
+          <ContactPlatformForm onSubmit={handleAddPlatformFast} />
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

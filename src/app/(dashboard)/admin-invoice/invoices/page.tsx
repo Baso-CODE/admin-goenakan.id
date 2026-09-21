@@ -37,14 +37,16 @@ import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 
+//  UPDATE: Sesuaikan tipe data dengan kembalian API terbaru
 type Invoice = {
   id: string;
   invoiceDate: string;
   invoiceNumber: string;
   dueDate: string | null;
-  poNumber: string;
+  orderNumber: string; // Menggantikan poNumber
   clientName: string;
   totalAmount: number;
+  currencyCode: string; // Tambahan properti mata uang
   status: "UNPAID" | "PAID" | "OVERDUE" | "CANCELLED" | "DRAFT";
   category: "DP" | "FULL_PAYMENT" | "INSTALLMENT" | "REMAINING_BALANCE";
   method: string;
@@ -61,10 +63,11 @@ type Meta = {
 };
 
 // === UTILS ===
-const formatCurrency = (amount: number) => {
+//  UPDATE: Buat formatter menerima parameter currencyCode secara dinamis
+const formatCurrency = (amount: number, currencyCode: string = "IDR") => {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
-    currency: "IDR",
+    currency: currencyCode,
     minimumFractionDigits: 0,
   }).format(amount);
 };
@@ -93,7 +96,7 @@ export default function InvoicesPage() {
 
   // Filters State
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
@@ -148,7 +151,7 @@ export default function InvoicesPage() {
 
   // === RENDER ===
   return (
-    <div className="space-y-6 w-full  mx-auto pb-10">
+    <div className="space-y-6 w-full mx-auto pb-10">
       {/* Header */}
       <Card className="border-l-4 border-l-blue-600 shadow-sm">
         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -179,7 +182,7 @@ export default function InvoicesPage() {
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Cari No Invoice / Client..."
+                placeholder="Cari Invoice / Order..."
                 className="pl-9"
                 value={search}
                 onChange={(e) => {
@@ -205,7 +208,7 @@ export default function InvoicesPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search Invoice / PO Number..."
+                  placeholder="Cari Invoice / Order..."
                   className="pl-9 h-10 text-sm bg-white"
                   value={search}
                   onChange={(e) => {
@@ -343,9 +346,6 @@ export default function InvoicesPage() {
               </div>
             </div>
           </div>
-
-          {/* Tombol Export atau Action Lain (Opsional) */}
-          {/* <Button variant="outline" ... >Export</Button> */}
         </div>
       </Card>
 
@@ -357,8 +357,8 @@ export default function InvoicesPage() {
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="w-30">Tanggal</TableHead>
-                  <TableHead className="w-30">Inovoice No</TableHead>
-                  <TableHead className="w-37.5">PO Number</TableHead>
+                  <TableHead className="w-30">Invoice No</TableHead>
+                  <TableHead className="w-37.5">Order / Sample No</TableHead>
                   <TableHead className="w-50">Client</TableHead>
                   <TableHead className="w-30">Kategori</TableHead>
                   <TableHead className="text-right w-37.5">
@@ -402,7 +402,7 @@ export default function InvoicesPage() {
                 ) : invoices.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={8}
                       className="h-32 text-center text-muted-foreground">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <FileText className="h-8 w-8 text-gray-300" />
@@ -422,7 +422,7 @@ export default function InvoicesPage() {
                           </span>
                           {inv.dueDate && (
                             <span className="text-[10px] text-muted-foreground">
-                              Due:
+                              Due:{" "}
                               {format(new Date(inv.dueDate), "dd MMM", {
                                 locale: idLocale,
                               })}
@@ -434,7 +434,8 @@ export default function InvoicesPage() {
                         {inv.invoiceNumber}
                       </TableCell>
                       <TableCell className="font-mono text-sm text-muted-foreground">
-                        {inv.poNumber}
+                        {/*  UPDATE: Memanggil data orderNumber terbaru */}
+                        {inv.orderNumber}
                       </TableCell>
                       <TableCell className="font-medium text-gray-700">
                         {inv.clientName}
@@ -447,7 +448,8 @@ export default function InvoicesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-semibold text-gray-900">
-                        {formatCurrency(inv.totalAmount)}
+                        {/*  UPDATE: Mengirimkan nominal beserta currencyCode-nya */}
+                        {formatCurrency(inv.totalAmount, inv.currencyCode)}
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge

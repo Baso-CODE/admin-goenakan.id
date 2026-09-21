@@ -35,7 +35,9 @@ export interface OrderInvoice {
 
 export interface OrderDetail {
   id: string;
+  orderNumber: string;
   poNumber: string;
+  status: "PENDING" | "PROCESSING" | "SHIPPED" | "COMPLETED" | "CANCELLED";
   dateOrder: string;
   salesCategory: "SALES" | "SAMPLE";
   shippingAddress: string;
@@ -59,6 +61,14 @@ export interface OrderDetail {
   vendors: OrderVendor[];
   invoices: OrderInvoice[];
   sampleFollowUps: SampleFollowUp[];
+
+  clientPurchaseOrder?: {
+    id: string;
+    poNumber: string | null;
+    fileUrl: string | null;
+    fileName: string | null;
+    fileType: string | null;
+  } | null;
 }
 
 export interface NoteCategory {
@@ -112,7 +122,11 @@ export type Client = {
 };
 
 export type Sales = { id: string; name: string; phone: string };
-export type Vendor = { id: string; companyName: string };
+export type Vendor = {
+  id: string;
+  companyName: string;
+  vendorType: "PRODUCT" | "SERVICE";
+};
 
 export type AttributeValueOption = {
   valueId: string;
@@ -125,6 +139,7 @@ export type AvailableAttribute = {
   attributeId: string;
   attributeName: string;
   attributeType: string;
+  isCustom: boolean;
   values: AttributeValueOption[];
 };
 

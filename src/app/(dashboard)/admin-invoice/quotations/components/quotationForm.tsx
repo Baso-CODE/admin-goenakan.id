@@ -3,10 +3,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import {
+  Banknote,
   Box,
   CalendarIcon,
+  Check,
   ChevronDown,
+  ChevronsUpDown,
   FileText,
+  ImageIcon,
   Layers,
   Loader2,
   Lock,
@@ -16,9 +20,9 @@ import {
   Trash2,
   User,
   UserCheck,
-  X, // 🔥
+  X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Resolver, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -27,6 +31,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Form,
   FormControl,
@@ -54,6 +66,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
+import { Currency } from "./quotationFormAdd";
 
 export type PICData = {
   id: string;
@@ -77,12 +90,42 @@ export type ClientData = {
 export type ProductData = {
   id: string;
   name: string;
+  sku: string | null;
   basePrice: number;
   isCustom: boolean;
   description?: string;
-  productVariants: { id: string; variantName: string; price: number }[];
-  priceTiers: { minQuantity: number; price: number }[];
+  uom: string;
+  category: {
+    id: string;
+    name: string;
+  } | null;
+  priceTiers: {
+    id: string;
+    minQuantity: number;
+    price: number;
+  }[];
+  availableAttributes: {
+    attributeId: string;
+    attributeName: string;
+    attributeType: string;
+    values: {
+      valueId: string;
+      value: string;
+      priceModifier: number;
+      productAttributeValueId: string;
+    }[];
+  }[];
+  productVariants: {
+    id: string;
+    variantName: string;
+    sku: string | null;
+    price: number;
+    stock: number;
+    combinationIds: string[];
+    attributesDescription: string;
+  }[];
 };
+
 export type NoteCategory = {
   id: string;
   name: string;
@@ -255,7 +298,7 @@ function NotesSection({
 }
 
 // ============================================================
-// ITEM ROW — LOGIKA TIERS
+// SUB-COMPONENT: ItemRow Edit Quotation
 // ============================================================
 function ItemRow({
   index,
@@ -263,20 +306,30 @@ function ItemRow({
   form,
   onRemove,
   canRemove,
+  onImageChange,
+  imageFile,
 }: {
   index: number;
   products: ProductData[];
   form: any;
   onRemove: () => void;
   canRemove: boolean;
+  onImageChange: (index: number, file: File | null) => void;
+  imageFile: File | null;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const isManualProduct = form.watch(`items.${index}.isManualProduct`);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [openCombobox, setOpenCombobox] = useState(false);
+
+  const isManualProduct = form.watch(`items.${index}.isManualProduct`);
   const selectedProductId = form.watch(`items.${index}.productId`);
   const selectedProduct = products.find((p: any) => p.id === selectedProductId);
-  const isCustomProduct = selectedProduct?.isCustom;
-  const productVariants = selectedProduct?.productVariants || [];
+
+  // Menggunakan format object kosong default agar tidak undefined
+  const currentSelectedAttrs =
+    form.watch(`items.${index}.selectedAttributes`) || {};
 
   const {
     fields: tierFields,
@@ -287,9 +340,102 @@ function ItemRow({
     name: `items.${index}.tiers`,
   });
 
+  useEffect(() => {
+    if (imageFile) {
+      const url = URL.createObjectURL(imageFile);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  }, [imageFile]);
+
+  //  LOGIKA UTAMA YANG SUDAH DIPERBARUI: (Kalkulasi Tiers Dipertahankan)
+  const handleAttributeToggle = (attributeId: string, valueId: string) => {
+    // 1. Tentukan status baru (toggle)
+    const currentArr: string[] = Array.isArray(
+      currentSelectedAttrs[attributeId],
+    )
+      ? currentSelectedAttrs[attributeId]
+      : [];
+
+    const isSelected = currentArr.includes(valueId);
+    const newArr = isSelected
+      ? currentArr.filter((id: string) => id !== valueId)
+      : [...currentArr, valueId];
+
+    const newAttrs = {
+      ...currentSelectedAttrs,
+      [attributeId]: newArr,
+    };
+
+    // 2. FUNGSI HITUNG ULANG TOTAL EKSTRA (Murni dari Atribut, tanpa dobel varian)
+    const calculateTotalExtra = (attrsObj: Record<string, string[]>) => {
+      let extra = 0;
+      let matchedVariantId = undefined;
+
+      if (!selectedProduct) return { extra, matchedVariantId };
+
+      const allSelectedValIds = Object.values(attrsObj)
+        .flat()
+        .filter(Boolean) as string[];
+
+      // A. Hitung modifier atribut
+      selectedProduct.availableAttributes?.forEach((attr: any) => {
+        attr.values.forEach((val: any) => {
+          if (allSelectedValIds.includes(val.valueId)) {
+            extra += Number(val.priceModifier || 0);
+          }
+        });
+      });
+
+      // B. Cari ID Varian yang cocok tanpa menambah harganya lagi ke extra
+      const matchedVariant = selectedProduct.productVariants?.find((v: any) => {
+        if (!v.combinationIds) return false;
+        return (
+          v.combinationIds.length === allSelectedValIds.length &&
+          v.combinationIds.every((id: string) => allSelectedValIds.includes(id))
+        );
+      });
+
+      if (matchedVariant) {
+        matchedVariantId = matchedVariant.id;
+      }
+
+      return { extra, matchedVariantId };
+    };
+
+    // Hitung ekstra lama dan ekstra baru untuk mendapatkan SELISIH (Diff)
+    const oldCalc = calculateTotalExtra(currentSelectedAttrs);
+    const newCalc = calculateTotalExtra(newAttrs);
+    const priceDiff = newCalc.extra - oldCalc.extra;
+
+    // 3. UPDATE FORM DENGAN HARGA PASTI UNTUK HARGA UTAMA (Base Price + Ekstra Baru)
+    const basePrice = Number(selectedProduct?.basePrice || 0);
+    const newTotalUnitPrice = basePrice + newCalc.extra;
+
+    form.setValue(`items.${index}.selectedAttributes`, newAttrs);
+    form.setValue(`items.${index}.variantId`, newCalc.matchedVariantId);
+
+    // Set harga utama
+    form.setValue(`items.${index}.unitPrice`, newTotalUnitPrice);
+
+    // 4. UPDATE TIERS BERDASARKAN SELISIH (Agar tingkatan harga tetap terjaga)
+    const currentTiers = form.getValues(`items.${index}.tiers`) || [];
+    currentTiers.forEach((tier: any, i: number) => {
+      const currentTierPrice = Number(tier.unitPrice || 0);
+      form.setValue(
+        `items.${index}.tiers.${i}.unitPrice`,
+        currentTierPrice + priceDiff,
+      );
+    });
+  };
+
   return (
     <div className="border rounded-lg bg-white shadow-sm transition-all duration-200">
-      <div className="grid grid-cols-12 gap-3 items-start p-3 bg-slate-50/50 rounded-t-lg border-b">
+      {/* --- BARIS UTAMA (GRID) --- */}
+      <div className="grid grid-cols-12 gap-3 items-start p-3">
+        {/* Toggle Manual/DB */}
         <div className="col-span-1 flex flex-col items-center gap-1 mt-1.5">
           <Switch
             checked={!!isManualProduct}
@@ -297,6 +443,9 @@ function ItemRow({
               form.setValue(`items.${index}.isManualProduct`, v);
               if (v) {
                 form.setValue(`items.${index}.productId`, "");
+                form.setValue(`items.${index}.variantId`, undefined);
+                form.setValue(`items.${index}.selectedAttributes`, {});
+              } else {
                 form.setValue(`items.${index}.productName`, "");
               }
             }}
@@ -307,104 +456,183 @@ function ItemRow({
           </span>
         </div>
 
-        {/* Nama Produk & Variant */}
-        <div className="col-span-5 flex flex-col gap-2">
+        {/* Input Produk */}
+        <div className="col-span-4 flex flex-col gap-2">
           {isManualProduct ? (
             <Input
-              placeholder="Nama barang/jasa..."
+              placeholder="Nama barang/jasa manual..."
+              className="h-10"
               {...form.register(`items.${index}.productName`)}
             />
           ) : (
-            <>
-              <Select
-                value={selectedProductId || ""}
-                onValueChange={(v) => {
-                  const p = products.find((x: any) => x.id === v);
-                  if (p) {
-                    form.setValue(`items.${index}.productId`, p.id);
-                    form.setValue(`items.${index}.productName`, p.name);
-                    form.setValue(`items.${index}.variantId`, undefined);
+            <div className="space-y-1">
+              <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className={cn(
+                      "w-full justify-between h-10 font-normal bg-white",
+                      !selectedProductId && "text-muted-foreground",
+                    )}>
+                    {selectedProductId
+                      ? selectedProduct?.name || "Produk Tidak Ditemukan"
+                      : "Cari Produk di Database..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-(--radix-popover-trigger-width) p-0"
+                  align="start">
+                  <Command>
+                    <CommandInput placeholder="Cari nama atau SKU produk..." />
+                    <CommandList>
+                      <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
+                      <CommandGroup>
+                        {products.map((p: any) => (
+                          <CommandItem
+                            key={p.id}
+                            value={`${p.name} ${p.sku || ""}`}
+                            onSelect={() => {
+                              form.setValue(`items.${index}.productId`, p.id);
+                              form.setValue(
+                                `items.${index}.productName`,
+                                p.name,
+                              );
+                              form.setValue(
+                                `items.${index}.variantId`,
+                                undefined,
+                              );
+                              form.setValue(
+                                `items.${index}.selectedAttributes`,
+                                {},
+                              );
 
-                    if (tierFields.length > 0) {
-                      form.setValue(
-                        `items.${index}.tiers.0.unitPrice`,
-                        p.basePrice,
-                      );
-                    }
+                              const basePrice = Number(p.basePrice || 0);
+                              form.setValue(
+                                `items.${index}.unitPrice`,
+                                basePrice,
+                              );
 
-                    if (p.description) {
-                      form.setValue(
-                        `items.${index}.description`,
-                        p.description,
-                      );
-                      setExpanded(true);
-                    }
-                  }
-                }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih Produk..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((p: any) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                              if (p.priceTiers && p.priceTiers.length > 0) {
+                                const autoTiers = p.priceTiers.map(
+                                  (tier: any) => ({
+                                    minQuantity: tier.minQuantity,
+                                    maxQuantity: tier.maxQuantity || undefined,
+                                    quantityLabel: "Pcs",
+                                    unitPrice: Number(tier.price),
+                                  }),
+                                );
+                                form.setValue(
+                                  `items.${index}.tiers`,
+                                  autoTiers,
+                                );
+                              } else {
+                                form.setValue(`items.${index}.tiers`, [
+                                  {
+                                    minQuantity: 1,
+                                    maxQuantity: undefined,
+                                    quantityLabel: "Pcs",
+                                    unitPrice: basePrice,
+                                  },
+                                ]);
+                              }
 
-              {isCustomProduct && (
-                <div className="relative pl-4 mt-0.5 before:content-[''] before:absolute before:left-1.5 before:top-0 before:w-px before:h-4 before:bg-blue-300 before:border-l before:border-blue-300">
-                  <div className="absolute left-1.5 top-4 w-2.5 h-px bg-blue-300"></div>
-                  <Select
-                    value={form.watch(`items.${index}.variantId`) || ""}
-                    onValueChange={(vid) => {
-                      form.setValue(`items.${index}.variantId`, vid);
-                      const variant = productVariants.find(
-                        (v: any) => v.id === vid,
-                      );
+                              if (p.description) {
+                                form.setValue(
+                                  `items.${index}.description`,
+                                  p.description,
+                                );
+                                setExpanded(true);
+                              }
+                              setOpenCombobox(false);
+                            }}>
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4 shrink-0",
+                                p.id === selectedProductId
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span>{p.name}</span>
+                              <span className="text-[10px] text-gray-500">
+                                SKU: {p.sku || "-"}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
 
-                      if (variant && variant.price && tierFields.length > 0) {
-                        form.setValue(
-                          `items.${index}.tiers.0.unitPrice`,
-                          Number(variant.price),
-                        );
-                      }
-                    }}>
-                    <SelectTrigger className="h-8 bg-slate-50 border-slate-200 text-xs shadow-none">
-                      <SelectValue placeholder="Pilih Spesifikasi Variant..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {productVariants.map((v: any) => (
-                        <SelectItem key={v.id} value={v.id}>
-                          {v.variantName} {v.price ? `- Rp ${v.price}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {selectedProduct && (
+                <div className="flex items-center gap-2 text-[10px] text-slate-500 pl-1">
+                  <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                    SKU:{" "}
+                    <span className="font-medium text-slate-700">
+                      {selectedProduct.sku || "-"}
+                    </span>
+                  </span>
+                  <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                    UOM:{" "}
+                    <span className="font-medium text-slate-700">
+                      {selectedProduct.uom || "-"}
+                    </span>
+                  </span>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
 
-        {/* Diskon */}
-        <div className="col-span-3">
+        {/* Qty */}
+        <div className="col-span-2">
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
-              Disc (Total) Rp
+            <Input
+              type="number"
+              placeholder="0"
+              className="pr-10 h-10 text-center"
+              {...form.register(`items.${index}.quantity`)}
+            />
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+              Qty
+            </span>
+          </div>
+        </div>
+
+        {/* Harga */}
+        <div className="col-span-2">
+          <div className="relative">
+            <Input
+              type="number"
+              placeholder="0"
+              className="h-10 text-right pr-2"
+              {...form.register(`items.${index}.unitPrice`)}
+            />
+          </div>
+        </div>
+
+        {/* Diskon */}
+        <div className="col-span-2">
+          <div className="relative">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
+              Disc
             </span>
             <Input
               type="number"
               placeholder="0"
-              className="pl-24"
+              className="pl-9 h-10 text-right pr-2"
               {...form.register(`items.${index}.discount`)}
             />
           </div>
         </div>
 
         {/* Actions */}
-        <div className="col-span-3 flex items-center justify-end gap-1 mt-1">
+        <div className="col-span-1 flex items-center justify-end gap-1 mt-1.5">
           <Button
             type="button"
             variant="ghost"
@@ -430,11 +658,77 @@ function ItemRow({
         </div>
       </div>
 
-      {/* TIER SECTION (QTY & HARGA BERTINGKAT) */}
-      <div className="p-3 bg-white">
+      {/*  AREA FULL-WIDTH: PILIHAN ATRIBUT/VARIAN BERURUTAN VERTIKAL */}
+      {!isManualProduct &&
+        selectedProduct?.availableAttributes &&
+        selectedProduct.availableAttributes.length > 0 && (
+          <div className="px-3 pb-4">
+            <div className="relative overflow-hidden bg-linear-to-br from-slate-50/90 to-slate-100/50 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] ring-1 ring-slate-900/5">
+              <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-blue-500" /> Pilih
+                Varian/Atribut:
+              </p>
+
+              {/*  UBAH DARI GRID MENJADI FLEX COLUMN AGAR BERURUTAN KE BAWAH */}
+              <div className="flex flex-col space-y-4">
+                {selectedProduct.availableAttributes.map((attr: any) => (
+                  <div
+                    key={attr.attributeId}
+                    className="flex flex-col space-y-1.5 bg-white/60 p-3 rounded-xl border border-slate-200/60 shadow-xs">
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      {attr.attributeName}
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {attr.values.map((val: any) => {
+                        const attributeSelection =
+                          currentSelectedAttrs[attr.attributeId];
+                        const isSelected = Array.isArray(attributeSelection)
+                          ? attributeSelection.includes(val.valueId)
+                          : false;
+
+                        return (
+                          <button
+                            type="button"
+                            key={val.valueId}
+                            onClick={() =>
+                              handleAttributeToggle(
+                                attr.attributeId,
+                                val.valueId,
+                              )
+                            }
+                            className={cn(
+                              "relative px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 ease-out flex items-center justify-center",
+                              isSelected
+                                ? "bg-blue-600 text-white shadow-[0_2px_8px_rgba(37,99,235,0.4)] scale-105 border border-blue-500/80"
+                                : "bg-white/80 text-slate-600 border border-slate-200/80 shadow-sm hover:bg-white hover:scale-105 hover:shadow-md backdrop-blur-md",
+                            )}>
+                            {val.value}
+                            {val.priceModifier > 0 && (
+                              <span
+                                className={cn(
+                                  "ml-1.5 opacity-90 text-[10px] font-medium tracking-wide",
+                                  isSelected
+                                    ? "text-blue-100"
+                                    : "text-emerald-600",
+                                )}>
+                                (+{val.priceModifier})
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      {/* --- AREA TIERS --- */}
+      <div className="p-3 bg-slate-50/50 border-t">
         <div className="flex items-center justify-between mb-2 px-1">
           <span className="text-[11px] font-semibold text-slate-500 uppercase flex items-center gap-1.5">
-            <Layers className="w-3 h-3" /> Opsi Kuantitas & Harga
+            <Layers className="w-3 h-3" /> Opsi Kuantitas & Harga (Tiers)
           </span>
           <Button
             type="button"
@@ -457,12 +751,7 @@ function ItemRow({
           {tierFields.map((tierField, tierIndex) => (
             <div
               key={tierField.id}
-              className="flex items-center gap-2 bg-slate-50 border border-slate-100 p-2 rounded-md">
-              <span className="text-[10px] font-bold text-slate-400 w-4 text-center">
-                #{tierIndex + 1}
-              </span>
-
-              {/*  Min Qty */}
+              className="flex items-center gap-2 bg-white border border-slate-200 p-2 rounded-md shadow-sm">
               <div className="w-24 relative">
                 <Input
                   type="number"
@@ -476,8 +765,6 @@ function ItemRow({
                   Min
                 </span>
               </div>
-
-              {/*  Max Qty */}
               <div className="w-24 relative">
                 <Input
                   type="number"
@@ -491,8 +778,6 @@ function ItemRow({
                   Max
                 </span>
               </div>
-
-              {/*  Label */}
               <div className="w-20">
                 <Input
                   placeholder="Pcs"
@@ -502,27 +787,21 @@ function ItemRow({
                   )}
                 />
               </div>
-
-              {/*  Unit Price */}
               <div className="flex-1 relative">
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground">
-                  Rp
-                </span>
                 <Input
                   type="number"
-                  placeholder="Harga"
-                  className="pl-7 h-8 text-xs"
+                  placeholder="Harga Satuan"
+                  className="h-8 text-xs"
                   {...form.register(
                     `items.${index}.tiers.${tierIndex}.unitPrice`,
                   )}
                 />
               </div>
-
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 hover:bg-red-50 shrink-0"
+                className="h-7 w-7 hover:bg-red-50"
                 onClick={() => removeTier(tierIndex)}
                 disabled={tierFields.length <= 1}>
                 <X className="w-3.5 h-3.5 text-red-400" />
@@ -532,7 +811,7 @@ function ItemRow({
         </div>
       </div>
 
-      {/* EXPANDED SECTION */}
+      {/* --- AREA EXPANDED (DESKRIPSI, GAMBAR DLL) --- */}
       {expanded && (
         <div className="border-t bg-gray-50/50 px-4 pb-4 pt-3 rounded-b-lg space-y-4">
           <div>
@@ -541,21 +820,66 @@ function ItemRow({
             </label>
             <Textarea
               placeholder={
-                "Contoh:\nFabric: 100D Anti color moving fabric\nPrint: Full digital print..."
+                "Contoh:\nFabric: 100D Anti color moving fabric\nPrint: Full digital print\nShaft: 14mm black fiberglass shaft..."
               }
               className="text-xs min-h-25 resize-none bg-white font-mono"
               {...form.register(`items.${index}.description`)}
             />
           </div>
-
           <div>
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
               Remarks / Catatan Item
             </label>
             <Input
-              placeholder="Contoh: Warna sesuai request client, konfirmasi ulang sebelum produksi..."
+              placeholder="Contoh: Warna sesuai request client..."
               className="text-xs bg-white"
               {...form.register(`items.${index}.remarks`)}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+              Referensi Gambar (Opsional)
+            </label>
+            {!previewUrl ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-slate-200 rounded-lg p-4 flex flex-col items-center gap-2 text-slate-400 hover:border-blue-300 hover:text-blue-400 transition-colors bg-white cursor-pointer">
+                <ImageIcon className="w-6 h-6" />
+                <span className="text-xs">
+                  Klik untuk upload gambar referensi
+                </span>
+                <span className="text-[10px] text-slate-300">
+                  PNG, JPG, WEBP hingga 5MB
+                </span>
+              </button>
+            ) : (
+              <div className="relative w-fit group">
+                <img
+                  src={previewUrl}
+                  alt="preview"
+                  className="h-28 w-28 object-cover rounded-lg border border-slate-200 shadow-sm transition-opacity group-hover:opacity-90"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    onImageChange(index, null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 shadow-md transform hover:scale-110 transition-transform">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onImageChange(index, file);
+              }}
             />
           </div>
         </div>
@@ -563,6 +887,7 @@ function ItemRow({
     </div>
   );
 }
+
 // === CONSTANTS & SCHEMA ===
 const QUOTATION_STATUSES = [
   "DRAFT",
@@ -579,6 +904,8 @@ const quotationSchema = z.object({
   validUntil: z.date().optional(),
   status: z.enum(QUOTATION_STATUSES).default("DRAFT"),
   isManualClient: z.boolean().default(false),
+  currencyCode: z.string().default("IDR"),
+  paymentTerms: z.string().optional(),
   clientId: z.string().optional(),
   picId: z.string().optional(),
   manualClientName: z.string().optional(),
@@ -592,8 +919,11 @@ const quotationSchema = z.object({
         isManualProduct: z.boolean().default(false),
         productId: z.string().optional(),
         variantId: z.string().optional(),
+        selectedAttributes: z.record(z.string(), z.any()).optional(),
         productName: z.string().min(1, "Product name is required"),
         description: z.string().optional(),
+        quantity: z.coerce.number().min(0).default(0),
+        unitPrice: z.coerce.number().min(0).default(0),
         discount: z.coerce.number().min(0).default(0),
         remarks: z.string().optional(),
         tiers: z
@@ -620,7 +950,7 @@ interface QuotationFormProps {
 }
 
 // ============================================================
-// MAIN FORM
+// MAIN FORM - EDIT QUOTATION (UPDATED: + Currency & Payment Terms)
 // ============================================================
 export default function QuotationForm({
   initialData,
@@ -631,8 +961,14 @@ export default function QuotationForm({
   const [clients, setClients] = useState<ClientData[]>([]);
   const [products, setProducts] = useState<ProductData[]>([]);
   const [noteCategories, setNoteCategories] = useState<NoteCategory[]>([]);
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [selectedClient, setSelectedClient] = useState<ClientData | null>(null);
+  const [itemImages, setItemImages] = useState<Record<number, File | null>>({});
+
+  const handleImageChange = (index: number, file: File | null) => {
+    setItemImages((prev) => ({ ...prev, [index]: file }));
+  };
 
   const initialNotes = useMemo<
     { categoryId: string; contents: string[] }[]
@@ -663,16 +999,17 @@ export default function QuotationForm({
       try {
         setLoadingData(true);
 
-        const [resClients, resProducts, resNotes] = await Promise.all([
+        const [resClients, resProducts, resNotes, resCurr] = await Promise.all([
           fetchApi("/clients/order"),
           fetchApi("/products/order"),
           fetchApi("/quotation-notes-categories"),
+          fetchApi("/currencies"), //  TAMBAH
         ]);
 
-        // Parsing data dari response
         const clientData = resClients.ok ? await resClients.json() : [];
         const productData = resProducts.ok ? await resProducts.json() : [];
         const notesData = resNotes.ok ? await resNotes.json() : [];
+        const currData = resCurr.ok ? await resCurr.json() : []; //  TAMBAH
 
         setClients(
           Array.isArray(clientData) ? clientData : clientData.data || [],
@@ -681,8 +1018,9 @@ export default function QuotationForm({
           Array.isArray(productData) ? productData : productData.data || [],
         );
         setNoteCategories(Array.isArray(notesData) ? notesData : []);
+        setCurrencies(currData.data || currData || []); //  TAMBAH
 
-        if (!resClients.ok || !resProducts.ok || !resNotes.ok) {
+        if (!resClients.ok || !resProducts.ok || !resNotes.ok || !resCurr.ok) {
           console.warn("Beberapa data Master gagal dimuat sepenuhnya.");
         }
       } catch (error) {
@@ -703,10 +1041,14 @@ export default function QuotationForm({
         status: "DRAFT" as const,
         isManualClient: false,
         picId: "",
+        currencyCode: "IDR",
+        paymentTerms: "",
         items: [
           {
             isManualProduct: false,
             productName: "",
+            quantity: 0,
+            unitPrice: 0,
             discount: 0,
             remarks: "",
             tiers: [
@@ -727,6 +1069,8 @@ export default function QuotationForm({
         ? new Date(initialData.validUntil)
         : undefined,
       picId: initialData.picId || "",
+      currencyCode: initialData.currencyCode || "IDR", //  TAMBAH
+      paymentTerms: initialData.paymentTerms || "", //  TAMBAH
     };
   }, [initialData]);
 
@@ -755,20 +1099,20 @@ export default function QuotationForm({
     control: form.control,
     name: "isManualClient",
   });
+  const currencyCode = useWatch({
+    control: form.control,
+    name: "currencyCode",
+  });
 
   const { subTotal, totalDiscount, grandTotal } = useMemo(() => {
     let sub = 0,
       disc = 0;
-
     (items || []).forEach((item) => {
-      const firstTier = item.tiers?.[0];
-      const qty = Number(firstTier?.minQuantity) || 0;
-      const price = Number(firstTier?.unitPrice) || 0;
-
+      const qty = Number(item.quantity) || 0;
+      const price = Number(item.unitPrice) || 0;
       sub += qty * price;
       disc += Number(item.discount) || 0;
     });
-
     return { subTotal: sub, totalDiscount: disc, grandTotal: sub - disc };
   }, [items]);
 
@@ -920,6 +1264,60 @@ export default function QuotationForm({
                         Hapus tanggal
                       </button>
                     )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="currencyCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5">
+                      <Banknote className="w-4 h-4 text-slate-500" /> Mata Uang
+                    </FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value ?? ""}
+                      disabled={loadingData}>
+                      <FormControl>
+                        <SelectTrigger className="bg-white">
+                          <SelectValue
+                            placeholder={
+                              loadingData
+                                ? "Memuat Mata Uang..."
+                                : "Pilih Mata Uang"
+                            }
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {currencies.map((curr) => (
+                          <SelectItem key={curr.code} value={curr.code}>
+                            {curr.code} - {curr.name} ({curr.symbol})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="paymentTerms"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Syarat Pembayaran (Payment Terms)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Contoh: DP 50%, Pelunasan sebelum pengiriman..."
+                        className="text-xs min-h-15"
+                        {...field}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -1222,12 +1620,11 @@ export default function QuotationForm({
               <Box className="w-4 h-4" /> Items & Products
             </CardTitle>
 
-            {/*  NEW: Menambahkan Legend agar user tidak bingung dengan 4 input di bagian tier */}
             <div className="hidden md:flex items-center gap-4 text-[11px] text-muted-foreground mr-auto ml-4">
               <span className="flex items-center gap-1">
                 <span className="font-semibold text-slate-600">
                   Min/Max Qty
-                </span>
+                </span>{" "}
                 = Rentang
               </span>
               <span className="flex items-center gap-1">
@@ -1245,13 +1642,13 @@ export default function QuotationForm({
               variant="secondary"
               size="sm"
               onClick={() =>
-                // 🔄 UPDATE: Mengubah struktur append agar sesuai dengan schema tier baru
                 append({
                   isManualProduct: true,
                   productName: "",
+                  quantity: 0,
+                  unitPrice: 0,
                   discount: 0,
                   remarks: "",
-                  //  Pastikan field nama sesuai dengan yang ada di ItemRow (minQuantity, dkk)
                   tiers: [
                     {
                       minQuantity: 1,
@@ -1275,6 +1672,8 @@ export default function QuotationForm({
                 form={form}
                 onRemove={() => remove(index)}
                 canRemove={fields.length > 1}
+                onImageChange={handleImageChange}
+                imageFile={itemImages[index] ?? null}
               />
             ))}
           </CardContent>
@@ -1290,9 +1689,7 @@ export default function QuotationForm({
 
           <Card className="bg-slate-50 h-fit">
             <CardHeader>
-              <CardTitle className="text-base">
-                Estimasi Biaya (Opsi 1)
-              </CardTitle>
+              <CardTitle className="text-base">Estimasi Biaya</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between text-sm">
@@ -1300,7 +1697,7 @@ export default function QuotationForm({
                 <span>
                   {new Intl.NumberFormat("id-ID", {
                     style: "currency",
-                    currency: "IDR",
+                    currency: currencyCode || "IDR",
                   }).format(subTotal)}
                 </span>
               </div>
@@ -1310,7 +1707,7 @@ export default function QuotationForm({
                   -
                   {new Intl.NumberFormat("id-ID", {
                     style: "currency",
-                    currency: "IDR",
+                    currency: currencyCode || "IDR",
                   }).format(totalDiscount)}
                 </span>
               </div>
@@ -1320,12 +1717,13 @@ export default function QuotationForm({
                 <span className="text-blue-600">
                   {new Intl.NumberFormat("id-ID", {
                     style: "currency",
-                    currency: "IDR",
+                    currency: currencyCode || "IDR",
                   }).format(grandTotal)}
                 </span>
               </div>
               <p className="text-[10px] text-muted-foreground text-center mt-2 italic">
-                *Total di atas adalah estimasi menggunakan Opsi/Tier pertama.
+                *Total di atas adalah estimasi menggunakan Qty dan Harga dari
+                form utama.
               </p>
               <Button
                 type="submit"

@@ -5,6 +5,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { useApi } from "@/hooks/useApi";
+import { ChevronLeft } from "lucide-react";
+import Link from "next/link";
 import AddVendorForm, {
   AddVendorFormValues,
 } from "../components/vendorFormAdd";
@@ -63,10 +65,27 @@ export default function AddVendorPage() {
   };
 
   return (
-    <div className="w-full  space-y-6">
-      <h2 className="text-xl font-semibold tracking-tight uppercase">
-        Add Vendor
-      </h2>
+    <div className="w-full mx-auto space-y-6 pb-10">
+      <Link
+        href="/super-admin/vendors"
+        className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+        <ChevronLeft className="w-4 h-4 mr-1" />
+        Kembali ke Daftar Vendor
+      </Link>
+
+      {/* Header Halaman */}
+      <div className="flex items-center justify-between border-b pb-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight uppercase text-slate-800">
+            Add Vendor
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Tambahkan informasi vendor baru ke dalam sistem manajemen.
+          </p>
+        </div>
+      </div>
+
+      {/* Komponen Form Vendor */}
       <AddVendorForm onSubmit={handleAddVendor} isSubmitting={isSubmitting} />
     </div>
   );

@@ -38,7 +38,6 @@ export default function EditFaqCategory() {
 
         const data = await res.json();
 
-        // Mapping dari response database ke format FormValues bilingual
         setCategoryData({
           nameId: data.nameId,
           nameEn: data.nameEn,
@@ -50,7 +49,7 @@ export default function EditFaqCategory() {
       } catch (err: any) {
         console.error("❌ Fetch Error:", err);
         toast.error(err.message || "Failed to load category data.");
-        router.push("/super-admin/faqs/categories");
+        router.push("/super-admin/content/faqs/categories");
       } finally {
         setIsLoading(false);
       }

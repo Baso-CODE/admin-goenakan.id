@@ -42,6 +42,7 @@ import {
   DollarSign,
   FileText,
   FlaskConical,
+  Layers,
   Plus,
   PlusCircle,
   ShoppingBag,
@@ -69,7 +70,6 @@ import PurchaseChannelForm, {
   PurchaseChannelFormValues,
 } from "../../purchase-channel/components/formPurchaseChannel";
 import { OrderFormValues, orderSchema } from "../order-schema";
-import { postOrder } from "../order-service";
 import {
   Currency,
   Product,
@@ -98,7 +98,6 @@ export default function AddOrderForm() {
       currencyCode: "",
       referenceQuotationId: "",
       referenceSampleId: "",
-
       clientId: "",
       clientB2BPICId: "",
       purchaseChannelId: "",
@@ -112,6 +111,7 @@ export default function AddOrderForm() {
           price: 0,
           customization: "",
           remarks: "",
+          selectedAttributes: {},
         },
       ],
     },
@@ -143,8 +143,7 @@ export default function AddOrderForm() {
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [sampleOpen, setSampleOpen] = useState(false);
   const [openCombobox, setOpenCombobox] = useState<Record<number, boolean>>({});
-  // 👆 ------------------- 👆
-  // Watchers
+
   const selectedClientId = watch("clientId");
   const salesCategory = watch("salesCategory");
   const selectedCurrencyCode = watch("currencyCode");
@@ -244,28 +243,66 @@ export default function AddOrderForm() {
   const onSubmit = async (data: OrderFormValues) => {
     try {
       setLoading(true);
-      const { phone, ...payload } = data;
+      const { phone, clientPoFile, ...payload } = data;
 
-      if (!payload.referenceQuotationId) delete payload.referenceQuotationId;
-      if (!payload.referenceSampleId) delete payload.referenceSampleId;
+      // 1. Buat FormData baru
+      const formData = new FormData();
 
-      await postOrder(fetchApi, {
-        ...payload,
-        sampleFollowUps: sampleSteps
-          .filter((s) => s.enabled && s.date)
-          .map((s) => ({ name: s.name, date: s.date })),
+      // 2. Masukkan semua data teks/angka ke dalam FormData
+      Object.keys(payload).forEach((key) => {
+        const value = (payload as any)[key];
+        // Jangan masukkan field yang kosong atau field kompleks (products) dulu
+        if (
+          value !== undefined &&
+          value !== null &&
+          value !== "" &&
+          key !== "products"
+        ) {
+          formData.append(key, String(value));
+        }
       });
+
+      // 3.  MASUKKAN FILE JIKA ADA
+      if (clientPoFile instanceof File) {
+        formData.append("clientPoFile", clientPoFile);
+      }
+
+      // 4. Masukkan array products (Ubah jadi JSON string, backend kita sudah siap menerimanya berkat @Transform)
+      formData.append("products", JSON.stringify(payload.products));
+
+      // 5. Masukkan array follow-ups (Jika ada)
+      const followUps = sampleSteps
+        .filter((s) => s.enabled && s.date)
+        .map((s) => ({ name: s.name, date: s.date }));
+
+      if (followUps.length > 0) {
+        formData.append("sampleFollowUps", JSON.stringify(followUps));
+      }
+
+      // 6. Kirim ke API menggunakan fetchApi
+      // Perhatikan: Kita tidak men-set "Content-Type", browser akan otomatis men-setnya menjadi "multipart/form-data"
+      const res = await fetchApi("/orders", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to create order");
+      }
 
       toast.success("Order created successfully");
       form.reset();
       setSampleSteps([]);
+
       if (data.salesCategory === "SAMPLE") {
         router.push("/super-admin/orders?tab=sample");
       } else {
         router.push("/super-admin/orders?tab=all");
       }
-    } catch {
-      toast.error("Failed to create order");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Failed to create order");
     } finally {
       setLoading(false);
     }
@@ -341,7 +378,6 @@ export default function AddOrderForm() {
       });
 
       if (hasNonZeroPrices) {
-        console.log("✅ Setting isConvertingPrices to true");
         setIsConvertingPrices(true);
       }
     }
@@ -478,7 +514,15 @@ export default function AddOrderForm() {
 
       <CardContent>
         <Form {...form}>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+          <form
+            onSubmit={handleSubmit(onSubmit, (errors) => {
+              const firstErrorField = Object.keys(errors)[0];
+              toast.error(
+                `Periksa kembali field: ${firstErrorField.replace("items.", "")}, ada yang belum sesuai.`,
+              );
+              console.error("Form Errors:", errors);
+            })}
+            className="space-y-8">
             {/* === SECTION 1: ORDER DETAILS === */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 border rounded-lg bg-gray-50/50 items-start">
               <h3 className="col-span-full font-medium text-lg text-gray-700">
@@ -601,23 +645,57 @@ export default function AddOrderForm() {
               />
 
               {salesCategory === "SALES" && (
-                <FormField
-                  control={control}
-                  name="clientPoNumber"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2">
-                      <FormLabel>Client PO Number (Optional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter client PO reference number"
-                          className="h-10"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <>
+                  <FormField
+                    control={control}
+                    name="clientPoNumber"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Client PO Number (Optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter client PO reference number"
+                            className="h-10"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/*  TAMBAHAN BARU: INPUT FILE UNTUK PO CLIENT */}
+                  <FormField
+                    control={control}
+                    name="clientPoFile"
+                    render={({ field: { value, onChange, ...fieldProps } }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Client PO Document (PDF/Image)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="file"
+                            accept=".pdf, image/jpeg, image/png, image/webp"
+                            className="h-10 cursor-pointer file:text-blue-600 file:bg-blue-50 file:border-0 file:rounded-md file:px-2 file:py-1 file:mr-3 hover:file:bg-blue-100"
+                            onChange={(event) => {
+                              // Ambil file pertama yang diupload user
+                              const file =
+                                event.target.files && event.target.files[0];
+                              if (file) {
+                                onChange(file); // Simpan objek file ke state react-hook-form
+                              }
+                            }}
+                            {...fieldProps}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs">
+                          Opsional. Format yang didukung: PDF, JPG, PNG
+                          (Maksimal bergantung batas server).
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
               )}
 
               <FormField
@@ -1100,102 +1178,136 @@ export default function AddOrderForm() {
               <div className="space-y-4">
                 {fields.map((field, index) => {
                   const currentProductId = watch(`products.${index}.productId`);
-                  const currentVariantId = watch(`products.${index}.variantId`);
+                  const currentQty = watch(`products.${index}.quantity`) || 1;
                   const selectedProduct = products.find(
                     (p) => p.id === currentProductId,
                   );
-
-                  const currentSelectedAttrs =
-                    watch(`products.${index}.selectedAttributes`) || {};
                   const subtotal =
-                    (watch(`products.${index}.price`) || 0) *
-                    (watch(`products.${index}.quantity`) || 0);
+                    (watch(`products.${index}.price`) || 0) * currentQty;
 
-                  // 1. LOGIKA PENCOCOKAN FLEKSIBEL
-                  const handleAttributeSelect = (
-                    attributeId: string,
-                    valueId: string,
+                  const updateCalculatedPrice = async (
+                    idx: number,
+                    prod: any,
+                    selectedAttrs: any,
+                    qty: number,
                   ) => {
-                    const newAttrs = {
-                      ...currentSelectedAttrs,
-                      [attributeId]: valueId,
-                    };
-                    form.setValue(
-                      `products.${index}.selectedAttributes`,
-                      newAttrs,
+                    if (!prod) return;
+
+                    // 1. Tentukan Harga Dasar
+                    let baseProductPrice = Number(prod.basePrice || 0);
+
+                    if (
+                      baseProductPrice === 0 &&
+                      prod.productVariants &&
+                      prod.productVariants.length > 0
+                    ) {
+                      baseProductPrice = Number(
+                        prod.productVariants[0].price || 0,
+                      );
+                    }
+
+                    // 2. Cek apakah ada Varian Fisik yang cocok
+                    const nonCustomAttrsObj = Object.fromEntries(
+                      Object.entries(selectedAttrs).filter(([key]) => {
+                        const foundAttr = prod.availableAttributes?.find(
+                          (a: any) => a.attributeId === key,
+                        );
+                        return foundAttr?.isCustom !== true;
+                      }),
                     );
 
-                    if (selectedProduct?.productVariants) {
-                      const selectedValIds = Object.values(newAttrs);
+                    const nonCustomVals = Object.values(nonCustomAttrsObj);
+                    const matchedVariant = prod.productVariants?.find(
+                      (v: any) =>
+                        v.combinationIds &&
+                        v.combinationIds.length === nonCustomVals.length &&
+                        v.combinationIds.length > 0 &&
+                        v.combinationIds.every((id: string) =>
+                          nonCustomVals.includes(id),
+                        ),
+                    );
 
-                      const matchedVariant = [
-                        ...selectedProduct.productVariants,
-                      ]
-                        .sort(
-                          (a, b) =>
-                            b.combinationIds.length - a.combinationIds.length,
-                        )
-                        .find(
-                          (v) =>
-                            v.combinationIds.length > 0 &&
-                            v.combinationIds.every((id) =>
-                              selectedValIds.includes(id),
-                            ),
-                        );
+                    if (matchedVariant && Number(matchedVariant.price) > 0) {
+                      baseProductPrice = Number(matchedVariant.price);
+                    }
 
-                      if (matchedVariant) {
-                        form.setValue(
-                          `products.${index}.variantId`,
-                          matchedVariant.id,
-                        );
-                        form.setValue(
-                          `products.${index}.price`,
-                          Number(matchedVariant.price),
-                        );
-                      } else {
-                        form.setValue(`products.${index}.variantId`, "");
+                    // 3. Hitung Tambahan Harga (Modifiers)
+                    let totalModifiers = 0;
+                    const selectedValIds = Object.values(selectedAttrs);
+
+                    if (
+                      prod.availableAttributes &&
+                      Array.isArray(prod.availableAttributes)
+                    ) {
+                      prod.availableAttributes.forEach((attr: any) => {
+                        if (attr.values && Array.isArray(attr.values)) {
+                          attr.values.forEach((val: any) => {
+                            if (selectedValIds.includes(val.valueId)) {
+                              totalModifiers += Number(val.priceModifier || 0);
+                            }
+                          });
+                        }
+                      });
+                    }
+
+                    // 4. Totalkan Harga Dasar dengan Tambahan
+                    let baseIdr = baseProductPrice + totalModifiers;
+
+                    // 5. Tier Price (Grosir) -  DENGAN PENGAMAN BARU
+                    if (
+                      prod.priceTiers &&
+                      Array.isArray(prod.priceTiers) &&
+                      prod.priceTiers.length > 0
+                    ) {
+                      const tiers = [...prod.priceTiers].sort(
+                        (a, b) => b.minQuantity - a.minQuantity,
+                      );
+                      const applicableTier = tiers.find(
+                        (tier) => qty >= tier.minQuantity,
+                      );
+
+                      //  PERBAIKAN: Pastikan tier ditemukan DAN harganya lebih dari 0
+                      if (applicableTier && Number(applicableTier.price) > 0) {
+                        baseIdr = Number(applicableTier.price) + totalModifiers;
                       }
                     }
-                  };
 
-                  // 2. FUNGSI UNTUK TOMBOL "QUICK SELECT" VARIAN
-                  const handleQuickSelectVariant = (variant: any) => {
-                    const newAttrs: Record<string, string> = {
-                      ...currentSelectedAttrs,
-                    };
+                    let finalPrice = baseIdr;
 
-                    // Cocokkan ID dari varian ke ID dropdown atribut
-                    selectedProduct?.availableAttributes?.forEach((attr) => {
-                      const matchedValue = attr.values.find((v) =>
-                        variant.combinationIds.includes(v.valueId),
-                      );
-                      if (matchedValue) {
-                        newAttrs[attr.attributeId] = matchedValue.valueId;
+                    // 6. Auto Konversi Currency
+                    if (
+                      selectedCurrencyCode &&
+                      selectedCurrencyCode !== "IDR"
+                    ) {
+                      try {
+                        const result = await convert(
+                          "IDR",
+                          selectedCurrencyCode,
+                          baseIdr,
+                        );
+                        if (result?.success) {
+                          finalPrice = parseFloat(
+                            result.convertedAmount.toFixed(2),
+                          );
+                        }
+                      } catch (error) {
+                        console.error(
+                          "Gagal convert saat memilih atribut:",
+                          error,
+                        );
                       }
-                    });
+                    }
 
-                    // Set otomatis semua nilai form
-                    form.setValue(
-                      `products.${index}.selectedAttributes`,
-                      newAttrs,
-                    );
-                    form.setValue(`products.${index}.variantId`, variant.id);
-                    form.setValue(
-                      `products.${index}.price`,
-                      Number(variant.price),
-                    );
-                    toast.success(
-                      `Varian ${variant.variantName || "terpilih"} diaplikasikan.`,
-                    );
+                    // 7. Simpan harga akhir
+                    form.setValue(`products.${idx}.price`, finalPrice);
                   };
-
                   return (
                     <div
                       key={field.id}
                       className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
                       <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                         <div className="md:col-span-4 space-y-4">
-                          {/* 1. SEARCHABLE PRODUCT DROPDOWN (COMBOBOX) */}
+                          {/* 1. SEARCHABLE PRODUCT DROPDOWN */}
                           <FormField
                             control={control}
                             name={`products.${index}.productId`}
@@ -1246,6 +1358,10 @@ export default function AddOrderForm() {
                                               key={p.id}
                                               value={`${p.name} ${p.sku}`}
                                               onSelect={() => {
+                                                console.log(
+                                                  "👉 [DEBUG] KLIK PRODUK:",
+                                                  p.name,
+                                                );
                                                 field.onChange(p.id);
                                                 form.setValue(
                                                   `products.${index}.variantId`,
@@ -1255,16 +1371,18 @@ export default function AddOrderForm() {
                                                   `products.${index}.selectedAttributes`,
                                                   {},
                                                 );
-                                                form.setValue(
-                                                  `products.${index}.price`,
-                                                  p.productVariants?.length
-                                                    ? 0
-                                                    : Number(p.basePrice),
-                                                );
                                                 setOpenCombobox((prev) => ({
                                                   ...prev,
                                                   [index]: false,
                                                 }));
+
+                                                // Update harga awal & Convert
+                                                updateCalculatedPrice(
+                                                  index,
+                                                  p,
+                                                  {},
+                                                  currentQty,
+                                                );
                                               }}>
                                               <Check
                                                 className={cn(
@@ -1308,95 +1426,6 @@ export default function AddOrderForm() {
                               </span>
                             </div>
                           )}
-
-                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start mt-4">
-                            {/* KIRI: FITUR PANDUAN VARIAN (QUICK SELECT) */}
-                            {selectedProduct?.productVariants &&
-                              selectedProduct.productVariants.length > 0 && (
-                                <div className="bg-blue-50/50 border border-blue-100 rounded-md p-3 space-y-2 h-full">
-                                  <p className="text-xs font-semibold text-blue-800 flex items-center gap-1">
-                                    <Bookmark className="w-3 h-3" /> Panduan
-                                    Varian Tersedia
-                                  </p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {selectedProduct.productVariants.map(
-                                      (variant) => (
-                                        <button
-                                          key={variant.id}
-                                          type="button"
-                                          onClick={() =>
-                                            handleQuickSelectVariant(variant)
-                                          }
-                                          className={cn(
-                                            "text-[10px] font-medium px-2 py-1 rounded border transition-colors",
-                                            currentVariantId === variant.id
-                                              ? "bg-blue-600 text-white border-blue-600"
-                                              : "bg-white text-gray-600 border-gray-300 hover:bg-blue-50",
-                                          )}>
-                                          {variant.attributesDescription ||
-                                            variant.variantName ||
-                                            `SKU: ${variant.sku}`}
-                                        </button>
-                                      ),
-                                    )}
-                                  </div>
-                                  <p className="text-[10px] text-gray-400 italic">
-                                    Klik tombol di atas untuk mengisi dropdown
-                                    otomatis.
-                                  </p>
-                                </div>
-                              )}
-
-                            {/* KANAN: DYNAMIC ATTRIBUTE SELECTION */}
-                            {selectedProduct?.availableAttributes &&
-                              selectedProduct.availableAttributes.length >
-                                0 && (
-                                <div className="bg-gray-50 border rounded-md p-3 space-y-3 h-full">
-                                  <p className="text-xs font-semibold text-gray-600 mb-1">
-                                    Select Attributes:
-                                  </p>
-                                  {selectedProduct.availableAttributes.map(
-                                    (attr) => (
-                                      <div
-                                        key={attr.attributeId}
-                                        className="flex flex-col space-y-1">
-                                        <label className="text-xs text-gray-500">
-                                          {attr.attributeName}
-                                        </label>
-                                        <Select
-                                          value={
-                                            currentSelectedAttrs[
-                                              attr.attributeId
-                                            ] || ""
-                                          }
-                                          onValueChange={(val) =>
-                                            handleAttributeSelect(
-                                              attr.attributeId,
-                                              val,
-                                            )
-                                          }>
-                                          <SelectTrigger className="h-8 text-sm bg-white">
-                                            <SelectValue
-                                              placeholder={`Select ${attr.attributeName}`}
-                                            />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {attr.values.map((val) => (
-                                              <SelectItem
-                                                key={val.valueId}
-                                                value={val.valueId}>
-                                                {val.value}
-                                              </SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                    ),
-                                  )}
-                                </div>
-                              )}
-                          </div>
-                          {/* ========================================== */}
                         </div>
 
                         <div className="md:col-span-2">
@@ -1416,31 +1445,20 @@ export default function AddOrderForm() {
                                       {...field}
                                       onChange={(e) => {
                                         const val = e.target.valueAsNumber;
-                                        field.onChange(isNaN(val) ? 0 : val);
+                                        const newQty = isNaN(val) ? 0 : val;
+                                        field.onChange(newQty);
 
-                                        // Logika Price Tier
-                                        if (
-                                          selectedProduct &&
-                                          !selectedProduct.productVariants
-                                            ?.length &&
-                                          selectedProduct.priceTiers?.length > 0
-                                        ) {
-                                          const tiers = [
-                                            ...selectedProduct.priceTiers,
-                                          ].sort(
-                                            (a, b) =>
-                                              b.minQuantity - a.minQuantity,
-                                          );
-                                          const applicableTier = tiers.find(
-                                            (tier) => val >= tier.minQuantity,
-                                          );
-                                          form.setValue(
-                                            `products.${index}.price`,
-                                            applicableTier
-                                              ? Number(applicableTier.price)
-                                              : Number(
-                                                  selectedProduct.basePrice,
-                                                ),
+                                        if (selectedProduct) {
+                                          const currentAttrs =
+                                            form.getValues(
+                                              `products.${index}.selectedAttributes`,
+                                            ) || {};
+                                          // Update ulang harga jika kuantitas menyentuh batas Price Tier baru
+                                          updateCalculatedPrice(
+                                            index,
+                                            selectedProduct,
+                                            currentAttrs,
+                                            newQty,
                                           );
                                         }
                                       }}
@@ -1516,8 +1534,178 @@ export default function AddOrderForm() {
                         </div>
                       </div>
 
+                      {/*  AREA FULL-WIDTH: DYNAMIC ATTRIBUTE SELECTION (BERURUTAN/STACK) */}
+                      {selectedProduct?.availableAttributes &&
+                        selectedProduct.availableAttributes.length > 0 && (
+                          <div className="px-4 pb-4">
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 shadow-inner">
+                              <p className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                                <Layers className="w-4 h-4 text-blue-500" />{" "}
+                                Pilih Varian Produk:
+                              </p>
+
+                              <div className="flex flex-col space-y-4">
+                                {selectedProduct.availableAttributes.map(
+                                  (attr: any, attrIdx: number) => {
+                                    const isCustomAttr = attr.isCustom === true;
+
+                                    const currentSelectedAttrs =
+                                      watch(
+                                        `products.${index}.selectedAttributes`,
+                                      ) || {};
+                                    const selectedValue =
+                                      currentSelectedAttrs[attr.attributeId];
+
+                                    return (
+                                      <div
+                                        key={attr.attributeId}
+                                        className="flex flex-col space-y-2 bg-white p-3 rounded-md border border-slate-200 shadow-sm">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                          Atribut #{attrIdx + 1}:{" "}
+                                          {attr.attributeName}{" "}
+                                          {isCustomAttr && (
+                                            <span className="text-purple-600 font-normal">
+                                              (Bebas)
+                                            </span>
+                                          )}
+                                        </label>
+
+                                        <div className="flex flex-wrap gap-2">
+                                          {attr.values.map((val: any) => {
+                                            const isSelected =
+                                              selectedValue === val.valueId;
+
+                                            return (
+                                              <button
+                                                type="button"
+                                                key={val.valueId}
+                                                // onClick sudah dimodifikasi untuk toggle dan clear!
+                                                onClick={() => {
+                                                  // Buat salinan atribut saat ini
+                                                  const newAttrs: Record<
+                                                    string,
+                                                    string
+                                                  > = {
+                                                    ...currentSelectedAttrs,
+                                                  };
+
+                                                  if (isSelected) {
+                                                    //  FITUR TOGGLE: Jika sudah terpilih, maka batalkan pilihannya (Hapus)
+                                                    delete newAttrs[
+                                                      attr.attributeId
+                                                    ];
+                                                  } else {
+                                                    //  FITUR TOGGLE: Jika belum terpilih, pilih ini
+                                                    newAttrs[attr.attributeId] =
+                                                      val.valueId;
+                                                  }
+
+                                                  // (Opsional UX): Hapus atribut turunan di bawahnya agar kombinasi tetap bersih
+                                                  selectedProduct.availableAttributes
+                                                    .slice(attrIdx + 1)
+                                                    .forEach(
+                                                      (nextAttr: any) => {
+                                                        delete newAttrs[
+                                                          nextAttr.attributeId
+                                                        ];
+                                                      },
+                                                    );
+
+                                                  form.setValue(
+                                                    `products.${index}.selectedAttributes`,
+                                                    newAttrs,
+                                                  );
+
+                                                  // Cek & Set Variant ID hanya dari atribut yang BUKAN custom
+                                                  const nonCustomAttrsObj =
+                                                    Object.fromEntries(
+                                                      Object.entries(
+                                                        newAttrs,
+                                                      ).filter(([key]) => {
+                                                        const foundAttr =
+                                                          selectedProduct.availableAttributes.find(
+                                                            (a: any) =>
+                                                              a.attributeId ===
+                                                              key,
+                                                          );
+                                                        return (
+                                                          foundAttr?.isCustom !==
+                                                          true
+                                                        );
+                                                      }),
+                                                    );
+
+                                                  const nonCustomVals =
+                                                    Object.values(
+                                                      nonCustomAttrsObj,
+                                                    );
+
+                                                  const matchedVariant =
+                                                    selectedProduct.productVariants?.find(
+                                                      (v: any) =>
+                                                        v.combinationIds
+                                                          .length ===
+                                                          nonCustomVals.length &&
+                                                        v.combinationIds.every(
+                                                          (id: string) =>
+                                                            nonCustomVals.includes(
+                                                              id,
+                                                            ),
+                                                        ),
+                                                    );
+
+                                                  form.setValue(
+                                                    `products.${index}.variantId`,
+                                                    matchedVariant?.id || "",
+                                                  );
+
+                                                  // Hitung harga (Base + Modifier) dan auto-convert currency
+                                                  updateCalculatedPrice(
+                                                    index,
+                                                    selectedProduct,
+                                                    newAttrs,
+                                                    currentQty,
+                                                  );
+                                                }}
+                                                // Tampilan diperbarui agar tidak ada efek abu-abu disabled
+                                                className={cn(
+                                                  "relative px-4 py-2 rounded-md text-sm font-medium transition-all duration-200",
+                                                  isSelected
+                                                    ? "bg-blue-600 text-white shadow-md border-transparent"
+                                                    : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:border-blue-400",
+                                                )}>
+                                                {val.value}
+                                                {Number(val.priceModifier) >
+                                                  0 && (
+                                                  <span
+                                                    className={cn(
+                                                      "ml-1.5 text-[10px] font-semibold",
+                                                      isSelected
+                                                        ? "text-blue-200"
+                                                        : "text-emerald-600",
+                                                    )}>
+                                                    (+
+                                                    {Number(
+                                                      val.priceModifier,
+                                                    ).toLocaleString("id-ID")}
+                                                    )
+                                                  </span>
+                                                )}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    );
+                                  },
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                       {/* Additional Details (Customization & Remarks) */}
-                      <div className="bg-gray-50/50 p-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4 rounded-b-lg">
+                      <div className="bg-gray-50/50 p-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 rounded-b-lg">
                         <FormField
                           control={control}
                           name={`products.${index}.customization`}
@@ -1560,6 +1748,7 @@ export default function AddOrderForm() {
                 })}
               </div>
             </div>
+
             <Button type="submit" className="text-md" disabled={loading}>
               {loading ? "Submitting Order..." : "Create Order"}
             </Button>

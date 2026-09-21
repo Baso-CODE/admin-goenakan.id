@@ -54,7 +54,7 @@ export default function ProductTags() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -317,12 +317,17 @@ export default function ProductTags() {
                       <div className="flex flex-wrap gap-1">
                         {data.categories && data.categories.length > 0 ? (
                           data.categories.map((cat) => (
-                            <Badge key={cat.id} variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
+                            <Badge
+                              key={cat.id}
+                              variant="outline"
+                              className="bg-indigo-50 text-indigo-700 border-indigo-200">
                               {cat.name}
                             </Badge>
                           ))
                         ) : (
-                          <span className="text-muted-foreground text-xs italic">Ungrouped</span>
+                          <span className="text-muted-foreground text-xs italic">
+                            Ungrouped
+                          </span>
                         )}
                       </div>
                     </TableCell>

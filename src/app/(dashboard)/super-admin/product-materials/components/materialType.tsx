@@ -11,6 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -36,7 +37,6 @@ import {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Switch } from "@/components/ui/switch";
 
 type MaterialType = {
   id: string;
@@ -64,7 +64,7 @@ export default function MaterialTypes() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
 
   // --- DELETE STATE ---
@@ -143,7 +143,9 @@ export default function MaterialTypes() {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Gagal mengubah status aktif material");
+        throw new Error(
+          errData.message || "Gagal mengubah status aktif material",
+        );
       }
       toast.success("Status aktif material berhasil diubah");
       setMaterials((prev) =>

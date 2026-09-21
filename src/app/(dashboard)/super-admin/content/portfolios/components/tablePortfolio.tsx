@@ -39,10 +39,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-//  UPDATE TIPE DATA SESUAI SCHEMA BARU
+//  UPDATE TIPE DATA BILINGUAL
 type Portfolio = {
   id: string;
-  title: string;
+  title_id: string;
+  title_en?: string | null;
   clientName: string;
   image: string;
   displayOrder: number;
@@ -52,7 +53,8 @@ type Portfolio = {
   createdAt: string;
   eventCategory?: {
     id: string;
-    title: string;
+    title_id: string;
+    title_en?: string | null;
   };
 };
 
@@ -78,7 +80,7 @@ export default function PortfolioTable() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
 
@@ -88,7 +90,6 @@ export default function PortfolioTable() {
     setLoading(true);
     setError(null);
     try {
-      // 1. Build Query Params
       const params = new URLSearchParams({
         page: page.toString(),
         take: "10",
@@ -217,14 +218,14 @@ export default function PortfolioTable() {
                 <TableRow>
                   <TableHead className="w-16 text-center">Order</TableHead>
                   <TableHead className="w-24">Image</TableHead>
-                  <TableHead className="min-w-40">Project & Category</TableHead>
+                  <TableHead className="min-w-64">
+                    Project & Category (ID / EN)
+                  </TableHead>
                   <TableHead>Client Name</TableHead>
                   <TableHead className="text-center">Items Ordered</TableHead>
-                  {/*  KOLOM BARU */}
                   <TableHead className="whitespace-nowrap">
                     Project Date
                   </TableHead>
-                  {/*  KOLOM BARU */}
                   <TableHead>Status</TableHead>
                   <TableHead className="whitespace-nowrap">Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -235,7 +236,6 @@ export default function PortfolioTable() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      {/*  colSpan jadi 9 */}
                       <TableCell colSpan={9}>
                         <Skeleton className="h-12 w-full" />
                       </TableCell>
@@ -264,21 +264,41 @@ export default function PortfolioTable() {
                         <div className="relative w-16 h-12 bg-stone-50 rounded-md border p-1 overflow-hidden">
                           <Image
                             src={item.image}
-                            alt={item.title}
+                            alt={item.title_id}
                             fill
                             className="object-cover"
                           />
                         </div>
                       </TableCell>
 
-                      {/* --- JUDUL PROYEK & KATEGORI --- */}
+                      {/* --- JUDUL PROYEK & KATEGORI (BILINGUAL) --- */}
                       <TableCell>
-                        <div className="font-semibold text-sm">
-                          {item.title}
-                        </div>
-                        <div className="flex items-center gap-1 mt-1 text-[11px] text-muted-foreground">
-                          <Tag className="h-3 w-3" />
-                          {item.eventCategory?.title || "Uncategorized"}
+                        <div className="space-y-1">
+                          <div className="font-semibold text-sm text-stone-900">
+                            {item.title_id}{" "}
+                            <span className="text-xs font-normal text-stone-400">
+                              (ID)
+                            </span>
+                          </div>
+                          {item.title_en ? (
+                            <div className="text-xs text-stone-500">
+                              {item.title_en}{" "}
+                              <span className="text-[10px] text-stone-400">
+                                (EN)
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] italic text-amber-600/70">
+                              Belum ada terjemahan EN
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-1 mt-1 text-[11px] text-muted-foreground pt-1 border-t border-stone-100">
+                            <Tag className="h-3 w-3 text-[#C4A48E]" />
+                            <span>
+                              {item.eventCategory?.title_id || "Uncategorized"}
+                            </span>
+                          </div>
                         </div>
                       </TableCell>
 

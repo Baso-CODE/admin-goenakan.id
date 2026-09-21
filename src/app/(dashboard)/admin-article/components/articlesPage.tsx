@@ -4,6 +4,13 @@ import { ConfirmDeleteDialog } from "@/app/(dashboard)/components/confirmDeleteD
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -36,7 +43,8 @@ type Article = {
   categoryId: string;
   category: {
     id: string;
-    name: string;
+    name_id: string;
+    name_en: string;
   };
   createdAt: string;
   updatedAt: string;
@@ -53,18 +61,54 @@ type Meta = {
 export default function ArticlesSection() {
   const { fetchApi, status } = useApi();
 
-  // --- STATE UNTUK TABLE ---
+  // --- STATE UNTUK TABLE & FILTER ---
   const [articles, setArticles] = useState<Article[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
+
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
+
+  //  STATE UNTUK NILAI FILTER
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedAuthor, setSelectedAuthor] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+
+  //  STATE UNTUK DATA MASTER DROPDOWN
+  const [categories, setCategories] = useState<any[]>([]);
+  const [authors, setAuthors] = useState<any[]>([]);
 
   // --- STATE UNTUK DELETE ---
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  //  FUNGSI LOAD MASTER DATA (Untuk Dropdown)
+  useEffect(() => {
+    async function loadFilters() {
+      if (status !== "authenticated") return;
+      try {
+        // Sesuaikan endpoint /users dengan API kamu yang mengembalikan list author
+        const [catRes, authRes] = await Promise.all([
+          fetchApi("/article-categories/list"),
+          fetchApi("/articles/authors"),
+        ]);
+
+        if (catRes.ok) {
+          const catData = await catRes.json();
+          setCategories(catData.data || catData);
+        }
+        if (authRes.ok) {
+          const authData = await authRes.json();
+          setAuthors(authData.data || authData);
+        }
+      } catch (err) {
+        console.error("Gagal memuat data filter", err);
+      }
+    }
+    loadFilters();
+  }, [status, fetchApi]);
 
   // --- FUNGSI FETCH DATA ---
   const fetchArticles = useCallback(async () => {
@@ -82,6 +126,12 @@ export default function ArticlesSection() {
         params.append("search", debouncedSearch.trim());
       }
 
+      //  Masukkan filter ke dalam parameter API
+      if (selectedCategory !== "all")
+        params.append("categoryId", selectedCategory);
+      if (selectedAuthor !== "all") params.append("authorId", selectedAuthor);
+      if (selectedStatus !== "all") params.append("published", selectedStatus);
+
       const res = await fetchApi(`/articles?${params}`);
 
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
@@ -95,7 +145,24 @@ export default function ArticlesSection() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, status, fetchApi]);
+  }, [
+    page,
+    debouncedSearch,
+    selectedCategory,
+    selectedAuthor,
+    selectedStatus,
+    status,
+    fetchApi,
+  ]);
+
+  //  Reset halaman ke 1 jika filter berubah
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, selectedCategory, selectedAuthor, selectedStatus]);
+
+  useEffect(() => {
+    fetchArticles();
+  }, [fetchArticles]);
 
   // --- FUNGSI HANDLE DELETE ---
   const handleDelete = async () => {
@@ -122,40 +189,95 @@ export default function ArticlesSection() {
       setIsDeleting(false);
     }
   };
-
-  // --- USE EFFECT ---
-  useEffect(() => {
-    fetchArticles();
-  }, [fetchArticles]);
-
   return (
     <div className="space-y-4 w-auto mx-auto">
       {/* === HEADER & SEARCH/FILTER TABLE === */}
       <Card>
-        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <CardTitle className="text-xl font-semibold">
-            Article Management 📰
-          </CardTitle>
+        <CardHeader className="flex flex-col gap-5">
+          {/* === BAGIAN ATAS: JUDUL & TOMBOL === */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <CardTitle className="text-xl font-semibold">
+              Article Management 📰
+            </CardTitle>
+            <Link href="/admin-article/article/add">
+              <Button
+                size="sm"
+                className="w-full md:w-auto gap-2 cursor-pointer h-10">
+                + Write Article
+              </Button>
+            </Link>
+          </div>
 
-          <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-            {/* SEARCH */}
-            <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          {/* === BAGIAN BAWAH: FILTER DAN PENCARIAN === */}
+          <div className="flex flex-col lg:flex-row gap-4 items-center w-full">
+            {/* 1. SEARCH (Akan melebar otomatis mengisi sisa ruang) */}
+            <div className="relative w-full lg:flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
                 placeholder="Search article title..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-8"
+                className="pl-9 w-full"
               />
             </div>
 
-            {/* BUTTON ADD ARTICLE */}
-            <Link href="/admin-article/article/add" className="md:ml-auto">
-              <Button size="sm" className="w-full gap-2 cursor-pointer h-10">
-                + Write Article
-              </Button>
-            </Link>
+            {/* 2. KELOMPOK FILTER (Ukuran lebih konsisten) */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+              {/* FILTER KATEGORI */}
+              <div className="w-full sm:w-44">
+                <Select
+                  value={selectedCategory}
+                  onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Semua Kategori" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Kategori</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name_id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* FILTER AUTHOR */}
+              <div className="w-full sm:w-44">
+                <Select
+                  value={selectedAuthor}
+                  onValueChange={setSelectedAuthor}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Semua Penulis" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Penulis</SelectItem>
+                    {authors.map((author) => (
+                      <SelectItem key={author.id} value={author.id}>
+                        {author.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* FILTER STATUS PUBLISH */}
+              <div className="w-full sm:w-44">
+                <Select
+                  value={selectedStatus}
+                  onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Semua Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Status</SelectItem>
+                    <SelectItem value="true">Published</SelectItem>
+                    <SelectItem value="false">Draft</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
         </CardHeader>
       </Card>
@@ -233,7 +355,7 @@ export default function ArticlesSection() {
 
                     {/* Category */}
                     <TableCell className="text-sm">
-                      {data.category?.name || "-"}
+                      {data.category?.name_id || data.category?.name_en || "-"}
                     </TableCell>
 
                     {/* Author */}

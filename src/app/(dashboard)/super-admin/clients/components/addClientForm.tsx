@@ -26,7 +26,10 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { DatePickerHelper } from "@/helper/datePickerHelper";
+import { ImageCropper } from "@/helper/image-cropper";
 import { useApi } from "@/hooks/useApi";
+import { format } from "date-fns";
 import { ChevronLeft, ClipboardList, ImagePlus, Trash2, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -64,6 +67,7 @@ interface PICFormData {
 interface ClientFormData {
   type: ClientType;
   custCode?: string;
+  joinedDate?: Date | undefined;
 
   // B2B
   b2b_brandName?: string;
@@ -81,7 +85,6 @@ interface ClientFormData {
   b2b_subDistrict?: string;
   b2b_postalCode?: string;
   b2b_fullAddress?: string;
-  b2b_purchaseChannelId?: string;
   b2b_pics: PICFormData[];
 
   // B2C
@@ -95,12 +98,12 @@ interface ClientFormData {
   b2c_subDistrict?: string;
   b2c_postalCode?: string;
   b2c_fullAddressB2C?: string;
-  b2c_purchaseChannelIdB2C?: string;
 }
 
 const initialFormData: ClientFormData = {
   type: "",
   custCode: "",
+  joinedDate: undefined,
   b2b_brandName: "",
   b2b_brandWebsiteUrl: "",
   b2b_brandLogoFile: null,
@@ -116,7 +119,6 @@ const initialFormData: ClientFormData = {
   b2b_subDistrict: "",
   b2b_postalCode: "",
   b2b_fullAddress: "",
-  b2b_purchaseChannelId: "",
   b2b_pics: [{ prefix: "", name: "", email: "", phone: "" }],
   b2c_name: "",
   b2c_prefix: "",
@@ -128,7 +130,6 @@ const initialFormData: ClientFormData = {
   b2c_subDistrict: "",
   b2c_postalCode: "",
   b2c_fullAddressB2C: "",
-  b2c_purchaseChannelIdB2C: "",
 };
 
 export default function ClientAddForm({
@@ -236,13 +237,15 @@ export default function ClientAddForm({
       const formDataPayload = new FormData();
       formDataPayload.append("type", clientType);
       formDataPayload.append("status", clientStatus);
+      if (formData.joinedDate) {
+        formDataPayload.append(
+          "joinedDate",
+          format(formData.joinedDate, "yyyy-MM-dd"),
+        );
+      }
       if (clientType === "B2B") {
         formDataPayload.append("companyName", formData.b2b_companyName || "");
         formDataPayload.append("departmentId", formData.b2b_departmentId || "");
-        formDataPayload.append(
-          "purchaseChannelId",
-          formData.b2b_purchaseChannelId || "",
-        );
         if (formData.b2b_phone)
           formDataPayload.append("phone", formData.b2b_phone);
         if (formData.b2b_email)
@@ -368,389 +371,173 @@ export default function ClientAddForm({
                 </TabsTrigger>
               </TabsList>
 
-              {/* TAB 1: INFO DASAR - Status & Tipe Klien */}
-              <TabsContent value="info-dasar" className="space-y-6">
-                <div className="space-y-4">
-                  <Label>Status Klien</Label>
-                  <Tabs
-                    value={clientStatus}
-                    onValueChange={(val) =>
-                      setClientStatus(val as "POTENTIAL" | "OFFICIAL")
-                    }
-                    className="w-fit">
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger
-                        value="OFFICIAL"
-                        className="data-[state=active]:bg-green-600 data-[state=active]:text-white">
-                        Official
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="POTENTIAL"
-                        className="data-[state=active]:bg-amber-500 data-[state=active]:text-white">
-                        Potential
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-
-                <div className="space-y-2 border-t pt-6">
-                  <Label htmlFor="type">Tipe Klien *</Label>
-                  <Select onValueChange={handleTypeChange} value={clientType}>
-                    <SelectTrigger id="type">
-                      <SelectValue placeholder="Pilih Tipe Klien" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="B2B">B2B (Business)</SelectItem>
-                      <SelectItem value="B2C">B2C (Personal)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Pilih tipe klien untuk melanjutkan ke tab berikutnya
-                  </p>
-                </div>
-              </TabsContent>
-
-              {/* TAB 2: DETAIL - Detail Perusahaan/Individu */}
-              <TabsContent value="detail" className="space-y-6">
-                {clientType === "B2B" && (
+              <div>
+                {/* TAB 1: INFO DASAR - Status & Tipe Klien */}
+                <TabsContent
+                  value="info-dasar"
+                  className="space-y-6"
+                  forceMount={true}
+                  hidden={activeTab !== "info-dasar"}>
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">
-                      Detail Perusahaan (B2B)
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Nama Perusahaan *</Label>
-                        <Input
-                          name="b2b_companyName"
-                          value={formData.b2b_companyName}
-                          onChange={handleChange}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Email Kantor</Label>
-                        <Input
-                          name="b2b_email"
-                          type="email"
-                          value={formData.b2b_email}
-                          onChange={handleChange}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Telepon Kantor</Label>
-                        <Input
-                          name="b2b_phone"
-                          value={formData.b2b_phone}
-                          onChange={handleChange}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Website *</Label>
-                        <Input
-                          name="b2b_website"
-                          value={formData.b2b_website}
-                          onChange={handleChange}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Departemen *</Label>
-                        <Select
-                          value={formData.b2b_departmentId}
-                          onValueChange={(value) => {
-                            if (value === "ADD_NEW_DEP") {
-                              setIsDepModalOpen(true);
-                              return;
-                            }
-                            setFormData((prev) => ({
-                              ...prev,
-                              b2b_departmentId: value,
-                            }));
-                          }}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih Departemen" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {departments.map((dep) => (
-                              <SelectItem key={dep.id} value={dep.id}>
-                                {dep.name}
-                              </SelectItem>
-                            ))}
-                            <div className="h-px bg-stone-200 my-1 mx-1" />
-                            <SelectItem
-                              value="ADD_NEW_DEP"
-                              className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
-                              + Tambah Departemen Baru
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+                    <Label>Status Klien</Label>
+                    <Tabs
+                      value={clientStatus}
+                      onValueChange={(val) =>
+                        setClientStatus(val as "POTENTIAL" | "OFFICIAL")
+                      }
+                      className="w-fit">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger
+                          value="OFFICIAL"
+                          className="data-[state=active]:bg-green-600 data-[state=active]:text-white">
+                          Official
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="POTENTIAL"
+                          className="data-[state=active]:bg-amber-500 data-[state=active]:text-white">
+                          Potential
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
                   </div>
-                )}
 
-                {clientType === "B2C" && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">
-                      Detail Individu (B2C)
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label>Prefix (Mr./Ms.)</Label>
-                        <Select
-                          value={formData.b2c_prefix}
-                          onValueChange={(value) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              b2c_prefix: value,
-                            }))
-                          }>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih Prefix" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Mr.">Mr.</SelectItem>
-                            <SelectItem value="Ms.">Ms.</SelectItem>
-                            <SelectItem value="Mrs.">Mrs.</SelectItem>
-                            <SelectItem value="Bpk.">Bpk.</SelectItem>
-                            <SelectItem value="Ibu.">Ibu.</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label>Nama Lengkap *</Label>
-                        <Input
-                          value={formData.b2c_name}
-                          name="b2c_name"
-                          onChange={handleChange}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Telepon</Label>
-                        <Input
-                          name="b2c_phone"
-                          value={formData.b2c_phone}
-                          onChange={handleChange}
-                        />
-                      </div>
-                    </div>
+                  <div className="space-y-2 border-t pt-6">
+                    <Label htmlFor="type">Tipe Klien *</Label>
+                    <Select onValueChange={handleTypeChange} value={clientType}>
+                      <SelectTrigger id="type">
+                        <SelectValue placeholder="Pilih Tipe Klien (B2B/B2C)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="B2B">B2B (Business)</SelectItem>
+                        <SelectItem value="B2C">B2C (Personal)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Pilih tipe klien untuk melanjutkan ke tab berikutnya
+                    </p>
                   </div>
-                )}
-              </TabsContent>
+                </TabsContent>
 
-              {/* TAB 3: ALAMAT */}
-              <TabsContent value="alamat" className="space-y-6">
-                <h3 className="text-lg font-semibold">Alamat</h3>
+                {/* TAB 2: DETAIL - Detail Perusahaan/Individu */}
+                <TabsContent
+                  value="detail"
+                  className="space-y-6"
+                  forceMount={true}
+                  hidden={activeTab !== "detail"}>
+                  {clientType === "B2B" && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">
+                        Detail Perusahaan (B2B)
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Nama Perusahaan *</Label>
+                          <Input
+                            name="b2b_companyName"
+                            value={formData.b2b_companyName}
+                            onChange={handleChange}
+                            placeholder="Contoh: PT. Maju Bersama"
+                            required
+                          />
+                        </div>
 
-                {clientType === "B2B" && (
-                  <AddressField
-                    value={{
-                      country: formData.b2b_country || "",
-                      province: formData.b2b_province || "",
-                      city: formData.b2b_city || "",
-                      district: formData.b2b_district || "",
-                      subDistrict: formData.b2b_subDistrict || "",
-                      postalCode: formData.b2b_postalCode || "",
-                    }}
-                    onChange={(updated) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        b2b_country: updated.country ?? prev.b2b_country,
-                        b2b_province: updated.province ?? prev.b2b_province,
-                        b2b_city: updated.city ?? prev.b2b_city,
-                        b2b_district: updated.district ?? prev.b2b_district,
-                        b2b_subDistrict:
-                          updated.subDistrict ?? prev.b2b_subDistrict,
-                        b2b_postalCode:
-                          updated.postalCode ?? prev.b2b_postalCode,
-                      }))
-                    }
-                  />
-                )}
-
-                {clientType === "B2C" && (
-                  <AddressField
-                    value={{
-                      country: formData.b2c_country || "",
-                      province: formData.b2c_province || "",
-                      city: formData.b2c_city || "",
-                      district: formData.b2c_district || "",
-                      subDistrict: formData.b2c_subDistrict || "",
-                      postalCode: formData.b2c_postalCode || "",
-                    }}
-                    onChange={(updated) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        b2c_country: updated.country ?? prev.b2c_country,
-                        b2c_province: updated.province ?? prev.b2c_province,
-                        b2c_city: updated.city ?? prev.b2c_city,
-                        b2c_district: updated.district ?? prev.b2c_district,
-                        b2c_subDistrict:
-                          updated.subDistrict ?? prev.b2c_subDistrict,
-                        b2c_postalCode:
-                          updated.postalCode ?? prev.b2c_postalCode,
-                      }))
-                    }
-                  />
-                )}
-
-                <div className="space-y-2 mt-6">
-                  <Label>
-                    Alamat Lengkap{" "}
-                    {clientType === "B2B" ? "(Perusahaan)" : "(Tempat Tinggal)"}
-                  </Label>
-                  <Textarea
-                    name={
-                      clientType === "B2B"
-                        ? "b2b_fullAddress"
-                        : "b2c_fullAddressB2C"
-                    }
-                    value={
-                      clientType === "B2B"
-                        ? formData.b2b_fullAddress
-                        : formData.b2c_fullAddressB2C
-                    }
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-              </TabsContent>
-
-              {/* TAB 4: BRAND (B2B Only) */}
-              <TabsContent value="brand" className="space-y-6">
-                <h3 className="text-lg font-semibold">
-                  Brand Client (Opsional)
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Informasi brand yang mewakili klien (jika ada)
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Nama Brand</Label>
-                    <Input
-                      name="b2b_brandName"
-                      placeholder="Contoh: Chitato, Indomie..."
-                      value={formData.b2b_brandName}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Website Brand</Label>
-                    <Input
-                      name="b2b_brandWebsiteUrl"
-                      placeholder="https://brand-website.com"
-                      value={formData.b2b_brandWebsiteUrl}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Logo Brand</Label>
-                    {formData.b2b_brandLogoFile ? (
-                      <div className="relative w-40 h-40 rounded-xl border border-gray-200 overflow-hidden group shadow-sm">
-                        <img
-                          src={URL.createObjectURL(formData.b2b_brandLogoFile)}
-                          alt="Preview Logo"
-                          className="w-full h-full object-contain bg-white p-2"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setFormData((prev) => ({
+                        {/* Tanggal Bergabung */}
+                        <div className="space-y-2 flex flex-col justify-end">
+                          <Label>Tanggal Bergabung</Label>
+                          <DatePickerHelper
+                            date={formData.joinedDate}
+                            setDate={(date) =>
+                              setFormData((prev: any) => ({
                                 ...prev,
-                                b2b_brandLogoFile: null,
+                                joinedDate: date,
                               }))
                             }
-                            className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
-                            <X className="w-5 h-5" />
-                          </button>
+                            placeholder="Pilih Tanggal (Opsional)"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Email Kantor</Label>
+                          <Input
+                            name="b2b_email"
+                            type="email"
+                            value={formData.b2b_email}
+                            onChange={handleChange}
+                            placeholder="kantor@perusahaan.com"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Telepon Kantor</Label>
+                          <Input
+                            name="b2b_phone"
+                            value={formData.b2b_phone}
+                            onChange={handleChange}
+                            placeholder="021-xxxxxxx"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Website *</Label>
+                          <Input
+                            name="b2b_website"
+                            value={formData.b2b_website}
+                            onChange={handleChange}
+                            placeholder="https://www.perusahaan.com"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Departemen *</Label>
+                          <Select
+                            value={formData.b2b_departmentId}
+                            onValueChange={(value) => {
+                              if (value === "ADD_NEW_DEP") {
+                                setIsDepModalOpen(true);
+                                return;
+                              }
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                b2b_departmentId: value,
+                              }));
+                            }}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Pilih Departemen" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {departments.map((dep) => (
+                                <SelectItem key={dep.id} value={dep.id}>
+                                  {dep.name}
+                                </SelectItem>
+                              ))}
+                              <div className="h-px bg-stone-200 my-1 mx-1" />
+                              <SelectItem
+                                value="ADD_NEW_DEP"
+                                className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                + Tambah Departemen Baru
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-center w-full max-w-md">
-                        <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 hover:border-primary transition-all">
-                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <div className="p-3 bg-white rounded-full shadow-sm mb-3">
-                              <ImagePlus className="w-6 h-6 text-gray-400" />
-                            </div>
-                            <p className="mb-1 text-sm text-gray-600">
-                              <span className="font-semibold text-primary">
-                                Klik untuk unggah
-                              </span>{" "}
-                              gambar
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              SVG, PNG, JPG atau WEBP
-                            </p>
-                          </div>
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept="image/*"
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                b2b_brandLogoFile: e.target.files?.[0] || null,
-                              }))
-                            }
-                          />
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </TabsContent>
+                    </div>
+                  )}
 
-              {/* TAB 5: PIC (B2B Only) */}
-              <TabsContent value="pic" className="space-y-6">
-                <h3 className="text-lg font-semibold">
-                  PIC (Person In Charge)
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Tambahkan kontak person in charge dari klien
-                </p>
-
-                {formData.b2b_pics.map((pic, index) => {
-                  const updateField = (
-                    field: keyof PICFormData,
-                    value: string,
-                  ) => {
-                    const updated = [...formData.b2b_pics];
-                    updated[index] = { ...updated[index], [field]: value };
-                    setFormData((prev) => ({ ...prev, b2b_pics: updated }));
-                  };
-                  return (
-                    <Card
-                      key={index}
-                      className="p-4 bg-card shadow-sm relative mb-4">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute top-2 right-2 h-6 w-6 p-0"
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              b2b_pics: prev.b2b_pics.filter(
-                                (_, i) => i !== index,
-                              ),
-                            }))
-                          }>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                  {clientType === "B2C" && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">
+                        Detail Individu (B2C)
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
-                          <Label>Prefix</Label>
+                          <Label>Prefix (Mr./Ms.)</Label>
                           <Select
-                            value={pic.prefix}
+                            value={formData.b2c_prefix}
                             onValueChange={(value) =>
-                              updateField("prefix", value)
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                b2c_prefix: value,
+                              }))
                             }>
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger>
                               <SelectValue placeholder="Pilih Prefix" />
                             </SelectTrigger>
                             <SelectContent>
@@ -762,54 +549,341 @@ export default function ClientAddForm({
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="space-y-2">
-                          <Label>Nama PIC *</Label>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Nama Lengkap *</Label>
                           <Input
+                            value={formData.b2c_name}
+                            name="b2c_name"
+                            onChange={handleChange}
+                            placeholder="Contoh: Budi Santoso"
                             required
-                            value={pic.name}
-                            onChange={(e) =>
-                              updateField("name", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Email PIC</Label>
-                          <Input
-                            value={pic.email}
-                            onChange={(e) =>
-                              updateField("email", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Telepon PIC</Label>
-                          <Input
-                            value={pic.phone}
-                            onChange={(e) =>
-                              updateField("phone", e.target.value)
-                            }
                           />
                         </div>
                       </div>
-                    </Card>
-                  );
-                })}
-                <Button
-                  variant="secondary"
-                  type="button"
-                  className="mt-2"
-                  onClick={() =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      b2b_pics: [
-                        ...prev.b2b_pics,
-                        { prefix: "", name: "", email: "", phone: "" },
-                      ],
-                    }))
-                  }>
-                  + Tambah PIC
-                </Button>
-              </TabsContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Telepon</Label>
+                          <Input
+                            name="b2c_phone"
+                            value={formData.b2c_phone}
+                            onChange={handleChange}
+                            placeholder="08xxxxxxxxxx"
+                          />
+                        </div>
+
+                        {/* Tanggal Bergabung untuk B2C */}
+                        <div className="space-y-2 flex flex-col justify-end">
+                          <Label>Tanggal Bergabung</Label>
+                          <DatePickerHelper
+                            date={formData.joinedDate}
+                            setDate={(date) =>
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                joinedDate: date,
+                              }))
+                            }
+                            placeholder="Pilih Tanggal (Opsional)"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* TAB 3: ALAMAT */}
+                <TabsContent
+                  value="alamat"
+                  className="space-y-6"
+                  forceMount={true}
+                  hidden={activeTab !== "alamat"}>
+                  <h3 className="text-lg font-semibold">Alamat</h3>
+
+                  {clientType === "B2B" && (
+                    <AddressField
+                      value={{
+                        country: formData.b2b_country || "",
+                        province: formData.b2b_province || "",
+                        city: formData.b2b_city || "",
+                        district: formData.b2b_district || "",
+                        subDistrict: formData.b2b_subDistrict || "",
+                        postalCode: formData.b2b_postalCode || "",
+                      }}
+                      onChange={(updated) =>
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          b2b_country: updated.country ?? prev.b2b_country,
+                          b2b_province: updated.province ?? prev.b2b_province,
+                          b2b_city: updated.city ?? prev.b2b_city,
+                          b2b_district: updated.district ?? prev.b2b_district,
+                          b2b_subDistrict:
+                            updated.subDistrict ?? prev.b2b_subDistrict,
+                          b2b_postalCode:
+                            updated.postalCode ?? prev.b2b_postalCode,
+                        }))
+                      }
+                    />
+                  )}
+
+                  {clientType === "B2C" && (
+                    <AddressField
+                      value={{
+                        country: formData.b2c_country || "",
+                        province: formData.b2c_province || "",
+                        city: formData.b2c_city || "",
+                        district: formData.b2c_district || "",
+                        subDistrict: formData.b2c_subDistrict || "",
+                        postalCode: formData.b2c_postalCode || "",
+                      }}
+                      onChange={(updated) =>
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          b2c_country: updated.country ?? prev.b2c_country,
+                          b2c_province: updated.province ?? prev.b2c_province,
+                          b2c_city: updated.city ?? prev.b2c_city,
+                          b2c_district: updated.district ?? prev.b2c_district,
+                          b2c_subDistrict:
+                            updated.subDistrict ?? prev.b2c_subDistrict,
+                          b2c_postalCode:
+                            updated.postalCode ?? prev.b2c_postalCode,
+                        }))
+                      }
+                    />
+                  )}
+
+                  <div className="space-y-2 mt-6">
+                    <Label>
+                      Alamat Lengkap{" "}
+                      {clientType === "B2B"
+                        ? "(Perusahaan)"
+                        : "(Tempat Tinggal)"}
+                    </Label>
+                    <Textarea
+                      name={
+                        clientType === "B2B"
+                          ? "b2b_fullAddress"
+                          : "b2c_fullAddressB2C"
+                      }
+                      value={
+                        clientType === "B2B"
+                          ? formData.b2b_fullAddress
+                          : formData.b2c_fullAddressB2C
+                      }
+                      onChange={handleChange}
+                      placeholder={
+                        clientType === "B2B"
+                          ? "Masukkan alamat lengkap kantor perusahaan (Jalan, RT/RW, Patokan)..."
+                          : "Masukkan alamat lengkap tempat tinggal (Jalan, RT/RW, Patokan)..."
+                      }
+                      required
+                    />
+                  </div>
+                </TabsContent>
+
+                {/* TAB 4: BRAND (B2B Only) */}
+                <TabsContent
+                  value="brand"
+                  className="space-y-6"
+                  forceMount={true}
+                  hidden={activeTab !== "brand"}>
+                  <h3 className="text-lg font-semibold">
+                    Brand Client (Opsional)
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Informasi brand yang mewakili klien (jika ada)
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Nama Brand</Label>
+                      <Input
+                        name="b2b_brandName"
+                        placeholder="Contoh: Chitato, Indomie..."
+                        value={formData.b2b_brandName}
+                        onChange={handleChange}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Website Brand</Label>
+                      <Input
+                        name="b2b_brandWebsiteUrl"
+                        placeholder="https://www.chitato.com"
+                        value={formData.b2b_brandWebsiteUrl}
+                        onChange={handleChange}
+                      />
+                    </div>
+
+                    {/* === BAGIAN UPLOAD & CROP LOGO BRAND === */}
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Logo Brand</Label>
+                      {formData.b2b_brandLogoFile ? (
+                        <div className="relative w-40 h-40 rounded-xl border border-gray-200 overflow-hidden group shadow-sm">
+                          <img
+                            src={URL.createObjectURL(
+                              formData.b2b_brandLogoFile,
+                            )}
+                            alt="Preview Logo"
+                            className="w-full h-full object-contain bg-white p-2"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFormData((prev: any) => ({
+                                  ...prev,
+                                  b2b_brandLogoFile: null,
+                                }))
+                              }
+                              className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-full max-w-md">
+                          <ImageCropper
+                            aspectRatio={1 / 1}
+                            onCropComplete={(croppedFile) =>
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                b2b_brandLogoFile: croppedFile,
+                              }))
+                            }>
+                            <div className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 hover:border-primary transition-all">
+                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <div className="p-3 bg-white rounded-full shadow-sm mb-3">
+                                  <ImagePlus className="w-6 h-6 text-gray-400" />
+                                </div>
+                                <p className="mb-1 text-sm text-gray-600">
+                                  <span className="font-semibold text-primary">
+                                    Klik untuk unggah & crop
+                                  </span>{" "}
+                                  logo
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  Format Persegi (Rasio 1:1)
+                                </p>
+                              </div>
+                            </div>
+                          </ImageCropper>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* TAB 5: PIC (B2B Only) */}
+                <TabsContent
+                  value="pic"
+                  className="space-y-6"
+                  forceMount={true}
+                  hidden={activeTab !== "pic"}>
+                  <h3 className="text-lg font-semibold">
+                    PIC (Person In Charge)
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Tambahkan kontak person in charge dari klien
+                  </p>
+
+                  {formData.b2b_pics.map((pic: any, index: number) => {
+                    const updateField = (field: string, value: string) => {
+                      const updated = [...formData.b2b_pics];
+                      updated[index] = { ...updated[index], [field]: value };
+                      setFormData((prev: any) => ({
+                        ...prev,
+                        b2b_pics: updated,
+                      }));
+                    };
+                    return (
+                      <Card
+                        key={index}
+                        className="p-4 bg-card shadow-sm relative mb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute top-2 right-2 h-6 w-6 p-0"
+                            onClick={() =>
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                b2b_pics: prev.b2b_pics.filter(
+                                  (_: any, i: number) => i !== index,
+                                ),
+                              }))
+                            }>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                          <div className="space-y-2">
+                            <Label>Prefix</Label>
+                            <Select
+                              value={pic.prefix}
+                              onValueChange={(value) =>
+                                updateField("prefix", value)
+                              }>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Pilih Prefix" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Mr.">Mr.</SelectItem>
+                                <SelectItem value="Ms.">Ms.</SelectItem>
+                                <SelectItem value="Mrs.">Mrs.</SelectItem>
+                                <SelectItem value="Bpk.">Bpk.</SelectItem>
+                                <SelectItem value="Ibu.">Ibu.</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Nama PIC *</Label>
+                            <Input
+                              required
+                              value={pic.name}
+                              onChange={(e) =>
+                                updateField("name", e.target.value)
+                              }
+                              placeholder="Cth: Budi Santoso"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Email PIC</Label>
+                            <Input
+                              value={pic.email}
+                              onChange={(e) =>
+                                updateField("email", e.target.value)
+                              }
+                              placeholder="budi@email.com"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Telepon PIC</Label>
+                            <Input
+                              value={pic.phone}
+                              onChange={(e) =>
+                                updateField("phone", e.target.value)
+                              }
+                              placeholder="08xxxxxxxxx"
+                            />
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    className="mt-2"
+                    onClick={() =>
+                      setFormData((prev: any) => ({
+                        ...prev,
+                        b2b_pics: [
+                          ...prev.b2b_pics,
+                          { prefix: "", name: "", email: "", phone: "" },
+                        ],
+                      }))
+                    }>
+                    + Tambah PIC
+                  </Button>
+                </TabsContent>
+              </div>
             </Tabs>
           </CardContent>
         </Card>

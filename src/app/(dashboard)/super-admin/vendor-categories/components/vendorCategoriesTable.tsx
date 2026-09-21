@@ -59,7 +59,7 @@ const VendorCategoriesTable = () => {
 
   // === State Filter Terpadu ===
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [isActiveFilter, setIsActiveFilter] = useState<string>("ALL");
   const [startDate, setStartDate] = useState<Date | undefined>();

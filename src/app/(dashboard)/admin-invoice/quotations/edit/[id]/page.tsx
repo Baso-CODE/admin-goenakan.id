@@ -20,29 +20,31 @@ export default function EditQuotationPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
   // ============================
   // FETCH DATA
   // ============================
   const fetchQuotation = useCallback(async () => {
-    // 🛑 Jangan jalan jika sesi belum siap atau ID tidak ada
     if (status === "loading" || status === "unauthenticated" || !id) return;
 
     try {
       setIsLoading(true);
 
-      //  Gunakan fetchApi (GET otomatis)
       const res = await fetchApi(`/quotations/${id}`);
 
       if (!res.ok) throw new Error("Failed to fetch quotation details");
 
       const data = await res.json();
 
-      // Mapping data tetap sama sesuai kebutuhan form Anda
+      console.log("ini adalah data", data);
+
       const formattedData: any = {
         date: new Date(data.date),
         validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
         status: data.status,
         notes: data.notes || [],
+        currencyCode: data.currencyCode || "IDR",
+        paymentTerms: data.paymentTerms || "",
         isManualClient: !data.clientId,
         clientId: data.clientId || "",
         picId: data.picId || "",
@@ -55,19 +57,26 @@ export default function EditQuotationPage() {
           isManualProduct: !item.productId,
           productId: item.productId || "",
           variantId: item.variantId || "",
+
+          selectedAttributes: item.selectedAttributes || {},
           productName: item.productName,
           description: item.description || "",
+
+          quantity: Number(item.quantity ?? 1),
+          unitPrice: Number(item.unitPrice ?? 0),
+
           discount: Number(item.discount || 0),
           remarks: item.remarks || "",
+
           tiers:
             item.tiers && item.tiers.length > 0
               ? item.tiers.map((t: any) => ({
-                  minQuantity: Number(t.minQuantity),
+                  minQuantity: Number(t.minQuantity || 1),
                   maxQuantity: t.maxQuantity
                     ? Number(t.maxQuantity)
                     : undefined,
                   quantityLabel: t.quantityLabel || "",
-                  unitPrice: Number(t.unitPrice),
+                  unitPrice: Number(t.unitPrice || 0),
                 }))
               : [
                   {
@@ -94,9 +103,9 @@ export default function EditQuotationPage() {
     fetchQuotation();
   }, [fetchQuotation]);
 
-  // ============================
+  // ==========================================
   // UPDATE DATA
-  // ============================
+  // ==========================================
   const handleUpdate = async (data: QuotationFormValues) => {
     if (status !== "authenticated") {
       toast.error("Sesi berakhir, silakan login kembali.");
@@ -129,7 +138,6 @@ export default function EditQuotationPage() {
     }
   };
 
-  // Render loading state awal
   if (status === "loading" || isLoading) {
     return (
       <div className="p-8 text-center text-muted-foreground animate-pulse">
@@ -139,7 +147,7 @@ export default function EditQuotationPage() {
   }
 
   return (
-    <div className=" mx-auto py-6 space-y-6">
+    <div className="mx-auto py-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Edit Quotation</h1>
       </div>

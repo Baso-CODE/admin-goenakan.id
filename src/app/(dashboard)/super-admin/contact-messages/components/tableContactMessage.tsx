@@ -66,7 +66,7 @@ export default function AdminContactMessage() {
   // --- STATE UNTUK FILTER & PAGINATION ---
   const [search, setSearch] = useState("");
   //  Menggunakan useDebounce yang jauh lebih bersih
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [isReadFilter, setIsReadFilter] = useState("all");
   const [page, setPage] = useState(1);
 

@@ -2,8 +2,14 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -22,11 +28,21 @@ import {
 } from "@/components/ui/table";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
+import { cn } from "@/lib/utils";
 import { formatDate } from "@/utils/formatDate";
-import { FileDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { format } from "date-fns";
+import {
+  CalendarIcon,
+  FileDown,
+  Loader2,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { DateRange } from "react-day-picker";
 import { toast } from "sonner";
 
 // === Type Definitions ===
@@ -69,14 +85,12 @@ export default function HeroTable() {
 
   // === FILTER STATE ===
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
 
-  // === EXPORT STATE ===
-  const [exportStartDate, setExportStartDate] = useState<string>("");
-  const [exportEndDate, setExportEndDate] = useState<string>("");
-  const [exportIsActive, setExportIsActive] = useState<string>("ALL");
+  // === EXPORT DATE RANGE STATE (Shadcn DatePicker) ===
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [exporting, setExporting] = useState<boolean>(false);
 
   // === FETCH DATA ===
@@ -97,7 +111,6 @@ export default function HeroTable() {
       }
 
       const res = await fetchApi(`/content/heros/admin/list?${params}`);
-
       const result = await res.json();
 
       if (!res.ok) {
@@ -148,15 +161,19 @@ export default function HeroTable() {
   };
 
   // === EXPORT HANDLER ===
-  // (Optional: Jika endpoint export hero belum dibuat di backend, fitur ini bisa di-disable dulu)
   const handleExport = async () => {
     setExporting(true);
     try {
       const exportFilters: HeroExportQuery = {
-        ...(exportStartDate && { startDate: exportStartDate }),
-        ...(exportEndDate && { endDate: exportEndDate }),
-        ...(exportIsActive !== "ALL" && {
-          isActive: exportIsActive as "true" | "false",
+        // Ambil tanggal mulai dan selesai dari DateRange picker
+        ...(dateRange?.from && {
+          startDate: format(dateRange.from, "yyyy-MM-dd"),
+        }),
+        ...(dateRange?.to && {
+          endDate: format(dateRange.to, "yyyy-MM-dd"),
+        }),
+        ...(statusFilter !== "ALL" && {
+          isActive: statusFilter as "true" | "false",
         }),
         ...(search.trim() && { search: search.trim() }),
       };
@@ -242,32 +259,53 @@ export default function HeroTable() {
             Filters & Actions:
           </h3>
 
-          {/* Export Date Filters */}
+          {/* Export Date Range Picker (Shadcn UI dengan Pilihan Tahun/Bulan) */}
           <div className="flex flex-col">
             <label className="text-xs font-medium text-muted-foreground mb-1">
-              From
+              Filter Rentang Tanggal (Export)
             </label>
-            <Input
-              type="date"
-              value={exportStartDate}
-              onChange={(e) => setExportStartDate(e.target.value)}
-              className="w-36"
-            />
-          </div>
-          <div className="flex flex-col">
-            <label className="text-xs font-medium text-muted-foreground mb-1">
-              To
-            </label>
-            <Input
-              type="date"
-              value={exportEndDate}
-              onChange={(e) => setExportEndDate(e.target.value)}
-              className="w-36"
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  id="date"
+                  variant={"outline"}
+                  className={cn(
+                    "w-65 justify-start text-left font-normal",
+                    !dateRange && "text-muted-foreground",
+                  )}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange?.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, "LLL dd, y")} -{" "}
+                        {format(dateRange.to, "LLL dd, y")}
+                      </>
+                    ) : (
+                      format(dateRange.from, "LLL dd, y")
+                    )
+                  ) : (
+                    <span>Pilih tanggal export...</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={dateRange?.from}
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  numberOfMonths={2}
+                  captionLayout="dropdown"
+                  fromYear={2020}
+                  toYear={new Date().getFullYear() + 5}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Add Button */}
-          <Link href="/super-admin/content/hero/add" className="ml-auto">
+          <Link href="/super-admin/content/heros/add" className="ml-auto">
             <Button size="sm" className="gap-2 cursor-pointer">
               <Plus className="h-4 w-4" /> Add Slide
             </Button>

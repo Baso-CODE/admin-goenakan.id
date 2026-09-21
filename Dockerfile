@@ -1,46 +1,41 @@
-# Gunakan image Bun resmi
-FROM oven/bun:latest
+# Gunakan image Bun versi terbaru yang mendukung lockfile versi modern
+FROM oven/bun:latest AS base
 
 WORKDIR /app
 
-# 1. Install Library C++ (Wajib untuk Argon2/NextAuth)
+# 1. Install Library C++, Python, dan Make (Wajib untuk kompilasi argon2 & modul native)
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
     openssl \
-    libstdc++-12-dev && \
-    rm -rf /var/lib/apt/lists/*  # 🔥 Clear apt cache
+    build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
 # 2. Copy dependency files
 COPY package.json bun.lock* ./
 
-# 3. Install dependencies (dengan cache clear + retry)
-RUN rm -rf ~/.bun/install/cache && \
-    bun install --frozen-lockfile || \
-    (echo "First install failed, retrying..." && \
-    rm -rf ~/.bun && \
-    bun install --no-save)
+# 3. Install dependencies 
+# Menggunakan 'bun install' biasa (tanpa --frozen-lockfile) agar aman jika ada perbedaan versi lockfile
+RUN bun install
 
-# 4. Copy seluruh kode source (Termasuk folder prisma/)
+# 4. Copy seluruh kode source 
 COPY . .
 
-# 5. Generate Prisma Client (Solusi error Prisma)
+# 5. Generate Prisma Client
 RUN bunx prisma generate
 
 # 6. Build Next.js
-# Tangkap ARG dari platform deployment (Dokploy/Docker)
 ARG NEXT_PUBLIC_BASE_URL_API
 ARG NEXT_PUBLIC_BASE_URL_WEB
 
-# Jadikan ARG sebagai ENV agar Next.js bisa membacanya saat build
 ENV NEXT_PUBLIC_BASE_URL_API="https://api.goenakan.tech"
 ENV NEXT_PUBLIC_BASE_URL_WEB="https://goenakan.tech"
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN bun run build
 
-# 7. Cleanup (reduce image size)
+# 7. Cleanup
 RUN rm -rf .next/cache
 
 # 8. Expose port & Start

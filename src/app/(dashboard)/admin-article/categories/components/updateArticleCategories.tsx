@@ -34,8 +34,10 @@ export default function EditArticleCategory() {
       const data = response.data || response;
 
       setCategoryData({
-        name: data.name,
-        description: data.description || "",
+        name_id: data.name_id,
+        description_id: data.description_id || "",
+        name_en: data.name_en,
+        description_en: data.description_en || "",
         isActive: data.isActive ?? true,
       });
     } catch (err) {

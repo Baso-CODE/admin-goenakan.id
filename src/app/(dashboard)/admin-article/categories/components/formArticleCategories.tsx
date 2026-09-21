@@ -21,8 +21,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Activity, AlignLeft, ClipboardList, Loader2, Tag } from "lucide-react";
 
 const articleCategorySchema = z.object({
-  name: z.string().min(2, { message: "Nama kategori minimal 2 karakter." }),
-  description: z.string().optional(),
+  name_id: z.string().min(2, { message: "Nama kategori minimal 2 karakter." }),
+  description_id: z.string().optional(),
+  name_en: z
+    .string()
+    .min(2, { message: "Category name must be at least 2 characters." }),
+  description_en: z.string().optional(),
   isActive: z.boolean().default(true),
 });
 
@@ -44,8 +48,10 @@ export default function ArticleCategoryForm({
       articleCategorySchema,
     ) as Resolver<ArticleCategoryFormValues>,
     defaultValues: initialData || {
-      name: "",
-      description: "",
+      name_id: "",
+      description_id: "",
+      name_en: "",
+      description_en: "",
       isActive: true,
     },
   });
@@ -71,15 +77,15 @@ export default function ArticleCategoryForm({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-6 w-full">
             <div className="grid grid-cols-1 gap-6">
-              {/* === Category Name === */}
+              {/* === Category Name (Bahasa Indonesia) === */}
               <FormField
                 control={form.control}
-                name="name"
+                name="name_id"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
                       <Tag className="h-4 w-4 text-muted-foreground" />
-                      Category Name
+                      Category Name (Bahasa Indonesia)
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -93,19 +99,64 @@ export default function ArticleCategoryForm({
                 )}
               />
 
-              {/* === Description === */}
+              {/* === Description (Bahasa Indonesia) === */}
               <FormField
                 control={form.control}
-                name="description"
+                name="description_id"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
                       <AlignLeft className="h-4 w-4 text-muted-foreground" />
-                      Description
+                      Description (Bahasa Indonesia)
                     </FormLabel>
                     <FormControl>
                       <Textarea
                         placeholder="Deskripsi singkat mengenai kategori ini (Opsional)"
+                        rows={3}
+                        {...field}
+                        disabled={isLoading || isSubmitting}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* === Category Name (English) === */}
+              <FormField
+                control={form.control}
+                name="name_en"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-muted-foreground" />
+                      Category Name (English)
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Example: Tutorial, Tips & Tricks..."
+                        {...field}
+                        disabled={isLoading || isSubmitting}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* === Description (English) === */}
+              <FormField
+                control={form.control}
+                name="description_en"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <AlignLeft className="h-4 w-4 text-muted-foreground" />
+                      Description (English)
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Short description about this category (Optional)"
                         rows={3}
                         {...field}
                         disabled={isLoading || isSubmitting}

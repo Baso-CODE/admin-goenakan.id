@@ -32,6 +32,7 @@ export function LoginForm({
   ...props
 }: React.ComponentProps<"form">) {
   const router = useRouter();
+
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -42,10 +43,10 @@ export function LoginForm({
     },
   });
 
+  const { isSubmitting } = form.formState;
+
   const handleSignIn = async (values: z.infer<typeof formSchema>) => {
     try {
-      setIsLoading(true);
-
       const res = await signIn("credentials", {
         redirect: false,
         email: values.email,
@@ -62,9 +63,8 @@ export function LoginForm({
       router.push(res?.url || "/");
     } catch (error) {
       toast.error("Something went wrong during login");
-    } finally {
-      setIsLoading(false);
     }
+    // Kita hapus finally { setIsLoading(false) } karena sudah diotomatisasi oleh isSubmitting
   };
 
   const handleSignInGoogle = async () => {
@@ -99,7 +99,11 @@ export function LoginForm({
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input placeholder="me@example.com" {...field} />
+                  <Input
+                    placeholder="me@example.com"
+                    {...field}
+                    disabled={isSubmitting || isLoading}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -120,7 +124,12 @@ export function LoginForm({
                   </Link>
                 </div>
                 <FormControl>
-                  <Input placeholder="Password" type="password" {...field} />
+                  <Input
+                    placeholder="Password"
+                    type="password"
+                    {...field}
+                    disabled={isSubmitting || isLoading}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -130,8 +139,8 @@ export function LoginForm({
           <Button
             type="submit"
             className="w-full cursor-pointer"
-            disabled={isLoading}>
-            {isLoading ? "Loading..." : "Login"}
+            disabled={isSubmitting || isLoading}>
+            {isSubmitting ? "Loading..." : "Login"}
           </Button>
 
           <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
@@ -145,7 +154,7 @@ export function LoginForm({
             type="button"
             className="w-full"
             onClick={handleSignInGoogle}
-            disabled={isLoading}>
+            disabled={isSubmitting || isLoading}>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"

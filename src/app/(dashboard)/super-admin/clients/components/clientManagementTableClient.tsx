@@ -111,7 +111,7 @@ export default function ClientManagementTable() {
 
   // State Filter
   const [search, setSearch] = useState<string>("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [clientTypeFilter, setClientTypeFilter] = useState<string>("ALL");
   const [clientStatusFilter, setClientStatusFilter] = useState<string>("ALL"); //  UPDATE: State Status
   const [startDate, setStartDate] = useState<string>("");

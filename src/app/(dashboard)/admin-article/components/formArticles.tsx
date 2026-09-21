@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ImageCropper } from "@/helper/image-cropper";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import {
@@ -131,6 +132,8 @@ export default function FormArticle({
   const { fetchApi, status } = useApi();
 
   const [categories, setCategories] = useState<any[]>([]);
+  console.log("ini adalah categories", categories);
+
   const [products, setProducts] = useState<any[]>([]);
   const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -192,6 +195,7 @@ export default function FormArticle({
   useEffect(() => {
     const fetchData = async () => {
       if (status !== "authenticated") return;
+
       try {
         const [catRes, prodRes, tagRes] = await Promise.all([
           fetchApi("/article-categories/list"),
@@ -199,18 +203,32 @@ export default function FormArticle({
           fetchApi("/article-tags/list"),
         ]);
 
-        if (catRes.ok) setCategories(await catRes.json());
+        // 1. Tangani Data Kategori
+        if (catRes.ok) {
+          const catData = await catRes.json();
+          console.log("Data Kategori dari API:", catData);
+          setCategories(Array.isArray(catData) ? catData : catData.data || []);
+        }
+
+        // 2. Tangani Data Produk
         if (prodRes.ok) {
           const p = await prodRes.json();
-          setProducts(p.data || p || []);
+          setProducts(Array.isArray(p) ? p : p.data || []);
         }
-        if (tagRes.ok) setAvailableTags(await tagRes.json());
+
+        // 3. Tangani Data Tags
+        if (tagRes.ok) {
+          const t = await tagRes.json();
+          setAvailableTags(Array.isArray(t) ? t : t.data || []);
+        }
       } catch (error) {
+        console.error("Fetch Data Error:", error);
         toast.error("Gagal memuat data pendukung.");
       } finally {
         setLoadingData(false);
       }
     };
+
     fetchData();
   }, [status, fetchApi]);
 
@@ -297,7 +315,30 @@ export default function FormArticle({
   }
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+      <form
+        onSubmit={form.handleSubmit(handleSubmit, (errors: any) => {
+          const firstErrorField = Object.keys(errors)[0];
+          let errorMessage = errors[firstErrorField]?.message as
+            | string
+            | undefined;
+
+          if (!errorMessage && typeof errors[firstErrorField] === "object") {
+            const nestedError = Object.values(
+              errors[firstErrorField],
+            )[0] as any;
+            errorMessage =
+              nestedError?.message ||
+              "Mohon lengkapi data yang berbentuk list atau SEO.";
+          }
+
+          // 3. Tampilkan pesan peringatan lewat toast
+          toast.error(
+            `Periksa kembali isian Anda: ${errorMessage || "Ada field yang belum sesuai."}`,
+          );
+
+          console.error("Form Validation Errors:", errors);
+        })}
+        className="space-y-8">
         <Tabs defaultValue="content" className="w-full">
           <TabsList className="mb-6 bg-stone-100 p-1">
             <TabsTrigger value="content" className="font-bold px-8">
@@ -312,6 +353,7 @@ export default function FormArticle({
             value="content"
             className="space-y-8 mt-0 focus-visible:outline-none">
             {/* AREA UPLOAD COVER */}
+            {/* AREA UPLOAD COVER */}
             <Card className="p-6 border-stone-200 shadow-sm bg-stone-50/30">
               <FormLabel className="text-base font-bold flex items-center gap-2 mb-6">
                 <FileImage className="w-5 h-5 text-primary" /> Manajemen Sampul
@@ -319,126 +361,138 @@ export default function FormArticle({
               </FormLabel>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* --- UPLOAD DESKTOP --- */}
+                {/* --- UPLOAD DESKTOP (Rasio 16:9) --- */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 text-sm font-semibold text-stone-700">
                     <FileImage className="w-4 h-4" /> Cover Desktop (Wajib)
                   </div>
-                  <div className="flex justify-center border-2 border-dashed rounded-xl p-2 bg-white min-h-48 items-center relative">
-                    {coverFile ? (
-                      <div className="relative group w-full h-44 cursor-zoom-in">
-                        <img
-                          src={URL.createObjectURL(coverFile)}
-                          className="w-full h-full object-cover rounded-lg"
-                          onClick={() =>
-                            handlePreview(URL.createObjectURL(coverFile))
-                          }
-                        />
-                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg pointer-events-none">
-                          <ZoomIn className="text-white w-8 h-8" />
+
+                  <ImageCropper
+                    aspectRatio={16 / 9}
+                    onCropComplete={(croppedFile) => setCoverFile(croppedFile)}>
+                    <div className="flex justify-center border-2 border-dashed rounded-xl p-2 bg-white min-h-48 items-center relative cursor-pointer hover:border-primary transition-all">
+                      {coverFile ? (
+                        <div className="relative group w-full h-44 cursor-zoom-in">
+                          <img
+                            src={URL.createObjectURL(coverFile)}
+                            className="w-full h-full object-cover rounded-lg"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePreview(URL.createObjectURL(coverFile));
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg pointer-events-none">
+                            <ZoomIn className="text-white w-8 h-8" />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCoverFile(null);
+                            }}>
+                            <X className="w-4 h-4" />
+                          </Button>
                         </div>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                      ) : isEditing && initialData?.coverImage ? (
+                        <div
+                          className="relative group w-full h-44 cursor-zoom-in"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setCoverFile(null);
+                            handlePreview(initialData.coverImage);
                           }}>
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ) : isEditing && initialData?.coverImage ? (
-                      <div
-                        className="relative group w-full h-44 cursor-zoom-in"
-                        onClick={() => handlePreview(initialData.coverImage)}>
-                        <img
-                          src={initialData.coverImage}
-                          className="w-full h-full object-cover rounded-lg"
-                        />
-                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
-                          <ZoomIn className="text-white w-8 h-8" />
+                          <img
+                            src={initialData.coverImage}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                            <ZoomIn className="text-white w-8 h-8" />
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-center text-stone-400 p-4">
-                        <FileImage className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                        <p className="text-xs italic">
-                          Belum ada gambar terpilih
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    className="bg-white cursor-pointer"
-                    onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
-                  />
+                      ) : (
+                        <div className="text-center text-stone-400 p-4">
+                          <FileImage className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                          <p className="text-xs font-semibold text-stone-600">
+                            Klik untuk unggah & crop Desktop
+                          </p>
+                          <p className="text-[10px] text-stone-400 mt-1">
+                            Rasio 16:9 disarankan
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </ImageCropper>
                 </div>
 
-                {/* --- UPLOAD MOBILE --- */}
+                {/* --- UPLOAD MOBILE (Rasio 9:16) --- */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 text-sm font-semibold text-stone-700">
                     <Smartphone className="w-4 h-4" /> Cover Mobile (Opsional)
                   </div>
-                  <div className="flex justify-center border-2 border-dashed rounded-xl p-2 bg-white min-h-48 items-center relative">
-                    {coverMobileFile ? (
-                      <div className="relative group w-32 h-44 cursor-zoom-in">
-                        <img
-                          src={URL.createObjectURL(coverMobileFile)}
-                          className="w-full h-full object-cover rounded-lg"
-                          onClick={() =>
-                            handlePreview(URL.createObjectURL(coverMobileFile))
-                          }
-                        />
-                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg pointer-events-none">
-                          <ZoomIn className="text-white w-8 h-8" />
+
+                  <ImageCropper
+                    aspectRatio={9 / 16}
+                    onCropComplete={(croppedFile) =>
+                      setCoverMobileFile(croppedFile)
+                    }>
+                    <div className="flex justify-center border-2 border-dashed rounded-xl p-2 bg-white min-h-48 items-center relative cursor-pointer hover:border-primary transition-all">
+                      {coverMobileFile ? (
+                        <div className="relative group w-32 h-44 cursor-zoom-in">
+                          <img
+                            src={URL.createObjectURL(coverMobileFile)}
+                            className="w-full h-full object-cover rounded-lg"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePreview(
+                                URL.createObjectURL(coverMobileFile),
+                              );
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg pointer-events-none">
+                            <ZoomIn className="text-white w-8 h-8" />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCoverMobileFile(null);
+                            }}>
+                            <X className="w-4 h-4" />
+                          </Button>
                         </div>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                      ) : isEditing && initialData?.coverImageMobile ? (
+                        <div
+                          className="relative group w-32 h-44 cursor-zoom-in"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setCoverMobileFile(null);
+                            handlePreview(initialData.coverImageMobile);
                           }}>
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ) : isEditing && initialData?.coverImageMobile ? (
-                      <div
-                        className="relative group w-32 h-44 cursor-zoom-in"
-                        onClick={() =>
-                          handlePreview(initialData.coverImageMobile)
-                        }>
-                        <img
-                          src={initialData.coverImageMobile}
-                          className="w-full h-full object-cover rounded-lg"
-                        />
-                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
-                          <ZoomIn className="text-white w-8 h-8" />
+                          <img
+                            src={initialData.coverImageMobile}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                            <ZoomIn className="text-white w-8 h-8" />
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-center text-stone-400 p-4">
-                        <Smartphone className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                        <p className="text-xs italic">
-                          Disarankan aspek rasio 9:16
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    className="bg-white cursor-pointer"
-                    onChange={(e) =>
-                      setCoverMobileFile(e.target.files?.[0] || null)
-                    }
-                  />
+                      ) : (
+                        <div className="text-center text-stone-400 p-4">
+                          <Smartphone className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                          <p className="text-xs font-semibold text-stone-600">
+                            Klik untuk unggah & crop Mobile
+                          </p>
+                          <p className="text-[10px] text-stone-400 mt-1">
+                            Rasio 9:16 disarankan
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </ImageCropper>
                 </div>
               </div>
 
@@ -464,7 +518,6 @@ export default function FormArticle({
                 />
               </div>
             </Card>
-
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* KOLOM KIRI (AREA UTAMA) */}
               <div className="lg:col-span-2 space-y-6">
@@ -757,7 +810,6 @@ export default function FormArticle({
                       control={form.control}
                       name="autoTranslate"
                       render={({ field }) => {
-                        // Cek apakah ini mode edit dan artikel sudah pernah ditranslate
                         const hasBeenTranslated =
                           isEditing && initialData?.isTranslated;
 
@@ -839,7 +891,7 @@ export default function FormArticle({
                             <SelectContent>
                               {categories.map((cat) => (
                                 <SelectItem key={cat.id} value={cat.id}>
-                                  {cat.name}
+                                  {cat.name_id}
                                 </SelectItem>
                               ))}
 
@@ -953,6 +1005,7 @@ export default function FormArticle({
                         <SimpleEditor
                           value={field.value}
                           onChange={field.onChange}
+                          minHeight="50vh"
                         />
                       </div>
                     </FormControl>

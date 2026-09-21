@@ -86,7 +86,7 @@ export default function CurrencyForm() {
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
 
   // Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false);

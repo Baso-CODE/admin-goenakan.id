@@ -66,7 +66,7 @@ export default function LogisticTableAnalysist() {
 
   // Filters
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [page, setPage] = useState(1);
 
   const [startDate, setStartDate] = useState<Date | undefined>();
@@ -333,7 +333,7 @@ export default function LogisticTableAnalysist() {
 
                       <TableCell className="text-right">
                         <Link
-                          href={`/super-admin/logistics/track/${item.orderId}`}>
+                          href={`/super-admin/logistics/track/${item.orderId}?tab=production`}>
                           <Button
                             variant="outline"
                             size="icon"

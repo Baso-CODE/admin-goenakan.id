@@ -47,13 +47,6 @@ enum WebOrderStatus {
   CANCELLED
 }
 
-// enum Role {
-//   SUPER_ADMIN
-//   ADMIN_ARTICLE
-//   ADMIN_INVOICE
-//   CUSTOMER
-// }
-
 enum AccountType {
   INDIVIDUAL
   CORPORATE
@@ -132,6 +125,7 @@ enum ShipmentStatus {
   PENDING
   PREPARED
   DISPATCHED
+  IN_TRANSIT
   ARRIVED
   CANCELLED
 }
@@ -150,7 +144,6 @@ enum TransactionType {
 enum PurchaseType {
   DIRECT_MATERIAL // Pembelian produk berdasarkan SO
   DIRECT_EXPENSES // Pembelian selain produk (ex: logistik) berdasarkan SO
-  INDIRECT_EXPENSES // Pembelian diluar SO (listrik, air, dll)
   STOCK // Pembelian produk bukan berdasarkan SO
 }
 
@@ -192,6 +185,7 @@ model User {
   emailVerified       DateTime?
   password            String?
   image               String?
+  phone               String?
   roleId              String
   createdAt           DateTime             @default(now())
   articles            Article[]
@@ -211,18 +205,29 @@ model User {
   createdQuotations   Quotation[]          @relation("QuotationCreatedBy")
   updatedQuotations   Quotation[]          @relation("QuotationUpdatedBy")
   approvedQuotations  Quotation[]          @relation("QuotationApprovedBy")
+  createdReplacements ReplacementOrder[]   @relation("ReplacementCreatedBy")
+  updatedReplacements ReplacementOrder[]   @relation("ReplacementUpdatedBy")
 
   @@map("users")
 }
 
 model Role {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  description String?
+  users       User[]
+  permissions Permission[] @relation("RoleToPermission")
+
+  @@map("roles")
+}
+
+model Permission {
   id          String  @id @default(cuid())
   name        String  @unique
   description String?
+  roles       Role[]  @relation("RoleToPermission")
 
-  users User[]
-
-  @@map("roles")
+  @@map("permissions")
 }
 
 model Account {
@@ -265,6 +270,20 @@ model VerificationToken {
 }
 
 // ===============================================
+// AUTO COUNTER SECTION (ANTI RACE CONDITION)
+// ===============================================
+model AutoCounter {
+  id        String @id @default(uuid())
+  type      String // Jenis Form: 'SO', 'SN', 'RN', 'PO', 'CLIENT', 'QN_CLIENT_123'
+  period    String // Periode: '2607' (YYMM), atau 'ALL' jika tidak di-reset per bulan
+  lastValue Int    @default(0) // Urutan terakhir
+
+  // Memastikan kombinasi tipe dan periode tidak boleh ada yang kembar
+  @@unique([type, period], name: "type_period")
+  @@map("auto_counters")
+}
+
+// ===============================================
 // CLIENT SECTION
 // ===============================================
 model PurchaseChannel {
@@ -282,19 +301,21 @@ model PurchaseChannel {
 }
 
 model Client {
-  id         String       @id @default(uuid())
-  custCode   String       @unique
-  type       ClientType
-  userId     String?      @unique
-  user       User?        @relation(fields: [userId], references: [id])
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  status     ClientStatus @default(OFFICIAL)
-  b2b        ClientB2B?
-  b2c        ClientB2C?
-  orders     Order[]
-  invoices   Invoice[]
-  quotations Quotation[]
+  id                String             @id @default(uuid())
+  custCode          String             @unique
+  type              ClientType
+  userId            String?            @unique
+  user              User?              @relation(fields: [userId], references: [id])
+  joinedDate        DateTime           @default(now())
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  status            ClientStatus       @default(OFFICIAL)
+  b2b               ClientB2B?
+  b2c               ClientB2C?
+  orders            Order[]
+  invoices          Invoice[]
+  quotations        Quotation[]
+  replacementOrders ReplacementOrder[]
 
   @@map("clients")
 }
@@ -346,9 +367,10 @@ model ClientB2BPIC {
   email       String?
   phone       String?
 
-  clientB2B  ClientB2B   @relation(fields: [clientB2BId], references: [id])
-  orders     Order[]
-  quotations Quotation[]
+  clientB2B         ClientB2B          @relation(fields: [clientB2BId], references: [id])
+  orders            Order[]
+  quotations        Quotation[]
+  replacementOrders ReplacementOrder[]
 
   @@map("client_b2b_pics")
 }
@@ -384,22 +406,24 @@ model ProductCategory {
   updatedAt      DateTime       @updatedAt
   products       Product[]
   itemCategories ItemCategory[]
+  vendors        Vendor[]
 
   @@map("product_categories")
 }
 
 model ItemCategory {
-  id                String          @id @default(uuid())
+  id                String               @id @default(uuid())
   name              String
-  slug              String          @unique
-  code              String          @unique
-  description       String?         @db.Text
+  slug              String               @unique
+  code              String               @unique
+  description       String?              @db.Text
   productCategoryId String
-  productCategory   ProductCategory @relation(fields: [productCategoryId], references: [id])
+  productCategory   ProductCategory      @relation(fields: [productCategoryId], references: [id])
   itemNames         ItemName[]
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
   products          Product[]
+  vendors           VendorItemCategory[]
 
   @@map("item_categories")
 }
@@ -427,6 +451,10 @@ model Product {
   description     String?                 @db.Text
   uom             String                  @default("pcs")
   basePrice       Decimal
+  foreignPrice    Decimal?
+  currencyCode    String?                 @default("IDR")
+  exchangeRate    Decimal?                @default(1.0)
+  additionalFee   Decimal?                @default(0.0)
   isCustom        Boolean                 @default(false)
   isMadeByOrder   Boolean                 @default(false)
   materialTypeId  String?
@@ -466,10 +494,14 @@ model Product {
   mockupAreaWidth  Float?
   mockupAreaHeight Float?
 
-  isMultiFace        Boolean @default(false)
-  mockupFrontImageId String?
-  mockupBackImageId  String?
-  vendorPrices       VendorPriceRecord[]
+  isMultiFace               Boolean                   @default(false)
+  mockupFrontImageId        String?
+  mockupBackImageId         String?
+  activeVendorPriceRecordId String?
+  activePriceFreightMode    String? // "SEA" | "AIR" | "CUSTOM"
+  activeVendorPriceRecord   VendorPriceRecord?        @relation("ActiveProductPrice", fields: [activeVendorPriceRecordId], references: [id], onDelete: SetNull)
+  vendorPrices              VendorPriceRecord[]
+  replacementProducts       ReplacementOrderProduct[]
 
   @@map("products")
 }
@@ -541,6 +573,7 @@ model AttributeValue {
   productVariantAttributeValues ProductVariantAttributeValue[]
   productImages                 ProductImage[]
   productImagesAsPosition       ProductImage[]                 @relation("PrintPositionValue")
+  productImagesAsPrintSide      ProductImage[]                 @relation("PrintSideValue")
 
   @@map("attribute_values")
 }
@@ -585,14 +618,16 @@ model ProductVariant {
   productId String
   product   Product @relation(fields: [productId], references: [id])
 
-  attributeValues ProductVariantAttributeValue[]
-  images          ProductVariantImage[]
-  orderProducts   OrderProduct[]
-  invoiceItems    InvoiceItem[]
-  quotationItems  QuotationItem[]
-  cartItems       CartItem[]
-  webOrderItems   WebOrderItem[]
-  priceTiers      PriceTier[]
+  attributeValues     ProductVariantAttributeValue[]
+  images              ProductVariantImage[]
+  orderProducts       OrderProduct[]
+  invoiceItems        InvoiceItem[]
+  quotationItems      QuotationItem[]
+  cartItems           CartItem[]
+  webOrderItems       WebOrderItem[]
+  priceTiers          PriceTier[]
+  purchaseOrderItems  PurchaseOrderItem[]
+  replacementProducts ReplacementOrderProduct[]
 
   @@map("product_variants")
 }
@@ -655,6 +690,9 @@ model ProductImage {
 
   printPositionValueId String?
   printPositionValue   AttributeValue? @relation("PrintPositionValue", fields: [printPositionValueId], references: [id])
+
+  printSideValueId String?
+  printSideValue   AttributeValue? @relation("PrintSideValue", fields: [printSideValueId], references: [id])
 
   mockupAreas ProductImageMockupArea[]
 
@@ -770,45 +808,74 @@ model TagCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tags      Tag[]    @relation("TagCategoryToTag")
+  tags Tag[] @relation("TagCategoryToTag")
 
   @@map("tag_categories")
 }
 
 model VendorPriceRecord {
-  id             String   @id @default(uuid())
-  productId      String?
+  id              String  @id @default(uuid())
+  productId       String?
   tempProductName String?
-  vendorId       String
-  
+  status          String  @default("POTENTIAL")
+  calculationMode String  @default("FIXED")
+  tiers           Json?
+  vendorId        String?
+  serviceVendorId String?
+
+  // Potential Supplier Sourcing Details
+  supplierPlatform    String?
+  supplierContactName String?
+  supplierContactLink String?
+  imageUrl            String?
+  imagePublicId       String?
+
+  // Import Mode
+  importType       String  @default("BORONGAN") // "BORONGAN" | "RESMI"
+  hsCode           String?
+  beaMasukPercent  Decimal @default(0.00) @db.Decimal(5, 2)
+  ppnPercent       Decimal @default(11.00) @db.Decimal(5, 2)
+  pphPercent       Decimal @default(2.50) @db.Decimal(5, 2)
+  formECost        Decimal @default(0.00) @db.Decimal(10, 2)
+  insurancePercent Decimal @default(0.00) @db.Decimal(5, 2)
+  handlingCost     Decimal @default(0.00) @db.Decimal(10, 2)
+  otherCost        Decimal @default(0.00) @db.Decimal(10, 2)
+
   // Supplier Pricing details
-  foreignPrice   Decimal  @db.Decimal(10, 2)
-  currencyCode   String   @default("RMB")
-  exchangeRate   Decimal  @db.Decimal(10, 2)
-  
+  foreignPrice Decimal @db.Decimal(10, 2)
+  currencyCode String  @default("RMB")
+  exchangeRate Decimal @db.Decimal(10, 2)
+
   // Packaging details (Overridable from Product default)
-  qtyPerCtn      Int?     @default(1)
-  length         Decimal? @db.Decimal(10, 2)
-  width          Decimal? @db.Decimal(10, 2)
-  height         Decimal? @db.Decimal(10, 2)
-  weight         Decimal? @db.Decimal(10, 2)
-  
+  qtyPerCtn Int?     @default(1)
+  length    Decimal? @db.Decimal(10, 2)
+  width     Decimal? @db.Decimal(10, 2)
+  height    Decimal? @db.Decimal(10, 2)
+  weight    Decimal? @db.Decimal(10, 2)
+
   // Local delivery in Origin & Target
-  gzDeliveryCost Decimal  @default(0) @db.Decimal(10, 2)
-  localFreight   Decimal  @default(0) @db.Decimal(10, 2)
-  
+  gzDeliveryCost Decimal @default(0) @db.Decimal(10, 2)
+  localFreight   Decimal @default(0) @db.Decimal(10, 2)
+  seaFreightRate Decimal @default(10000000) @db.Decimal(12, 2)
+  airFreightRate Decimal @default(260000) @db.Decimal(12, 2)
+  moqCtn         Int     @default(1)
+  targetQtyPcs   Int?    @default(0)
+
   // Target selling guides
-  margin         Decimal  @default(0) @db.Decimal(10, 2)
-  sponsorPercent Decimal  @default(0.02) @db.Decimal(5, 4)
-  
-  notes          String?  @db.Text
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  margin         Decimal @default(0) @db.Decimal(10, 2)
+  sponsorPercent Decimal @default(0.02) @db.Decimal(5, 4)
+  roundUpTo      Int     @default(1000)
+
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relationships
   product        Product?  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  vendor         Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  currency       Currency @relation(fields: [currencyCode], references: [code])
+  vendor         Vendor?   @relation("ProductVendorPrices", fields: [vendorId], references: [id], onDelete: SetNull)
+  serviceVendor  Vendor?   @relation("ServiceVendorPrices", fields: [serviceVendorId], references: [id], onDelete: SetNull)
+  currency       Currency  @relation(fields: [currencyCode], references: [code])
+  activeProducts Product[] @relation("ActiveProductPrice")
 
   @@map("vendor_price_records")
 }
@@ -865,30 +932,35 @@ model InvoiceNote {
 // ===============================================
 
 model Vendor {
-  id             String              @id @default(uuid())
-  companyName    String
-  slug           String              @unique
-  picName        String
-  country        String?
-  province       String?
-  city           String?
-  district       String?
-  subDistrict    String?
-  postalCode     String?
-  address        String?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  isActive       Boolean             @default(true)
-  trackingUrl    String?             @db.Text
-  // === RELATIONS ===
-  vendorItems    VendorVendorItem[]
-  cashflowCost   CashflowCost[]
-  // orderVendors   OrderVendor[]
-  contacts       VendorContact[]
-  productionJobs ProductionTracker[]
-  shipments      Shipment[]
-  purchaseOrders PurchaseOrder[]
-  vendorPrices   VendorPriceRecord[]
+  id                    String               @id @default(uuid())
+  companyName           String
+  slug                  String               @unique
+  picName               String
+  country               String?
+  province              String?
+  city                  String?
+  district              String?
+  subDistrict           String?
+  postalCode            String?
+  address               String?
+  type                  VendorType?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  isActive              Boolean              @default(true)
+  trackingUrl           String?              @db.Text
+  vendorItems           VendorVendorItem[]
+  productItemCategories VendorItemCategory[]
+  cashflowCost          CashflowCost[]
+  contacts              VendorContact[]
+  productionJobs        ProductionTracker[]
+  shipments             Shipment[]
+  purchaseOrders        PurchaseOrder[]
+  serviceCategoryId     String?
+  serviceCategory       VendorCategory?      @relation(fields: [serviceCategoryId], references: [id])
+  productCategoryId     String?
+  productCategory       ProductCategory?     @relation(fields: [productCategoryId], references: [id])
+  vendorPrices          VendorPriceRecord[]  @relation("ProductVendorPrices")
+  serviceVendorPrices   VendorPriceRecord[]  @relation("ServiceVendorPrices")
 
   @@map("vendors")
 }
@@ -903,6 +975,7 @@ model VendorCategory {
   updatedAt   DateTime     @updatedAt
   isActive    Boolean      @default(true)
   items       VendorItem[]
+  vendors     Vendor[]
 
   @@map("vendor_categories")
 }
@@ -930,6 +1003,16 @@ model VendorVendorItem {
 
   @@id([vendorId, itemId])
   @@map("vendor_vendor_items")
+}
+
+model VendorItemCategory {
+  vendorId       String
+  itemCategoryId String
+  vendor         Vendor       @relation(fields: [vendorId], references: [id])
+  itemCategory   ItemCategory @relation(fields: [itemCategoryId], references: [id])
+
+  @@id([vendorId, itemCategoryId])
+  @@map("vendor_item_categories")
 }
 
 // ===============================================
@@ -1006,7 +1089,6 @@ model Order {
   orderNumber          String?               @unique
   dateOrder            DateTime
   salesCategory        SalesCategory
-  // poNumber             String?
   clientPoNumber       String?
   remark               String?               @db.Text
   currencyCode         String                @default("IDR")
@@ -1049,6 +1131,8 @@ model Order {
   userId               String?
   sales                Sales?                @relation(fields: [salesId], references: [id])
   salesId              String?
+  whatsappMessages     WhatsappMessage[]
+  replacementOrders    ReplacementOrder[]    @relation("OrderToReplacement")
 
   @@map("orders")
 }
@@ -1077,6 +1161,7 @@ model OrderProduct {
   productId          String
   quantity           Int
   unitPrice          Decimal
+  selectedAttributes Json?
   customization      Json?
   remarks            String?
   order              Order               @relation(fields: [orderId], references: [id])
@@ -1088,19 +1173,6 @@ model OrderProduct {
 
   @@map("order_products")
 }
-
-// model OrderVendor {
-//   id             String @id @default(uuid())
-//   orderId        String
-//   vendorId       String
-//   vendorPicName  String
-//   vendorPicPhone String
-//   roleInOrder    String
-//   order          Order  @relation(fields: [orderId], references: [id])
-//   vendor         Vendor @relation(fields: [vendorId], references: [id])
-
-//   @@map("order_vendors")
-// }
 
 model OrderSampleFollowUp {
   id         String   @id @default(uuid())
@@ -1117,6 +1189,76 @@ model OrderSampleFollowUp {
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("order_sample_follow_ups")
+}
+
+// ===============================================
+// REPLACEMENT ORDER SECTION
+// ===============================================
+
+model ReplacementOrder {
+  id                String   @id @default(uuid())
+  replacementNumber String?  @unique // Replacement Number (RN)
+  replacementDate   DateTime @default(now()) // Replacement order date
+
+  // === RELATIONS TO ORIGINAL ORDER ===
+  referenceOrderId String
+  referenceOrder   Order  @relation("OrderToReplacement", fields: [referenceOrderId], references: [id])
+
+  // === CLIENT RELATIONS (Menyediakan nama, alamat, dll via relasi) ===
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id])
+  clientB2BPICId String?
+  pic            ClientB2BPIC? @relation(fields: [clientB2BPICId], references: [id])
+
+  // === DETAILS ===
+  replacementReason String // (wrong color, defect, lost shipment, etc)
+  remarks           String? @db.Text
+
+  // === SHIPPING TRACKING ===
+  sendToCustDate    DateTime?
+  arrivalInCustDate DateTime?
+
+  // === ITEMS ===
+  items              ReplacementOrderProduct[]
+  purchaseOrderItems PurchaseOrderItem[]
+
+  // === AUDIT TRAIL ===
+  createdById String?
+  createdBy   User?   @relation("ReplacementCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?   @relation("ReplacementUpdatedBy", fields: [updatedById], references: [id])
+
+  cashflows          Cashflow[]
+  cashflowSummaries  CashflowSummary[]
+  productionTrackers ProductionTracker[]
+  shipments          Shipment[]
+
+  createdAt DateTime @default(now()) // Created time
+  updatedAt DateTime @updatedAt // Updated time
+
+  @@map("replacement_orders")
+}
+
+model ReplacementOrderProduct {
+  id                 String           @id @default(uuid())
+  replacementOrderId String
+  replacementOrder   ReplacementOrder @relation(fields: [replacementOrderId], references: [id], onDelete: Cascade)
+
+  // Referensi ke produk yang diganti
+  productId String
+  product   Product         @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
+  quantity Int // Harga bisa diset 0 jika ini murni replacement gratis, atau tetap dicatat sebagai referensi nilai
+
+  unitPrice          Decimal?            @default(0)
+  productionTrackers ProductionTracker[]
+  selectedAttributes Json?
+  customization      Json?
+  remarks            String?
+
+  @@map("replacement_order_products")
 }
 
 // ===============================================
@@ -1152,27 +1294,36 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id               String        @id @default(uuid())
-  purchaseOrderId  String
-  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  itemName         String
-  productId        String?
-  product          Product?      @relation(fields: [productId], references: [id])
+  id                 String        @id @default(uuid())
+  purchaseOrderId    String
+  purchaseOrder      PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  itemName           String
+  productId          String?
+  product            Product?      @relation(fields: [productId], references: [id])
+  selectedAttributes Json?
+
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
   // === REFERENSI SO / SN ===
-  // Relasi ke tabel Order (Opsional: karena tipe INDIRECT_EXPENSES / STOCK tidak pakai SO)
-  orderId          String?
-  order            Order?        @relation(fields: [orderId], references: [id])
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  replacementOrderId String?
+  replacementOrder   ReplacementOrder? @relation(fields: [replacementOrderId], references: [id])
+
   // === KALKULASI KUANTITAS ===
   quantityOrder    Int
-  quantityStock    Int           @default(0)
+  quantityStock    Int    @default(0)
   quantityPurchase Int
   uom              String
+
   // === KALKULASI HARGA ===
-  unitPrice        Decimal
-  totalAmount      Decimal
-  remarks          String?       @db.Text
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  unitPrice   Decimal
+  totalAmount Decimal
+  remarks     String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@map("purchase_order_items")
 }
@@ -1182,50 +1333,103 @@ model PurchaseOrderItem {
 // ===============================================
 
 model Cashflow {
-  id          String       @id @default(uuid())
-  orderId     String
-  description String
-  amount      Decimal
-  type        CashflowType
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  order       Order        @relation(fields: [orderId], references: [id])
+  id                 String            @id @default(uuid())
+  orderId            String?
+  replacementOrderId String?
+  description        String
+  amount             Decimal
+  type               CashflowType
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  order              Order?            @relation(fields: [orderId], references: [id])
+  replacementOrder   ReplacementOrder? @relation(fields: [replacementOrderId], references: [id])
 
   @@map("cashflows")
 }
 
-// model InboundOutbound {
-//   id      String    @id @default(uuid())
-//   orderId String
-//   type    InOutType
-//   date    DateTime
-//   remarks String
-//   order   Order     @relation(fields: [orderId], references: [id])
+model CashflowSummary {
+  id                 String   @id @default(uuid())
+  orderId            String?
+  replacementOrderId String?
+  orderNumber        String?
+  totalRevenue       Decimal
+  totalCost          Decimal
+  profitLoss         Decimal
+  baseCurrencyId     String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-//   @@map("inbound_outbound")
-// }
+  order            Order?            @relation(fields: [orderId], references: [id])
+  replacementOrder ReplacementOrder? @relation(fields: [replacementOrderId], references: [id])
+  baseCurrency     Currency          @relation(fields: [baseCurrencyId], references: [code])
+  revenues         CashflowRevenue[]
+  costs            CashflowCost[]
 
-// ===============================================
-// PRODUCTION TRACKING (NEW)
-// Mencatat waktu produksi barang di pabrik/vendor
-// ===============================================
+  @@map("cashflow_summaries")
+}
+
+model CashflowRevenue {
+  id           String   @id @default(uuid())
+  cashflowId   String
+  description  String
+  productId    String?
+  unitPrice    Decimal
+  quantity     Int
+  total        Decimal
+  currency     String   @default("IDR")
+  exchangeRate Decimal?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  summary      CashflowSummary @relation(fields: [cashflowId], references: [id])
+  product      Product?        @relation(fields: [productId], references: [id])
+  Currency     Currency?       @relation(fields: [currencyCode], references: [code])
+  currencyCode String?
+
+  @@map("cashflow_revenue")
+}
+
+model CashflowCost {
+  id           String   @id @default(uuid())
+  cashflowId   String
+  description  String
+  vendorId     String?
+  costPerUnit  Decimal
+  quantity     Int
+  total        Decimal
+  currency     String   @default("IDR")
+  exchangeRate Decimal?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  summary      CashflowSummary @relation(fields: [cashflowId], references: [id])
+  vendor       Vendor?         @relation(fields: [vendorId], references: [id])
+  Currency     Currency?       @relation(fields: [currencyCode], references: [code])
+  currencyCode String?
+
+  @@map("cashflow_cost")
+}
 
 model ProductionTracker {
-  id             String           @id @default(uuid())
-  orderId        String
-  orderProductId String
-  vendorId       String
-  step           Int              @default(1)
-  quantity       Int
-  startDate      DateTime?
-  endDate        DateTime?
-  status         ProductionStatus @default(PENDING)
-  remarks        String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  order          Order            @relation(fields: [orderId], references: [id])
-  orderProduct   OrderProduct     @relation(fields: [orderProductId], references: [id], onDelete: Cascade)
-  vendor         Vendor           @relation(fields: [vendorId], references: [id])
+  id                        String                   @id @default(uuid())
+  orderId                   String?
+  orderProductId            String?
+  replacementOrderId        String?
+  replacementOrderProductId String?
+  vendorId                  String
+  step                      Int                      @default(1)
+  quantity                  Int
+  startDate                 DateTime?
+  endDate                   DateTime?
+  status                    ProductionStatus         @default(PENDING)
+  remarks                   String?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  order                     Order?                   @relation(fields: [orderId], references: [id])
+  orderProduct              OrderProduct?            @relation(fields: [orderProductId], references: [id], onDelete: Cascade)
+  replacementOrder          ReplacementOrder?        @relation(fields: [replacementOrderId], references: [id])
+  replacementOrderProduct   ReplacementOrderProduct? @relation(fields: [replacementOrderProductId], references: [id], onDelete: Cascade)
+  vendor                    Vendor                   @relation(fields: [vendorId], references: [id])
 
   @@map("production_trackers")
 }
@@ -1237,7 +1441,8 @@ model ProductionTracker {
 
 model Shipment {
   id                 String            @id @default(uuid())
-  orderId            String
+  orderId            String?
+  replacementOrderId String?
   vendorId           String?
   deliveryNoteNumber String?
   trackingNumber     String?
@@ -1255,7 +1460,8 @@ model Shipment {
   notes              ShipmentNote[]
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
-  order              Order             @relation(fields: [orderId], references: [id])
+  order              Order?            @relation(fields: [orderId], references: [id])
+  replacementOrder   ReplacementOrder? @relation(fields: [replacementOrderId], references: [id])
   vendor             Vendor?           @relation(fields: [vendorId], references: [id])
   items              ShipmentItem[]
 
@@ -1359,7 +1565,6 @@ model Quotation {
   order           Order?  @relation("OrderQuotations", fields: [orderId], references: [id])
   resultingOrders Order[] @relation("OrderSourcedFromQuotation")
 
-  // === CREATED BY (INTERNAL SALES / USER) ===
   userId String?
   user   User?   @relation("QuotationCreatedBy", fields: [userId], references: [id])
 
@@ -1370,8 +1575,9 @@ model Quotation {
   approvedBy   User?     @relation("QuotationApprovedBy", fields: [approvedById], references: [id])
   approvedAt   DateTime?
 
-  items     QuotationItem[]
-  followUps QuotationFollowUp[]
+  items            QuotationItem[]
+  followUps        QuotationFollowUp[]
+  whatsappMessages WhatsappMessage[]
 
   @@map("quotations")
 }
@@ -1423,44 +1629,18 @@ model QuotationFollowUp {
   @@map("quotation_follow_ups")
 }
 
-// model QuotationItem {
-//   id          String @id @default(uuid())
-//   quotationId String
-
-//   productId String?
-//   product   Product? @relation(fields: [productId], references: [id])
-
-//   variantId String?
-//   variant   ProductVariant? @relation(fields: [variantId], references: [id])
-
-//   productName String
-//   description String? @db.Text
-
-//   quantity   Int
-//   unitPrice  Decimal
-//   discount   Decimal? @default(0)
-//   totalPrice Decimal
-
-//   customization Json?
-//   remarks       String?
-
-//   imageUrl      String?
-//   imagePublicId String?
-
-//   quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
-
-//   @@map("quotation_items")
-// }
-
 model QuotationItem {
-  id            String              @id @default(cuid())
-  quotationId   String
-  productId     String?
-  product       Product?            @relation(fields: [productId], references: [id])
-  variantId     String?
-  variant       ProductVariant?     @relation(fields: [variantId], references: [id])
-  productName   String
-  description   String?             @db.Text
+  id          String          @id @default(cuid())
+  quotationId String
+  productId   String?
+  product     Product?        @relation(fields: [productId], references: [id])
+  variantId   String?
+  variant     ProductVariant? @relation(fields: [variantId], references: [id])
+  productName String
+  description String?         @db.Text
+  quantity    Int             @default(1)
+  unitPrice   Decimal         @default(0)
+
   customization Json?
   discount      Decimal?            @default(0)
   remarks       String?
@@ -1485,73 +1665,12 @@ model QuotationItemTier {
   @@map("quotation_item_tiers")
 }
 
-model CashflowSummary {
-  id             String   @id @default(uuid())
-  orderId        String
-  orderNumber    String?
-  totalRevenue   Decimal
-  totalCost      Decimal
-  profitLoss     Decimal
-  baseCurrencyId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  order        Order             @relation(fields: [orderId], references: [id])
-  baseCurrency Currency          @relation(fields: [baseCurrencyId], references: [code])
-  revenues     CashflowRevenue[]
-  costs        CashflowCost[]
-
-  @@map("cashflow_summaries")
-}
-
-model CashflowRevenue {
-  id           String   @id @default(uuid())
-  cashflowId   String
-  description  String
-  productId    String?
-  unitPrice    Decimal
-  quantity     Int
-  total        Decimal
-  currency     String   @default("IDR")
-  exchangeRate Decimal?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  summary      CashflowSummary @relation(fields: [cashflowId], references: [id])
-  product      Product?        @relation(fields: [productId], references: [id])
-  Currency     Currency?       @relation(fields: [currencyCode], references: [code])
-  currencyCode String?
-
-  @@map("cashflow_revenue")
-}
-
-model CashflowCost {
-  id           String   @id @default(uuid())
-  cashflowId   String
-  description  String
-  vendorId     String?
-  costPerUnit  Decimal
-  quantity     Int
-  total        Decimal
-  currency     String   @default("IDR")
-  exchangeRate Decimal?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  summary      CashflowSummary @relation(fields: [cashflowId], references: [id])
-  vendor       Vendor?         @relation(fields: [vendorId], references: [id])
-  Currency     Currency?       @relation(fields: [currencyCode], references: [code])
-  currencyCode String?
-
-  @@map("cashflow_cost")
-}
-
 // ===============================================
 // CURRENCY MASTER
 // ===============================================
 
 model Currency {
-  code              String            @id
+  code              String              @id
   symbol            String
   name              String
   cashflowSummaries CashflowSummary[]
@@ -1929,13 +2048,20 @@ model WebOrderItem {
 // ===============================================
 
 model ArticleCategory {
-  id          String   @id @default(uuid())
-  name        String   @unique // contoh: "Tutorial", "Tips & Trik"
-  slug        String   @unique
-  description String?  @db.Text
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id   String @id @default(uuid())
+  slug String @unique
+
+  // === KONTEN BAHASA INDONESIA (DEFAULT) ===
+  name_id        String  @unique @map("name")
+  description_id String? @map("description") @db.Text
+
+  // === KONTEN BAHASA INGGRIS ===
+  name_en        String?
+  description_en String? @db.Text
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   articles Article[]
 
@@ -2133,4 +2259,26 @@ model HeroBannerProduct {
   updatedAt     DateTime @updatedAt
 
   @@map("hero_banners")
+}
+
+model WhatsappMessage {
+  id          String    @id @default(cuid())
+  phoneNumber String
+  message     String    @db.LongText
+  type        String // "order_created", "quotation_sent", "payment_reminder"
+  orderId     String?
+  quotationId String?
+  status      String    @default("pending") // "pending", "sent", "failed"
+  sentAt      DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  order     Order?     @relation(fields: [orderId], references: [id])
+  quotation Quotation? @relation(fields: [quotationId], references: [id])
+
+  @@index([phoneNumber])
+  @@index([status])
+  @@index([type])
+  @@map("whatsapp_messages")
 }

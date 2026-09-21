@@ -110,7 +110,7 @@ function CategoriesTable() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
 
   const fetchData = useCallback(async () => {
     // 🛑 Jangan fetch jika session NextAuth masih loading atau tidak ada
@@ -297,7 +297,7 @@ function TemplatesTable() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
 
   const fetchData = useCallback(async () => {
     if (status === "loading" || status === "unauthenticated") return;

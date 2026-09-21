@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { DatePickerHelper } from "@/helper/datePickerHelper";
+import { useCurrencyConvert } from "@/hooks/use-currency-convert";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -45,6 +46,7 @@ import {
   ChevronsUpDown,
   DollarSign,
   FileText,
+  Layers,
   Loader2,
   PlusCircle,
   Trash2,
@@ -70,6 +72,8 @@ import {
 
 export default function EditOrderForm() {
   const { fetchApi, status } = useApi();
+  const { convert, loading: convertLoading } = useCurrencyConvert();
+
   const params = useParams();
   const router = useRouter();
   const orderId = params.id as string;
@@ -161,6 +165,7 @@ export default function EditOrderForm() {
         const jsonQ = resQ.ok ? await resQ.json() : null;
         const jsonSamp = resSamp.ok ? await resSamp.json() : null;
         const orderData = await resOrder.json();
+        console.log("📦 [DEBUG] Data Order dari Backend:", orderData);
 
         setClients(c);
         setProducts(p);
@@ -209,21 +214,16 @@ export default function EditOrderForm() {
           shippingAddress: orderData.shippingAddress || "",
           products: orderData.products.map((item: any) => {
             let initialAttrs: Record<string, string> = {};
-            const prod = p.find((x: any) => x.id === item.productId);
 
-            if (prod && item.variantId && prod.productVariants) {
-              const variant = prod.productVariants.find(
-                (v: any) => v.id === item.variantId,
-              );
-              if (variant && prod.availableAttributes) {
-                prod.availableAttributes.forEach((attr: any) => {
-                  const matchedValue = attr.values.find((v: any) =>
-                    variant.combinationIds.includes(v.valueId),
-                  );
-                  if (matchedValue) {
-                    initialAttrs[attr.attributeId] = matchedValue.valueId;
-                  }
-                });
+            if (item.selectedAttributes) {
+              if (typeof item.selectedAttributes === "object") {
+                initialAttrs = item.selectedAttributes;
+              } else if (typeof item.selectedAttributes === "string") {
+                try {
+                  initialAttrs = JSON.parse(item.selectedAttributes);
+                } catch (error) {
+                  console.error("Gagal parse selectedAttributes:", error);
+                }
               }
             }
 
@@ -231,10 +231,10 @@ export default function EditOrderForm() {
               productId: item.productId,
               variantId: item.variantId || "",
               quantity: item.quantity,
-              price: item.price,
+              price: Number(item.price || 0),
               customization: item.customization || "",
               remarks: item.remarks || "",
-              selectedAttributes: initialAttrs,
+              selectedAttributes: initialAttrs, //  Masukkan ke form
             };
           }),
         });
@@ -280,6 +280,7 @@ export default function EditOrderForm() {
       setValue("phone", (pic as any).phone);
     }
   }, [selectedPicId, isB2B, availablePics, setValue]);
+
   const onSubmit = async (data: OrderFormValues) => {
     try {
       setSubmitting(true);
@@ -313,6 +314,21 @@ export default function EditOrderForm() {
     }
   };
 
+  const onError = (errors: any) => {
+    // Membaca semua error yang dikembalikan oleh validasi Zod
+    Object.keys(errors).forEach((field) => {
+      const error = errors[field];
+
+      // Jika error berupa teks (misalnya field teks biasa yang kosong)
+      if (error && error.message) {
+        toast.error(`${error.message}`);
+      }
+      // Jika error terjadi di dalam array (seperti form field 'products' yang berlapis)
+      else if (Array.isArray(error)) {
+        toast.error(`Mohon lengkapi detail pada daftar produk (Products).`);
+      }
+    });
+  };
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -332,7 +348,9 @@ export default function EditOrderForm() {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+          <form
+            onSubmit={handleSubmit(onSubmit, onError)}
+            className="space-y-8">
             {/* === SECTION 1: ORDER DETAILS === */}
             <div className="grid grid-cols-1 items-start md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 border rounded-lg bg-gray-50/50">
               <h3 className="col-span-full font-medium text-lg text-gray-700">
@@ -811,90 +829,128 @@ export default function EditOrderForm() {
               <div className="space-y-4">
                 {fields.map((field, index) => {
                   const currentProductId = watch(`products.${index}.productId`);
-                  const currentVariantId = watch(`products.${index}.variantId`);
+                  const currentQty = watch(`products.${index}.quantity`) || 1;
                   const selectedProduct = products.find(
                     (p) => p.id === currentProductId,
                   );
-                  const currentSelectedAttrs =
-                    watch(`products.${index}.selectedAttributes`) || {};
-
                   const subtotal =
-                    (watch(`products.${index}.price`) || 0) *
-                    (watch(`products.${index}.quantity`) || 0);
+                    (watch(`products.${index}.price`) || 0) * currentQty;
 
-                  // 1. LOGIKA PENCOCOKAN FLEKSIBEL
-                  const handleAttributeSelect = (
-                    attributeId: string,
-                    valueId: string,
+                  //  FUNGSI BARU: Perhitungan Harga yang sudah diperbaiki (Sama dengan AddOrder)
+                  const updateCalculatedPrice = async (
+                    idx: number,
+                    prod: any,
+                    selectedAttrs: any,
+                    qty: number,
                   ) => {
-                    const newAttrs = {
-                      ...currentSelectedAttrs,
-                      [attributeId]: valueId,
-                    };
-                    form.setValue(
-                      `products.${index}.selectedAttributes`,
-                      newAttrs,
+                    if (!prod) return;
+
+                    // 1. Tentukan Harga Dasar
+                    let baseProductPrice = Number(prod.basePrice || 0);
+
+                    if (
+                      baseProductPrice === 0 &&
+                      prod.productVariants &&
+                      prod.productVariants.length > 0
+                    ) {
+                      baseProductPrice = Number(
+                        prod.productVariants[0].price || 0,
+                      );
+                    }
+
+                    // 2. Cek apakah ada Varian Fisik yang cocok
+                    const nonCustomAttrsObj = Object.fromEntries(
+                      Object.entries(selectedAttrs).filter(([key]) => {
+                        const foundAttr = prod.availableAttributes?.find(
+                          (a: any) => a.attributeId === key,
+                        );
+                        return foundAttr?.isCustom !== true;
+                      }),
                     );
 
-                    if (selectedProduct?.productVariants) {
-                      const selectedValIds = Object.values(newAttrs);
-                      const matchedVariant = [
-                        ...selectedProduct.productVariants,
-                      ]
-                        .sort(
-                          (a, b) =>
-                            b.combinationIds.length - a.combinationIds.length,
-                        )
-                        .find(
-                          (v) =>
-                            v.combinationIds.length > 0 &&
-                            v.combinationIds.every((id) =>
-                              selectedValIds.includes(id),
-                            ),
-                        );
+                    const nonCustomVals = Object.values(nonCustomAttrsObj);
+                    const matchedVariant = prod.productVariants?.find(
+                      (v: any) =>
+                        v.combinationIds &&
+                        v.combinationIds.length === nonCustomVals.length &&
+                        v.combinationIds.length > 0 &&
+                        v.combinationIds.every((id: string) =>
+                          nonCustomVals.includes(id),
+                        ),
+                    );
 
-                      if (matchedVariant) {
-                        form.setValue(
-                          `products.${index}.variantId`,
-                          matchedVariant.id,
-                        );
-                        form.setValue(
-                          `products.${index}.price`,
-                          Number(matchedVariant.price),
-                        );
-                      } else {
-                        form.setValue(`products.${index}.variantId`, "");
+                    if (matchedVariant && Number(matchedVariant.price) > 0) {
+                      baseProductPrice = Number(matchedVariant.price);
+                    }
+
+                    // 3. Hitung Tambahan Harga (Modifiers)
+                    let totalModifiers = 0;
+                    const selectedValIds = Object.values(selectedAttrs);
+
+                    if (
+                      prod.availableAttributes &&
+                      Array.isArray(prod.availableAttributes)
+                    ) {
+                      prod.availableAttributes.forEach((attr: any) => {
+                        if (attr.values && Array.isArray(attr.values)) {
+                          attr.values.forEach((val: any) => {
+                            if (selectedValIds.includes(val.valueId)) {
+                              totalModifiers += Number(val.priceModifier || 0);
+                            }
+                          });
+                        }
+                      });
+                    }
+
+                    // 4. Totalkan Harga Dasar dengan Tambahan
+                    let baseIdr = baseProductPrice + totalModifiers;
+
+                    // 5. Tier Price (Grosir) dengan Pengaman
+                    if (
+                      prod.priceTiers &&
+                      Array.isArray(prod.priceTiers) &&
+                      prod.priceTiers.length > 0
+                    ) {
+                      const tiers = [...prod.priceTiers].sort(
+                        (a, b) => b.minQuantity - a.minQuantity,
+                      );
+                      const applicableTier = tiers.find(
+                        (tier) => qty >= tier.minQuantity,
+                      );
+
+                      if (applicableTier && Number(applicableTier.price) > 0) {
+                        baseIdr = Number(applicableTier.price) + totalModifiers;
                       }
                     }
-                  };
 
-                  // 2. FUNGSI UNTUK TOMBOL "QUICK SELECT" VARIAN
-                  const handleQuickSelectVariant = (variant: any) => {
-                    const newAttrs: Record<string, string> = {
-                      ...currentSelectedAttrs,
-                    };
+                    let finalPrice = baseIdr;
 
-                    selectedProduct?.availableAttributes?.forEach((attr) => {
-                      const matchedValue = attr.values.find((v) =>
-                        variant.combinationIds.includes(v.valueId),
-                      );
-                      if (matchedValue) {
-                        newAttrs[attr.attributeId] = matchedValue.valueId;
+                    // 6. Auto Konversi Currency
+                    if (
+                      selectedCurrencyCode &&
+                      selectedCurrencyCode !== "IDR"
+                    ) {
+                      try {
+                        const result = await convert(
+                          "IDR",
+                          selectedCurrencyCode,
+                          baseIdr,
+                        );
+                        if (result?.success) {
+                          finalPrice = parseFloat(
+                            result.convertedAmount.toFixed(2),
+                          );
+                        }
+                      } catch (error) {
+                        console.error(
+                          "Gagal convert saat memilih atribut:",
+                          error,
+                        );
                       }
-                    });
+                    }
 
-                    form.setValue(
-                      `products.${index}.selectedAttributes`,
-                      newAttrs,
-                    );
-                    form.setValue(`products.${index}.variantId`, variant.id);
-                    form.setValue(
-                      `products.${index}.price`,
-                      Number(variant.price),
-                    );
-                    toast.success(
-                      `Varian ${variant.variantName || "terpilih"} diaplikasikan.`,
-                    );
+                    // 7. Simpan harga akhir
+                    form.setValue(`products.${idx}.price`, finalPrice);
                   };
 
                   return (
@@ -903,7 +959,7 @@ export default function EditOrderForm() {
                       className={cn(
                         "border rounded-lg bg-white shadow-sm transition-all duration-200",
                         !isPending
-                          ? "opacity-60 pointer-events-none"
+                          ? "opacity-60 pointer-events-none" // 🔒 Kunci form jika tidak Pending
                           : "hover:shadow-md",
                       )}>
                       <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
@@ -930,6 +986,7 @@ export default function EditOrderForm() {
                                       <Button
                                         variant="outline"
                                         role="combobox"
+                                        disabled={!isPending}
                                         className={cn(
                                           "w-full justify-between h-10 font-normal",
                                           !field.value &&
@@ -968,16 +1025,18 @@ export default function EditOrderForm() {
                                                   `products.${index}.selectedAttributes`,
                                                   {},
                                                 );
-                                                form.setValue(
-                                                  `products.${index}.price`,
-                                                  p.productVariants?.length
-                                                    ? 0
-                                                    : Number(p.basePrice),
-                                                );
                                                 setOpenCombobox((prev) => ({
                                                   ...prev,
                                                   [index]: false,
                                                 }));
+
+                                                // Update harga awal & Convert
+                                                updateCalculatedPrice(
+                                                  index,
+                                                  p,
+                                                  {},
+                                                  currentQty,
+                                                );
                                               }}>
                                               <Check
                                                 className={cn(
@@ -1005,7 +1064,6 @@ export default function EditOrderForm() {
                             )}
                           />
 
-                          {/* INFO SKU & UOM */}
                           {selectedProduct && (
                             <div className="flex items-center gap-3 text-xs text-gray-500">
                               <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">
@@ -1022,97 +1080,8 @@ export default function EditOrderForm() {
                               </span>
                             </div>
                           )}
-
-                          {/* ATTRIBUTES & VARIANTS SECTION */}
-                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start mt-4">
-                            {/* KIRI: PANDUAN VARIAN (QUICK SELECT) */}
-                            {selectedProduct?.productVariants &&
-                              selectedProduct.productVariants.length > 0 && (
-                                <div className="bg-blue-50/50 border border-blue-100 rounded-md p-3 space-y-2 h-full">
-                                  <p className="text-xs font-semibold text-blue-800 flex items-center gap-1">
-                                    <Bookmark className="w-3 h-3" /> Panduan
-                                    Varian
-                                  </p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {selectedProduct.productVariants.map(
-                                      (variant) => (
-                                        <button
-                                          key={variant.id}
-                                          type="button"
-                                          onClick={() =>
-                                            handleQuickSelectVariant(variant)
-                                          }
-                                          className={cn(
-                                            "text-[10px] font-medium px-2 py-1 rounded border transition-colors",
-                                            currentVariantId === variant.id
-                                              ? "bg-blue-600 text-white border-blue-600"
-                                              : "bg-white text-gray-600 border-gray-300 hover:bg-blue-50",
-                                          )}>
-                                          {variant.attributesDescription ||
-                                            variant.variantName ||
-                                            `SKU: ${variant.sku}`}
-                                        </button>
-                                      ),
-                                    )}
-                                  </div>
-                                  <p className="text-[10px] text-gray-400 italic">
-                                    Klik untuk mengisi dropdown otomatis.
-                                  </p>
-                                </div>
-                              )}
-
-                            {/* KANAN: DYNAMIC ATTRIBUTE SELECTION */}
-                            {selectedProduct?.availableAttributes &&
-                              selectedProduct.availableAttributes.length >
-                                0 && (
-                                <div className="bg-gray-50 border rounded-md p-3 space-y-3 h-full">
-                                  <p className="text-xs font-semibold text-gray-600 mb-1">
-                                    Pilih Atribut:
-                                  </p>
-                                  {selectedProduct.availableAttributes.map(
-                                    (attr) => (
-                                      <div
-                                        key={attr.attributeId}
-                                        className="flex flex-col space-y-1">
-                                        <label className="text-xs text-gray-500">
-                                          {attr.attributeName}
-                                        </label>
-                                        <Select
-                                          value={
-                                            currentSelectedAttrs[
-                                              attr.attributeId
-                                            ] || ""
-                                          }
-                                          onValueChange={(val) =>
-                                            handleAttributeSelect(
-                                              attr.attributeId,
-                                              val,
-                                            )
-                                          }>
-                                          <SelectTrigger className="h-8 text-sm bg-white">
-                                            <SelectValue
-                                              placeholder={`Pilih ${attr.attributeName}`}
-                                            />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {attr.values.map((val) => (
-                                              <SelectItem
-                                                key={val.valueId}
-                                                value={val.valueId}>
-                                                {val.value}
-                                              </SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                    ),
-                                  )}
-                                </div>
-                              )}
-                          </div>
                         </div>
 
-                        {/* QUANTITY */}
                         <div className="md:col-span-2">
                           <FormField
                             control={control}
@@ -1128,40 +1097,29 @@ export default function EditOrderForm() {
                                       type="number"
                                       min={1}
                                       {...field}
+                                      disabled={!isPending}
                                       onChange={(e) => {
                                         const val = e.target.valueAsNumber;
-                                        field.onChange(isNaN(val) ? 0 : val);
+                                        const newQty = isNaN(val) ? 0 : val;
+                                        field.onChange(newQty);
 
-                                        // Logika Price Tier
-                                        if (
-                                          selectedProduct &&
-                                          !selectedProduct.productVariants
-                                            ?.length &&
-                                          selectedProduct.priceTiers?.length > 0
-                                        ) {
-                                          const tiers = [
-                                            ...selectedProduct.priceTiers,
-                                          ].sort(
-                                            (a, b) =>
-                                              b.minQuantity - a.minQuantity,
-                                          );
-                                          const applicableTier = tiers.find(
-                                            (tier) => val >= tier.minQuantity,
-                                          );
-                                          form.setValue(
-                                            `products.${index}.price`,
-                                            applicableTier
-                                              ? Number(applicableTier.price)
-                                              : Number(
-                                                  selectedProduct.basePrice,
-                                                ),
+                                        if (selectedProduct) {
+                                          const currentAttrs =
+                                            form.getValues(
+                                              `products.${index}.selectedAttributes`,
+                                            ) || {};
+                                          updateCalculatedPrice(
+                                            index,
+                                            selectedProduct,
+                                            currentAttrs,
+                                            newQty,
                                           );
                                         }
                                       }}
                                       className="text-center h-10"
                                     />
                                     <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium pointer-events-none">
-                                      {selectedProduct?.uom || ""}
+                                      {selectedProduct?.uom}
                                     </span>
                                   </div>
                                 </FormControl>
@@ -1171,7 +1129,6 @@ export default function EditOrderForm() {
                           />
                         </div>
 
-                        {/* UNIT PRICE */}
                         <div className="md:col-span-3">
                           <FormField
                             control={control}
@@ -1191,6 +1148,7 @@ export default function EditOrderForm() {
                                       min={0}
                                       step="any"
                                       {...field}
+                                      disabled={!isPending}
                                       onChange={(e) => {
                                         const val = e.target.valueAsNumber;
                                         field.onChange(isNaN(val) ? 0 : val);
@@ -1205,7 +1163,6 @@ export default function EditOrderForm() {
                           />
                         </div>
 
-                        {/* SUBTOTAL */}
                         <div className="md:col-span-2 flex flex-col justify-center items-end h-10 pt-8 md:pt-0">
                           <span className="md:hidden text-xs text-gray-500 mb-1">
                             Subtotal
@@ -1218,7 +1175,6 @@ export default function EditOrderForm() {
                           </span>
                         </div>
 
-                        {/* ACTION / DELETE */}
                         <div className="md:col-span-1 flex justify-center pt-8 md:pt-0">
                           {fields.length > 1 && isPending && (
                             <Button
@@ -1233,19 +1189,190 @@ export default function EditOrderForm() {
                         </div>
                       </div>
 
-                      {/* ADDITIONAL DETAILS */}
-                      <div className="bg-gray-50/50 p-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4 rounded-b-lg">
+                      {/*  AREA FULL-WIDTH: DYNAMIC ATTRIBUTE SELECTION (BERURUTAN/STACK) */}
+                      {selectedProduct?.availableAttributes &&
+                        selectedProduct.availableAttributes.length > 0 && (
+                          <div className="px-4 pb-4">
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 shadow-inner">
+                              <p className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                                <Layers className="w-4 h-4 text-blue-500" />{" "}
+                                Pilih Varian Produk:
+                              </p>
+
+                              <div className="flex flex-col space-y-4">
+                                {selectedProduct.availableAttributes.map(
+                                  (attr: any, attrIdx: number) => {
+                                    const isCustomAttr = attr.isCustom === true;
+
+                                    const currentSelectedAttrs =
+                                      watch(
+                                        `products.${index}.selectedAttributes`,
+                                      ) || {};
+                                    const selectedValue =
+                                      currentSelectedAttrs[attr.attributeId];
+
+                                    return (
+                                      <div
+                                        key={attr.attributeId}
+                                        className="flex flex-col space-y-2 bg-white p-3 rounded-md border border-slate-200 shadow-sm">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                          Atribut #{attrIdx + 1}:{" "}
+                                          {attr.attributeName}{" "}
+                                          {isCustomAttr && (
+                                            <span className="text-purple-600 font-normal">
+                                              (Bebas)
+                                            </span>
+                                          )}
+                                        </label>
+
+                                        <div className="flex flex-wrap gap-2">
+                                          {attr.values.map((val: any) => {
+                                            const isSelected =
+                                              selectedValue === val.valueId;
+
+                                            return (
+                                              <button
+                                                type="button"
+                                                key={val.valueId}
+                                                // 🔒 Hanya disable jika bukan Pending (isAvailable logic dihapus)
+                                                disabled={!isPending}
+                                                onClick={() => {
+                                                  //  FITUR TOGGLE SEPERTI DI ADD ORDER
+                                                  const newAttrs: Record<
+                                                    string,
+                                                    string
+                                                  > = {
+                                                    ...currentSelectedAttrs,
+                                                  };
+
+                                                  if (isSelected) {
+                                                    delete newAttrs[
+                                                      attr.attributeId
+                                                    ];
+                                                  } else {
+                                                    newAttrs[attr.attributeId] =
+                                                      val.valueId;
+                                                  }
+
+                                                  // Hapus atribut turunan di bawahnya agar kombinasi tetap bersih
+                                                  selectedProduct.availableAttributes
+                                                    .slice(attrIdx + 1)
+                                                    .forEach(
+                                                      (nextAttr: any) => {
+                                                        delete newAttrs[
+                                                          nextAttr.attributeId
+                                                        ];
+                                                      },
+                                                    );
+
+                                                  form.setValue(
+                                                    `products.${index}.selectedAttributes`,
+                                                    newAttrs,
+                                                  );
+
+                                                  // Cek & Set Variant ID
+                                                  const nonCustomAttrsObj =
+                                                    Object.fromEntries(
+                                                      Object.entries(
+                                                        newAttrs,
+                                                      ).filter(([key]) => {
+                                                        const foundAttr =
+                                                          selectedProduct.availableAttributes.find(
+                                                            (a: any) =>
+                                                              a.attributeId ===
+                                                              key,
+                                                          );
+                                                        return (
+                                                          foundAttr?.isCustom !==
+                                                          true
+                                                        );
+                                                      }),
+                                                    );
+
+                                                  const nonCustomVals =
+                                                    Object.values(
+                                                      nonCustomAttrsObj,
+                                                    );
+
+                                                  const matchedVariant =
+                                                    selectedProduct.productVariants?.find(
+                                                      (v: any) =>
+                                                        v.combinationIds
+                                                          .length ===
+                                                          nonCustomVals.length &&
+                                                        v.combinationIds.every(
+                                                          (id: string) =>
+                                                            nonCustomVals.includes(
+                                                              id,
+                                                            ),
+                                                        ),
+                                                    );
+
+                                                  form.setValue(
+                                                    `products.${index}.variantId`,
+                                                    matchedVariant?.id || "",
+                                                  );
+
+                                                  // Hitung harga
+                                                  updateCalculatedPrice(
+                                                    index,
+                                                    selectedProduct,
+                                                    newAttrs,
+                                                    currentQty,
+                                                  );
+                                                }}
+                                                className={cn(
+                                                  "relative px-4 py-2 rounded-md text-sm font-medium transition-all duration-200",
+                                                  isSelected
+                                                    ? "bg-blue-600 text-white shadow-md border-transparent"
+                                                    : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:border-blue-400",
+                                                )}>
+                                                {val.value}
+                                                {Number(val.priceModifier) >
+                                                  0 && (
+                                                  <span
+                                                    className={cn(
+                                                      "ml-1.5 text-[10px] font-semibold",
+                                                      isSelected
+                                                        ? "text-blue-200"
+                                                        : "text-emerald-600",
+                                                    )}>
+                                                    (+
+                                                    {Number(
+                                                      val.priceModifier,
+                                                    ).toLocaleString("id-ID")}
+                                                    )
+                                                  </span>
+                                                )}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    );
+                                  },
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                      {/* Additional Details (Customization & Remarks) */}
+                      <div className="bg-gray-50/50 p-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 rounded-b-lg">
                         <FormField
                           control={control}
                           name={`products.${index}.customization`}
                           render={({ field }) => (
                             <FormItem>
                               <FormControl>
-                                <Input
-                                  placeholder="Add Customization details..."
-                                  {...field}
-                                  className="text-sm bg-white"
-                                />
+                                <div className="relative">
+                                  <Input
+                                    placeholder="Add Customization details..."
+                                    {...field}
+                                    disabled={!isPending}
+                                    className="text-sm border-gray-200 pl-8 bg-white"
+                                  />
+                                </div>
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -1257,11 +1384,14 @@ export default function EditOrderForm() {
                           render={({ field }) => (
                             <FormItem>
                               <FormControl>
-                                <Input
-                                  placeholder="Internal remarks (optional)..."
-                                  {...field}
-                                  className="text-sm bg-white"
-                                />
+                                <div className="relative">
+                                  <Input
+                                    placeholder="Internal remarks (optional)..."
+                                    {...field}
+                                    disabled={!isPending}
+                                    className="text-sm border-gray-200 pl-8 bg-white"
+                                  />
+                                </div>
                               </FormControl>
                               <FormMessage />
                             </FormItem>

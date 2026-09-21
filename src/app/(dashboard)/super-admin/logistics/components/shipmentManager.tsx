@@ -4,6 +4,8 @@ import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import {
   CalendarIcon,
+  Copy,
+  ExternalLink,
   FileText,
   History,
   MapPin,
@@ -69,19 +71,20 @@ import { cn } from "@/lib/utils";
 // --- KONFIGURASI STATUS (Sesuai DTO Backend) ---
 const SHIPMENT_STATUSES = {
   INBOUND: [
-    { value: "PREPARED", label: "Prepared (Disiapkan)" },
-    { value: "DISPATCHED", label: "Dispatched (Berangkat/OTW)" },
-    { value: "ARRIVED", label: "Arrived (Sampai Tujuan Step Ini)" },
-    { value: "CANCELLED", label: "Cancelled (Dibatalkan)" },
+    { value: "PREPARED", label: "📦 Prepared (Disiapkan di Pabrik)" },
+    { value: "DISPATCHED", label: "🚚 Dispatched (Berangkat/OTW)" },
+    { value: "IN_TRANSIT", label: "🏢 In Transit (Singgah/Transit)" },
+    { value: "ARRIVED", label: "✅ Arrived (Sampai di Gudang)" },
+    { value: "CANCELLED", label: "❌ Cancelled (Dibatalkan)" },
   ],
   OUTBOUND: [
-    { value: "PREPARED", label: "Prepared (Disiapkan)" },
-    { value: "DISPATCHED", label: "Dispatched (Dikirim)" },
-    { value: "ARRIVED", label: "Arrived (Diterima Client/Tujuan)" },
-    { value: "CANCELLED", label: "Cancelled (Dibatalkan)" },
+    { value: "PREPARED", label: "📦 Prepared (Disiapkan di Gudang)" },
+    { value: "DISPATCHED", label: "🚚 Dispatched (Diserahkan ke Kurir)" },
+    { value: "IN_TRANSIT", label: "🏢 In Transit (Paket di Kota Transit)" },
+    { value: "ARRIVED", label: "✅ Arrived (Diterima Klien)" },
+    { value: "CANCELLED", label: "❌ Cancelled (Dibatalkan)" },
   ],
 };
-
 // --- TIPE DATA ---
 type NoteCategory = {
   id: string;
@@ -92,7 +95,9 @@ type NoteCategory = {
 interface ShipmentManagerProps {
   type: "INBOUND" | "OUTBOUND";
   orderId: string;
+  orderInfo: any;
   shipments: any[];
+  allVendors: any[];
   products: any[];
   couriers: any[];
   onUpdate: () => void;
@@ -102,7 +107,9 @@ export default function ShipmentManager({
   type,
   orderId,
   shipments,
+  orderInfo,
   products,
+  allVendors,
   couriers,
   onUpdate,
 }: ShipmentManagerProps) {
@@ -164,11 +171,9 @@ export default function ShipmentManager({
     if (isOpen || updateStatusId) {
       fetchCategories();
     }
-  }, [isOpen, updateStatusId, status, fetchApi]); // Tambahkan dependensi lengkap
+  }, [isOpen, updateStatusId, status, fetchApi]);
 
   // === HELPER FUNCTIONS ===
-
-  // 🔄 UPDATE: Menambahkan parameter currentStep
   const getRemainingQty = (
     productId: string,
     totalOrderQty: number,
@@ -253,6 +258,7 @@ export default function ShipmentManager({
     if (!vendorId) return toast.error("Pilih Vendor");
     if (!origin || !destination) return toast.error("Isi Kota Asal & Tujuan");
     if (status !== "authenticated") return;
+
     try {
       setLoading(true);
 
@@ -260,8 +266,8 @@ export default function ShipmentManager({
         orderId,
         type,
         step: Number(step),
-        vendorId,
-        trackingNumber: trackingNo,
+        vendorId: vendorId || undefined,
+        trackingNumber: trackingNo || undefined,
         method,
         origin,
         destination,
@@ -270,10 +276,11 @@ export default function ShipmentManager({
         items: selectedItems.map((i) => ({
           orderProductId: i.id,
           quantity: Number(i.qty),
-          totalCarton: Number(i.totalCarton),
+          totalCarton: Number(i.totalCarton) || 0,
         })),
         notes: getNotesPayload(),
       };
+
       const res = await fetchApi("/logistics/shipments", {
         method: "POST",
         body: JSON.stringify(payload),
@@ -281,7 +288,15 @@ export default function ShipmentManager({
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to create shipment");
+
+        let errorMessage = "Failed to create shipment";
+        if (Array.isArray(errData.message)) {
+          errorMessage = errData.message.join(", ");
+        } else if (errData.message) {
+          errorMessage = errData.message;
+        }
+
+        throw new Error(errorMessage);
       }
 
       toast.success("Pengiriman berhasil dibuat!");
@@ -298,13 +313,13 @@ export default function ShipmentManager({
       setDate(new Date());
       setStep(1);
       setArrivalDate(undefined);
-    } catch (e) {
-      toast.error("Gagal membuat pengiriman");
+    } catch (e: any) {
+      console.error("❌ Create Shipment Error:", e);
+      toast.error(e.message || "Gagal membuat pengiriman");
     } finally {
       setLoading(false);
     }
   };
-
   // === 2. UPDATE STATUS TRACKING (Add History) ===
   const handleUpdateStatus = async () => {
     if (!updateStatusId) return;
@@ -432,6 +447,67 @@ export default function ShipmentManager({
 
     return currentStatuses.find((s) => s.value === val)?.label || val;
   };
+
+  // 1: Auto-fill Origin berdasarkan riwayat
+  const handleOpenCreateDialog = () => {
+    const maxStep =
+      shipments.length > 0 ? Math.max(...shipments.map((s) => s.step || 1)) : 0;
+    const nextStep = maxStep + 1;
+    setStep(nextStep);
+
+    let autoOrigin = "";
+    let autoDest = "";
+
+    if (type === "INBOUND") {
+      if (nextStep === 1) {
+        // Step 1 Inbound: Asal (Origin) = Kota Vendor Produksi (Pabrik)
+        const prodVendorId = products?.[0]?.productionTrackers?.[0]?.vendorId;
+        const prodVendor = allVendors.find((v) => v.id === prodVendorId);
+
+        autoOrigin = prodVendor?.city || "";
+      } else {
+        // Step Lanjutan Inbound: Asal (Origin) = Tujuan dari Step sebelumnya
+        const prevShip = shipments.find((s) => s.step === nextStep - 1);
+        if (prevShip) autoOrigin = prevShip.destination || "";
+      }
+    } else if (type === "OUTBOUND") {
+      if (nextStep === 1) {
+        // Step 1 Outbound: Asal (Origin) = Tujuan akhir dari INBOUND (Gudang)
+        const inboundShips =
+          orderInfo?.shipments?.filter((s: any) => s.type === "INBOUND") || [];
+        const maxInbound =
+          inboundShips.length > 0
+            ? Math.max(...inboundShips.map((s: any) => s.step))
+            : 0;
+        const lastInbound = inboundShips.find(
+          (s: any) => s.step === maxInbound,
+        );
+
+        autoOrigin = lastInbound?.destination || "";
+        autoDest = orderInfo?.shippingAddress || "";
+      } else {
+        const prevShip = shipments.find((s) => s.step === nextStep - 1);
+        if (prevShip) autoOrigin = prevShip.destination || "";
+        autoDest = orderInfo?.shippingAddress || "";
+      }
+    }
+
+    setOrigin(autoOrigin);
+    setDestination(autoDest);
+    setIsOpen(true);
+  };
+
+  //  LOGIKA CERDAS 2: Penyesuaian untuk Outbound
+  const handleVendorChange = (selectedVendorId: string) => {
+    setVendorId(selectedVendorId);
+
+    const selectedCourier = couriers.find((c) => c.id === selectedVendorId);
+    if (selectedCourier?.city) {
+      if (type === "INBOUND") {
+        setDestination(selectedCourier.city);
+      }
+    }
+  };
   return (
     <div className="space-y-6">
       <Card
@@ -454,14 +530,7 @@ export default function ShipmentManager({
             </CardDescription>
           </div>
           <Button
-            onClick={() => {
-              const maxStep =
-                shipments.length > 0
-                  ? Math.max(...shipments.map((s) => s.step || 1))
-                  : 0;
-              setStep(maxStep + 1);
-              setIsOpen(true);
-            }}
+            onClick={handleOpenCreateDialog}
             className="bg-primary hover:bg-primary/90">
             <Plus className="mr-2 h-4 w-4" /> Buat Pengiriman
           </Button>
@@ -485,14 +554,35 @@ export default function ShipmentManager({
                         <Badge variant="outline" className="font-mono bg-white">
                           {ship.method}
                         </Badge>
+
+                        {/*  LOGIKA BARU: Tampilan Nomor Resi dengan Tombol Copy */}
                         <h3 className="font-bold text-lg flex items-center gap-2">
                           {ship.trackingNumber || "No Resi"}
+
+                          {/* Menampilkan tombol copy HANYA jika nomor resi tersedia */}
+                          {ship.trackingNumber && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                              onClick={() => {
+                                navigator.clipboard.writeText(
+                                  ship.trackingNumber,
+                                );
+                                toast.success("Nomor resi berhasil disalin!");
+                              }}
+                              title="Copy Nomor Resi">
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+
                           <Badge
                             variant="secondary"
                             className="bg-slate-200 text-slate-700 text-xs">
                             Step {ship.step || 1}
                           </Badge>
                         </h3>
+
                         <Badge
                           className={cn(
                             "ml-2",
@@ -516,7 +606,22 @@ export default function ShipmentManager({
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                      {/*  LOGIKA BARU: Tombol Tracking URL Vendor */}
+                      {ship.vendor?.trackingUrl && (
+                        <a
+                          href={ship.vendor.trackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-9 gap-2 border-blue-200 text-blue-700 hover:bg-blue-50">
+                            <ExternalLink className="h-3.5 w-3.5" /> Cek Resi
+                          </Button>
+                        </a>
+                      )}
+
                       {type === "OUTBOUND" && (
                         <Link
                           href={`/super-admin/logistics/print/${ship.id}`}
@@ -715,7 +820,7 @@ export default function ShipmentManager({
 
               <div className="space-y-2 md:col-span-2">
                 <Label>Ekspedisi / Vendor</Label>
-                <Select value={vendorId} onValueChange={setVendorId}>
+                <Select value={vendorId} onValueChange={handleVendorChange}>
                   <SelectTrigger className="bg-white">
                     <SelectValue placeholder="Pilih Kurir/Vendor..." />
                   </SelectTrigger>
@@ -747,6 +852,12 @@ export default function ShipmentManager({
                   onChange={(e) => setDestination(e.target.value)}
                   placeholder="Contoh: Jakarta"
                 />
+                {type === "OUTBOUND" &&
+                  destination === orderInfo?.shippingAddress && (
+                    <p className="text-[10px] font-medium text-emerald-600 flex items-center gap-1 mt-1">
+                      ✓ Menggunakan alamat pengiriman Klien
+                    </p>
+                  )}
               </div>
               <div className="space-y-2">
                 <Label>
@@ -958,8 +1069,25 @@ export default function ShipmentManager({
             {/* 1. Status Selection */}
             <div className="space-y-2">
               <Label>Status Baru</Label>
-              <Select value={statusVal} onValueChange={setStatusVal}>
-                <SelectTrigger>
+              <Select
+                value={statusVal}
+                onValueChange={(val) => {
+                  setStatusVal(val);
+                  const currentShipment = shipments.find(
+                    (s) => s.id === updateStatusId,
+                  );
+
+                  if (currentShipment) {
+                    if (val === "PREPARED" || val === "DISPATCHED") {
+                      setStatusCity(currentShipment.origin || "");
+                    } else if (val === "ARRIVED") {
+                      setStatusCity(currentShipment.destination || "");
+                    } else {
+                      setStatusCity("");
+                    }
+                  }
+                }}>
+                <SelectTrigger className="bg-white">
                   <SelectValue placeholder="Pilih tahapan..." />
                 </SelectTrigger>
                 <SelectContent>

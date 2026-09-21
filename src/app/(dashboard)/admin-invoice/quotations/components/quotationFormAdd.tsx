@@ -6,7 +6,9 @@ import {
   Banknote,
   Box,
   CalendarIcon,
+  Check,
   ChevronDown,
+  ChevronsUpDown,
   ImageIcon,
   Layers,
   Loader2,
@@ -29,6 +31,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Dialog,
   DialogContent,
@@ -68,10 +78,17 @@ import {
 } from "./helper/quotationNotesSection";
 import { ClientData, NoteCategory, ProductData } from "./quotationForm";
 
-type SalesData = { id: string; name: string };
-type Currency = { code: string; name: string; symbol: string };
+export type Currency = { code: string; name: string; symbol: string };
 
-const QUOTATION_STATUSES = ["DRAFT", "SENT", "FOLLOW_UP"] as const;
+const QUOTATION_STATUSES = [
+  "DRAFT",
+  "SENT",
+  "FOLLOW_UP",
+  "ACCEPTED",
+  "REJECTED",
+  "EXPIRED",
+  "CANCELLED",
+] as const;
 
 const quotationSchema = z.object({
   date: z.date(),
@@ -95,8 +112,13 @@ const quotationSchema = z.object({
         isManualProduct: z.boolean().default(false),
         productId: z.string().optional(),
         variantId: z.string().optional(),
+        selectedAttributes: z.record(z.string(), z.any()).optional(),
         productName: z.string().min(1, "Product name is required"),
         description: z.string().optional(),
+
+        quantity: z.coerce.number().min(1, "Quantity minimal 1").default(1),
+
+        unitPrice: z.coerce.number().min(0).default(0), // Pastikan juga unitPrice ada
         discount: z.coerce.number().min(0).default(0),
         remarks: z.string().optional(),
         tiers: z
@@ -117,7 +139,91 @@ const quotationSchema = z.object({
 export type AddQuotationFormValues = z.infer<typeof quotationSchema>;
 
 // ============================================================
-// SUB-COMPONENT: ItemRow (Tetap sama seperti yang Anda buat)
+// SUB-COMPONENT: OrderSummary (Glassmorphism & Real-time Calculation)
+// ============================================================
+function OrderSummary({ form, isLoading }: { form: any; isLoading: boolean }) {
+  const items = form.watch("items") || [];
+  const currencyCode = form.watch("currencyCode") || "IDR"; // Dinamis mengikuti form
+
+  const subTotal = items.reduce((acc: number, item: any) => {
+    const qty = Number(item.quantity) > 0 ? Number(item.quantity) : 1; // Ambil dari input Qty baris produk
+    const unitPrice = Number(item.unitPrice) || 0; // Harga satuan murni hasil kalkulasi
+    return acc + qty * unitPrice;
+  }, 0);
+
+  const discount = items.reduce(
+    (acc: number, item: any) => acc + Number(item.discount || 0),
+    0,
+  );
+
+  const grandTotal = subTotal - discount;
+
+  return (
+    <div className="relative overflow-hidden bg-linear-to-br from-slate-50/90 to-slate-100/50 backdrop-blur-xl border border-white/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] ring-1 ring-slate-900/5 h-fit">
+      <div className="flex items-center justify-between pb-4 border-b border-slate-200/60">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+          <Banknote className="w-4 h-4 text-blue-500" /> Estimasi Biaya
+        </h3>
+      </div>
+
+      <div className="space-y-3 pt-4 text-sm">
+        <div className="flex justify-between text-slate-600">
+          <span>Estimasi Subtotal</span>
+          <span className="font-semibold text-slate-700">
+            {new Intl.NumberFormat("id-ID", {
+              style: "currency",
+              currency: currencyCode,
+            }).format(subTotal)}
+          </span>
+        </div>
+
+        {discount > 0 && (
+          <div className="flex justify-between text-emerald-600 text-xs">
+            <span>Total Diskon Item</span>
+            <span>
+              -{" "}
+              {new Intl.NumberFormat("id-ID", {
+                style: "currency",
+                currency: currencyCode,
+              }).format(discount)}
+            </span>
+          </div>
+        )}
+
+        <Separator className="bg-slate-200/60" />
+
+        <div className="flex justify-between text-lg font-extrabold items-center">
+          <span className="text-slate-800">Estimasi Total</span>
+          <span className="text-blue-600 tracking-tight">
+            {new Intl.NumberFormat("id-ID", {
+              style: "currency",
+              currency: currencyCode,
+            }).format(grandTotal >= 0 ? grandTotal : 0)}
+          </span>
+        </div>
+
+        <p className="text-[10px] text-slate-400 text-center mt-2 italic leading-relaxed">
+          *Total dihitung secara real-time berdasarkan jumlah kuantitas dan
+          harga satuan terkini (termasuk penyesuaian varian/atribut).
+        </p>
+
+        <Button
+          type="submit"
+          className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl shadow-lg shadow-blue-500/20 transition-all duration-200"
+          disabled={isLoading}>
+          {isLoading ? (
+            <Loader2 className="animate-spin w-4 h-4 mr-2" />
+          ) : (
+            "Simpan & Generate Penawaran"
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// SUB-COMPONENT: ItemRow Add Quotation
 // ============================================================
 function ItemRow({
   index,
@@ -140,11 +246,16 @@ function ItemRow({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [openCombobox, setOpenCombobox] = useState(false);
+
   const isManualProduct = form.watch(`items.${index}.isManualProduct`);
   const selectedProductId = form.watch(`items.${index}.productId`);
   const selectedProduct = products.find((p: any) => p.id === selectedProductId);
-  const isCustomProduct = selectedProduct?.isCustom;
-  const productVariants = selectedProduct?.productVariants || [];
+
+  // Menggunakan format object kosong default agar tidak undefined
+  const currentSelectedAttrs =
+    form.watch(`items.${index}.selectedAttributes`) || {};
+
   const {
     fields: tierFields,
     append: appendTier,
@@ -164,15 +275,107 @@ function ItemRow({
     }
   }, [imageFile]);
 
+  //  LOGIKA UTAMA YANG SUDAH DIPERBARUI: (Mencegah Harga Dobel & Menjaga Jarak Tiers)
+  const handleAttributeToggle = (attributeId: string, valueId: string) => {
+    // 1. Tentukan status baru (toggle)
+    const currentArr: string[] = Array.isArray(
+      currentSelectedAttrs[attributeId],
+    )
+      ? currentSelectedAttrs[attributeId]
+      : [];
+
+    const isSelected = currentArr.includes(valueId);
+    const newArr = isSelected
+      ? currentArr.filter((id: string) => id !== valueId)
+      : [...currentArr, valueId];
+
+    const newAttrs = {
+      ...currentSelectedAttrs,
+      [attributeId]: newArr,
+    };
+
+    // 2. FUNGSI HITUNG ULANG TOTAL (Murni dari Atribut, tanpa dobel varian)
+    const calculateTotalExtra = (attrsObj: Record<string, string[]>) => {
+      let extra = 0;
+      let matchedVariantId = undefined;
+
+      if (!selectedProduct) return { extra, matchedVariantId };
+
+      const allSelectedValIds = Object.values(attrsObj)
+        .flat()
+        .filter(Boolean) as string[];
+
+      // A. Hitung modifier atribut (HANYA INI YANG MENAMBAH HARGA EKSTRA)
+      selectedProduct.availableAttributes?.forEach((attr: any) => {
+        attr.values.forEach((val: any) => {
+          if (allSelectedValIds.includes(val.valueId)) {
+            extra += Number(val.priceModifier || 0);
+          }
+        });
+      });
+
+      // B. Cari ID Varian yang cocok
+      const matchedVariant = selectedProduct.productVariants?.find((v: any) => {
+        if (!v.combinationIds) return false;
+        // Pastikan jumlah pilihan pas dan semuanya cocok agar mendapat Varian yang tepat
+        return (
+          v.combinationIds.length === allSelectedValIds.length &&
+          v.combinationIds.every((id: string) => allSelectedValIds.includes(id))
+        );
+      });
+
+      if (matchedVariant) {
+        matchedVariantId = matchedVariant.id;
+        //  Harga varian tidak lagi ditambahkan di sini agar tidak dobel.
+      }
+
+      return { extra, matchedVariantId };
+    };
+
+    // Hitung ekstra lama dan ekstra baru untuk mendapatkan SELISIH (Diff) khusus Tiers
+    const oldCalc = calculateTotalExtra(currentSelectedAttrs);
+    const newCalc = calculateTotalExtra(newAttrs);
+    const priceDiff = newCalc.extra - oldCalc.extra;
+
+    // 3. UPDATE FORM DENGAN HARGA PASTI (Base Price + Ekstra Baru)
+    const basePrice = Number(selectedProduct?.basePrice || 0);
+    const newTotalUnitPrice = basePrice + newCalc.extra;
+
+    form.setValue(`items.${index}.selectedAttributes`, newAttrs);
+    form.setValue(`items.${index}.variantId`, newCalc.matchedVariantId);
+
+    // Set harga utama dengan total harga absolut yang aman
+    form.setValue(`items.${index}.unitPrice`, newTotalUnitPrice);
+
+    // 4. UPDATE TIERS BERDASARKAN SELISIH (Agar tingkatan harga tetap terjaga jaraknya)
+    const currentTiers = form.getValues(`items.${index}.tiers`) || [];
+    currentTiers.forEach((tier: any, i: number) => {
+      const currentTierPrice = Number(tier.unitPrice || 0);
+      form.setValue(
+        `items.${index}.tiers.${i}.unitPrice`,
+        currentTierPrice + priceDiff,
+      );
+    });
+  };
+
   return (
     <div className="border rounded-lg bg-white shadow-sm transition-all duration-200">
+      {/* --- BARIS UTAMA (GRID) --- */}
       <div className="grid grid-cols-12 gap-3 items-start p-3">
+        {/* Toggle Manual/DB */}
         <div className="col-span-1 flex flex-col items-center gap-1 mt-1.5">
           <Switch
             checked={!!isManualProduct}
-            onCheckedChange={(v) =>
-              form.setValue(`items.${index}.isManualProduct`, v)
-            }
+            onCheckedChange={(v) => {
+              form.setValue(`items.${index}.isManualProduct`, v);
+              if (v) {
+                form.setValue(`items.${index}.productId`, "");
+                form.setValue(`items.${index}.variantId`, undefined);
+                form.setValue(`items.${index}.selectedAttributes`, {});
+              } else {
+                form.setValue(`items.${index}.productName`, "");
+              }
+            }}
             className="scale-75"
           />
           <span className="text-[10px] uppercase font-bold text-muted-foreground">
@@ -180,75 +383,136 @@ function ItemRow({
           </span>
         </div>
 
+        {/* Input Produk */}
         <div className="col-span-4 flex flex-col gap-2">
           {isManualProduct ? (
             <Input
-              placeholder="Nama barang/jasa..."
+              placeholder="Nama barang/jasa manual..."
+              className="h-10"
               {...form.register(`items.${index}.productName`)}
             />
           ) : (
-            <>
-              <Select
-                value={selectedProductId || ""}
-                onValueChange={(v) => {
-                  const p = products.find((x: any) => x.id === v);
-                  if (p) {
-                    form.setValue(`items.${index}.productId`, p.id);
-                    form.setValue(`items.${index}.productName`, p.name);
-                    form.setValue(`items.${index}.variantId`, undefined);
-                    form.setValue(`items.${index}.unitPrice`, p.basePrice);
-                    if (p.description) {
-                      form.setValue(
-                        `items.${index}.description`,
-                        p.description,
-                      );
-                      setExpanded(true);
-                    }
-                  }
-                }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih Produk..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((p: any) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-1">
+              <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className={cn(
+                      "w-full justify-between h-10 font-normal bg-white",
+                      !selectedProductId && "text-muted-foreground",
+                    )}>
+                    {selectedProductId
+                      ? selectedProduct?.name || "Produk Tidak Ditemukan"
+                      : "Cari Produk di Database..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-(--radix-popover-trigger-width) p-0"
+                  align="start">
+                  <Command>
+                    <CommandInput placeholder="Cari nama atau SKU produk..." />
+                    <CommandList>
+                      <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
+                      <CommandGroup>
+                        {products.map((p: any) => (
+                          <CommandItem
+                            key={p.id}
+                            value={`${p.name} ${p.sku || ""}`}
+                            onSelect={() => {
+                              form.setValue(`items.${index}.productId`, p.id);
+                              form.setValue(
+                                `items.${index}.productName`,
+                                p.name,
+                              );
+                              form.setValue(
+                                `items.${index}.variantId`,
+                                undefined,
+                              );
+                              form.setValue(
+                                `items.${index}.selectedAttributes`,
+                                {},
+                              );
 
-              {isCustomProduct && (
-                <div className="relative pl-4 mt-0.5 before:content-[''] before:absolute before:left-1.5 before:top-0 before:w-px before:h-4 before:bg-blue-300 before:border-l before:border-blue-300">
-                  <div className="absolute left-1.5 top-4 w-2.5 h-px bg-blue-300"></div>
-                  <Select
-                    value={form.watch(`items.${index}.variantId`) || ""}
-                    onValueChange={(vid) => {
-                      form.setValue(`items.${index}.variantId`, vid);
-                      const variant = productVariants.find(
-                        (v: any) => v.id === vid,
-                      );
-                      if (variant && variant.price) {
-                        form.setValue(
-                          `items.${index}.unitPrice`,
-                          Number(variant.price),
-                        );
-                      }
-                    }}>
-                    <SelectTrigger className="h-8 bg-slate-50 border-slate-200 text-xs shadow-none">
-                      <SelectValue placeholder="Pilih Spesifikasi Variant..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {productVariants.map((v: any) => (
-                        <SelectItem key={v.id} value={v.id}>
-                          {v.variantName} {v.price ? `- Rp ${v.price}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                              const basePrice = Number(p.basePrice || 0);
+                              form.setValue(
+                                `items.${index}.unitPrice`,
+                                basePrice,
+                              );
+
+                              if (p.priceTiers && p.priceTiers.length > 0) {
+                                const autoTiers = p.priceTiers.map(
+                                  (tier: any) => ({
+                                    minQuantity: tier.minQuantity,
+                                    maxQuantity: tier.maxQuantity || undefined,
+                                    quantityLabel: "Pcs",
+                                    unitPrice: Number(tier.price),
+                                  }),
+                                );
+                                form.setValue(
+                                  `items.${index}.tiers`,
+                                  autoTiers,
+                                );
+                              } else {
+                                form.setValue(`items.${index}.tiers`, [
+                                  {
+                                    minQuantity: 1,
+                                    maxQuantity: undefined,
+                                    quantityLabel: "Pcs",
+                                    unitPrice: basePrice,
+                                  },
+                                ]);
+                              }
+
+                              if (p.description) {
+                                form.setValue(
+                                  `items.${index}.description`,
+                                  p.description,
+                                );
+                                setExpanded(true);
+                              }
+                              setOpenCombobox(false);
+                            }}>
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4 shrink-0",
+                                p.id === selectedProductId
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span>{p.name}</span>
+                              <span className="text-[10px] text-gray-500">
+                                SKU: {p.sku || "-"}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              {selectedProduct && (
+                <div className="flex items-center gap-2 text-[10px] text-slate-500 pl-1">
+                  <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                    SKU:{" "}
+                    <span className="font-medium text-slate-700">
+                      {selectedProduct.sku || "-"}
+                    </span>
+                  </span>
+                  <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                    UOM:{" "}
+                    <span className="font-medium text-slate-700">
+                      {selectedProduct.uom || "-"}
+                    </span>
+                  </span>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
 
@@ -258,7 +522,7 @@ function ItemRow({
             <Input
               type="number"
               placeholder="0"
-              className="pr-10"
+              className="pr-10 h-10 text-center"
               {...form.register(`items.${index}.quantity`)}
             />
             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground pointer-events-none">
@@ -273,6 +537,7 @@ function ItemRow({
             <Input
               type="number"
               placeholder="0"
+              className="h-10 text-right pr-2"
               {...form.register(`items.${index}.unitPrice`)}
             />
           </div>
@@ -287,13 +552,14 @@ function ItemRow({
             <Input
               type="number"
               placeholder="0"
-              className="pl-9"
+              className="pl-9 h-10 text-right pr-2"
               {...form.register(`items.${index}.discount`)}
             />
           </div>
         </div>
 
-        <div className="col-span-1 flex items-center justify-end gap-1 mt-1">
+        {/* Actions */}
+        <div className="col-span-1 flex items-center justify-end gap-1 mt-1.5">
           <Button
             type="button"
             variant="ghost"
@@ -318,6 +584,75 @@ function ItemRow({
           </Button>
         </div>
       </div>
+
+      {/*  AREA FULL-WIDTH: PILIHAN ATRIBUT/VARIAN BERURUTAN VERTIKAL */}
+      {!isManualProduct &&
+        selectedProduct?.availableAttributes &&
+        selectedProduct.availableAttributes.length > 0 && (
+          <div className="px-3 pb-4">
+            <div className="relative overflow-hidden bg-linear-to-br from-slate-50/90 to-slate-100/50 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] ring-1 ring-slate-900/5">
+              <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-blue-500" /> Pilih
+                Varian/Atribut:
+              </p>
+
+              {/* UBAH DARI GRID MENJADI FLEX COLUMN AGAR BERURUTAN KE BAWAH */}
+              <div className="flex flex-col space-y-4">
+                {selectedProduct.availableAttributes.map((attr: any) => (
+                  <div
+                    key={attr.attributeId}
+                    className="flex flex-col space-y-1.5 bg-white/60 p-3 rounded-xl border border-slate-200/60 shadow-xs">
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      {attr.attributeName}
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {attr.values.map((val: any) => {
+                        const attributeSelection =
+                          currentSelectedAttrs[attr.attributeId];
+                        const isSelected = Array.isArray(attributeSelection)
+                          ? attributeSelection.includes(val.valueId)
+                          : false;
+
+                        return (
+                          <button
+                            type="button"
+                            key={val.valueId}
+                            onClick={() =>
+                              handleAttributeToggle(
+                                attr.attributeId,
+                                val.valueId,
+                              )
+                            }
+                            className={cn(
+                              "relative px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 ease-out flex items-center justify-center",
+                              isSelected
+                                ? "bg-blue-600 text-white shadow-[0_2px_8px_rgba(37,99,235,0.4)] scale-105 border border-blue-500/80"
+                                : "bg-white/80 text-slate-600 border border-slate-200/80 shadow-sm hover:bg-white hover:scale-105 hover:shadow-md backdrop-blur-md",
+                            )}>
+                            {val.value}
+                            {val.priceModifier > 0 && (
+                              <span
+                                className={cn(
+                                  "ml-1.5 opacity-90 text-[10px] font-medium tracking-wide",
+                                  isSelected
+                                    ? "text-blue-100"
+                                    : "text-emerald-600",
+                                )}>
+                                (+{val.priceModifier})
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+      {/* --- AREA TIERS --- */}
       <div className="p-3 bg-slate-50/50 border-t">
         <div className="flex items-center justify-between mb-2 px-1">
           <span className="text-[11px] font-semibold text-slate-500 uppercase flex items-center gap-1.5">
@@ -403,6 +738,8 @@ function ItemRow({
           ))}
         </div>
       </div>
+
+      {/* --- AREA EXPANDED (DESKRIPSI, GAMBAR DLL) --- */}
       {expanded && (
         <div className="border-t bg-gray-50/50 px-4 pb-4 pt-3 rounded-b-lg space-y-4">
           <div>
@@ -480,71 +817,6 @@ function ItemRow({
 }
 
 // ============================================================
-// SUB-COMPONENT: OrderSummary
-// ============================================================
-function OrderSummary({ form, isLoading }: { form: any; isLoading: boolean }) {
-  const items = form.watch("items") || [];
-  const currencyCode = form.watch("currencyCode") || "IDR"; // Dinamis mengikuti form
-
-  const subTotal = items.reduce((acc: number, item: any) => {
-    const firstTier = item.tiers?.[0];
-    const qty = Number(firstTier?.minQuantity) || 0;
-    const price = Number(firstTier?.unitPrice) || 0;
-    return acc + qty * price;
-  }, 0);
-
-  const discount = items.reduce(
-    (acc: number, item: any) => acc + Number(item.discount || 0),
-    0,
-  );
-
-  const grandTotal = subTotal - discount;
-
-  return (
-    <Card className="bg-slate-50 border-blue-100 h-fit">
-      <CardHeader>
-        <CardTitle className="text-base">Estimasi Biaya (Ops. 1)</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        <div className="flex justify-between">
-          <span>Estimasi Subtotal</span>
-          <span>
-            {new Intl.NumberFormat("id-ID", {
-              style: "currency",
-              currency: currencyCode, // Format dinamis
-            }).format(subTotal)}
-          </span>
-        </div>
-        <Separator />
-        <div className="flex justify-between text-lg font-bold">
-          <span>Estimasi Total</span>
-          <span className="text-blue-600">
-            {new Intl.NumberFormat("id-ID", {
-              style: "currency",
-              currency: currencyCode, // Format dinamis
-            }).format(grandTotal)}
-          </span>
-        </div>
-        <p className="text-[10px] text-muted-foreground text-center mt-2 italic">
-          *Total di atas adalah estimasi menggunakan Opsi/Tier pertama. Harga
-          asli menyesuaikan pilihan Klien.
-        </p>
-        <Button
-          type="submit"
-          className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
-          disabled={isLoading}>
-          {isLoading ? (
-            <Loader2 className="animate-spin w-4 h-4 mr-2" />
-          ) : (
-            "Simpan & Generate Penawaran"
-          )}
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ============================================================
 // MAIN FORM
 // ============================================================
 export default function QuotationAddForm({
@@ -565,6 +837,7 @@ export default function QuotationAddForm({
   const [itemImages, setItemImages] = useState<Record<number, File | null>>({});
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [isClientAddModalOpen, setIsClientAddModalOpen] = useState(false);
+  const [openClientCombobox, setOpenClientCombobox] = useState(false);
 
   const form = useForm<AddQuotationFormValues>({
     resolver: zodResolver(quotationSchema) as Resolver<AddQuotationFormValues>,
@@ -637,7 +910,6 @@ export default function QuotationAddForm({
 
   useEffect(() => {
     fetchMaster();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
   const handleImageChange = (index: number, file: File | null) => {
@@ -887,44 +1159,86 @@ export default function QuotationAddForm({
                       control={form.control}
                       name="clientId"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex flex-col">
                           <FormLabel>Pilih Client dari Database *</FormLabel>
-                          <Select
-                            onValueChange={(val) => {
-                              field.onChange(val);
-                              const client = clients.find((c) => c.id === val);
-                              if (client) {
-                                setSelectedClient(client);
-                                form.setValue("picId", "");
-                              }
-                            }}
-                            value={field.value ?? ""}
-                            disabled={loadingMaster}>
-                            <FormControl>
-                              <SelectTrigger className="bg-white h-11 border-blue-200">
-                                <SelectValue
-                                  placeholder={
-                                    loadingMaster
+                          <Popover
+                            open={openClientCombobox}
+                            onOpenChange={setOpenClientCombobox}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  disabled={loadingMaster}
+                                  className={cn(
+                                    "w-full justify-between bg-white h-11 border-blue-200 font-normal",
+                                    !field.value && "text-muted-foreground",
+                                  )}>
+                                  {field.value
+                                    ? (() => {
+                                        const c = clients.find(
+                                          (client) => client.id === field.value,
+                                        );
+                                        return c
+                                          ? `${c.name} (${c.type})`
+                                          : "Pilih Client...";
+                                      })()
+                                    : loadingMaster
                                       ? "Memuat data client..."
-                                      : "Ketik & Cari Client di Database..."
-                                  }
-                                />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {clients.map((c) => (
-                                <SelectItem key={c.id} value={c.id}>
-                                  {c.name} ({c.type}){" "}
-                                  {c.status ? `- ${c.status}` : ""}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                                      : "Ketik & Cari Client di Database..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-(--radix-popover-trigger-width) p-0"
+                              align="start">
+                              <Command>
+                                <CommandInput placeholder="Cari nama client, tipe, atau kode..." />
+                                <CommandList>
+                                  <CommandEmpty>
+                                    Client tidak ditemukan.
+                                  </CommandEmpty>
+                                  <CommandGroup>
+                                    {clients.map((c) => (
+                                      <CommandItem
+                                        key={c.id}
+                                        value={`${c.name} ${c.type} ${c.custCode || ""}`}
+                                        onSelect={() => {
+                                          field.onChange(c.id);
+                                          setSelectedClient(c);
+                                          form.setValue("picId", "");
+                                          setOpenClientCombobox(false);
+                                        }}>
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4 shrink-0",
+                                            c.id === field.value
+                                              ? "opacity-100"
+                                              : "opacity-0",
+                                          )}
+                                        />
+                                        <div className="flex flex-col">
+                                          <span>
+                                            {c.name} ({c.type})
+                                          </span>
+                                          {c.status && (
+                                            <span className="text-[10px] text-muted-foreground">
+                                              Status: {c.status}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
                     {selectedClient && (
                       <div className="rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 animate-in fade-in slide-in-from-top-1 overflow-hidden">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
@@ -1097,7 +1411,6 @@ export default function QuotationAddForm({
                   Total Diskon Item
                 </span>
               </div>
-
               <Button
                 type="button"
                 size="sm"
@@ -1106,6 +1419,8 @@ export default function QuotationAddForm({
                   append({
                     isManualProduct: true,
                     productName: "",
+                    quantity: 1, //  Diperbarui: Memberikan nilai default 1 agar tidak kosong
+                    unitPrice: 0,
                     discount: 0,
                     remarks: "",
                     tiers: [

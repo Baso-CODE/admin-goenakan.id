@@ -56,6 +56,7 @@ export const productSchema = z.object({
   tagIds: z.array(z.string()).optional(),
   description: z.string().optional(),
   basePrice: z.number().min(0, "Base price must be >= 0"),
+  isSample: z.boolean().optional(),
   isCustom: z.boolean().optional(),
   isMadeByOrder: z.boolean().optional(),
   isActive: z.boolean().optional(),

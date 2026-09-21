@@ -260,6 +260,7 @@ export default function PolicyForm({
                           <SimpleEditor
                             value={field.value ?? ""}
                             onChange={field.onChange}
+                            minHeight="250px"
                           />
                         </div>
                       </FormControl>
@@ -286,6 +287,7 @@ export default function PolicyForm({
                           <SimpleEditor
                             value={field.value ?? ""}
                             onChange={field.onChange}
+                            minHeight="250px"
                           />
                         </div>
                       </FormControl>

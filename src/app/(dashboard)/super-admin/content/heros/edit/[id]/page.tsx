@@ -1,6 +1,8 @@
 "use client";
 
 import { useApi } from "@/hooks/useApi";
+import { ChevronLeft } from "lucide-react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -8,14 +10,19 @@ import HeroForm, { HeroFormValues } from "../../components/heroForm";
 
 export default function EditHero() {
   const { fetchApi, status } = useApi();
-
   const { id } = useParams();
   const router = useRouter();
 
-  // Tipe data state mencakup imageUrl untuk preview
+  // 1. UPDATE TIPE STATE: Tambahkan imageMobileUrl dan imageTabletUrl
   const [heroData, setHeroData] = useState<
-    (HeroFormValues & { imageUrl: string }) | undefined
+    | (HeroFormValues & {
+        imageUrl?: string;
+        imageMobileUrl?: string;
+        imageTabletUrl?: string | null;
+      })
+    | undefined
   >(undefined);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -36,6 +43,7 @@ export default function EditHero() {
 
         const data = await res.json();
 
+        // 2. UPDATE SET DATA: Masukkan juga URL gambar untuk Mobile dan Tablet
         setHeroData({
           title: data.title,
           altText: data.altText,
@@ -44,6 +52,8 @@ export default function EditHero() {
           displayOrder: data.displayOrder,
           isActive: data.isActive,
           imageUrl: data.imageUrl,
+          imageMobileUrl: data.imageMobileUrl,
+          imageTabletUrl: data.imageTabletUrl,
         });
       } catch (err: any) {
         console.error("❌ Fetch Error:", err);
@@ -58,7 +68,11 @@ export default function EditHero() {
   }, [id, status, fetchApi, router]);
 
   // === 2. HANDLE UPDATE ===
-  const handleUpdateHero = async (data: HeroFormValues, file?: File) => {
+  // 3. UPDATE PARAMETER FILE: Tangkap file desktop, mobile, dan tablet
+  const handleUpdateHero = async (
+    data: HeroFormValues,
+    files: { desktop?: File; mobile?: File; tablet?: File },
+  ) => {
     if (status !== "authenticated") return;
 
     try {
@@ -73,8 +87,15 @@ export default function EditHero() {
       formData.append("displayOrder", data.displayOrder.toString());
       formData.append("isActive", String(data.isActive));
 
-      if (file) {
-        formData.append("image", file);
+      // 4. APPEND FILES JIKA ADA PERUBAHAN
+      if (files.desktop) {
+        formData.append("imageDesktop", files.desktop);
+      }
+      if (files.mobile) {
+        formData.append("imageMobile", files.mobile);
+      }
+      if (files.tablet) {
+        formData.append("imageTablet", files.tablet);
       }
 
       const res = await fetchApi(`/content/heros/${id}`, {
@@ -97,8 +118,16 @@ export default function EditHero() {
       setIsSubmitting(false);
     }
   };
+
   return (
-    <div className="space-y-4  mx-auto">
+    <div className="space-y-4 mx-auto">
+      <Link
+        href="/super-admin/content/heros"
+        className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-primary mb-2 transition-colors">
+        <ChevronLeft className="w-4 h-4 mr-1" />
+        Kembali ke Daftar Hero
+      </Link>
+
       <h2 className="text-xl font-semibold tracking-tight uppercase">
         Edit Hero Slide
       </h2>

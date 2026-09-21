@@ -6,28 +6,21 @@ import html2canvas from "html2canvas-pro";
 import jsPDF from "jspdf";
 import { FileDown, Loader2 } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useApi } from "@/hooks/useApi";
 
-const formatCurrency = (amount: string | number) => {
-  const numericAmount = Number(amount) || 0;
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-  }).format(numericAmount);
-};
-
 export default function QuotationPrint() {
   const { fetchApi, status } = useApi();
+  const params = useParams();
+  const quotationId = params?.quotationId;
 
-  const { quotationId } = useParams();
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   const [data, setData] = useState<any>(null);
+  console.log("ini adalah data", data);
 
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -52,6 +45,21 @@ export default function QuotationPrint() {
       setLoading(false);
     }
   }, [quotationId, status, fetchApi]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // === UTILS: FORMAT CURRENCY DINAMIS ===
+  const formatDynamicCurrency = (amount: string | number) => {
+    const code = data?.currencyCode || "IDR";
+    const numericAmount = Number(amount) || 0;
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: code,
+      minimumFractionDigits: 0,
+    }).format(numericAmount);
+  };
 
   const handleDownloadPDF = async () => {
     const element = invoiceRef.current;
@@ -102,9 +110,11 @@ export default function QuotationPrint() {
   // PREPARE VARIABLES
   // =========================================================
 
-  const salesName = data.sales?.name || "Goenakan Admin";
+  const salesName =
+    data.sales?.name || data.createdBy?.name || "Goenakan Admin";
   const salesPhone = data.sales?.phone || "+62 888-0370-1081";
-  const salesEmail = "goenakan.id@gmail.com";
+  const salesEmail =
+    data.sales?.email || data.createdBy?.email || "goenakan.id@gmail.com";
   const signatureUrl = data.sales?.signatureUrl;
 
   let clientCompany = data.manualClientCompany || data.manualClientName || "-";
@@ -171,7 +181,6 @@ export default function QuotationPrint() {
                 crossOrigin="anonymous"
               />
             </div>
-
             {/* 2. HEADER INFO */}
             <div className="flex justify-between items-start mb-6 text-[12px] text-gray-900">
               <div className="flex flex-col">
@@ -192,7 +201,7 @@ export default function QuotationPrint() {
                     <tr>
                       <td className="py-0.5 pr-4 align-top">Qtn Date</td>
                       <td className="py-0.5 align-top font-medium">
-                        :
+                        :{" "}
                         {data.date
                           ? format(new Date(data.date), "dd MMMM yyyy", {
                               locale: idLocale,
@@ -203,7 +212,7 @@ export default function QuotationPrint() {
                     <tr>
                       <td className="py-0.5 pr-4 align-top">Valid Until</td>
                       <td className="py-0.5 align-top font-medium">
-                        :
+                        :{" "}
                         {data.validUntil
                           ? format(new Date(data.validUntil), "dd MMMM yyyy", {
                               locale: idLocale,
@@ -220,14 +229,13 @@ export default function QuotationPrint() {
                     <tr>
                       <td className="py-0.5 pr-4 align-top">Currency</td>
                       <td className="py-0.5 align-top font-bold text-blue-600">
-                        : IDR
+                        : {data.currencyCode || "IDR"}
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </div>
-
             {/* 3. CUSTOMER INFO */}
             <div className="mb-8 w-[60%] border border-gray-300 p-4 rounded-sm bg-gray-50/50">
               <h2 className="text-[13px] font-bold text-gray-500 uppercase tracking-wide border-b border-gray-200 pb-1 mb-2">
@@ -261,122 +269,182 @@ export default function QuotationPrint() {
                 </tbody>
               </table>
             </div>
-
-            {/* 4. PRODUCT TABLE DENGAN LOGIKA TIER */}
+            {/* 4. PRODUCT TABLE UTAMA */}
             <div className="mb-8">
-              <table className="w-full border-collapse border border-[#94a3b8]">
+              <table className="w-full border-collapse border border-gray-800">
                 <thead>
-                  <tr className="bg-[#f3f4f6] text-center font-bold text-[11px] uppercase text-gray-700">
-                    <th className="border border-[#94a3b8] py-2 w-56">
+                  <tr className="bg-white text-center font-bold text-[11px] text-gray-900 border-b border-gray-800">
+                    <th className="border-r border-gray-800 py-2 w-32">
                       Product Detail
                     </th>
-                    <th className="border border-[#94a3b8] py-2">
-                      Description & Specification
+                    <th className="border-r border-gray-800 py-2">
+                      Product Specification
                     </th>
-                    <th className="border border-[#94a3b8] py-2 w-20">Qty</th>
-                    <th className="border border-[#94a3b8] py-2 w-32">
-                      Unit Price
-                    </th>
+                    <th className="border-r border-gray-800 py-2 w-20">Qty</th>
+                    <th className="py-2 w-32">Unit Price</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.items?.map((item: any) => {
+                  {data.items?.map((item: any, index: number) => {
                     const imageUrl = item.imageUrl;
-                    const tiers =
-                      item.tiers && item.tiers.length > 0 ? item.tiers : [{}];
-                    const rowSpanLength = tiers.length;
-                    return tiers.map((tier: any, index: number) => (
+                    const itemQty = Number(item.quantity) || 0;
+                    const itemPrice = Number(item.unitPrice) || 0;
+                    const hasTiers = item.tiers && item.tiers.length > 0;
+                    const basePrice = item.product?.basePrice
+                      ? Number(item.product.basePrice)
+                      : null;
+
+                    return (
                       <tr
-                        key={`${item.id}-${index}`}
-                        className="align-top text-[12px]">
-                        {index === 0 && (
-                          <>
-                            <td
-                              className="border border-[#94a3b8] py-2 px-3"
-                              rowSpan={rowSpanLength}>
-                              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3">
-                                {imageUrl && (
-                                  <div className="shrink-0">
-                                    <img
-                                      src={imageUrl}
-                                      alt={item.productName}
-                                      className="w-14 h-14 object-cover rounded shadow-sm border border-gray-200"
-                                      crossOrigin="anonymous"
-                                    />
-                                  </div>
-                                )}
-                                <div className="font-bold text-gray-800 mt-1">
-                                  {item.productName}
-                                  {item.variant?.variantName && (
-                                    <div className="text-[10px] text-blue-600 font-semibold mt-0.5">
-                                      ({item.variant.variantName})
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td
-                              className="border border-[#94a3b8] py-2 px-3 text-gray-700"
-                              rowSpan={rowSpanLength}>
-                              {/* 1. PRODUCT DESCRIPTION */}
-                              {item.description ? (
-                                <div className="text-[11px] leading-relaxed whitespace-pre-line text-justify">
-                                  {item.description}
-                                </div>
-                              ) : null}
+                        key={item.id || index}
+                        className="align-top text-[11px] border-b border-gray-800">
+                        {/* Kolom 1: Product Detail (Hanya Gambar & Link URL) */}
+                        <td className="border-r border-gray-800 p-2 text-center align-top">
+                          {imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={item.productName}
+                              className="w-24 h-24 object-contain mx-auto"
+                              crossOrigin="anonymous"
+                            />
+                          ) : (
+                            <div className="text-gray-400 italic text-[9px] mt-8">
+                              No Image
+                            </div>
+                          )}
 
-                              {/* 2. PRODUCT SPECIFICATION / CUSTOMIZATION */}
-                              {item.customization && (
-                                <div
-                                  className={`text-[10px] space-y-1 ${item.description ? "mt-3 pt-2 border-t border-gray-100" : ""}`}>
-                                  <div className="font-semibold text-gray-800 mb-1">
-                                    Specifications:
-                                  </div>
-                                  {item.customization}
-                                </div>
-                              )}
-
-                              {/* FALLBACK JIKA KEDUANYA KOSONG */}
-                              {!item.description && !item.customization && (
-                                <span className="text-gray-400 italic text-[10px]">
-                                  No description or specification provided.
-                                </span>
-                              )}
-
-                              {/* 3. REMARKS / CATATAN KHUSUS */}
-                              {item.remarks && (
-                                <div className="mt-2 text-[10px] text-slate-500 italic border-t border-slate-100 pt-1.5 bg-slate-50 p-1 rounded-sm">
-                                  <span className="font-semibold text-slate-700 not-italic">
-                                    Note:
-                                  </span>
-                                  {item.remarks}
-                                </div>
-                              )}
-                            </td>
-                          </>
-                        )}
-
-                        <td className="border border-[#94a3b8] py-2 text-center font-semibold">
-                          {tier.minQuantity || "0"}
-                          {tier.maxQuantity ? ` - ${tier.maxQuantity}` : ""}
-                          {tier.quantityLabel && (
-                            <span className="ml-1 text-[10px] font-normal text-gray-500 uppercase">
-                              {tier.quantityLabel}
-                            </span>
+                          {item.product?.slug && (
+                            <a
+                              href={`https://client.goenakan.tech/en/products/${item.product.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-1.5 block text-[9px] text-blue-600 hover:underline">
+                              View Product Page
+                            </a>
                           )}
                         </td>
-                        <td className="border border-[#94a3b8] py-2 text-right px-4 font-mono font-medium text-blue-700">
-                          {tier.unitPrice
-                            ? formatCurrency(tier.unitPrice)
-                            : "-"}
+
+                        {/* Kolom 2: Product Specification */}
+                        {/*  PERBAIKAN JARAK: align-top dan class margin diperkecil */}
+                        <td className="border-r border-gray-800 p-3 align-top text-gray-800">
+                          <div className="font-bold text-[12px] mb-1">
+                            {item.productName}
+                          </div>
+
+                          {/* Spesifikasi (Deskripsi & Customization Manual) */}
+                          <div className="space-y-0.5 text-[10px]">
+                            {item.customization &&
+                            typeof item.customization === "object" ? (
+                              Object.entries(item.customization).map(
+                                ([key, value]) => (
+                                  <div key={key}>
+                                    <span className="font-medium">{key}:</span>{" "}
+                                    {String(value)}
+                                  </div>
+                                ),
+                              )
+                            ) : item.customization ? (
+                              <div className="whitespace-pre-line">
+                                {item.customization}
+                              </div>
+                            ) : null}
+
+                            {item.description && (
+                              <div className="whitespace-pre-line mt-1">
+                                {item.description}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Attributes Available / Selected */}
+                          {item.product?.availableAttributes?.map(
+                            (attr: any, attrIdx: number) => {
+                              return (
+                                <div
+                                  key={attrIdx}
+                                  className="mt-1 text-[10px] text-gray-700">
+                                  {attr.hasSelection
+                                    ? `${attr.attributeName} : `
+                                    : `Available in ${attr.attributeName} : `}
+
+                                  {attr.values.map((v: any, vIdx: number) => (
+                                    <span key={v.valueId}>
+                                      {v.value}
+                                      {vIdx < attr.values.length - 2 && ", "}
+                                      {vIdx === attr.values.length - 2 &&
+                                        " and "}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            },
+                          )}
+
+                          {/* Remarks */}
+                          {item.remarks && (
+                            <div className="mt-2 text-[10px] italic text-gray-500 bg-gray-50 p-1.5 rounded">
+                              <span className="font-semibold text-gray-700 not-italic">
+                                Note:{" "}
+                              </span>
+                              {item.remarks}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Kolom 3: Qty */}
+                        {/*  PERBAIKAN ALIGNMENT: Ubah jadi align-top dan tambahkan elemen transparan pendobrak */}
+                        <td className="border-r border-gray-800 p-3 text-center align-top font-medium text-[11px]">
+                          {/* Elemen invisible untuk menyeimbangkan tinggi "Start from" di sebelahnya */}
+                          {basePrice !== null && item.isPriceStartFrom && (
+                            <div className="text-[10px] mb-1.5 pb-1 border-b border-transparent invisible">
+                              Start from:
+                              <br />
+                              <span>0</span>
+                            </div>
+                          )}
+
+                          {hasTiers ? (
+                            <div className="flex flex-col space-y-1.5">
+                              {item.tiers.map((t: any, idx: number) => (
+                                <div key={idx}>{t.minQuantity}</div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div>{itemQty}</div>
+                          )}
+                        </td>
+
+                        {/* Kolom 4: Unit Price */}
+                        {/*  PERBAIKAN ALIGNMENT: Ubah jadi align-top */}
+                        <td className="p-3 text-center align-top font-medium text-gray-800 text-[11px]">
+                          {basePrice !== null && item.isPriceStartFrom && (
+                            <div className="text-[10px] text-gray-500 mb-1.5 pb-1 border-b border-gray-300">
+                              Start from:
+                              <br />
+                              <span className="font-medium text-gray-800">
+                                {formatDynamicCurrency(basePrice)}
+                              </span>
+                            </div>
+                          )}
+
+                          {hasTiers ? (
+                            <div className="flex flex-col space-y-1.5">
+                              {item.tiers.map((t: any, idx: number) => (
+                                <div key={idx}>
+                                  {formatDynamicCurrency(t.unitPrice)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div>{formatDynamicCurrency(itemPrice)}</div>
+                          )}
                         </td>
                       </tr>
-                    ));
+                    );
                   })}
                 </tbody>
               </table>
             </div>
-
             {/* 5. NOTES */}
             <div className="mb-10">
               <div className="font-bold text-[13px] uppercase mb-2 text-gray-800 border-b border-gray-800 inline-block pb-0.5">

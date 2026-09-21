@@ -22,7 +22,6 @@ import {
 
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
-import TableRole from "./tableRole";
 
 // --- Definisi Tipe (Sesuai dengan balikan dari UserService backend) ---
 interface User {
@@ -52,7 +51,7 @@ export default function UserManagementPage() {
   const [search, setSearch] = useState<string>("");
 
   // Jika backend belum pakai pagination, kita pakai pencarian di sisi client (Client-side filtering)
-  const debouncedSearch = useDebounce(search, 300);
+  const debouncedSearch = useDebounce(search, 800);
 
   // === FETCH DATA DARI BACKEND ===
   const fetchUsers = async () => {
@@ -255,15 +254,6 @@ export default function UserManagementPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* ========================================== */}
-      {/* BAGIAN 2: TABEL ROLE MANAGEMENT            */}
-      {/* ========================================== */}
-      <hr className="border-dashed border-gray-300 my-8" />
-
-      <div id="roles-section">
-        <TableRole />
       </div>
     </div>
   );

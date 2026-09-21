@@ -3,7 +3,16 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -22,20 +31,23 @@ import {
 } from "@/components/ui/table";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
-import { formatCurrency } from "@/utils/formatCurrency";
-import { FileText, Layers, RefreshCw, Search, Package, ChevronDown, ChevronUp, Coins, TrendingUp, ArrowRight, Check, Loader2, Save } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Coins,
+  Layers,
+  Loader2,
+  Package,
+  RefreshCw,
+  Save,
+  Search,
+  TrendingUp,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ManagePriceModal } from "./components/ManagePriceModal";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 
 export type PriceTier = {
   id: string;
@@ -122,7 +134,9 @@ export default function MasterPricingPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [currencies, setCurrencies] = useState<{ code: string; name: string; symbol?: string }[]>([]);
+  const [currencies, setCurrencies] = useState<
+    { code: string; name: string; symbol?: string }[]
+  >([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -150,11 +164,12 @@ export default function MasterPricingPage() {
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
 
   // Global Foreign Price Adjuster states
-  const [globalForeignPriceAdjuster, setGlobalForeignPriceAdjuster] = useState<number>(0);
+  const [globalForeignPriceAdjuster, setGlobalForeignPriceAdjuster] =
+    useState<number>(0);
   const [isSavingAdjuster, setIsSavingAdjuster] = useState(false);
   const [adjusterOpen, setAdjusterOpen] = useState(false);
 
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
 
   const fetchGlobalSettings = async () => {
     try {
@@ -225,7 +240,9 @@ export default function MasterPricingPage() {
         if (data.rates) {
           const rateVal = data.rates.IDR;
           setNewExchangeRate(rateVal);
-          toast.success(`Kurs ${code} berhasil diperbarui: Rp ${rateVal.toLocaleString("id-ID")}`);
+          toast.success(
+            `Kurs ${code} berhasil diperbarui: Rp ${rateVal.toLocaleString("id-ID")}`,
+          );
         } else {
           toast.error(`Gagal mengambil kurs terbaru untuk ${code}.`);
         }
@@ -241,7 +258,11 @@ export default function MasterPricingPage() {
   };
 
   const handleOpenPreview = async () => {
-    if (!newExchangeRate || isNaN(Number(newExchangeRate)) || Number(newExchangeRate) <= 0) {
+    if (
+      !newExchangeRate ||
+      isNaN(Number(newExchangeRate)) ||
+      Number(newExchangeRate) <= 0
+    ) {
       toast.error("Silakan masukkan nilai kurs yang valid.");
       return;
     }
@@ -263,7 +284,9 @@ export default function MasterPricingPage() {
       const data = await res.json();
       if (res.ok) {
         setPreviewData(data);
-        setSelectedProductIds(data.previewItems?.map((item: any) => item.productId) || []);
+        setSelectedProductIds(
+          data.previewItems?.map((item: any) => item.productId) || [],
+        );
       } else {
         toast.error(data.message || "Gagal memuat preview penyesuaian harga.");
         setIsPreviewOpen(false);
@@ -301,7 +324,9 @@ export default function MasterPricingPage() {
       });
       const result = await res.json();
       if (res.ok) {
-        toast.success(result.message || "Penyesuaian harga global berhasil disimpan!");
+        toast.success(
+          result.message || "Penyesuaian harga global berhasil disimpan!",
+        );
         setIsPreviewOpen(false);
         fetchProducts();
       } else {
@@ -333,7 +358,8 @@ export default function MasterPricingPage() {
       });
 
       if (categoryFilter !== "ALL") params.append("categoryId", categoryFilter);
-      if (debouncedSearch.trim()) params.append("search", debouncedSearch.trim());
+      if (debouncedSearch.trim())
+        params.append("search", debouncedSearch.trim());
 
       const res = await fetchApi(`/products?${params}`);
       const result = await res.json();
@@ -377,7 +403,8 @@ export default function MasterPricingPage() {
             Master Pricing
           </h1>
           <p className="text-sm text-stone-500 dark:text-stone-400 mt-1">
-            Pusat kelola dan sinkronisasi harga katalog produk berdasarkan kalkulator COGS supplier.
+            Pusat kelola dan sinkronisasi harga katalog produk berdasarkan
+            kalkulator COGS supplier.
           </p>
         </div>
         <Button
@@ -454,7 +481,9 @@ export default function MasterPricingPage() {
           <div className="p-4 border-t bg-stone-50/50 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
               <div className="space-y-1">
-                <Label htmlFor="targetCurrency" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                <Label
+                  htmlFor="targetCurrency"
+                  className="text-xs font-bold text-stone-600 uppercase tracking-wide">
                   Target Currency
                 </Label>
                 <Select
@@ -468,18 +497,23 @@ export default function MasterPricingPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="IDR">IDR (Rupiah)</SelectItem>
-                    {currencies.filter(c => c.code !== "IDR").map((cur) => (
-                      <SelectItem key={cur.code} value={cur.code}>
-                        {cur.code} ({cur.symbol || "$"}) - {cur.name || cur.code}
-                      </SelectItem>
-                    ))}
+                    {currencies
+                      .filter((c) => c.code !== "IDR")
+                      .map((cur) => (
+                        <SelectItem key={cur.code} value={cur.code}>
+                          {cur.code} ({cur.symbol || "$"}) -{" "}
+                          {cur.name || cur.code}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="newExchangeRate" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                  <Label
+                    htmlFor="newExchangeRate"
+                    className="text-xs font-bold text-stone-600 uppercase tracking-wide">
                     New Exchange Rate (Kurs)
                   </Label>
                   {targetCurrency !== "IDR" && (
@@ -489,9 +523,10 @@ export default function MasterPricingPage() {
                       size="icon"
                       className="h-5 w-5 hover:bg-stone-100"
                       onClick={() => handleFetchRate(targetCurrency)}
-                      disabled={isFetchingRate}
-                    >
-                      <RefreshCw className={`h-3 w-3 text-stone-500 ${isFetchingRate ? "animate-spin text-indigo-600" : ""}`} />
+                      disabled={isFetchingRate}>
+                      <RefreshCw
+                        className={`h-3 w-3 text-stone-500 ${isFetchingRate ? "animate-spin text-indigo-600" : ""}`}
+                      />
                     </Button>
                   )}
                 </div>
@@ -507,7 +542,9 @@ export default function MasterPricingPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="offsetValue" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                <Label
+                  htmlFor="offsetValue"
+                  className="text-xs font-bold text-stone-600 uppercase tracking-wide">
                   Offset Value (Adjustment)
                 </Label>
                 <Input
@@ -519,12 +556,15 @@ export default function MasterPricingPage() {
                   onChange={(e) => setOffsetValue(e.target.value)}
                 />
                 <p className="text-[10px] text-amber-600 mt-1 font-medium">
-                  * Catatan: Nilai offset ini akan langsung memengaruhi harga dasar akhir (final base price).
+                  * Catatan: Nilai offset ini akan langsung memengaruhi harga
+                  dasar akhir (final base price).
                 </p>
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="offsetCurrency" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                <Label
+                  htmlFor="offsetCurrency"
+                  className="text-xs font-bold text-stone-600 uppercase tracking-wide">
                   Offset Currency
                 </Label>
                 <Select
@@ -535,11 +575,14 @@ export default function MasterPricingPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="IDR">IDR (Rupiah)</SelectItem>
-                    {currencies.filter(c => c.code !== "IDR").map((cur) => (
-                      <SelectItem key={cur.code} value={cur.code}>
-                        {cur.code} ({cur.symbol || "$"}) - {cur.name || cur.code}
-                      </SelectItem>
-                    ))}
+                    {currencies
+                      .filter((c) => c.code !== "IDR")
+                      .map((cur) => (
+                        <SelectItem key={cur.code} value={cur.code}>
+                          {cur.code} ({cur.symbol || "$"}) -{" "}
+                          {cur.name || cur.code}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -579,11 +622,17 @@ export default function MasterPricingPage() {
         {adjusterOpen && (
           <div className="p-4 border-t bg-stone-50/50 space-y-4">
             <p className="text-xs text-stone-500 leading-relaxed max-w-2xl">
-              Atur persentase penyesuaian harga global untuk pengguna luar negeri. Nilai ini akan berlaku untuk semua produk yang diakses dari luar negeri (berdasarkan deteksi kurs/currency non-IDR), kecuali jika produk tersebut memiliki adjuster khusus sendiri di menu Kelola Master Pricing masing-masing produk.
+              Atur persentase penyesuaian harga global untuk pengguna luar
+              negeri. Nilai ini akan berlaku untuk semua produk yang diakses
+              dari luar negeri (berdasarkan deteksi kurs/currency non-IDR),
+              kecuali jika produk tersebut memiliki adjuster khusus sendiri di
+              menu Kelola Master Pricing masing-masing produk.
             </p>
             <div className="flex items-end gap-4 max-w-md">
               <div className="flex-1 space-y-1">
-                <Label htmlFor="globalForeignPriceAdjuster" className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                <Label
+                  htmlFor="globalForeignPriceAdjuster"
+                  className="text-xs font-bold text-stone-600 uppercase tracking-wide">
                   Adjuster Persentase (%)
                 </Label>
                 <Input
@@ -593,15 +642,18 @@ export default function MasterPricingPage() {
                   max="100"
                   placeholder="0"
                   value={globalForeignPriceAdjuster}
-                  onChange={(e) => setGlobalForeignPriceAdjuster(parseFloat(e.target.value) || 0)}
+                  onChange={(e) =>
+                    setGlobalForeignPriceAdjuster(
+                      parseFloat(e.target.value) || 0,
+                    )
+                  }
                   className="bg-white border-stone-200 font-semibold"
                 />
               </div>
               <Button
                 onClick={handleSaveGlobalAdjuster}
                 disabled={isSavingAdjuster}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded shadow-xs gap-1.5 h-10"
-              >
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded shadow-xs gap-1.5 h-10">
                 {isSavingAdjuster ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -628,35 +680,51 @@ export default function MasterPricingPage() {
               Review Global Price Adjustments
             </DialogTitle>
             <DialogDescription className="text-sm text-stone-500 mt-1">
-              Pratinjau perubahan nilai exchange rate dan offset harga dasar untuk seluruh katalog produk.
+              Pratinjau perubahan nilai exchange rate dan offset harga dasar
+              untuk seluruh katalog produk.
             </DialogDescription>
           </DialogHeader>
 
           {previewLoading ? (
             <div className="flex-1 py-20 flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
-              <span className="text-sm text-stone-600 font-medium">Menghitung ulang harga dasar seluruh produk...</span>
+              <span className="text-sm text-stone-600 font-medium">
+                Menghitung ulang harga dasar seluruh produk...
+              </span>
             </div>
           ) : previewData ? (
             <div className="flex-grow overflow-hidden flex flex-col space-y-4 my-2">
               {/* Summary Banner */}
               <div className="p-4 rounded-lg bg-indigo-50 border border-indigo-100 flex flex-wrap md:flex-nowrap gap-4 justify-between items-center text-xs">
                 <div className="space-y-1">
-                  <div className="font-semibold text-indigo-900">Parameter Batch Update</div>
+                  <div className="font-semibold text-indigo-900">
+                    Parameter Batch Update
+                  </div>
                   <div className="text-indigo-700 flex items-center gap-2 font-mono">
-                    Target: {targetCurrency} Exchange Rate <ArrowRight className="h-3 w-3" /> Rp {Number(newExchangeRate).toLocaleString("id-ID")}
+                    Target: {targetCurrency} Exchange Rate{" "}
+                    <ArrowRight className="h-3 w-3" /> Rp{" "}
+                    {Number(newExchangeRate).toLocaleString("id-ID")}
                   </div>
                 </div>
                 {Number(offsetValue) !== 0 && (
                   <div className="space-y-1 text-right md:text-left">
-                    <div className="font-semibold text-indigo-900">Tambahan Offset</div>
+                    <div className="font-semibold text-indigo-900">
+                      Tambahan Offset
+                    </div>
                     <div className="text-indigo-700 font-mono">
-                      {Number(offsetValue) > 0 ? "+" : ""}{Number(offsetValue).toLocaleString("id-ID")} {offsetCurrency} (≈ Rp {Number(previewData.summary?.rupiahOffset).toLocaleString("id-ID")})
+                      {Number(offsetValue) > 0 ? "+" : ""}
+                      {Number(offsetValue).toLocaleString("id-ID")}{" "}
+                      {offsetCurrency} (≈ Rp{" "}
+                      {Number(previewData.summary?.rupiahOffset).toLocaleString(
+                        "id-ID",
+                      )}
+                      )
                     </div>
                   </div>
                 )}
                 <div className="p-2 bg-white rounded-md border border-indigo-200 font-bold text-indigo-900 text-center min-w-[120px]">
-                  {selectedProductIds.length} / {previewData.previewItems?.length || 0} Terpilih
+                  {selectedProductIds.length} /{" "}
+                  {previewData.previewItems?.length || 0} Terpilih
                 </div>
               </div>
 
@@ -671,54 +739,86 @@ export default function MasterPricingPage() {
                           className="h-4.5 w-4.5 rounded border-stone-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                           checked={
                             previewData.previewItems?.length > 0 &&
-                            selectedProductIds.length === previewData.previewItems.length
+                            selectedProductIds.length ===
+                              previewData.previewItems.length
                           }
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedProductIds(previewData.previewItems.map((item: any) => item.productId));
+                              setSelectedProductIds(
+                                previewData.previewItems.map(
+                                  (item: any) => item.productId,
+                                ),
+                              );
                             } else {
                               setSelectedProductIds([]);
                             }
                           }}
                         />
                       </TableHead>
-                      <TableHead className="w-[37%] bg-stone-50">Produk</TableHead>
-                      <TableHead className="w-[15%] bg-stone-50">Kategori</TableHead>
-                      <TableHead className="w-[15%] text-right bg-stone-50">Harga Lama</TableHead>
-                      <TableHead className="w-[15%] text-right bg-stone-50">Harga Baru</TableHead>
-                      <TableHead className="w-[10%] text-right bg-stone-50">Selisih</TableHead>
+                      <TableHead className="w-[37%] bg-stone-50">
+                        Produk
+                      </TableHead>
+                      <TableHead className="w-[15%] bg-stone-50">
+                        Kategori
+                      </TableHead>
+                      <TableHead className="w-[15%] text-right bg-stone-50">
+                        Harga Lama
+                      </TableHead>
+                      <TableHead className="w-[15%] text-right bg-stone-50">
+                        Harga Baru
+                      </TableHead>
+                      <TableHead className="w-[10%] text-right bg-stone-50">
+                        Selisih
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {previewData.previewItems?.map((item: any) => (
-                      <TableRow key={item.productId} className="hover:bg-stone-50/50">
+                      <TableRow
+                        key={item.productId}
+                        className="hover:bg-stone-50/50">
                         <TableCell className="text-center">
                           <input
                             type="checkbox"
                             className="h-4.5 w-4.5 rounded border-stone-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                            checked={selectedProductIds.includes(item.productId)}
+                            checked={selectedProductIds.includes(
+                              item.productId,
+                            )}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedProductIds((prev) => [...prev, item.productId]);
+                                setSelectedProductIds((prev) => [
+                                  ...prev,
+                                  item.productId,
+                                ]);
                               } else {
-                                setSelectedProductIds((prev) => prev.filter((id) => id !== item.productId));
+                                setSelectedProductIds((prev) =>
+                                  prev.filter((id) => id !== item.productId),
+                                );
                               }
                             }}
                           />
                         </TableCell>
                         <TableCell>
-                          <div className="font-semibold text-stone-900 text-xs">{item.name}</div>
-                          <div className="text-[10px] text-stone-500 font-mono mt-0.5">{item.sku}</div>
+                          <div className="font-semibold text-stone-900 text-xs">
+                            {item.name}
+                          </div>
+                          <div className="text-[10px] text-stone-500 font-mono mt-0.5">
+                            {item.sku}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-stone-600 text-xs">{item.categoryName}</TableCell>
+                        <TableCell className="text-stone-600 text-xs">
+                          {item.categoryName}
+                        </TableCell>
                         <TableCell className="text-right text-stone-600 text-xs font-mono">
                           Rp {item.currentPrice.toLocaleString("id-ID")}
                         </TableCell>
                         <TableCell className="text-right text-stone-900 font-bold text-xs font-mono">
                           Rp {item.newPrice.toLocaleString("id-ID")}
                         </TableCell>
-                        <TableCell className={`text-right font-semibold text-xs font-mono ${item.difference > 0 ? "text-emerald-600" : item.difference < 0 ? "text-rose-600" : "text-stone-500"}`}>
-                          {item.difference > 0 ? "+" : ""}{item.difference.toLocaleString("id-ID")}
+                        <TableCell
+                          className={`text-right font-semibold text-xs font-mono ${item.difference > 0 ? "text-emerald-600" : item.difference < 0 ? "text-rose-600" : "text-stone-500"}`}>
+                          {item.difference > 0 ? "+" : ""}
+                          {item.difference.toLocaleString("id-ID")}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -735,14 +835,22 @@ export default function MasterPricingPage() {
                   checked={confirmCheckbox}
                   onChange={(e) => setConfirmCheckbox(e.target.checked)}
                 />
-                <label htmlFor="confirm-batch" className="text-xs text-stone-600 leading-normal cursor-pointer select-none">
-                  <span className="font-bold text-stone-800 block mb-0.5">Konfirmasi Batch Update</span>
-                  Saya menyetujui untuk mengubah harga dasar seluruh katalog produk di atas. Tindakan ini bersifat permanen dan akan langsung memperbarui harga jual di website.
+                <label
+                  htmlFor="confirm-batch"
+                  className="text-xs text-stone-600 leading-normal cursor-pointer select-none">
+                  <span className="font-bold text-stone-800 block mb-0.5">
+                    Konfirmasi Batch Update
+                  </span>
+                  Saya menyetujui untuk mengubah harga dasar seluruh katalog
+                  produk di atas. Tindakan ini bersifat permanen dan akan
+                  langsung memperbarui harga jual di website.
                 </label>
               </div>
             </div>
           ) : (
-            <div className="py-12 text-center text-stone-500 text-sm">Gagal memuat pratinjau data.</div>
+            <div className="py-12 text-center text-stone-500 text-sm">
+              Gagal memuat pratinjau data.
+            </div>
           )}
 
           <DialogFooter className="border-t pt-4 mt-2">
@@ -787,8 +895,12 @@ export default function MasterPricingPage() {
                 <TableRow>
                   <TableHead className="w-[30%]">Produk</TableHead>
                   <TableHead className="w-[15%]">Kategori</TableHead>
-                  <TableHead className="w-[15%] text-right">Harga Dasar</TableHead>
-                  <TableHead className="w-[15%] text-center">Wholesale Tiers</TableHead>
+                  <TableHead className="w-[15%] text-right">
+                    Harga Dasar
+                  </TableHead>
+                  <TableHead className="w-[15%] text-center">
+                    Wholesale Tiers
+                  </TableHead>
                   <TableHead className="w-[15%]">Referensi Sumber</TableHead>
                   <TableHead className="w-[10%] text-center">Aksi</TableHead>
                 </TableRow>
@@ -797,25 +909,42 @@ export default function MasterPricingPage() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, idx) => (
                     <TableRow key={idx}>
-                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-20 mx-auto" /></TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-40" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-20" />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Skeleton className="h-4 w-20 ml-auto" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-12 mx-auto" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-32" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-8 w-20 mx-auto" />
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : products.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-stone-500 font-medium">
-                      {error ? `Gagal memuat: ${error}` : "Tidak ada data produk ditemukan."}
+                    <TableCell
+                      colSpan={6}
+                      className="text-center py-12 text-stone-500 font-medium">
+                      {error
+                        ? `Gagal memuat: ${error}`
+                        : "Tidak ada data produk ditemukan."}
                     </TableCell>
                   </TableRow>
                 ) : (
                   products.map((p) => {
                     const activeQuote = p.activeVendorPriceRecord;
                     const freightMode = p.activePriceFreightMode;
-                    const thumbnail = p.images?.find((img) => img.isFeatured) || p.images?.[0];
+                    const thumbnail =
+                      p.images?.find((img) => img.isFeatured) || p.images?.[0];
 
                     return (
                       <TableRow key={p.id} className="hover:bg-stone-50/50">
@@ -833,8 +962,12 @@ export default function MasterPricingPage() {
                               </div>
                             )}
                             <div>
-                              <div className="font-semibold text-stone-900 text-sm">{p.name}</div>
-                              <div className="text-xs text-stone-500 font-mono mt-0.5">{p.sku}</div>
+                              <div className="font-semibold text-stone-900 text-sm">
+                                {p.name}
+                              </div>
+                              <div className="text-xs text-stone-500 font-mono mt-0.5">
+                                {p.sku}
+                              </div>
                             </div>
                           </div>
                         </TableCell>
@@ -850,7 +983,10 @@ export default function MasterPricingPage() {
                           Rp {Number(p.basePrice).toLocaleString("id-ID")}
                           {p.currencyCode && p.currencyCode !== "IDR" ? (
                             <span className="block text-[10px] text-stone-500 font-normal mt-0.5">
-                              {p.currencyCode} {Number(p.foreignPrice).toLocaleString("id-ID")} (Kurs: Rp {Number(p.exchangeRate).toLocaleString("id-ID")})
+                              {p.currencyCode}{" "}
+                              {Number(p.foreignPrice).toLocaleString("id-ID")}{" "}
+                              (Kurs: Rp{" "}
+                              {Number(p.exchangeRate).toLocaleString("id-ID")})
                             </span>
                           ) : (
                             <span className="block text-[10px] text-stone-400 font-normal mt-0.5">
@@ -871,10 +1007,16 @@ export default function MasterPricingPage() {
                           {activeQuote ? (
                             <div className="flex flex-col gap-1">
                               <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50 font-bold text-[10px] w-fit">
-                                {activeQuote.vendor?.companyName || "Supplier Sourcing"}
+                                {activeQuote.vendor?.companyName ||
+                                  "Supplier Sourcing"}
                               </Badge>
                               <span className="text-[10px] text-stone-500 font-medium">
-                                Mode: {freightMode === "SEA" ? "🚢 Sea" : freightMode === "AIR" ? "✈️ Air" : "✏️ Custom"}
+                                Mode:{" "}
+                                {freightMode === "SEA"
+                                  ? "🚢 Sea"
+                                  : freightMode === "AIR"
+                                    ? "✈️ Air"
+                                    : "✏️ Custom"}
                               </span>
                             </div>
                           ) : (

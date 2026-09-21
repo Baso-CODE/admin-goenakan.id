@@ -30,13 +30,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-// === SESUAIKAN TIPE DATA ===
+// === SESUAIKAN TIPE DATA BILINGUAL ===
 type EventCategory = {
   id: string;
-  title: string;
+  title_id: string;
+  title_en?: string | null;
   image?: string | null;
   displayOrder: number;
-  orderCount: number; //  TAMBAHAN: Menyimpan data ordered times
+  orderCount: number;
   isActive: boolean;
   createdAt: string;
 };
@@ -62,7 +63,7 @@ export default function EventCategoryTable() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
 
@@ -203,9 +204,10 @@ export default function EventCategoryTable() {
                 <TableRow>
                   <TableHead className="w-16 text-center">Order</TableHead>
                   <TableHead className="w-24">Image</TableHead>
-                  <TableHead className="min-w-64">Category Title</TableHead>
+                  <TableHead className="min-w-64">
+                    Category Title (ID / EN)
+                  </TableHead>
                   <TableHead className="text-center">Ordered</TableHead>
-                  {/*  HEADER BARU */}
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -216,7 +218,6 @@ export default function EventCategoryTable() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      {/*  colSpan diubah jadi 7 karena ada tambahan 1 kolom */}
                       <TableCell colSpan={7}>
                         <Skeleton className="h-12 w-full" />
                       </TableCell>
@@ -246,7 +247,7 @@ export default function EventCategoryTable() {
                           {item.image ? (
                             <Image
                               src={item.image}
-                              alt={item.title}
+                              alt={item.title_id}
                               fill
                               className="object-cover"
                             />
@@ -256,20 +257,37 @@ export default function EventCategoryTable() {
                         </div>
                       </TableCell>
 
-                      {/* --- JUDUL KATEGORI --- */}
+                      {/* --- JUDUL KATEGORI (ID & EN) --- */}
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Tag className="h-3 w-3 text-[#C4A48E]" />
-                          <div className="font-semibold text-sm">
-                            {item.title}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Tag className="h-3 w-3 text-[#C4A48E]" />
+                            <span className="font-semibold text-sm text-stone-900">
+                              {item.title_id}{" "}
+                              <span className="text-xs font-normal text-stone-400">
+                                (ID)
+                              </span>
+                            </span>
                           </div>
+                          {item.title_en ? (
+                            <div className="text-xs text-stone-500 pl-5">
+                              {item.title_en}{" "}
+                              <span className="text-[10px] text-stone-400">
+                                (EN)
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] italic text-amber-600/70 pl-5">
+                              Belum ada terjemahan EN
+                            </div>
+                          )}
                         </div>
-                        <div className="text-[10px] text-muted-foreground uppercase tracking-tighter mt-1">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-tighter mt-1 pl-5">
                           ID: {item.id.substring(0, 8)}...
                         </div>
                       </TableCell>
 
-                      {/* --- ORDER COUNT (BARU) --- */}
+                      {/* --- ORDER COUNT --- */}
                       <TableCell className="text-center">
                         <Badge
                           variant="secondary"

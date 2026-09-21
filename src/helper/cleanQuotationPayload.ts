@@ -19,7 +19,6 @@ export const cleanQuotationPayload = (data: QuotationPayloadInput) => {
     payload.clientId = null;
   }
 
-  // 3. 🔥 Logic Items — preserve tiers, buang field UI only
   payload.items = data.items.map((item) => {
     const { isManualProduct, ...cleanItem }: any = { ...item };
 
@@ -28,12 +27,14 @@ export const cleanQuotationPayload = (data: QuotationPayloadInput) => {
       // dari DB — biarkan productId
     } else {
       cleanItem.productId = null;
-      cleanItem.variantId = null; // 🔥 manual product tidak punya variant
+      cleanItem.variantId = null;
     }
 
+    cleanItem.quantity = Number(item.quantity || 1);
+    cleanItem.unitPrice = Number(item.unitPrice || 0);
     cleanItem.discount = Number(item.discount || 0);
 
-    // 🔥 Normalize tiers — pastikan semua field numerik ter-cast dengan benar
+    // Format tiers sebagai acuan harga grosir
     if (cleanItem.tiers && cleanItem.tiers.length > 0) {
       cleanItem.tiers = cleanItem.tiers.map((tier: any) => ({
         minQuantity: Number(tier.minQuantity) || 1,
@@ -42,7 +43,6 @@ export const cleanQuotationPayload = (data: QuotationPayloadInput) => {
         unitPrice: Number(tier.unitPrice) || 0,
       }));
     } else {
-      // 🔥 Fallback: jika tiers kosong, buat minimal 1 tier
       cleanItem.tiers = [
         {
           minQuantity: 1,
@@ -52,10 +52,6 @@ export const cleanQuotationPayload = (data: QuotationPayloadInput) => {
         },
       ];
     }
-
-    // 🔥 Hapus field lama yang tidak relevan di schema baru
-    delete cleanItem.quantity;
-    delete cleanItem.unitPrice;
 
     return cleanItem;
   });

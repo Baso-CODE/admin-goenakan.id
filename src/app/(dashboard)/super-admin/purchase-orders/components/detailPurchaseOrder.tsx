@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/utils/formatCurrency";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import {
@@ -66,15 +67,6 @@ type PurchaseOrderDetail = {
   }>;
 };
 
-// === UTILS ===
-const formatCurrency = (amount: number, symbol: string = "Rp") => {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: symbol === "Rp" ? "IDR" : "USD", // Sesuaikan fallback
-    minimumFractionDigits: 0,
-  }).format(amount);
-};
-
 const getStatusColor = (status: string) => {
   switch (status) {
     case "DRAFT":
@@ -109,6 +101,8 @@ export default function PurchaseOrderDetail() {
         const res = await fetchApi(`/purchase-orders/${poId}`);
         if (!res.ok) throw new Error("Gagal mengambil data");
         const data = await res.json();
+        console.log("ini dalah data", data);
+
         setPoData(data);
       } catch (error) {
         toast.error("Gagal memuat detail Purchase Order");
@@ -123,7 +117,7 @@ export default function PurchaseOrderDetail() {
 
   if (loading) {
     return (
-      <div className="space-y-4 max-w-6xl mx-auto p-4">
+      <div className="space-y-4 w-full mx-auto p-4">
         <Skeleton className="h-12 w-1/3" />
         <Skeleton className="h-64 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -139,8 +133,7 @@ export default function PurchaseOrderDetail() {
     );
   }
 
-  const currSymbol = poData.currency?.symbol || "Rp";
-
+  const currCode = poData.currencyCode || "IDR";
   return (
     <div className="space-y-6  mx-auto pb-10">
       {/* === HEADER ACTION BAR === */}
@@ -283,7 +276,6 @@ export default function PurchaseOrderDetail() {
               </TableHeader>
               <TableBody>
                 {poData.items.map((item) => (
-                  // 1. Hapus logika ganjil-genap, gunakan warna seragam dengan efek hover bawaan
                   <TableRow key={item.id}>
                     <TableCell>
                       <p className="font-medium text-slate-800">
@@ -312,10 +304,10 @@ export default function PurchaseOrderDetail() {
                       <span className="text-xs">{item.uom}</span>
                     </TableCell>
                     <TableCell className="text-right font-mono text-slate-700">
-                      {formatCurrency(Number(item.unitPrice), currSymbol)}
+                      {formatCurrency(Number(item.unitPrice), currCode)}
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold text-slate-900">
-                      {formatCurrency(Number(item.totalAmount), currSymbol)}
+                      {formatCurrency(Number(item.totalAmount), currCode)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -328,7 +320,7 @@ export default function PurchaseOrderDetail() {
             <div className="flex justify-between w-full sm:w-64">
               <span className="text-slate-500 font-medium">Grand Total</span>
               <span className="text-xl font-bold text-slate-900">
-                {formatCurrency(Number(poData.totalAmount), currSymbol)}
+                {formatCurrency(Number(poData.totalAmount), currCode)}
               </span>
             </div>
           </div>

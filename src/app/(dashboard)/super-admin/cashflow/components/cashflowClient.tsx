@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge"; // 👈 Tambahan import Badge
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,19 +37,24 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import UtangPiutangCard from "./utangPiutangCard";
-
 // === TYPES ===
 type CashflowItem = {
-  orderId: string;
-  orderNumber: string;
+  id: string;
+  referenceId: string;
+  type: "order" | "replacement";
   dateOrder: string;
+  orderNumber: string;
+  salesCategory: string;
+  currencyCode: string; // "IDR"
+  originalCurrencyCode: string; // "EUR", "RMB", dll
+  originalRevenue: number; // Nilai murni asli (misal: 578)
+  originalCost: number; // Nilai murni asli cost
+  originalProfitOrLoss: number; // Nilai murni asli profit
   clientName: string;
   totalRevenue: number;
   totalCost: number;
   profitOrLoss: number;
   hasCashflowData: boolean;
-  salesCategory: string;
-  currencyCode: string;
 };
 
 type Meta = {
@@ -61,6 +66,7 @@ type Meta = {
 
 export default function CashflowClient() {
   const { fetchApi, status } = useApi();
+
   // === STATE ===
   const [cashflows, setCashflows] = useState<CashflowItem[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -68,7 +74,7 @@ export default function CashflowClient() {
 
   // Filters
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  const debouncedSearch = useDebounce(search, 800);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [page, setPage] = useState(1);
@@ -84,7 +90,7 @@ export default function CashflowClient() {
         take: "10",
       });
 
-      if (debouncedSearch) params.append("search", debouncedSearch);
+      if (debouncedSearch) params.append("search", debouncedSearch[0]);
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
@@ -93,6 +99,8 @@ export default function CashflowClient() {
       if (!res.ok) throw new Error("Failed to fetch cashflows");
 
       const result = await res.json();
+      console.log("ini adalah hasil console", result);
+
       setCashflows(result.data || []);
       setMeta(result.meta);
     } catch (error) {
@@ -136,7 +144,7 @@ export default function CashflowClient() {
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search SO/SN..." // 👈 Ubah placeholder
+                placeholder="Search SO/RN..."
                 className="pl-9 h-10 text-sm bg-white shadow-sm border-gray-200 focus-visible:ring-1"
                 value={search}
                 onChange={(e) => {
@@ -215,7 +223,7 @@ export default function CashflowClient() {
                       onSelect={(date) => {
                         const dateStr = date ? format(date, "yyyy-MM-dd") : "";
                         setEndDate(dateStr);
-                        setPage(1); // Reset ke halaman 1 saat filter berubah
+                        setPage(1);
                       }}
                       initialFocus
                     />
@@ -235,8 +243,7 @@ export default function CashflowClient() {
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="w-32">Date</TableHead>
-                  <TableHead className="w-40">SO / SN</TableHead>{" "}
-                  {/* 👈 Header diubah */}
+                  <TableHead className="w-40">SO / RN</TableHead>
                   <TableHead className="w-48">Client</TableHead>
                   <TableHead className="text-right w-36 text-emerald-600">
                     Revenue
@@ -286,7 +293,7 @@ export default function CashflowClient() {
                 ) : (
                   cashflows.map((item) => (
                     <TableRow
-                      key={item.orderId}
+                      key={item.id}
                       className="hover:bg-muted/5 group transition-colors">
                       <TableCell className="text-xs text-muted-foreground">
                         <div className="flex items-center gap-2">
@@ -297,7 +304,6 @@ export default function CashflowClient() {
                         </div>
                       </TableCell>
 
-                      {/* 👈 Render Badge berdasarkan kategori SAMPLE (Ungu) atau SALES (Hijau) */}
                       <TableCell>
                         <Badge
                           variant="outline"
@@ -305,7 +311,9 @@ export default function CashflowClient() {
                             "font-mono text-[11px] font-semibold tracking-wider",
                             item.salesCategory === "SAMPLE"
                               ? "text-purple-700 bg-purple-50 border-purple-200"
-                              : "text-emerald-700 bg-emerald-50 border-emerald-200",
+                              : item.salesCategory === "REPLACEMENT"
+                                ? "text-orange-700 bg-orange-50 border-orange-200"
+                                : "text-emerald-700 bg-emerald-50 border-emerald-200",
                           )}>
                           {item.orderNumber || "-"}
                         </Badge>
@@ -315,46 +323,101 @@ export default function CashflowClient() {
                         {item.clientName}
                       </TableCell>
 
-                      {/* 👈 Revenue menyesuaikan Currency Code */}
-                      <TableCell className="text-right text-sm font-medium text-emerald-700">
-                        {formatCurrency(item.totalRevenue, item.currencyCode)}
-                      </TableCell>
-
-                      {/* 👈 Cost menyesuaikan Currency Code */}
-                      <TableCell className="text-right text-sm font-medium text-red-700">
-                        {item.totalCost > 0 ? (
-                          formatCurrency(item.totalCost, item.currencyCode)
-                        ) : (
-                          <span className="text-gray-400 italic text-[10px]">
-                            --
+                      {/* Kolom Revenue */}
+                      <TableCell className="text-right">
+                        <div className="flex flex-col">
+                          {/* Nilai Konversi ke Rupiah (IDR) */}
+                          <span className="text-sm font-semibold text-emerald-700">
+                            {formatCurrency(
+                              item.totalRevenue,
+                              item.currencyCode,
+                            )}
                           </span>
-                        )}
+
+                          {/* Nilai Murni Asli (Contoh: €578,48) */}
+                          {item.originalCurrencyCode &&
+                            item.originalCurrencyCode !== "IDR" && (
+                              <span className="text-[11px] text-muted-foreground italic">
+                                Asli:{" "}
+                                {formatCurrency(
+                                  item.originalRevenue,
+                                  item.originalCurrencyCode,
+                                )}
+                              </span>
+                            )}
+                        </div>
                       </TableCell>
 
-                      {/* 👈 Profit / Loss menyesuaikan Currency Code */}
-                      <TableCell className="text-right text-sm">
+                      {/* Kolom Cost */}
+                      <TableCell className="text-right">
+                        <div className="flex flex-col">
+                          {item.totalCost > 0 ? (
+                            <>
+                              <span className="text-sm font-semibold text-red-700">
+                                {formatCurrency(
+                                  item.totalCost,
+                                  item.currencyCode,
+                                )}
+                              </span>
+                              {item.originalCurrencyCode &&
+                                item.originalCurrencyCode !== "IDR" && (
+                                  <span className="text-[11px] text-muted-foreground italic">
+                                    Asli:{" "}
+                                    {formatCurrency(
+                                      item.originalCost,
+                                      item.originalCurrencyCode,
+                                    )}
+                                  </span>
+                                )}
+                            </>
+                          ) : (
+                            <span className="text-gray-400 italic text-[10px]">
+                              --
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      {/* Kolom Profit / Loss */}
+                      <TableCell className="text-right">
                         <div
                           className={cn(
-                            "font-bold flex items-center justify-end gap-1",
+                            "font-bold flex flex-col items-end",
                             item.profitOrLoss > 0
                               ? "text-emerald-600"
                               : item.profitOrLoss < 0
                                 ? "text-red-600"
                                 : "text-gray-400",
                           )}>
-                          {item.profitOrLoss > 0 && (
-                            <TrendingUp className="h-3 w-3" />
-                          )}
-                          {item.profitOrLoss < 0 && (
-                            <TrendingDown className="h-3 w-3" />
-                          )}
-                          {formatCurrency(item.profitOrLoss, item.currencyCode)}
+                          <div className="flex items-center gap-1 text-sm">
+                            {item.profitOrLoss > 0 && (
+                              <TrendingUp className="h-3 w-3" />
+                            )}
+                            {item.profitOrLoss < 0 && (
+                              <TrendingDown className="h-3 w-3" />
+                            )}
+                            {formatCurrency(
+                              item.profitOrLoss,
+                              item.currencyCode,
+                            )}
+                          </div>
+
+                          {item.originalCurrencyCode &&
+                            item.originalCurrencyCode !== "IDR" && (
+                              <span className="text-[11px] text-muted-foreground italic font-normal">
+                                Asli:{" "}
+                                {formatCurrency(
+                                  item.originalProfitOrLoss,
+                                  item.originalCurrencyCode,
+                                )}
+                              </span>
+                            )}
                         </div>
                       </TableCell>
 
                       <TableCell className="text-center">
                         <Link
-                          href={`/super-admin/cashflow/edit/${item.orderId}`}>
+                          href={`/super-admin/cashflow/edit/${item.referenceId}?type=${item.type}`}>
                           <Button
                             variant={item.hasCashflowData ? "ghost" : "default"}
                             size="sm"

@@ -13,18 +13,18 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { ImageCropper } from "@/helper/image-cropper";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   AlignLeft,
   Check,
   ClipboardList,
   Image as ImageIcon,
-  ImagePlus,
   Link as LinkIcon,
   ListOrdered,
   Loader2,
   Type,
-  X,
+  UploadCloud,
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -39,10 +39,6 @@ const bannerProductSchema = z.object({
   image: z.any().optional(), // File upload
   sortOrder: z.coerce.number().default(0),
   isActive: z.boolean().default(true),
-
-  // Opsional: Jika kamu ingin fitur schedule juga ada di BannerProduct
-  // startDate: z.string().optional(),
-  // endDate: z.string().optional(),
 });
 
 export type BannerProductFormValues = z.infer<typeof bannerProductSchema>;
@@ -96,18 +92,12 @@ export default function BannerProductForm({
     }
   }, [initialData, form]);
 
-  // === HANDLE FILE CHANGE ===
-  const handleFileChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    fieldChange: (value: any) => void,
-  ) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      fieldChange(e.target.files);
-      const objectUrl = URL.createObjectURL(file);
-      setImagePreview(objectUrl);
-    }
+  // ✨ HANDLE FILE CHANGE (Disesuaikan untuk menerima File langsung dari Cropper)
+  const handleFileChange = (file: File, fieldChange: (value: any) => void) => {
+    setSelectedFile(file);
+    fieldChange(file); // Update state react-hook-form
+    const objectUrl = URL.createObjectURL(file);
+    setImagePreview(objectUrl);
   };
 
   const handleSubmit = (values: BannerProductFormValues) => {
@@ -143,39 +133,40 @@ export default function BannerProductForm({
                   name="image"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-stone-600 mb-2 block">
+                      <FormLabel className="text-stone-600 mb-2 block font-semibold">
                         Upload Image {initialData ? "(Optional)" : "(Required)"}
                       </FormLabel>
                       <FormControl>
-                        <div className="space-y-4">
-                          {imagePreview ? (
-                            // === TAMPILAN PREVIEW BANNER ===
-                            <div className="relative w-full aspect-21/9 bg-stone-100 rounded-xl overflow-hidden border border-stone-200 shadow-sm group">
-                              <Image
-                                src={imagePreview}
-                                alt="Banner Preview"
-                                fill
-                                className="object-cover"
-                              />
-                              {/* Overlay Hapus */}
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    field.onChange(undefined);
-                                    setImagePreview(null);
-                                  }}
-                                  className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110">
-                                  <X className="w-6 h-6" />
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            // === AREA UPLOAD BANNER ===
-                            <label className="flex flex-col items-center justify-center w-full aspect-21/9 border-2 border-dashed rounded-xl cursor-pointer bg-stone-50 hover:bg-stone-100 border-stone-300 hover:border-stone-500 transition-all">
-                              <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
-                                <div className="p-3 bg-white rounded-full shadow-sm mb-3">
-                                  <ImagePlus className="w-6 h-6 text-stone-400" />
+                        {/* ✨ ImageCropper dengan rasio 1920:820 */}
+                        <ImageCropper
+                          aspectRatio={1920 / 820}
+                          disabled={isLoading || isSubmitting}
+                          onCropComplete={(file) =>
+                            handleFileChange(file, field.onChange)
+                          }>
+                          {/* Wadah visual menjadi div biasa (karena klik sudah ditangani ImageCropper) */}
+                          <div className="relative w-full aspect-21/9 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 hover:bg-stone-100 transition-colors flex flex-col items-center justify-center overflow-hidden group shadow-sm">
+                            {imagePreview ? (
+                              // === TAMPILAN PREVIEW BANNER DENGAN EFEK HOVER CHANGE IMAGE ===
+                              <>
+                                <Image
+                                  src={imagePreview}
+                                  alt="Banner Preview"
+                                  fill
+                                  className="object-contain p-2"
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                  <p className="text-white font-medium flex items-center gap-2">
+                                    <UploadCloud className="h-5 w-5" /> Change
+                                    Image
+                                  </p>
+                                </div>
+                              </>
+                            ) : (
+                              // === AREA UPLOAD BANNER KOSONG ===
+                              <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center p-4">
+                                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-stone-200 mb-3">
+                                  <UploadCloud className="h-6 w-6 text-stone-400" />
                                 </div>
                                 <p className="mb-1 text-sm text-stone-600">
                                   <span className="font-semibold text-stone-800">
@@ -183,23 +174,13 @@ export default function BannerProductForm({
                                   </span>{" "}
                                   Banner
                                 </p>
-                                <p className="text-xs text-stone-400">
-                                  Landscape Image (e.g. 1920x820)
+                                <p className="text-xs text-stone-500">
+                                  Otomatis potong ke format Landscape (1920x820)
                                 </p>
                               </div>
-                              <Input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                disabled={isLoading || isSubmitting}
-                                onChange={(e) =>
-                                  handleFileChange(e, field.onChange)
-                                }
-                                required={!initialData}
-                              />
-                            </label>
-                          )}
-                        </div>
+                            )}
+                          </div>
+                        </ImageCropper>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
