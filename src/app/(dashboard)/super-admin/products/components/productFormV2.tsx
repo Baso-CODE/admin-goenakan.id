@@ -51,6 +51,7 @@ import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown, Loader2, RefreshCw, X, Layers, PlusCircle, Trash2, Plus, ChevronDown, Info } from "lucide-react";
 import { AddItemCategoryModal } from "../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../item-names-product/components/addItemNameModal";
+import { AddTagModal } from "../../product-tags/components/addTagModal";
 import CreateCategoryModal from "../../product-categories/components/createCategoryModal";
 import MaterialTypeForm from "../../product-materials/components/materialTypeForm";
 import { AttributeSelector, ModelShapeValueInput } from "./AttributeSelector";
@@ -87,6 +88,7 @@ export default function ProductFormV2({
 
   const [previewUrl, setPreviewUrl] = useState<string | undefined>();
   const [isTagCategoryModalOpen, setIsTagCategoryModalOpen] = useState(false);
+  const [isAddTagModalOpen, setIsAddTagModalOpen] = useState(false);
   const [tempAttributeSelections, setTempAttributeSelections] = useState<any[]>([]);
   const [tempFullAttrs, setTempFullAttrs] = useState<any[]>([]);
   const [globalStock, setGlobalStock] = useState<string>("");
@@ -942,15 +944,18 @@ export default function ProductFormV2({
                                           </CommandItem>
                                         ))}
                                       </CommandGroup>
-                                      <div className="h-px bg-stone-200 my-1 mx-1" />
-                                      <CommandItem
-                                        onSelect={() => {
-                                          setters.setIsTagModalOpen(true);
-                                          setters.setTagSearchOpen(false);
-                                        }}
-                                        className="text-blue-600 font-bold justify-center text-xs">
-                                        + Tambah Tag Baru Sekaligus
-                                      </CommandItem>
+                                      <div className="h-px bg-stone-100 my-1" />
+                                      <CommandGroup>
+                                        <CommandItem
+                                          value="ADD_NEW_PRODUCT_TAG"
+                                          onSelect={() => {
+                                            setters.setTagSearchOpen(false);
+                                            setIsAddTagModalOpen(true);
+                                          }}
+                                          className="text-blue-600 font-bold focus:bg-blue-50 focus:text-blue-700 cursor-pointer text-xs">
+                                          + Tambah Tag Baru
+                                        </CommandItem>
+                                      </CommandGroup>
                                     </CommandList>
                                   </Command>
                                 </PopoverContent>
@@ -1860,35 +1865,20 @@ export default function ProductFormV2({
         }}
       />
 
-      <Dialog
-        open={state.isTagModalOpen}
-        onOpenChange={setters.setIsTagModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Tambah Tags Baru</DialogTitle>
-            <DialogDescription>Pisahkan dengan koma ( , )</DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              value={state.bulkTagInput}
-              onChange={(e) => setters.setBulkTagInput(e.target.value)}
-              disabled={state.isSubmittingTags}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setters.setIsTagModalOpen(false)}>
-              Batal
-            </Button>
-            <Button
-              onClick={handlers.handleBulkCreateTags}
-              disabled={state.isSubmittingTags}>
-              {state.isSubmittingTags ? "Menyimpan..." : "Simpan"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddTagModal
+        isOpen={isAddTagModalOpen}
+        onClose={() => setIsAddTagModalOpen(false)}
+        onSuccess={(newTag) => {
+          setters.setTags((prev: any[]) => {
+            if (prev.some((t) => t.id === newTag.id)) return prev;
+            return [...prev, newTag];
+          });
+          const currentTags = form.getValues("tagIds") || [];
+          if (!currentTags.includes(newTag.id)) {
+            form.setValue("tagIds", [...currentTags, newTag.id]);
+          }
+        }}
+      />
 
       <Dialog
         open={state.isMaterialModalOpen}
