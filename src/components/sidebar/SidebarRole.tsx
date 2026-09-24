@@ -262,6 +262,10 @@ export default function SidebarRole({ ...props }) {
           { title: "Categories", url: "/admin-article/categories" },
           { title: "Banners", url: "/admin-article/banners" },
           { title: "Tags", url: "/admin-article/tags" },
+          {
+            title: "Success Stories",
+            url: "/super-admin/content/sucess-stories",
+          },
         ],
       },
       {
@@ -290,10 +294,6 @@ export default function SidebarRole({ ...props }) {
           {
             title: "Event Categories",
             url: "/super-admin/content/event-categories",
-          },
-          {
-            title: "Success Stories",
-            url: "/super-admin/content/sucess-stories",
           },
         ],
       },
