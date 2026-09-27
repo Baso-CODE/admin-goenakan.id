@@ -22,33 +22,36 @@ export default function AddArticle() {
     }
 
     setIsSubmitting(true);
+
     try {
       const formData = new FormData();
 
-      // Data Utama
       formData.append("title", values.title);
       formData.append("authorName", values.authorName);
       formData.append("content", values.content);
       formData.append("categoryId", values.categoryId);
       formData.append("published", String(values.published));
       formData.append("coverImageAlt", values.coverImageAlt || "");
-
       formData.append("focusKeywords_id", values.focusKeywords_id || "");
+      formData.append("autoTranslate", String(values.autoTranslate ?? false));
+      formData.append("productIds", values.productIds?.join(",") || "");
+      formData.append("tagIds", values.tagIds?.join(",") || "");
 
-      formData.append("autoTranslate", String(values.autoTranslate));
+      if (values.title_en) {
+        formData.append("title_en", values.title_en);
+      }
 
-      if (values.title_en) formData.append("title_en", values.title_en);
-      if (values.content_en) formData.append("content_en", values.content_en);
-      if (values.focusKeywords_en)
+      if (values.content_en) {
+        formData.append("content_en", values.content_en);
+      }
+
+      if (values.focusKeywords_en) {
         formData.append("focusKeywords_en", values.focusKeywords_en);
+      }
 
       if (values.source) {
         formData.append("source", values.source);
       }
-
-      // Relasi
-      formData.append("productIds", values.productIds?.join(",") || "");
-      formData.append("tagIds", values.tagIds?.join(",") || "");
 
       if (values.seo) {
         formData.append("seo", JSON.stringify(values.seo));
@@ -75,9 +78,9 @@ export default function AddArticle() {
       toast.success("Artikel berhasil dibuat dan diunggah!");
       router.push("/admin-article/article");
       router.refresh();
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Terjadi kesalahan pada server");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Terjadi kesalahan pada server");
     } finally {
       setIsSubmitting(false);
     }
@@ -88,6 +91,7 @@ export default function AddArticle() {
       <h2 className="text-2xl font-bold tracking-tight">
         Tulis Artikel Baru ✍️
       </h2>
+
       <FormArticle onSubmit={handleCreateArticle} isSubmitting={isSubmitting} />
     </div>
   );

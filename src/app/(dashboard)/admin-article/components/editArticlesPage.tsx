@@ -18,17 +18,20 @@ export default function EditArticle() {
   const [initialData, setInitialData] = useState<ArticleInitialData | null>(
     null,
   );
-
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchArticle = useCallback(async () => {
-    if (status === "loading" || status === "unauthenticated") return;
+    if (!id || status !== "authenticated") return;
 
     try {
       setIsLoading(true);
+
       const res = await fetchApi(`/articles/${id}`);
-      if (!res.ok) throw new Error("Gagal mengambil data artikel");
+
+      if (!res.ok) {
+        throw new Error("Gagal mengambil data artikel");
+      }
 
       const responseData = await res.json();
       const article = responseData.data || responseData;
@@ -50,8 +53,10 @@ export default function EditArticle() {
         coverImageMobile: article.coverImageMobile || undefined,
         coverImageAlt: article.coverImageAlt || "",
         productIds:
-          article.relatedProducts?.map((rp: any) => rp.productId) || [],
-        tagIds: article.articleTags?.map((at: any) => at.tagId) || [],
+          article.relatedProducts?.map(
+            (item: any) => item.productId || item.product?.id,
+          ) || [],
+        tagIds: article.tags?.map((tag: any) => tag.id) || [],
         seo: {
           metaTitle: article.seo?.metaTitle || "",
           metaDescription: article.seo?.metaDescription || "",
@@ -71,63 +76,77 @@ export default function EditArticle() {
     } finally {
       setIsLoading(false);
     }
-  }, [id, router, fetchApi, status]);
+  }, [id, status, fetchApi, router]);
 
   useEffect(() => {
-    if (id) fetchArticle();
-  }, [id, fetchArticle]);
+    if (id && status === "authenticated") {
+      fetchArticle();
+    }
+  }, [id, status, fetchArticle]);
 
-  // Fungsi ketika tombol Update ditekan
   const handleUpdateArticle = async (
     values: ArticleFormValues,
     coverFile: File | null,
     coverMobileFile: File | null,
   ) => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated") {
+      toast.error("Sesi anda berakhir, silakan login kembali.");
+      return;
+    }
 
     setIsSubmitting(true);
+
     try {
       const formData = new FormData();
+
       formData.append("title", values.title);
       formData.append("title_en", values.title_en || "");
       formData.append("content", values.content);
       formData.append("content_en", values.content_en || "");
       formData.append("focusKeywords_id", values.focusKeywords_id || "");
       formData.append("focusKeywords_en", values.focusKeywords_en || "");
-      formData.append("autoTranslate", String(values.autoTranslate || false));
-
+      formData.append("autoTranslate", String(values.autoTranslate ?? false));
       formData.append("authorName", values.authorName);
       formData.append("categoryId", values.categoryId);
       formData.append("published", String(values.published));
       formData.append("coverImageAlt", values.coverImageAlt || "");
-
-      if (values.source) formData.append("source", values.source);
       formData.append("productIds", values.productIds?.join(",") || "");
       formData.append("tagIds", values.tagIds?.join(",") || "");
 
-      if (coverFile) formData.append("coverFile", coverFile);
-      if (coverMobileFile) formData.append("coverMobileFile", coverMobileFile);
+      if (values.source) {
+        formData.append("source", values.source);
+      } else {
+        formData.append("source", "");
+      }
 
-      const resArticle = await fetchApi(`/articles/${id}`, {
+      if (values.seo) {
+        formData.append("seo", JSON.stringify(values.seo));
+      }
+
+      if (coverFile) {
+        formData.append("coverFile", coverFile);
+      }
+
+      if (coverMobileFile) {
+        formData.append("coverMobileFile", coverMobileFile);
+      }
+
+      const res = await fetchApi(`/articles/${id}`, {
         method: "PATCH",
         body: formData,
       });
 
-      if (!resArticle.ok) throw new Error("Gagal mengupdate artikel");
-
-      if (values.seo) {
-        await fetchApi(`/article-seo/${id}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(values.seo),
-        });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Gagal mengupdate artikel");
       }
 
       toast.success("Artikel berhasil diperbarui!");
       router.push("/admin-article/article");
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message || "Terjadi kesalahan");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Terjadi kesalahan");
     } finally {
       setIsSubmitting(false);
     }
@@ -150,11 +169,12 @@ export default function EditArticle() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold tracking-tight">Edit Artikel 📝</h2>
+
       <FormArticle
         onSubmit={handleUpdateArticle}
         isSubmitting={isSubmitting}
         initialData={initialData}
-        isEditing={true}
+        isEditing
       />
     </div>
   );

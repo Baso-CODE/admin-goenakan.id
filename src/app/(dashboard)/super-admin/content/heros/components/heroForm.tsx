@@ -174,7 +174,6 @@ export default function HeroForm({
                     {initialData ? "(Optional)" : "(Required)"}
                   </FormLabel>
                   <FormControl>
-                    {/* ✨ Bungkus dengan ImageCropper, atur rasio 16/9 */}
                     <ImageCropper
                       aspectRatio={16 / 9}
                       disabled={isCurrentlySubmitting}

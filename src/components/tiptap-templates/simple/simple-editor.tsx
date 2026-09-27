@@ -28,7 +28,6 @@ import TableHeader from "@tiptap/extension-table-header";
 import TableRow from "@tiptap/extension-table-row";
 
 // --- UI Primitives ---
-import { Button } from "@/components/tiptap-ui-primitive/button";
 import { Spacer } from "@/components/tiptap-ui-primitive/spacer";
 import {
   Toolbar,
@@ -62,7 +61,6 @@ import {
   ColorHighlightPopoverContent,
 } from "@/components/tiptap-ui/color-highlight-popover";
 import { HeadingDropdownMenu } from "@/components/tiptap-ui/heading-dropdown-menu";
-import { ImageUploadButton } from "@/components/tiptap-ui/image-upload-button";
 import {
   LinkButton,
   LinkContent,
@@ -81,6 +79,7 @@ import {
   ArrowDownToLine,
   ArrowRightToLine,
   Captions,
+  ImagePlus,
   MinusSquare,
   Table as TableIcon,
   Trash2,
@@ -93,6 +92,7 @@ import { useWindowSize } from "@/hooks/use-window-size";
 
 // --- Styles & Component ---
 import "@/components/tiptap-templates/simple/simple-editor.scss";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -103,6 +103,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ImageCropper } from "@/helper/image-cropper";
 import { useApi } from "@/hooks/useApi";
 import { Table } from "@tiptap/extension-table";
 
@@ -294,15 +295,73 @@ const TableControls = () => {
   );
 };
 
+const CustomCroppedImageUploadButton = ({
+  customUploadFn,
+}: {
+  customUploadFn: (file: File) => Promise<string>;
+}) => {
+  const { editor } = useCurrentEditor();
+  const [isUploading, setIsUploading] = useState(false);
+
+  if (!editor) return null;
+
+  const handleCropComplete = async (croppedFile: File) => {
+    setIsUploading(true);
+    try {
+      // 1. Unggah file hasil crop ke Cloudinary
+      const imageUrl = await customUploadFn(croppedFile);
+
+      // 2. Sisipkan URL gambar ke dalam editor
+      editor.chain().focus().setImage({ src: imageUrl }).run();
+    } catch (error) {
+      console.error("Gagal menyisipkan gambar hasil crop:", error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <ImageCropper
+      aspectRatio={null} // null = Free Crop (Bisa portrait, landscape, bebas)
+      onCropComplete={handleCropComplete}
+      disabled={isUploading}>
+      {/* Tombol yang muncul di Toolbar Tiptap */}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="default"
+              className="h-8 w-8"
+              disabled={isUploading}
+              asChild>
+              <div>
+                <ImagePlus
+                  className={`h-4 w-4 ${isUploading ? "opacity-50 animate-pulse" : "text-gray-700"}`}
+                />
+              </div>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {isUploading ? "Mengunggah..." : "Tambah Gambar (dengan Crop)"}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </ImageCropper>
+  );
+};
+
 // ─── TOOLBAR COMPONENTS ───
 const MainToolbarContent = ({
   onHighlighterClick,
   onLinkClick,
   isMobile,
+  customUploadFn,
 }: {
   onHighlighterClick: () => void;
   onLinkClick: () => void;
   isMobile: boolean;
+  customUploadFn: (file: File) => Promise<string>;
 }) => {
   return (
     <>
@@ -352,7 +411,7 @@ const MainToolbarContent = ({
 
       <ToolbarSeparator />
       <ToolbarGroup>
-        <ImageUploadButton text="Add Image" />
+        <CustomCroppedImageUploadButton customUploadFn={customUploadFn} />{" "}
         <ImageControls />
       </ToolbarGroup>
       <Spacer />
@@ -621,6 +680,7 @@ export function SimpleEditor({
                 onHighlighterClick={() => setMobileView("highlighter")}
                 onLinkClick={() => setMobileView("link")}
                 isMobile={isMobile}
+                customUploadFn={customCloudinaryUpload}
               />
             ) : (
               <MobileToolbarContent

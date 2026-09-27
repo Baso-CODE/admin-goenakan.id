@@ -8,19 +8,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import getCroppedImg, { createImage } from "@/lib/cropImage";
 import {
   FlipHorizontal,
   FlipVertical,
   RotateCcw,
   RotateCw,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
-import React, { useCallback, useRef, useState } from "react";
-import Cropper from "react-easy-crop";
+import React, { useEffect, useRef, useState } from "react";
+import { Cropper, type ReactCropperElement } from "react-cropper";
+
+import "cropperjs/dist/cropper.css";
 
 interface ImageCropperProps {
   children: React.ReactNode;
-  aspectRatio: number;
+  aspectRatio?: number | null;
   onCropComplete: (croppedFile: File) => void;
   disabled?: boolean;
   allowVideo?: boolean;
@@ -34,200 +37,756 @@ export function ImageCropper({
   allowVideo = false,
 }: ImageCropperProps) {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
-  const [isCropping, setIsCropping] = useState(false);
+
   const [isOpen, setIsOpen] = useState(false);
+
+  const [isCropping, setIsCropping] = useState(false);
+
+  const [zoomValue, setZoomValue] = useState(1);
+
+  const [scaleX, setScaleX] = useState(1);
+
+  const [scaleY, setScaleY] = useState(1);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const cropperRef = useRef<ReactCropperElement>(null);
+
+  /**
+   * ==========================================
+   * CLEANUP BLOB
+   * ==========================================
+   */
+  useEffect(() => {
+    return () => {
+      if (imageSrc?.startsWith("blob:")) {
+        URL.revokeObjectURL(imageSrc);
+      }
+    };
+  }, [imageSrc]);
+
+  /**
+   * ==========================================
+   * OPEN FILE PICKER
+   * ==========================================
+   */
   const handleTriggerClick = () => {
-    if (!disabled && fileInputRef.current) {
-      fileInputRef.current.click();
-    }
+    if (disabled) return;
+
+    fileInputRef.current?.click();
   };
 
-  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
+  /**
+   * ==========================================
+   * FILE CHANGE
+   * ==========================================
+   */
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
 
-      if (file.type.startsWith("video/")) {
+    if (!file) return;
+
+    /**
+     * VIDEO
+     */
+    if (file.type.startsWith("video/")) {
+      if (allowVideo) {
         onCropComplete(file);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        return;
       }
 
-      // Jika file gambar, jalankan cropper seperti biasa
-      const imageDataUrl = URL.createObjectURL(file);
-      setImageSrc(imageDataUrl);
-      setRotation(0);
-      setZoom(1);
-      setIsOpen(true);
-    }
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const onCropCompleteCallback = useCallback(
-    (croppedArea: any, croppedAreaPixels: any) => {
-      setCroppedAreaPixels(croppedAreaPixels);
-    },
-    [],
-  );
-
-  const flipImage = async (direction: "horizontal" | "vertical") => {
-    if (!imageSrc) return;
-    try {
-      const image = await createImage(imageSrc);
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      canvas.width = image.width;
-      canvas.height = image.height;
-
-      if (direction === "horizontal") {
-        ctx.translate(image.width, 0);
-        ctx.scale(-1, 1);
-      } else {
-        ctx.translate(0, image.height);
-        ctx.scale(1, -1);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
 
-      ctx.drawImage(image, 0, 0);
-      const newImageSrc = canvas.toDataURL("image/png");
-      setImageSrc(newImageSrc);
-    } catch (e) {
-      console.error("Gagal melakukan flip gambar:", e);
+      return;
+    }
+
+    /**
+     * IMAGE VALIDATION
+     */
+    if (!file.type.startsWith("image/")) {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
+      return;
+    }
+
+    /**
+     * Cleanup source sebelumnya.
+     */
+    if (imageSrc?.startsWith("blob:")) {
+      URL.revokeObjectURL(imageSrc);
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+
+    setImageSrc(objectUrl);
+
+    /**
+     * Reset transform.
+     */
+    setZoomValue(1);
+
+    setScaleX(1);
+    setScaleY(1);
+
+    setIsOpen(true);
+
+    /**
+     * Agar file yang sama
+     * bisa dipilih kembali.
+     */
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
+  /**
+   * ==========================================
+   * GET CROPPER
+   * ==========================================
+   */
+  const getCropper = () => {
+    return cropperRef.current?.cropper;
+  };
+
+  /**
+   * ==========================================
+   * ROTATE LEFT
+   * ==========================================
+   */
+  const handleRotateLeft = () => {
+    const cropper = getCropper();
+
+    if (!cropper) return;
+
+    cropper.rotate(-90);
+  };
+
+  /**
+   * ==========================================
+   * ROTATE RIGHT
+   * ==========================================
+   */
+  const handleRotateRight = () => {
+    const cropper = getCropper();
+
+    if (!cropper) return;
+
+    cropper.rotate(90);
+  };
+
+  /**
+   * ==========================================
+   * FLIP HORIZONTAL
+   * ==========================================
+   */
+  const handleFlipHorizontal = () => {
+    const cropper = getCropper();
+
+    if (!cropper) return;
+
+    const nextScaleX = scaleX * -1;
+
+    setScaleX(nextScaleX);
+
+    cropper.scaleX(nextScaleX);
+  };
+
+  /**
+   * ==========================================
+   * FLIP VERTICAL
+   * ==========================================
+   */
+  const handleFlipVertical = () => {
+    const cropper = getCropper();
+
+    if (!cropper) return;
+
+    const nextScaleY = scaleY * -1;
+
+    setScaleY(nextScaleY);
+
+    cropper.scaleY(nextScaleY);
+  };
+
+  /**
+   * ==========================================
+   * ZOOM IN
+   * ==========================================
+   */
+  const handleZoomIn = () => {
+    const cropper = getCropper();
+
+    if (!cropper) return;
+
+    /**
+     * +2%.
+     */
+    cropper.zoom(0.02);
+
+    setZoomValue((prev) => Math.min(3, Number((prev + 0.02).toFixed(2))));
+  };
+
+  /**
+   * ==========================================
+   * ZOOM OUT
+   * ==========================================
+   */
+  const handleZoomOut = () => {
+    const cropper = getCropper();
+
+    if (!cropper) return;
+
+    /**
+     * -2%.
+     */
+    cropper.zoom(-0.02);
+
+    setZoomValue((prev) => Math.max(0.1, Number((prev - 0.02).toFixed(2))));
+  };
+
+  /**
+   * ==========================================
+   * ZOOM SLIDER
+   * ==========================================
+   */
+  const handleZoomSlider = (value: number) => {
+    const cropper = getCropper();
+
+    if (!cropper) return;
+
+    /**
+     * Ambil ratio image saat ini.
+     */
+    const imageData = cropper.getImageData();
+
+    const currentRatio = imageData.width / imageData.naturalWidth;
+
+    /**
+     * Target relative terhadap
+     * base image.
+     */
+    const difference = value - zoomValue;
+
+    cropper.zoom(difference);
+
+    setZoomValue(value);
+  };
+
+  /**
+   * ==========================================
+   * RESET
+   * ==========================================
+   */
+  const handleReset = () => {
+    const cropper = getCropper();
+
+    if (!cropper) return;
+
+    cropper.reset();
+
+    /**
+     * Setelah reset, pastikan
+     * aspect ratio tetap sesuai prop.
+     */
+    cropper.setAspectRatio(aspectRatio ?? Number.NaN);
+
+    setZoomValue(1);
+
+    setScaleX(1);
+    setScaleY(1);
+  };
+
+  /**
+   * ==========================================
+   * CROPPER READY
+   * ==========================================
+   */
+  const handleCropperReady = () => {
+    const cropper = getCropper();
+
+    if (!cropper) return;
+
+    /**
+     * Pakai aspect ratio
+     * dari parent.
+     *
+     * null / undefined =
+     * free crop.
+     */
+    cropper.setAspectRatio(aspectRatio ?? Number.NaN);
+
+    /**
+     * Reset posisi awal.
+     */
+    setZoomValue(1);
+
+    setScaleX(1);
+    setScaleY(1);
+  };
+
+  /**
+   * ==========================================
+   * SAVE
+   * ==========================================
+   */
   const handleCropSave = async () => {
-    if (!imageSrc || !croppedAreaPixels) return;
+    const cropper = getCropper();
+
+    if (!cropper) return;
 
     try {
       setIsCropping(true);
-      const croppedFile = await getCroppedImg(
-        imageSrc,
-        croppedAreaPixels,
-        rotation,
-        `cropped-${Date.now()}.webp`,
-      );
-      onCropComplete(croppedFile);
-      setIsOpen(false);
-      setImageSrc(null);
-    } catch (e) {
-      console.error("Gagal melakukan crop:", e);
+
+      /**
+       * Canvas hasil crop.
+       */
+      const canvas = cropper.getCroppedCanvas({
+        /**
+         * Batasi output terlalu besar.
+         */
+        maxWidth: 4096,
+        maxHeight: 4096,
+
+        /**
+         * Kualitas resize.
+         */
+        imageSmoothingEnabled: true,
+
+        imageSmoothingQuality: "high",
+
+        /**
+         * Untuk image transparan.
+         */
+        fillColor: "transparent",
+      });
+
+      if (!canvas) {
+        throw new Error("Gagal membuat canvas crop");
+      }
+
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, "image/webp", 0.92);
+      });
+
+      if (!blob) {
+        throw new Error("Gagal membuat file hasil crop");
+      }
+
+      const file = new File([blob], `cropped-${Date.now()}.webp`, {
+        type: "image/webp",
+      });
+
+      onCropComplete(file);
+
+      closeEditor();
+    } catch (error) {
+      console.error("Gagal melakukan crop:", error);
     } finally {
       setIsCropping(false);
     }
   };
 
+  /**
+   * ==========================================
+   * CLOSE EDITOR
+   * ==========================================
+   */
+  const closeEditor = () => {
+    if (imageSrc?.startsWith("blob:")) {
+      URL.revokeObjectURL(imageSrc);
+    }
+
+    setImageSrc(null);
+
+    setZoomValue(1);
+
+    setScaleX(1);
+    setScaleY(1);
+
+    setIsOpen(false);
+  };
+
+  /**
+   * ==========================================
+   * DIALOG CHANGE
+   * ==========================================
+   */
+  const handleDialogChange = (open: boolean) => {
+    if (isCropping) {
+      return;
+    }
+
+    if (!open) {
+      closeEditor();
+      return;
+    }
+
+    setIsOpen(true);
+  };
+
   return (
     <>
+      {/* ================================= */}
+      {/* TRIGGER */}
+      {/* ================================= */}
+
       <div
         onClick={handleTriggerClick}
         className="w-full h-full cursor-pointer">
         {children}
+
         <input
+          ref={fileInputRef}
           type="file"
           accept={allowVideo ? "image/*,video/*" : "image/*"}
-          ref={fileInputRef}
           onChange={onFileChange}
           className="hidden"
           disabled={disabled}
         />
       </div>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-162.5 h-[85vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="p-4 bg-white z-10 shadow-sm border-b">
-            <DialogTitle>Sesuaikan Gambar</DialogTitle>
+      {/* ================================= */}
+      {/* DIALOG */}
+      {/* ================================= */}
+
+      <Dialog open={isOpen} onOpenChange={handleDialogChange}>
+        <DialogContent
+          className="
+            sm:max-w-4xl
+            h-[90vh]
+            max-h-[900px]
+            flex
+            flex-col
+            p-0
+            overflow-hidden
+            bg-white
+          ">
+          {/* ============================= */}
+          {/* HEADER */}
+          {/* ============================= */}
+
+          <DialogHeader
+            className="
+              shrink-0
+              px-5
+              py-4
+              bg-white
+              border-b
+            ">
+            <DialogTitle>Sesuaikan Area Gambar</DialogTitle>
           </DialogHeader>
 
-          <div className="flex items-center justify-center gap-2 p-3 bg-stone-50 z-10">
+          {/* ============================= */}
+          {/* TOOLBAR */}
+          {/* ============================= */}
+
+          <div
+            className="
+              shrink-0
+              flex
+              items-center
+              justify-center
+              gap-2
+              px-4
+              py-3
+              bg-stone-50
+              border-b
+              overflow-x-auto
+            ">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setRotation((r) => r - 90)}>
+              onClick={handleRotateLeft}
+              disabled={isCropping}>
               <RotateCcw className="w-4 h-4 sm:mr-2" />
+
               <span className="hidden sm:inline">Kiri</span>
             </Button>
+
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setRotation((r) => r + 90)}>
+              onClick={handleRotateRight}
+              disabled={isCropping}>
               <RotateCw className="w-4 h-4 sm:mr-2" />
+
               <span className="hidden sm:inline">Kanan</span>
             </Button>
-            <div className="w-px h-6 bg-stone-300 mx-2" />
+
+            <div className="w-px h-6 bg-stone-300 mx-1 shrink-0" />
+
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => flipImage("horizontal")}>
+              onClick={handleFlipHorizontal}
+              disabled={isCropping}>
               <FlipHorizontal className="w-4 h-4 sm:mr-2" />
+
               <span className="hidden sm:inline">Horizontal</span>
             </Button>
+
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => flipImage("vertical")}>
+              onClick={handleFlipVertical}
+              disabled={isCropping}>
               <FlipVertical className="w-4 h-4 sm:mr-2" />
+
               <span className="hidden sm:inline">Vertikal</span>
+            </Button>
+
+            <div className="w-px h-6 bg-stone-300 mx-1 shrink-0" />
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleReset}
+              disabled={isCropping}>
+              Reset
             </Button>
           </div>
 
-          <div className="relative flex-1 bg-stone-900">
+          {/* ============================= */}
+          {/* INFO */}
+          {/* ============================= */}
+
+          <div
+            className="
+              shrink-0
+              bg-white
+              border-b
+              px-4
+              py-2
+              text-center
+            ">
+            <p className="text-xs text-stone-500">
+              {aspectRatio
+                ? "Rasio crop mengikuti ukuran yang ditentukan. Gambar dapat digeser dan diperbesar di dalam area crop."
+                : "Crop bebas. Tarik sudut atau sisi untuk menentukan ukuran potongan."}
+            </p>
+          </div>
+
+          {/* ============================= */}
+          {/* CROPPER */}
+          {/* ============================= */}
+
+          <div
+            className="
+              relative
+              flex-1
+              min-h-0
+              bg-[#111111]
+            ">
             {imageSrc && (
               <Cropper
-                image={imageSrc}
-                crop={crop}
-                zoom={zoom}
-                rotation={rotation}
-                aspect={aspectRatio}
-                onCropChange={setCrop}
-                onCropComplete={onCropCompleteCallback}
-                onZoomChange={setZoom}
-                onRotationChange={setRotation}
-                restrictPosition={false}
+                ref={cropperRef}
+                src={imageSrc}
+                /**
+                 * Sangat penting:
+                 *
+                 * width + height 100%
+                 * membuat editor tidak
+                 * terpisah-pisah.
+                 */
+                style={{
+                  height: "100%",
+                  width: "100%",
+                }}
+                /**
+                 * Aspect ratio parent.
+                 *
+                 * NaN = FREE.
+                 */
+                aspectRatio={aspectRatio ?? Number.NaN}
+                /**
+                 * Crop box langsung
+                 * muncul ketika editor dibuka.
+                 */
+                autoCrop
+                autoCropArea={0.9}
+                /**
+                 * User bisa resize crop box.
+                 */
+                cropBoxResizable
+                /**
+                 * User bisa geser crop box.
+                 */
+                cropBoxMovable
+                /**
+                 * User bisa drag gambar.
+                 */
+                dragMode="move"
+                /**
+                 * Double click tidak
+                 * mengubah drag mode.
+                 */
+                toggleDragModeOnDblclick={false}
+                /**
+                 * Gambar tetap berada
+                 * di area canvas.
+                 *
+                 * Ini mengurangi kejadian
+                 * gambar lari ke pojok.
+                 */
+                viewMode={1}
+                /**
+                 * Zoom menggunakan
+                 * mouse wheel.
+                 */
+                zoomable
+                zoomOnWheel
+                /**
+                 * Cropper responsive.
+                 */
+                responsive
+                /**
+                 * Tidak menampilkan
+                 * background grid tambahan.
+                 */
+                background={false}
+                /**
+                 * Guidelines.
+                 */
+                guides
+                center
+                highlight
+                /**
+                 * Crop box minimum.
+                 */
+                minCropBoxWidth={40}
+                minCropBoxHeight={40}
+                /**
+                 * Restore posisi jika
+                 * ukuran container berubah.
+                 */
+                restore
+                /**
+                 * Cek orientation EXIF.
+                 */
+                checkOrientation
+                /**
+                 * Ready.
+                 */
+                ready={handleCropperReady}
               />
             )}
           </div>
 
-          <DialogFooter className="p-4 bg-white z-10 flex flex-col sm:flex-row items-center gap-4 border-t">
-            <div className="flex-1 flex items-center w-full gap-2">
-              <span className="text-xs text-stone-500 font-medium">Zoom</span>
+          {/* ============================= */}
+          {/* ZOOM */}
+          {/* ============================= */}
+
+          <div
+            className="
+              shrink-0
+              px-5
+              py-3
+              bg-stone-50
+              border-t
+            ">
+            <div className="flex items-center gap-3">
+              {/* ZOOM OUT BUTTON */}
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                onClick={handleZoomOut}
+                disabled={isCropping}>
+                <ZoomOut className="w-4 h-4" />
+              </Button>
+
+              {/* ZOOM SLIDER */}
+
               <input
                 type="range"
-                value={zoom}
-                min={1}
+                value={zoomValue}
+                min={0.5}
                 max={3}
-                step={0.1}
-                aria-labelledby="Zoom"
-                onChange={(e) => setZoom(Number(e.target.value))}
-                className="w-full accent-[#C4A48E]"
+                /**
+                 * Sekarang 1%,
+                 * bukan lompat 5%.
+                 */
+                step={0.01}
+                onChange={(e) => handleZoomSlider(Number(e.target.value))}
+                disabled={isCropping}
+                className="
+                  flex-1
+                  accent-[#C4A48E]
+                  cursor-pointer
+                "
               />
-            </div>
-            <div className="flex gap-2 w-full sm:w-auto">
+
+              {/* ZOOM IN BUTTON */}
+
               <Button
+                type="button"
                 variant="outline"
-                className="w-full sm:w-auto"
-                onClick={() => setIsOpen(false)}
+                size="icon"
+                className="shrink-0"
+                onClick={handleZoomIn}
                 disabled={isCropping}>
-                Batal
+                <ZoomIn className="w-4 h-4" />
               </Button>
-              <Button
-                onClick={handleCropSave}
-                className="w-full sm:w-auto bg-[#C4A48E] hover:bg-[#a88a75] text-white"
-                disabled={isCropping}>
-                {isCropping ? "Memproses..." : "Crop & Simpan"}
-              </Button>
+
+              {/* PERCENTAGE */}
+
+              <span
+                className="
+                  text-xs
+                  text-stone-500
+                  font-medium
+                  min-w-[52px]
+                  text-right
+                ">
+                {Math.round(zoomValue * 100)}%
+              </span>
             </div>
+          </div>
+
+          {/* ============================= */}
+          {/* FOOTER */}
+          {/* ============================= */}
+
+          <DialogFooter
+            className="
+              shrink-0
+              p-4
+              bg-white
+              border-t
+              flex
+              flex-col
+              sm:flex-row
+              gap-2
+            ">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeEditor}
+              disabled={isCropping}>
+              Batal
+            </Button>
+
+            <Button
+              type="button"
+              onClick={handleCropSave}
+              disabled={isCropping}
+              className="
+                bg-[#C4A48E]
+                hover:bg-[#a88a75]
+                text-white
+              ">
+              {isCropping ? "Memproses..." : "Crop & Simpan"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

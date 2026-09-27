@@ -64,12 +64,11 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { toast } from "sonner";
+import { AddTagModal } from "../../super-admin/product-tags/components/addTagModal";
+import { TagCategoryManagerModal } from "../../super-admin/products/components/TagCategoryManagerModal";
 import ArticleCategoryForm, {
   ArticleCategoryFormValues,
 } from "../categories/components/formArticleCategories";
-import ArticleTagForm, {
-  ArticleTagFormValues,
-} from "../tags/components/formArticleTag";
 import { FormSeo } from "./formArticleSEO";
 import { ImagePreviewModal } from "./imagePreviewModal";
 import { SEOAnalyzer } from "./seoAnalyzer";
@@ -114,6 +113,19 @@ export interface ArticleInitialData extends ArticleFormValues {
   isTranslated?: boolean;
 }
 
+interface Tag {
+  id: string;
+  name: string;
+  slug?: string;
+}
+
+interface TagCategory {
+  id: string;
+  name: string;
+  slug: string;
+  tags: Tag[];
+}
+
 export default function FormArticle({
   onSubmit,
   isSubmitting,
@@ -132,10 +144,9 @@ export default function FormArticle({
   const { fetchApi, status } = useApi();
 
   const [categories, setCategories] = useState<any[]>([]);
-  console.log("ini adalah categories", categories);
-
   const [products, setProducts] = useState<any[]>([]);
-  const [availableTags, setAvailableTags] = useState<any[]>([]);
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+  const [tagCategories, setTagCategories] = useState<TagCategory[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -144,7 +155,7 @@ export default function FormArticle({
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverMobileFile, setCoverMobileFile] = useState<File | null>(null);
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
-  const [isSubmittingTag, setIsSubmittingTag] = useState(false);
+  const [isTagCategoryModalOpen, setIsTagCategoryModalOpen] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState("");
 
   const form = useForm<any>({
@@ -183,13 +194,18 @@ export default function FormArticle({
   const watchedKeywords = form.watch("focusKeywords_id");
 
   useEffect(() => {
-    if (initialData) {
-      form.reset({
-        ...initialData,
-        productIds: initialData.productIds || [],
-        tagIds: initialData.tagIds || [],
-      });
-    }
+    if (!initialData) return;
+    form.reset({
+      ...initialData,
+      productIds:
+        initialData.productIds ||
+        initialData.relatedProducts?.map(
+          (item: any) => item.productId || item.product?.id,
+        ) ||
+        [],
+      tagIds:
+        initialData.tagIds || initialData.tags?.map((tag: Tag) => tag.id) || [],
+    });
   }, [initialData, form]);
 
   useEffect(() => {
@@ -197,29 +213,31 @@ export default function FormArticle({
       if (status !== "authenticated") return;
 
       try {
-        const [catRes, prodRes, tagRes] = await Promise.all([
+        const [catRes, prodRes, tagRes, tagCategoryRes] = await Promise.all([
           fetchApi("/article-categories/list"),
           fetchApi("/products/order"),
-          fetchApi("/article-tags/list"),
+          fetchApi("/product-tags/list"),
+          fetchApi("/product-tags/categories"),
         ]);
 
-        // 1. Tangani Data Kategori
         if (catRes.ok) {
           const catData = await catRes.json();
-          console.log("Data Kategori dari API:", catData);
           setCategories(Array.isArray(catData) ? catData : catData.data || []);
         }
 
-        // 2. Tangani Data Produk
         if (prodRes.ok) {
           const p = await prodRes.json();
           setProducts(Array.isArray(p) ? p : p.data || []);
         }
 
-        // 3. Tangani Data Tags
         if (tagRes.ok) {
           const t = await tagRes.json();
           setAvailableTags(Array.isArray(t) ? t : t.data || []);
+        }
+
+        if (tagCategoryRes.ok) {
+          const t = await tagCategoryRes.json();
+          setTagCategories(Array.isArray(t) ? t : t.data || []);
         }
       } catch (error) {
         console.error("Fetch Data Error:", error);
@@ -273,36 +291,6 @@ export default function FormArticle({
     }
   };
 
-  const handleAddTagFast = async (data: ArticleTagFormValues) => {
-    if (status !== "authenticated") return;
-    setIsSubmittingTag(true);
-    try {
-      const res = await fetchApi("/article-tags", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-
-      if (!res.ok) throw new Error("Gagal membuat tag baru");
-
-      const responseData = await res.json();
-      const newTag = responseData.data || responseData;
-
-      setAvailableTags((prev) => [...prev, newTag]);
-
-      const currentSelectedTags = form.getValues("tagIds") || [];
-      form.setValue("tagIds", [...currentSelectedTags, newTag.id]);
-
-      // 3. Tutup modal & bersihkan pencarian
-      setIsTagModalOpen(false);
-      setTagSearchQuery("");
-      toast.success("Tag berhasil ditambahkan!");
-    } catch (err: any) {
-      toast.error(err.message || "Terjadi kesalahan saat menyimpan tag.");
-    } finally {
-      setIsSubmittingTag(false);
-    }
-  };
-
   if (loadingData) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-stone-500">
@@ -352,7 +340,6 @@ export default function FormArticle({
           <TabsContent
             value="content"
             className="space-y-8 mt-0 focus-visible:outline-none">
-            {/* AREA UPLOAD COVER */}
             {/* AREA UPLOAD COVER */}
             <Card className="p-6 border-stone-200 shadow-sm bg-stone-50/30">
               <FormLabel className="text-base font-bold flex items-center gap-2 mb-6">
@@ -566,125 +553,226 @@ export default function FormArticle({
                 <FormField
                   control={form.control}
                   name="tagIds"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <div className="flex items-center justify-between">
-                        <FormLabel className="font-bold flex items-center gap-2">
-                          <TagIcon className="w-4 h-4" /> Tags Artikel
-                        </FormLabel>
-                      </div>
+                  render={({ field }) => {
+                    const selectedTagIds: string[] = field.value || [];
 
-                      <Dialog
-                        open={isTagModalOpen}
-                        onOpenChange={setIsTagModalOpen}>
-                        <DialogContent className="sm:max-w-md">
-                          <DialogHeader>
-                            <DialogTitle>Tambah Tag Artikel Baru</DialogTitle>
-                          </DialogHeader>
-                          <ArticleTagForm
-                            initialData={{ name: tagSearchQuery }}
-                            onSubmit={handleAddTagFast}
-                            isSubmitting={isSubmittingTag}
-                          />
-                        </DialogContent>
-                      </Dialog>
+                    return (
+                      <FormItem className="flex flex-col">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <FormLabel className="font-bold flex items-center gap-2">
+                              <TagIcon className="w-4 h-4" /> Tags
+                            </FormLabel>
+                            <p className="text-[11px] text-muted-foreground mt-1">
+                              Menggunakan tag dan group yang sama dengan tag
+                              produk.
+                            </p>
+                          </div>
 
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
+                          <div className="flex items-center gap-2">
                             <Button
+                              type="button"
                               variant="outline"
-                              role="combobox"
-                              className={cn(
-                                "w-full justify-between bg-white min-h-11 h-auto py-2",
-                                !field.value?.length && "text-muted-foreground",
-                              )}>
-                              <div className="flex flex-wrap gap-1">
-                                {field.value?.length > 0
-                                  ? field.value.map((id: string) => (
-                                      <Badge
-                                        key={id}
-                                        variant="secondary"
-                                        className="bg-stone-100 text-stone-700 hover:bg-stone-200">
-                                        {
-                                          availableTags.find((t) => t.id === id)
-                                            ?.name
-                                        }
-                                      </Badge>
-                                    ))
-                                  : "Cari & pilih tag artikel..."}
-                              </div>
-                              <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              size="sm"
+                              onClick={() => setIsTagCategoryModalOpen(true)}
+                              className="text-xs h-8 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                              <Plus className="w-3.5 h-3.5 mr-1" />
+                              Kelola Group
                             </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0" align="start">
-                          <Command>
-                            <CommandInput
-                              placeholder="Ketik nama tag..."
-                              value={tagSearchQuery}
-                              onValueChange={setTagSearchQuery}
-                            />
-                            <CommandList>
-                              <CommandEmpty className="py-4 flex flex-col items-center justify-center gap-2">
-                                <span className="text-sm text-muted-foreground">
-                                  Tag tidak ditemukan.
-                                </span>
-                                <Button
+
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsTagModalOpen(true)}
+                              className="text-xs h-8">
+                              <Plus className="w-3.5 h-3.5 mr-1" />
+                              Tag Baru
+                            </Button>
+                          </div>
+                        </div>
+
+                        {tagCategories.length > 0 && (
+                          <div className="flex flex-wrap gap-2 items-center p-2 bg-slate-50 dark:bg-stone-900 rounded-md border border-slate-100 dark:border-stone-800">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mr-1 select-none">
+                              Tag Groups:
+                            </span>
+
+                            {tagCategories.map((category) => {
+                              const categoryTagIds = (category.tags || []).map(
+                                (tag) => tag.id,
+                              );
+
+                              if (categoryTagIds.length === 0) return null;
+
+                              const selectedCategoryTagIds =
+                                categoryTagIds.filter((id) =>
+                                  selectedTagIds.includes(id),
+                                );
+
+                              const isAllSelected =
+                                selectedCategoryTagIds.length ===
+                                categoryTagIds.length;
+
+                              const isPartSelected =
+                                selectedCategoryTagIds.length > 0 &&
+                                !isAllSelected;
+
+                              return (
+                                <button
+                                  key={category.id}
                                   type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                                  onClick={() => setIsTagModalOpen(true)}>
-                                  <Plus className="w-4 h-4 mr-1" />
-                                  Buat Tag "{tagSearchQuery}"
-                                </Button>
-                              </CommandEmpty>
+                                  title={`${category.name} (${category.tags
+                                    .map((tag) => tag.name)
+                                    .join(", ")})`}
+                                  onClick={() => {
+                                    if (isAllSelected) {
+                                      field.onChange(
+                                        selectedTagIds.filter(
+                                          (id) => !categoryTagIds.includes(id),
+                                        ),
+                                      );
+                                      return;
+                                    }
 
-                              <CommandGroup>
-                                {availableTags.map((tag) => (
-                                  <CommandItem
-                                    key={tag.id}
-                                    onSelect={() => {
-                                      const current = field.value || [];
-                                      const next = current.includes(tag.id)
-                                        ? current.filter(
-                                            (id: string) => id !== tag.id,
-                                          )
-                                        : [...current, tag.id];
-                                      field.onChange(next);
-                                    }}>
-                                    <Check
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        field.value?.includes(tag.id)
-                                          ? "opacity-100"
-                                          : "opacity-0",
-                                      )}
-                                    />
-                                    {tag.name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
+                                    field.onChange(
+                                      Array.from(
+                                        new Set([
+                                          ...selectedTagIds,
+                                          ...categoryTagIds,
+                                        ]),
+                                      ),
+                                    );
+                                  }}
+                                  className={cn(
+                                    "text-xs px-2.5 py-1 rounded-full border transition-all duration-150 font-medium select-none",
+                                    isAllSelected
+                                      ? "bg-indigo-600 border-indigo-600 text-white font-semibold shadow-xs"
+                                      : isPartSelected
+                                        ? "bg-indigo-50 border-dashed border-indigo-300 text-indigo-700 font-semibold"
+                                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                                  )}>
+                                  {category.name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
 
-                              {availableTags.length > 0 && (
-                                <>
-                                  <div className="h-1px bg-stone-100 my-1 mx-2" />
-                                  <CommandItem
-                                    onSelect={() => setIsTagModalOpen(true)}
-                                    className="text-blue-600 font-medium justify-center cursor-pointer py-2">
-                                    <Plus className="mr-2 h-4 w-4" /> Buat Tag
-                                    Baru
-                                  </CommandItem>
-                                </>
-                              )}
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                role="combobox"
+                                className={cn(
+                                  "w-full justify-between bg-white min-h-11 h-auto py-2",
+                                  selectedTagIds.length === 0 &&
+                                    "text-muted-foreground",
+                                )}>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {selectedTagIds.length > 0
+                                    ? selectedTagIds.map((id) => {
+                                        const tag = availableTags.find(
+                                          (item) => item.id === id,
+                                        );
+
+                                        return (
+                                          <Badge
+                                            key={id}
+                                            variant="secondary"
+                                            className="bg-stone-100 text-stone-700">
+                                            {tag?.name || "Unknown Tag"}
+                                          </Badge>
+                                        );
+                                      })
+                                    : "Cari & pilih tag..."}
+                                </div>
+                                <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+
+                          <PopoverContent
+                            className="w-(--radix-popover-trigger-width) p-0"
+                            align="start">
+                            <Command>
+                              <CommandInput
+                                placeholder="Cari tag produk..."
+                                value={tagSearchQuery}
+                                onValueChange={setTagSearchQuery}
+                              />
+
+                              <CommandList>
+                                <CommandEmpty className="py-4 flex flex-col items-center justify-center gap-2">
+                                  <span className="text-sm text-muted-foreground">
+                                    Tag tidak ditemukan.
+                                  </span>
+
+                                  {tagSearchQuery.trim() && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setIsTagModalOpen(true)}>
+                                      <Plus className="w-4 h-4 mr-1" />
+                                      Buat Tag "{tagSearchQuery}"
+                                    </Button>
+                                  )}
+                                </CommandEmpty>
+
+                                <CommandGroup>
+                                  {availableTags.map((tag) => {
+                                    const selected = selectedTagIds.includes(
+                                      tag.id,
+                                    );
+
+                                    return (
+                                      <CommandItem
+                                        key={tag.id}
+                                        value={tag.name}
+                                        onSelect={() => {
+                                          field.onChange(
+                                            selected
+                                              ? selectedTagIds.filter(
+                                                  (id) => id !== tag.id,
+                                                )
+                                              : [...selectedTagIds, tag.id],
+                                          );
+                                          setTagSearchQuery("");
+                                        }}>
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            selected
+                                              ? "opacity-100"
+                                              : "opacity-0",
+                                          )}
+                                        />
+                                        {tag.name}
+                                      </CommandItem>
+                                    );
+                                  })}
+                                </CommandGroup>
+
+                                <div className="h-px bg-stone-100 my-1" />
+
+                                <CommandItem
+                                  onSelect={() => setIsTagModalOpen(true)}
+                                  className="text-blue-600 font-medium justify-center cursor-pointer">
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  Tambah Tag Baru Sekaligus
+                                </CommandItem>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
 
                 <FormField
@@ -1039,6 +1127,68 @@ export default function FormArticle({
           </Button>
         </div>
       </form>
+
+      <AddTagModal
+        isOpen={isTagModalOpen}
+        onClose={() => {
+          setIsTagModalOpen(false);
+          setTagSearchQuery("");
+        }}
+        onSuccess={(newTags) => {
+          setAvailableTags((prev) => {
+            const existingIds = new Set(prev.map((tag) => tag.id));
+            const merged = [...prev];
+
+            newTags.forEach((tag) => {
+              if (!existingIds.has(tag.id)) {
+                merged.push(tag);
+                existingIds.add(tag.id);
+              }
+            });
+
+            return merged;
+          });
+
+          const currentTagIds = form.getValues("tagIds") || [];
+
+          form.setValue(
+            "tagIds",
+            Array.from(
+              new Set([...currentTagIds, ...newTags.map((tag) => tag.id)]),
+            ),
+            {
+              shouldDirty: true,
+              shouldValidate: true,
+            },
+          );
+
+          setTagSearchQuery("");
+        }}
+      />
+
+      <TagCategoryManagerModal
+        isOpen={isTagCategoryModalOpen}
+        onClose={() => setIsTagCategoryModalOpen(false)}
+        availableTags={availableTags}
+        tagCategories={tagCategories}
+        onCategoriesChange={(updated) => {
+          setTagCategories(updated);
+        }}
+        onTagCreated={(newTag) => {
+          setAvailableTags((prev) => {
+            if (prev.some((tag) => tag.id === newTag.id)) return prev;
+
+            return [
+              ...prev,
+              {
+                id: newTag.id,
+                name: newTag.name,
+                slug: (newTag as Tag).slug || "",
+              },
+            ];
+          });
+        }}
+      />
 
       <ImagePreviewModal
         src={previewUrl}

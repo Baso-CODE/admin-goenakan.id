@@ -59,9 +59,9 @@ import {
 } from "lucide-react";
 import { AddItemCategoryModal } from "../../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../../item-names-product/components/addItemNameModal";
-import { AddTagModal } from "../../../product-tags/components/addTagModal";
 import CreateCategoryModal from "../../../product-categories/components/createCategoryModal";
 import MaterialTypeForm from "../../../product-materials/components/materialTypeForm";
+import { AddTagModal } from "../../../product-tags/components/addTagModal";
 import { TagCategoryManagerModal } from "../TagCategoryManagerModal";
 
 const FormCoreSchema = z.object({
@@ -1330,22 +1330,43 @@ export default function FormProductCore({
           setTagCategories(updated);
         }}
         onTagCreated={(newTag) => {
-          setTags((prev) => [...prev, newTag]);
+          setTags((prev) => {
+            if (prev.some((tag) => tag.id === newTag.id)) return prev;
+            return [...prev, newTag];
+          });
         }}
       />
 
       <AddTagModal
         isOpen={isAddTagModalOpen}
         onClose={() => setIsAddTagModalOpen(false)}
-        onSuccess={(newTag) => {
+        onSuccess={(newTags) => {
           setTags((prev: any[]) => {
-            if (prev.some((t) => t.id === newTag.id)) return prev;
-            return [...prev, newTag];
+            const existingIds = new Set(prev.map((tag) => tag.id));
+            const merged = [...prev];
+
+            newTags.forEach((tag) => {
+              if (!existingIds.has(tag.id)) {
+                merged.push(tag);
+                existingIds.add(tag.id);
+              }
+            });
+
+            return merged;
           });
-          const currentTags = form.getValues("tagIds") || [];
-          if (!currentTags.includes(newTag.id)) {
-            form.setValue("tagIds", [...currentTags, newTag.id]);
-          }
+
+          const currentTagIds = form.getValues("tagIds") || [];
+
+          form.setValue(
+            "tagIds",
+            Array.from(
+              new Set([...currentTagIds, ...newTags.map((tag) => tag.id)]),
+            ),
+            {
+              shouldDirty: true,
+              shouldValidate: true,
+            },
+          );
         }}
       />
     </>

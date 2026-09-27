@@ -63,9 +63,9 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AddItemCategoryModal } from "../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../item-names-product/components/addItemNameModal";
-import { AddTagModal } from "../../product-tags/components/addTagModal";
 import CreateCategoryModal from "../../product-categories/components/createCategoryModal";
 import MaterialTypeForm from "../../product-materials/components/materialTypeForm";
+import { AddTagModal } from "../../product-tags/components/addTagModal";
 import { AttributeSelector, ModelShapeValueInput } from "./AttributeSelector";
 import { MockupAreaSelector } from "./MockupAreaSelector";
 import { PriceTiers } from "./PriceTiers";
@@ -104,7 +104,9 @@ export default function ProductFormV2({
   const [previewUrl, setPreviewUrl] = useState<string | undefined>();
   const [isTagCategoryModalOpen, setIsTagCategoryModalOpen] = useState(false);
   const [isAddTagModalOpen, setIsAddTagModalOpen] = useState(false);
-  const [tempAttributeSelections, setTempAttributeSelections] = useState<any[]>([]);
+  const [tempAttributeSelections, setTempAttributeSelections] = useState<any[]>(
+    [],
+  );
   const [tempFullAttrs, setTempFullAttrs] = useState<any[]>([]);
   const [globalStock, setGlobalStock] = useState<string>("");
   const [inlineInputAttrId, setInlineInputAttrId] = useState<string | null>(
@@ -2359,35 +2361,53 @@ export default function ProductFormV2({
         />
 
         <AddTagModal
-        isOpen={isAddTagModalOpen}
-        onClose={() => setIsAddTagModalOpen(false)}
-        onSuccess={(newTag) => {
-          setters.setTags((prev: any[]) => {
-            if (prev.some((t) => t.id === newTag.id)) return prev;
-            return [...prev, newTag];
-          });
-          const currentTags = form.getValues("tagIds") || [];
-          if (!currentTags.includes(newTag.id)) {
-            form.setValue("tagIds", [...currentTags, newTag.id]);
-          }
-        }}
-      />
+          isOpen={isAddTagModalOpen}
+          onClose={() => setIsAddTagModalOpen(false)}
+          onSuccess={(newTags) => {
+            setters.setTags((prev: any[]) => {
+              const existingIds = new Set(prev.map((tag) => tag.id));
+              const merged = [...prev];
 
-      <Dialog
-        open={state.isMaterialModalOpen}
-        onOpenChange={setters.setIsMaterialModalOpen}>
-        <DialogContent className="sm:max-w-140 bg-[oklch(0.98_0.02_90)]">
-          <DialogHeader>
-            <DialogTitle>Tambah Material Baru</DialogTitle>
-          </DialogHeader>
-          <div className="mt-2">
-            <MaterialTypeForm
-              onSubmit={handlers.handleAddMaterialSubmit}
-              isSubmitting={state.isSubmittingMaterial}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+              newTags.forEach((tag) => {
+                if (!existingIds.has(tag.id)) {
+                  merged.push(tag);
+                  existingIds.add(tag.id);
+                }
+              });
+
+              return merged;
+            });
+
+            const currentTagIds = form.getValues("tagIds") || [];
+
+            form.setValue(
+              "tagIds",
+              Array.from(
+                new Set([...currentTagIds, ...newTags.map((tag) => tag.id)]),
+              ),
+              {
+                shouldDirty: true,
+                shouldValidate: true,
+              },
+            );
+          }}
+        />
+
+        <Dialog
+          open={state.isMaterialModalOpen}
+          onOpenChange={setters.setIsMaterialModalOpen}>
+          <DialogContent className="sm:max-w-140 bg-[oklch(0.98_0.02_90)]">
+            <DialogHeader>
+              <DialogTitle>Tambah Material Baru</DialogTitle>
+            </DialogHeader>
+            <div className="mt-2">
+              <MaterialTypeForm
+                onSubmit={handlers.handleAddMaterialSubmit}
+                isSubmitting={state.isSubmittingMaterial}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </Card>
 
       {/* Mockup area selector modal */}
