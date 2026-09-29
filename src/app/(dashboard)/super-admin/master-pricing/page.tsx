@@ -209,10 +209,20 @@ export default function MasterPricingPage() {
   const fetchCategories = async () => {
     try {
       const res = await fetchApi("/product-categories/list");
+      if (!res.ok) {
+        setCategories([]);
+        return;
+      }
       const data = await res.json();
-      setCategories(data);
+      const items = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
+      setCategories(items);
     } catch (err) {
       console.error("Failed to load categories", err);
+      setCategories([]);
     }
   };
 
@@ -447,11 +457,12 @@ export default function MasterPricingPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">Semua Kategori</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name_id || c.name || "Kategori"}
-                  </SelectItem>
-                ))}
+                {Array.isArray(categories) &&
+                  categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name_id || c.name || "Kategori"}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
