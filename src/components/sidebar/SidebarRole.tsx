@@ -28,6 +28,7 @@ import {
   ListOrdered,
   LucideChartNetwork,
   Megaphone,
+  MessageSquare,
   MessageSquareQuote,
   Package,
   Settings,
@@ -311,6 +312,29 @@ export default function SidebarRole({ ...props }) {
       },
     ],
 
+    // 5. WA PORTAL SECTION
+    navWaPortal: [
+      {
+        title: "WA Portal",
+        url: "#",
+        icon: MessageSquare,
+        items: [
+          { title: "Live Chat Inbox", url: "/super-admin/wa-portal/live-chat" },
+          { title: "Dashboard & Sessions", url: "/super-admin/wa-portal" },
+          { title: "Send Message", url: "/super-admin/wa-portal?tab=send" },
+          {
+            title: "Scheduled Messages",
+            url: "/super-admin/wa-portal?tab=schedule",
+          },
+          {
+            title: "Message Logs & Audit",
+            url: "/super-admin/wa-portal?tab=logs",
+          },
+          { title: "Webhooks", url: "/super-admin/wa-portal?tab=webhooks" },
+        ],
+      },
+    ],
+
     // OTHER
     Etc: [
       {
@@ -387,6 +411,13 @@ export default function SidebarRole({ ...props }) {
           <NavMain
             label="Marketing & Content"
             items={getVisibleItems(data.navMarketing)}
+          />
+        )}
+
+        {getVisibleItems(data.navWaPortal).length > 0 && (
+          <NavMain
+            label="WA Portal"
+            items={getVisibleItems(data.navWaPortal)}
           />
         )}
 

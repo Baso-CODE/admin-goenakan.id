@@ -157,10 +157,20 @@ export default function ProductsAll() {
   const fetchCategories = async () => {
     try {
       const res = await fetchApi("/product-categories/list");
+      if (!res.ok) {
+        setCategories([]);
+        return;
+      }
       const data = await res.json();
-      setCategories(data);
+      const items = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
+      setCategories(items);
     } catch (error) {
       console.error("Failed to load categories", error);
+      setCategories([]);
     }
   };
 
@@ -193,11 +203,17 @@ export default function ProductsAll() {
         throw new Error(result.message || "Failed to fetch product data.");
       }
 
-      setProducts(result.data || []);
+      const items = Array.isArray(result.data)
+        ? result.data
+        : Array.isArray(result)
+        ? result
+        : [];
+      setProducts(items);
       setMeta(result.meta);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Unknown error");
       toast.error("Failed to load products");
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -342,11 +358,12 @@ export default function ProductsAll() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All Categories</SelectItem>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name_id || cat.name || "Unnamed"}
-                  </SelectItem>
-                ))}
+                {Array.isArray(categories) &&
+                  categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name_id || cat.name || "Unnamed"}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
 
@@ -463,7 +480,7 @@ export default function ProductsAll() {
                       Error: {error || "Failed to load products."}
                     </TableCell>
                   </TableRow>
-                ) : products.length > 0 ? (
+                ) : Array.isArray(products) && products.length > 0 ? (
                   products.map((product) => {
                     const thumbnail =
                       product.images?.find((img) => img.isFeatured) ||
