@@ -1,5 +1,15 @@
 "use client";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -140,6 +150,36 @@ export default function ProductsAll() {
       );
     } catch (err: any) {
       toast.error(err.message || "Gagal mengubah status aktif");
+    }
+  };
+
+  // === Delete Product State & Handler ===
+  const [productToDelete, setProductToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    try {
+      setIsDeleting(true);
+      const res = await fetchApi(`/products/${productToDelete.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Gagal menghapus produk.");
+      }
+
+      toast.success(data.message || "Produk berhasil dihapus.");
+      setProductToDelete(null);
+      fetchProducts();
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menghapus produk.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -608,7 +648,14 @@ export default function ProductsAll() {
                                   <DropdownMenuSeparator />
 
                                   {/* ACTION: DELETE */}
-                                  <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50">
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      setProductToDelete({
+                                        id: product.id,
+                                        name: product.name,
+                                      })
+                                    }
+                                    className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50">
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     <span>Delete</span>
                                   </DropdownMenuItem>
@@ -673,6 +720,51 @@ export default function ProductsAll() {
           </div>
         </div>
       )}
+
+      {/* === Dialog Konfirmasi Hapus Produk === */}
+      <AlertDialog
+        open={!!productToDelete}
+        onOpenChange={(open) =>
+          !open && !isDeleting && setProductToDelete(null)
+        }>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Produk?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus produk{" "}
+              <strong className="text-foreground font-semibold">
+                {productToDelete?.name}
+              </strong>
+              ?
+              <span className="block mt-2 text-xs text-muted-foreground">
+                * Catatan: Produk hanya dapat dihapus jika belum pernah memiliki
+                riwayat transaksi (pesanan, penawaran harga, faktur). Jika sudah
+                ada riwayat transaksi, sistem akan menolak penghapusan untuk
+                menjaga integritas data.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteProduct();
+              }}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white focus:ring-red-600">
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Menghapus...
+                </>
+              ) : (
+                "Hapus Permanen"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
