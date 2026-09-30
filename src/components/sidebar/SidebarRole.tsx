@@ -1,5 +1,6 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
 import {
   Sidebar,
   SidebarContent,
@@ -10,12 +11,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { useSession } from "next-auth/react";
-
-import { checkPermission } from "@/lib/roleAccess";
-
+import { SIDEBAR_MENU } from "@/config/sidebarMenu";
+import { getAccessibleAdminRoutes } from "@/lib/adminAccess";
+import type { LucideIcon } from "lucide-react";
 import {
-  AlignHorizontalDistributeStart,
   AudioWaveform,
   Calculator,
   Command,
@@ -26,434 +25,255 @@ import {
   HandshakeIcon,
   LayoutTemplate,
   ListOrdered,
-  LucideChartNetwork,
   Megaphone,
   MessageSquare,
   MessageSquareQuote,
   Package,
+  Search,
   Settings,
   Store,
-  Tags,
   Truck,
   UserCircle,
   Users,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import { NavMain } from "./NavMain";
 import { NavUser } from "./nav-user";
 import { TeamSwitcher } from "./team-switcher";
 
+const ICONS: Record<string, LucideIcon> = {
+  orders: ListOrdered,
+  invoice: FileSpreadsheet,
+  logistic: Truck,
+  quotation: MessageSquareQuote,
+  purchase: FileText,
+  vendor: Store,
+  client: UserCircle,
+  product: Package,
+  cogs: Calculator,
+  sales: HandshakeIcon,
+  users: Users,
+  article: FileText,
+  content: LayoutTemplate,
+  marketing: Megaphone,
+  whatsapp: MessageSquare,
+  settings: Settings,
+};
+
 export default function SidebarRole({ ...props }) {
   const { data: session } = useSession();
+  const [search, setSearch] = useState("");
 
-  const userPermissions = (session?.user as any)?.permissions || [];
-  const role = (session?.user?.role as string) || "";
+  const role = session?.user?.role || "";
 
-  const getPermissionFromMenuUrl = (url: string): string | null => {
-    if (!url || url === "#") return null;
+  const userPermissions = useMemo<string[]>(
+    () => session?.user?.permissions || [],
+    [session?.user?.permissions],
+  );
 
-    // Pecah URL berdasarkan garis miring
-    const segments = url.split("/").filter(Boolean);
-    if (segments.length === 0) return null;
+  const isSuperAdmin = role === "SUPER_ADMIN";
 
-    const filteredSegments = segments.filter(
-      (seg) =>
-        ![
-          "super-admin",
-          "admin",
-          "dashboard",
-          "admin-invoice",
-          "admin-article",
-        ].includes(seg),
+  const accessibleRoutes = useMemo(
+    () => getAccessibleAdminRoutes(role, userPermissions),
+    [role, userPermissions],
+  );
+
+  const accessibleRouteUrls = useMemo(
+    () => new Set(accessibleRoutes.map((route) => route.url)),
+    [accessibleRoutes],
+  );
+
+  const visibleSections = useMemo(() => {
+    return SIDEBAR_MENU.map((section) => {
+      const groups = section.groups
+        .map((group) => {
+          const children = group.children.filter((child) =>
+            accessibleRouteUrls.has(child.routeUrl),
+          );
+
+          return {
+            ...group,
+            children,
+          };
+        })
+        .filter((group) => group.children.length > 0);
+
+      return {
+        ...section,
+        groups,
+      };
+    }).filter((section) => section.groups.length > 0);
+  }, [accessibleRouteUrls]);
+
+  const navSections = useMemo(() => {
+    return visibleSections.map((section) => ({
+      title: section.title,
+      items: section.groups.map((group) => ({
+        title: group.title,
+        url: "#",
+        icon: ICONS[group.icon],
+        items: group.children.map((child) => ({
+          title: child.title,
+          url: child.href || child.routeUrl,
+        })),
+      })),
+    }));
+  }, [visibleSections]);
+
+  const searchablePages = useMemo(() => {
+    const pages = visibleSections.flatMap((section) =>
+      section.groups.flatMap((group) =>
+        group.children.map((child) => ({
+          title: child.title,
+          url: child.href || child.routeUrl,
+          section: section.title,
+          group: group.title,
+          icon: ICONS[group.icon],
+        })),
+      ),
     );
 
-    if (filteredSegments.length === 0) return null;
-
-    let rawModule = filteredSegments[0];
-
-    let cleanModule = rawModule.replace(/-/g, "_");
-    if (cleanModule.endsWith("s")) {
-      cleanModule = cleanModule.slice(0, -1);
+    if (isSuperAdmin) {
+      pages.unshift({
+        title: "Main Dashboard",
+        url: "/super-admin",
+        section: "Dashboard",
+        group: "Dashboard",
+        icon: Frame,
+      });
     }
 
-    return `read_${cleanModule}`;
-  };
+    return pages;
+  }, [visibleSections, isSuperAdmin]);
 
-  const data = {
-    user: {
-      name: session?.user.name || "User",
-      email: session?.user.email || "user@example.com",
-      avatar: "/avatars/shadcn.jpg",
-    },
-    teams: [
-      { name: "Admin Team", logo: GalleryVerticalEnd, plan: "Enterprise" },
-      { name: "Invoice Dept", logo: AudioWaveform, plan: "Startup" },
-      { name: "Article Dept", logo: Command, plan: "Free" },
-    ],
+  const searchResults = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
 
-    // 1. ORDER MANAGEMENT SECTION
-    navOrder: [
-      {
-        title: "Orders & Dashboard",
-        url: "#",
-        icon: ListOrdered,
-        items: [
-          { title: "All Orders List", url: "/super-admin/orders" },
-          {
-            title: "Sample History",
-            url: "/super-admin/sample-history",
-          },
-        ],
-      },
-      {
-        title: "Cashflow & Invoicing",
-        url: "#",
-        icon: FileSpreadsheet,
-        items: [
-          { title: "Invoices", url: "/admin-invoice/invoices" },
-          { title: "Cashflow", url: "/super-admin/cashflow" },
-          { title: "Finance", url: "/super-admin/finance" },
-          { title: "Currency", url: "/admin-invoice/currency" },
-        ],
-      },
-      {
-        title: "Logistic & Delivery",
-        url: "#",
-        icon: Truck,
-        items: [
-          { title: "Tracking Dashboard", url: "/super-admin/logistics" },
-          {
-            title: "Delivery Notes",
-            url: "/super-admin/logistics/shipment-notes",
-          },
-        ],
-      },
-      {
-        title: "Quotation & Follow Up",
-        url: "#",
-        icon: MessageSquareQuote,
-        items: [
-          { title: "Quotations", url: "/admin-invoice/quotations" },
-          { title: "Quotation Notes", url: "/admin-invoice/quotations/notes" },
-          {
-            title: "Follow Up Tracking",
-            url: "/admin-invoice/quotations/follow-up",
-          },
-        ],
-      },
-      {
-        title: "Purchase Orders",
-        url: "/super-admin/purchase-orders",
-        icon: FileText,
-        items: [
-          { title: "All Purchase Orders", url: "/super-admin/purchase-orders" },
-        ],
-      },
-    ],
+    if (!keyword) {
+      return [];
+    }
 
-    // 2. DATABASE SECTION
-    navDatabase: [
-      {
-        title: "Vendor Management",
-        url: "#",
-        icon: Store,
-        items: [
-          { title: "Vendors", url: "/super-admin/vendors" },
-          { title: "Vendor Items", url: "/super-admin/vendor-items" },
-          { title: "Vendor Categories", url: "/super-admin/vendor-categories" },
-          { title: "Platform", url: "/super-admin/contact-platforms" },
-        ],
-      },
-      {
-        title: "Client Management",
-        url: "#",
-        icon: UserCircle,
-        items: [
-          { title: "All Client", url: "/super-admin/clients" },
-          { title: "Departments", url: "/super-admin/departments" },
-        ],
-      },
-      {
-        title: "Product Management",
-        url: "#",
-        icon: Package,
-        items: [
-          { title: "Products", url: "/super-admin/products", icon: Package },
-          {
-            title: "Product Categories",
-            url: "/super-admin/product-categories",
-            icon: Tags,
-          },
-          {
-            title: "Category Items",
-            url: "/super-admin/item-categories-product",
-            icon: Tags,
-          },
-          {
-            title: "Item Names",
-            url: "/super-admin/item-names-product",
-            icon: Tags,
-          },
-          {
-            title: "Product Materials",
-            url: "/super-admin/product-materials",
-            icon: Tags,
-          },
-          {
-            title: "Product Tags",
-            url: "/super-admin/product-tags",
-            icon: Tags,
-          },
-          {
-            title: "Product Attributes",
-            url: "/super-admin/product-attributes",
-            icon: AlignHorizontalDistributeStart,
-          },
-        ],
-      },
-      {
-        title: "Supplier COGS",
-        url: "#",
-        icon: Calculator,
-        items: [
-          {
-            title: "COGS Calculator",
-            url: "/super-admin/supplier-cogs",
-            icon: Calculator,
-          },
-          {
-            title: "Master Pricing",
-            url: "/super-admin/master-pricing",
-            icon: FileText,
-          },
-        ],
-      },
-    ],
+    return searchablePages.filter((page) => {
+      const searchableText = [page.title, page.section, page.group]
+        .join(" ")
+        .toLowerCase();
 
-    // 3. USER MANAGEMENT SECTION
-    navUserManagement: [
-      {
-        title: "Sales Team",
-        url: "#",
-        icon: HandshakeIcon,
-        items: [
-          { title: "All Sales Team", url: "/super-admin/sales-team" },
-          { title: "Sales Performance", url: "/super-admin/sales/performance" },
-        ],
-      },
-      {
-        title: "Users",
-        url: "#",
-        icon: Users,
-        items: [
-          { title: "All Users", url: "/super-admin/users" },
-          { title: "Roles & Permissions", url: "/super-admin/users/roles" },
-        ],
-      },
-    ],
-
-    // 4. MARKETING & CONTENT SECTION
-    navMarketing: [
-      {
-        title: "Articles / Blog",
-        url: "#",
-        icon: FileText,
-        items: [
-          { title: "All Articles", url: "/admin-article/article" },
-          { title: "Categories", url: "/admin-article/categories" },
-          { title: "Banners", url: "/admin-article/banners" },
-          { title: "Tags", url: "/admin-article/tags" },
-          {
-            title: "Success Stories",
-            url: "/super-admin/content/sucess-stories",
-          },
-        ],
-      },
-      {
-        title: "Web Content",
-        url: "#",
-        icon: LayoutTemplate,
-        items: [
-          { title: "Hero Images", url: "/super-admin/content/heros" },
-          { title: "Banner Pop-Up", url: "/super-admin/content/banner-popup" },
-          {
-            title: "Banner Products",
-            url: "/super-admin/content/banner-products",
-          },
-          { title: "Brand Client", url: "/super-admin/content/client-logo" },
-          {
-            title: "Testimonials & Photos",
-            url: "/super-admin/content/testimonials",
-          },
-          { title: "Faqs", url: "/super-admin/content/faqs" },
-          {
-            title: "Best Price Guarantee",
-            url: "/super-admin/content/best-price-guarantee",
-          },
-          { title: "Policies", url: "/super-admin/content/policies" },
-          { title: "Portfolios", url: "/super-admin/content/portfolios" },
-          {
-            title: "Event Categories",
-            url: "/super-admin/content/event-categories",
-          },
-        ],
-      },
-      {
-        title: "Marketing Campaigns",
-        url: "#",
-        icon: Megaphone,
-        items: [
-          { title: "Campaigns", url: "/super-admin/marketing/campaigns" },
-          {
-            title: "Contact Message Client",
-            url: "/super-admin/contact-messages",
-          },
-        ],
-      },
-    ],
-
-    // 5. WA PORTAL SECTION
-    navWaPortal: [
-      {
-        title: "WA Portal",
-        url: "#",
-        icon: MessageSquare,
-        items: [
-          { title: "Live Chat Inbox", url: "/super-admin/wa-portal/live-chat" },
-          { title: "Dashboard & Sessions", url: "/super-admin/wa-portal" },
-          { title: "Send Message", url: "/super-admin/wa-portal?tab=send" },
-          {
-            title: "Scheduled Messages",
-            url: "/super-admin/wa-portal?tab=schedule",
-          },
-          {
-            title: "Message Logs & Audit",
-            url: "/super-admin/wa-portal?tab=logs",
-          },
-          { title: "Webhooks", url: "/super-admin/wa-portal?tab=webhooks" },
-        ],
-      },
-    ],
-
-    // OTHER
-    Etc: [
-      {
-        name: "Settings",
-        url: "/super-admin/settings",
-        icon: Settings,
-      },
-      {
-        name: "Purchase Channel",
-        url: "/super-admin/purchase-channel",
-        icon: LucideChartNetwork,
-      },
-    ],
-    dashboard: [{ name: "Main Dashboard", url: "/dashboard", icon: Frame }],
-  };
-
-  // === FUNGSI FILTER OTOMATIS BERDASARKAN URL ===
-  const getVisibleItems = (items: any[]) => {
-    return items.filter((group) => {
-      // Ambil URL pertama dari sub-item di dalam grup menu
-      const firstSubUrl = group.items?.[0]?.url || group.url;
-      const inferredPermission = getPermissionFromMenuUrl(firstSubUrl);
-
-      if (inferredPermission) {
-        return checkPermission(userPermissions, inferredPermission, role);
-      }
-      return true;
+      return searchableText.includes(keyword);
     });
+  }, [search, searchablePages]);
+
+  const userData = {
+    name: session?.user?.name || "User",
+    email: session?.user?.email || "user@example.com",
+    avatar: "/avatars/shadcn.jpg",
   };
+
+  const teams = [
+    {
+      name: "Admin Team",
+      logo: GalleryVerticalEnd,
+      plan: "Enterprise",
+    },
+    {
+      name: "Invoice Dept",
+      logo: AudioWaveform,
+      plan: "Startup",
+    },
+    {
+      name: "Article Dept",
+      logo: Command,
+      plan: "Free",
+    },
+  ];
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <TeamSwitcher teams={teams} />
+
+        <div className="relative px-2 group-data-[collapsible=icon]:hidden">
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari halaman..."
+            className="pl-9"
+          />
+        </div>
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Main Dashboard */}
-        {role === "SUPER_ADMIN" && (
+        {search.trim() ? (
           <SidebarGroup>
+            <div className="px-2 pb-2 text-xs font-semibold text-muted-foreground">
+              Hasil Pencarian
+            </div>
+
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Main Dashboard">
-                  <Link href="/super-admin/">
-                    <Frame />
-                    <span>Main Dashboard</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {searchResults.length > 0 ? (
+                searchResults.map((item) => {
+                  const Icon = item.icon;
+
+                  return (
+                    <SidebarMenuItem key={`${item.url}-${item.title}`}>
+                      <SidebarMenuButton asChild tooltip={item.title}>
+                        <Link href={item.url} onClick={() => setSearch("")}>
+                          <Icon />
+
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate font-medium">
+                              {item.title}
+                            </span>
+
+                            <span className="truncate text-[10px] text-muted-foreground">
+                              {item.section} • {item.group}
+                            </span>
+                          </div>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })
+              ) : (
+                <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  Halaman tidak ditemukan
+                </div>
+              )}
             </SidebarMenu>
           </SidebarGroup>
-        )}
-
-        {/* -- SECTION DINAMIS -- */}
-        {getVisibleItems(data.navOrder).length > 0 && (
-          <NavMain
-            label="Order Management"
-            items={getVisibleItems(data.navOrder)}
-          />
-        )}
-
-        {getVisibleItems(data.navDatabase).length > 0 && (
-          <NavMain label="Database" items={getVisibleItems(data.navDatabase)} />
-        )}
-
-        {getVisibleItems(data.navUserManagement).length > 0 && (
-          <NavMain
-            label="User Management"
-            items={getVisibleItems(data.navUserManagement)}
-          />
-        )}
-
-        {getVisibleItems(data.navMarketing).length > 0 && (
-          <NavMain
-            label="Marketing & Content"
-            items={getVisibleItems(data.navMarketing)}
-          />
-        )}
-
-        {getVisibleItems(data.navWaPortal).length > 0 && (
-          <NavMain
-            label="WA Portal"
-            items={getVisibleItems(data.navWaPortal)}
-          />
-        )}
-
-        {/* -- SECTION ETC -- */}
-        {(() => {
-          const etcItems = data.Etc.filter((item) => {
-            const inferredPermission = getPermissionFromMenuUrl(item.url);
-            if (inferredPermission) {
-              return checkPermission(userPermissions, inferredPermission, role);
-            }
-            return true;
-          });
-
-          return etcItems.length > 0 ? (
-            <SidebarGroup>
-              <SidebarMenu>
-                {etcItems.map((item, index) => (
-                  <SidebarMenuItem key={index}>
-                    <SidebarMenuButton asChild tooltip={item.name}>
-                      <Link href={item.url}>
-                        <item.icon />
-                        <span>
-                          <span>{item.name}</span>
-                        </span>
+        ) : (
+          <>
+            {isSuperAdmin && (
+              <SidebarGroup>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Main Dashboard">
+                      <Link href="/super-admin">
+                        <Frame />
+                        <span className="font-medium">Main Dashboard</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroup>
-          ) : null;
-        })()}
+                </SidebarMenu>
+              </SidebarGroup>
+            )}
+
+            {navSections.map((section) => (
+              <NavMain
+                key={section.title}
+                label={section.title}
+                items={section.items}
+              />
+            ))}
+          </>
+        )}
       </SidebarContent>
 
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={userData} />
       </SidebarFooter>
     </Sidebar>
   );
