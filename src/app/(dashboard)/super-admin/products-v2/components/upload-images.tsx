@@ -98,6 +98,17 @@ export function UploadImages({
       return;
     }
 
+    const MAX_IMAGE_SIZE_MB = 15;
+    const oversizedFiles = newFiles.filter(
+      (f) => f.size > MAX_IMAGE_SIZE_MB * 1024 * 1024,
+    );
+    if (oversizedFiles.length > 0) {
+      alert(
+        `File "${oversizedFiles[0].name}" melebihi batas maksimal ${MAX_IMAGE_SIZE_MB} MB. Harap gunakan gambar dengan ukuran lebih kecil.`,
+      );
+      return;
+    }
+
     let currentTempId = tempIdCounter;
     const newItems: ImageItem[] = newFiles.map((file) => {
       currentTempId += 1;
