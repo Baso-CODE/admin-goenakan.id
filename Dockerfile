@@ -19,7 +19,7 @@ COPY . .
 RUN bunx prisma generate
 
 ENV NEXT_PUBLIC_BASE_URL_API="https://api.goenakan.tech"
-ENV NEXT_PUBLIC_BASE_URL_WEB="https://goenakan.tech"
+ENV NEXT_PUBLIC_BASE_URL_WEB="https://goenakan.id"
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN bun run build

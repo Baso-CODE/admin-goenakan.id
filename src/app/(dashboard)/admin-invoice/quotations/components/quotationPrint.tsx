@@ -315,7 +315,7 @@ export default function QuotationPrint() {
 
                           {item.product?.slug && (
                             <a
-                              href={`https://client.goenakan.tech/en/products/${item.product.slug}`}
+                              href={`https://goenakan.id/en/products/${item.product.slug}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="mt-1.5 block text-[9px] text-blue-600 hover:underline">
