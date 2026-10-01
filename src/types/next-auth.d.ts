@@ -9,7 +9,8 @@ declare module "next-auth" {
       email?: string | null;
       role: string;
       roleId: string;
-      permissions: string[]; //  Tambahkan tipe data permissions di Session
+      permissions: string[];
+      permissionVersion: number;
       accessToken: string;
     };
   }
@@ -20,7 +21,8 @@ declare module "next-auth" {
     email?: string | null;
     role: string;
     roleId: string;
-    permissions: string[]; //  Tambahkan tipe data permissions di User
+    permissions: string[];
+    permissionVersion: number;
   }
 }
 
@@ -29,7 +31,8 @@ declare module "next-auth/jwt" {
     id: string;
     role: string;
     roleId: string;
-    permissions: string[]; //  Tambahkan tipe data permissions di JWT Token
+    permissions: string[];
+    permissionVersion: number;
     accessToken: string;
   }
 }

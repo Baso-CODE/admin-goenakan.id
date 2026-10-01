@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -44,6 +44,23 @@ export function LoginForm({
   });
 
   const { isSubmitting } = form.formState;
+  const waitForSession = async () => {
+    const delays = [0, 200, 300];
+
+    for (const delay of delays) {
+      if (delay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+
+      const currentSession = await getSession();
+
+      if (currentSession?.user) {
+        return currentSession;
+      }
+    }
+
+    return null;
+  };
 
   const handleSignIn = async (values: z.infer<typeof formSchema>) => {
     try {
@@ -54,17 +71,29 @@ export function LoginForm({
         callbackUrl: "/",
       });
 
-      if (res?.error) {
+      if (!res?.ok || res.error) {
         toast.error("Invalid credentials or user not found");
         return;
       }
 
+      const currentSession = await waitForSession();
+
+      if (!currentSession?.user) {
+        toast.error(
+          "Login berhasil, tetapi session belum siap. Silakan coba lagi.",
+        );
+        return;
+      }
+
       toast.success("Login successful!");
-      router.push(res?.url || "/");
+
+      router.replace("/");
+      router.refresh();
     } catch (error) {
+      console.error("Login error:", error);
+
       toast.error("Something went wrong during login");
     }
-    // Kita hapus finally { setIsLoading(false) } karena sudah diotomatisasi oleh isSubmitting
   };
 
   const handleSignInGoogle = async () => {

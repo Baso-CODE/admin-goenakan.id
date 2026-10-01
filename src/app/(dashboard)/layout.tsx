@@ -2,6 +2,7 @@ import { authOptions } from "@/lib/authOptions";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import DashboardLayoutClient from "./DashboardLayoutClient";
+import PermissionRouteGuard from "./components/permissionRouteGuard";
 
 export default async function DashboardGuardLayout({
   children,
@@ -20,5 +21,9 @@ export default async function DashboardGuardLayout({
     redirect("/login");
   }
 
-  return <DashboardLayoutClient>{children}</DashboardLayoutClient>;
+  return (
+    <PermissionRouteGuard>
+      <DashboardLayoutClient>{children}</DashboardLayoutClient>
+    </PermissionRouteGuard>
+  );
 }
