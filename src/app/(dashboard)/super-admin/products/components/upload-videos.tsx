@@ -75,6 +75,14 @@ export function UploadVideos({
 
   // === FUNGSI UPLOAD KE CLOUDINARY ===
   const uploadToCloudinary = async (file: File): Promise<VideoItem | null> => {
+    const MAX_VIDEO_SIZE_MB = 30;
+    if (file.size > MAX_VIDEO_SIZE_MB * 1024 * 1024) {
+      alert(
+        `Ukuran video "${file.name}" terlalu besar (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maksimal ukuran file adalah ${MAX_VIDEO_SIZE_MB} MB agar video dapat dimuat dengan cepat oleh pengunjung website.`,
+      );
+      return null;
+    }
+
     const formData = new FormData();
     formData.append("file", file);
     formData.append("upload_preset", UPLOAD_PRESET);
@@ -92,9 +100,22 @@ export function UploadVideos({
       if (!res.ok) throw new Error("Gagal upload ke Cloudinary");
       const data = await res.json();
 
+      let optimizedUrl = data.secure_url;
+      if (optimizedUrl && optimizedUrl.includes("/video/upload/")) {
+        if (
+          !optimizedUrl.includes("/video/upload/q_") &&
+          !optimizedUrl.includes("/video/upload/w_")
+        ) {
+          optimizedUrl = optimizedUrl.replace(
+            "/video/upload/",
+            "/video/upload/q_auto,w_1080,c_limit,vc_auto/",
+          );
+        }
+      }
+
       return {
         tempId: data.public_id, // Gunakan public_id sebagai key unik
-        url: data.secure_url,
+        url: optimizedUrl,
         publicId: data.public_id,
         title: file.name,
         isFeatured: false,
