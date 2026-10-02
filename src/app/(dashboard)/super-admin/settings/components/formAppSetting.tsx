@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { BarChart3, Facebook, Loader2, Save, Search, Tags } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -79,6 +79,7 @@ export default function AppSettings() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const hasFetchedSettings = useRef(false);
 
   const form = useForm<AppSettingValues>({
     resolver: zodResolver(appSettingSchema) as Resolver<AppSettingValues>,
@@ -105,11 +106,17 @@ export default function AppSettings() {
   });
 
   useEffect(() => {
-    const fetchSettings = async () => {
-      if (status !== "authenticated") {
-        return;
-      }
+    if (status !== "authenticated") {
+      return;
+    }
 
+    if (hasFetchedSettings.current) {
+      return;
+    }
+
+    hasFetchedSettings.current = true;
+
+    const fetchSettings = async () => {
       try {
         const res = await fetchApi("/app-settings/admin");
 
