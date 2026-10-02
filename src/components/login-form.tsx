@@ -76,19 +76,28 @@ export function LoginForm({
         return;
       }
 
-      const currentSession = await waitForSession();
+      let currentSession = null;
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        currentSession = await getSession();
+
+        if (currentSession?.user) {
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
 
       if (!currentSession?.user) {
         toast.error(
-          "Login berhasil, tetapi session belum siap. Silakan coba lagi.",
+          "Login berhasil, tetapi session gagal dimuat. Silakan coba kembali.",
         );
         return;
       }
 
       toast.success("Login successful!");
 
-      router.replace("/");
-      router.refresh();
+      window.location.replace("/");
     } catch (error) {
       console.error("Login error:", error);
 
