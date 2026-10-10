@@ -285,7 +285,7 @@ export default function TableOrder() {
   };
 
   const handleDelete = async () => {
-    if (!deleteId || status !== "authenticated") return;
+    if (!deleteId || isDeleting || status !== "authenticated") return;
 
     setIsDeleting(true);
     try {
@@ -293,22 +293,29 @@ export default function TableOrder() {
         method: "DELETE",
       });
 
+      const result = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || "Gagal menghapus data");
+        throw new Error(result.message || "Gagal menghapus Sales Order");
       }
 
-      toast.success("Data berhasil dihapus");
+      toast.success(result.message || "Sales Order berhasil dihapus");
+      setDeleteId(null);
 
-      // Refresh tabel setelah delete
-      setPage(1);
-      fetchOrders();
-    } catch (error: any) {
-      console.error("❌ Error delete data:", error);
-      toast.error(error.message || "Terjadi kesalahan saat menghapus data");
+      if (page !== 1) {
+        setPage(1);
+      } else {
+        await fetchOrders();
+      }
+    } catch (error) {
+      console.error("Error delete Sales Order:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Terjadi kesalahan saat menghapus Sales Order",
+      );
     } finally {
       setIsDeleting(false);
-      setDeleteId(null);
     }
   };
 
@@ -662,7 +669,11 @@ export default function TableOrder() {
                             <DropdownMenuItem
                               className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50"
                               onSelect={() => {
-                                if (order.status !== "PENDING") {
+                                if (
+                                  !["PENDING", "CANCELLED"].includes(
+                                    order.status,
+                                  )
+                                ) {
                                   toast.error(
                                     "Maaf, Sales Order tidak dapat dihapus karena sudah dalam proses.",
                                   );
