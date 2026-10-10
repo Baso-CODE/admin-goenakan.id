@@ -31,6 +31,7 @@ import FormUpdateVariants, {
   VariantFormValues,
 } from "../../components/update/VariantsSection";
 import { ModelShapeValueInput } from "../../components/AttributeSelector";
+import { isMockupImage } from "@/helper/mediaFilter";
 
 const CLOUDINARY_CLOUD_NAME = "do9sfnf5k";
 const CLOUDINARY_UPLOAD_PRESET = "ml_default";
@@ -427,6 +428,12 @@ export default function EditProductPage() {
     fileOrUrl: File | string,
     onProgress?: (progress: number) => void,
     altText?: string,
+    extraMeta?: {
+      mockupSideName?: string | null;
+      attributeValueId?: string | null;
+      printPositionValueId?: string | null;
+      printSideValueId?: string | null;
+    },
   ): Promise<any> => {
     try {
       const currentSession = await getSession();
@@ -437,6 +444,18 @@ export default function EditProductPage() {
         formData.append("image", fileOrUrl);
         if (altText) {
           formData.append("altText", altText);
+        }
+        if (extraMeta?.mockupSideName) {
+          formData.append("mockupSideName", extraMeta.mockupSideName);
+        }
+        if (extraMeta?.attributeValueId) {
+          formData.append("attributeValueId", extraMeta.attributeValueId);
+        }
+        if (extraMeta?.printPositionValueId) {
+          formData.append("printPositionValueId", extraMeta.printPositionValueId);
+        }
+        if (extraMeta?.printSideValueId) {
+          formData.append("printSideValueId", extraMeta.printSideValueId);
         }
 
         const uploadData = await new Promise<any>((resolve, reject) => {
@@ -485,6 +504,18 @@ export default function EditProductPage() {
         formData.append("url", fileOrUrl);
         if (altText) {
           formData.append("altText", altText);
+        }
+        if (extraMeta?.mockupSideName) {
+          formData.append("mockupSideName", extraMeta.mockupSideName);
+        }
+        if (extraMeta?.attributeValueId) {
+          formData.append("attributeValueId", extraMeta.attributeValueId);
+        }
+        if (extraMeta?.printPositionValueId) {
+          formData.append("printPositionValueId", extraMeta.printPositionValueId);
+        }
+        if (extraMeta?.printSideValueId) {
+          formData.append("printSideValueId", extraMeta.printSideValueId);
         }
 
         const res = await fetchApi(`/products/${id}/image`, {
@@ -580,9 +611,10 @@ export default function EditProductPage() {
     setProductData((prev: any) => {
       if (!prev) return prev;
       if (type === "image") {
+        const mockupImages = (prev.images || []).filter(isMockupImage);
         const map = new Map((prev.images || []).map((img: any) => [img.id, img]));
         const reordered = orderedIds.map((imgId) => map.get(imgId)).filter(Boolean);
-        return { ...prev, images: reordered };
+        return { ...prev, images: [...reordered, ...mockupImages] };
       } else {
         const map = new Map((prev.videos || []).map((vid: any) => [vid.id, vid]));
         const reordered = orderedIds.map((vidId) => map.get(vidId)).filter(Boolean);
@@ -1146,7 +1178,7 @@ export default function EditProductPage() {
             productId={id as string}
             initialData={productData ? {
               ...productData,
-              images: (productData.images || []).filter((img: any) => !img.attributeValueId && img.altText !== "Mockup Image")
+              images: (productData.images || []).filter((img: any) => !isMockupImage(img))
             } : undefined}
             isSubmitting={isSubmitting}
             onAddImage={handleAddImage}

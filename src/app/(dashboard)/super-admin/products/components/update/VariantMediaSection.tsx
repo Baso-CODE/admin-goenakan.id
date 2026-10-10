@@ -9,6 +9,7 @@ import { ChangeEvent, useRef, useState, useEffect } from "react";
 import { ImageDetailModalCore } from "../imageDetailCore";
 import { VideoDetailModalCore } from "../videoDetailCore";
 import { MockupAreaSelector } from "../MockupAreaSelector";
+import { isMockupImage } from "@/helper/mediaFilter";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -404,7 +405,7 @@ export default function FormUpdateProductMedia({
               Setiap gambar yang berhasil diunggah akan otomatis dikonversi ke format <strong>.webp</strong> untuk mengoptimalkan performa pemuatan halaman.
             </p>
             <ExistingMediaDisplay
-              media={initialData?.images || []}
+              media={(initialData?.images || []).filter((img: any) => !isMockupImage(img))}
               type="image"
               onDelete={onDeleteImage}
               onEdit={handleOpenModal}

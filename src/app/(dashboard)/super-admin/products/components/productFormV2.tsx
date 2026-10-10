@@ -59,8 +59,9 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
+import { useUnsavedChangesWarning } from "@/hooks/useUnsavedChangesWarning";
 import { AddItemCategoryModal } from "../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../item-names-product/components/addItemNameModal";
 import CreateCategoryModal from "../../product-categories/components/createCategoryModal";
@@ -119,6 +120,83 @@ export default function ProductFormV2({
   const [inlineInputPrice, setInlineInputPrice] = useState<string>("");
 
   const [mockupSides, setMockupSides] = useState<any[]>([]);
+
+  // Prevent accidental data loss when refreshing or navigating away
+  const isFormFilled = useMemo(() => {
+    if (isSubmitting) return false;
+
+    // A. Native react-hook-form dirty state
+    if (form.formState.isDirty) return true;
+
+    // B. Check key form fields
+    const values = form.getValues();
+    if (values.name && values.name.trim() !== "") return true;
+    if (values.sku && values.sku.trim() !== "") return true;
+    if (values.categoryId && values.categoryId !== "") return true;
+    if (values.itemCategoryId && values.itemCategoryId !== "") return true;
+    if (values.itemNameId && values.itemNameId !== "") return true;
+    if (
+      values.description &&
+      values.description.trim() !== "" &&
+      values.description !== "<p></p>"
+    )
+      return true;
+    if (values.basePrice && Number(values.basePrice) > 0) return true;
+    if (values.stock && Number(values.stock) > 0) return true;
+    if (values.weight && Number(values.weight) > 0) return true;
+    if (values.width && Number(values.width) > 0) return true;
+    if (values.height && Number(values.height) > 0) return true;
+    if (values.length && Number(values.length) > 0) return true;
+    if (values.materialTypeId && values.materialTypeId !== "") return true;
+    if (values.tagIds && values.tagIds.length > 0) return true;
+    if (values.priceTiers && values.priceTiers.length > 0) return true;
+    if (values.attributes && values.attributes.length > 0) return true;
+
+    // C. Uploaded files or variants in state
+    if (state.productImagesFiles && state.productImagesFiles.length > 0)
+      return true;
+    if (state.variantMetas && state.variantMetas.length > 0)
+      return true;
+
+    // D. Mockup sides or variant combinations
+    if (mockupSides && mockupSides.length > 0) return true;
+    if (state.attributeSelections && state.attributeSelections.length > 0)
+      return true;
+    if (state.combinations && state.combinations.length > 0) return true;
+
+    return false;
+  }, [
+    isSubmitting,
+    form.formState.isDirty,
+    form.watch("name"),
+    form.watch("sku"),
+    form.watch("categoryId"),
+    form.watch("itemCategoryId"),
+    form.watch("itemNameId"),
+    form.watch("description"),
+    form.watch("basePrice"),
+    form.watch("stock"),
+    form.watch("weight"),
+    form.watch("width"),
+    form.watch("height"),
+    form.watch("length"),
+    form.watch("materialTypeId"),
+    form.watch("tagIds"),
+    form.watch("priceTiers"),
+    form.watch("attributes"),
+    state.productImagesFiles,
+    state.variantMetas,
+    mockupSides,
+    state.attributeSelections,
+    state.combinations,
+  ]);
+
+  useUnsavedChangesWarning({
+    isDirty: isFormFilled,
+    isSubmitting,
+    message:
+      "Data produk yang sudah diisi belum disimpan. Apakah Anda yakin ingin memuat ulang halaman ini?",
+  });
   const handleAddMockupSide = () => {
     setMockupSides((prev) => [
       ...prev,

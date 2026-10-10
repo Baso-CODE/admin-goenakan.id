@@ -16,6 +16,7 @@ type FileUploads = {
 export default function AddProductPage() {
   const { fetchApi, status } = useApi();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const router = useRouter();
 
   const handleAddProduct = async (
@@ -55,7 +56,7 @@ export default function AddProductPage() {
       const extraImagesMetadata = sizeDefaultSides.map((side: any) => ({
         url: side.url,
         isFeatured: false,
-        altText: side.name || "Default Size Mockup"
+        altText: "Mockup Image"
       }));
 
       const cleanImagesMetadata = [
@@ -131,6 +132,7 @@ export default function AddProductPage() {
       }
 
       toast.success("Product created successfully!");
+      setIsSuccess(true);
       router.push("/super-admin/products-v2");
       router.refresh();
     } catch (err) {
@@ -145,7 +147,7 @@ export default function AddProductPage() {
         Tambah Produk Baru (V2)
       </h2>
 
-      <ProductFormV2 onSubmit={handleAddProduct} isSubmitting={isSubmitting} />
+      <ProductFormV2 onSubmit={handleAddProduct} isSubmitting={isSubmitting || isSuccess} />
     </div>
   );
 }

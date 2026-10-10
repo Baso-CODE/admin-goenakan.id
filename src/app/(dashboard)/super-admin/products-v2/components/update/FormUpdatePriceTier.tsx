@@ -30,6 +30,7 @@ import { ArrowRight, Layers, Loader2, PlusCircle, Trash2, Info } from "lucide-re
 import { useEffect } from "react";
 import { Resolver, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
+import { useUnsavedChangesWarning } from "@/hooks/useUnsavedChangesWarning";
 
 // Schema validasi untuk Price Tier
 const priceTierSchema = z.object({
@@ -61,6 +62,13 @@ export default function FormUpdatePriceTiers({
     defaultValues: {
       priceTiers: [],
     },
+  });
+
+  useUnsavedChangesWarning({
+    isDirty: form.formState.isDirty,
+    isSubmitting,
+    message:
+      "Perubahan tingkatan harga belum disimpan. Apakah Anda yakin ingin memuat ulang halaman ini?",
   });
 
   const { control, handleSubmit, reset } = form;

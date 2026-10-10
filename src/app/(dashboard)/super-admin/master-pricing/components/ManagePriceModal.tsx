@@ -32,6 +32,7 @@ import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Product, VendorPriceRecord } from "../page";
 import FastCurrencyForm from "@/app/(dashboard)/admin-invoice/currency/components/formCurrencyFast";
+import { getFixedSimulationSteps } from "@/helper/cogsSimulationHelper";
 
 interface ManagePriceModalProps {
   isOpen: boolean;
@@ -309,14 +310,14 @@ export function ManagePriceModal({
 
     const qtyPerCtn = Number(quote.qtyPerCtn) || 1;
     const moqCtn = Number(quote.moqCtn) || 1;
-    const qtyPcs = qtyPerCtn * moqCtn;
+    const targetQtyPcs = Number(quote.targetQtyPcs) || 0;
     const roundUpToVal = Number((quote as any).roundUpTo) || 1000;
 
     const savedFreightMode = product.activePriceFreightMode === "CUSTOM" || !product.activePriceFreightMode ? "SEA" : product.activePriceFreightMode;
     const isInitialConfig = selectedQuoteId === product.activeVendorPriceRecordId && freightMode === savedFreightMode;
 
     if (quote.calculationMode === "FIXED") {
-      const activeTiers = (product.priceTiers && product.priceTiers.length > 0) 
+      const activeTiers = (product.priceTiers && product.priceTiers.length > 0 && isInitialConfig) 
         ? product.priceTiers 
         : null;
 
@@ -383,15 +384,9 @@ export function ManagePriceModal({
         setBasePrice(computedBasePrice);
         setTiers(generatedTiers);
       } else {
-        // Generate the 5 MOQ simulation steps as tiers! (Fallback)
-        const baseMoqCtn = Math.max(1, moqCtn || 1);
-        const tempTiers = [0, 1, 2, 3, 4].map((step) => {
-          const stepCtn = baseMoqCtn + step;
-          const stepPcs = stepCtn * qtyPerCtn;
-          const nextStepPcs = (baseMoqCtn + step + 1) * qtyPerCtn;
-          const minQuantity = stepPcs;
-          const maxQuantity = step < 4 ? nextStepPcs - 1 : null;
-
+        // Generate the 5 MOQ simulation steps as tiers! (Aligned with COGS targetQtyPcs)
+        const steps = getFixedSimulationSteps(moqCtn, qtyPerCtn, targetQtyPcs);
+        const tempTiers = steps.map((step, idx) => {
           const calc = calculateCogsAndSellingPrice({
             importType: quote.importType as "BORONGAN" | "RESMI",
             beaMasukPercent: Number(quote.beaMasukPercent) || 0,
@@ -404,7 +399,7 @@ export function ManagePriceModal({
             foreignPrice: Number(quote.foreignPrice) || 0,
             gzDeliveryCost: Number(quote.gzDeliveryCost) || 0,
             exchangeRate: exchangeRate,
-            qtyPcs: stepPcs,
+            qtyPcs: step.calcQty,
             qtyPerCtn,
             length: Number(quote.length) || 0,
             width: Number(quote.width) || 0,
@@ -421,9 +416,9 @@ export function ManagePriceModal({
           const finalPrice = freightMode === "SEA" ? calc.sellPriceSea : calc.sellPriceAir;
 
           return {
-            id: `temp-fixed-step-${step}`,
-            minQuantity,
-            maxQuantity,
+            id: `temp-fixed-step-${idx}`,
+            minQuantity: step.minQuantity,
+            maxQuantity: step.maxQuantity,
             price: finalPrice,
             discount: 0,
           };
@@ -541,6 +536,128 @@ export function ManagePriceModal({
         setCurrencyCode(quote.currencyCode || "IDR");
         setForeignPrice(Number(quote.foreignPrice) || 0);
         setExchangeRate(Number(quote.exchangeRate) || 1);
+      }
+    }
+  };
+
+  const handleSyncTiersFromQuote = () => {
+    if (selectedQuoteId === "NONE") return;
+    const quote = product.vendorPrices?.find((v) => v.id === selectedQuoteId);
+    if (!quote) return;
+
+    const qtyPerCtn = Number(quote.qtyPerCtn) || 1;
+    const moqCtn = Number(quote.moqCtn) || 1;
+    const targetQtyPcs = Number(quote.targetQtyPcs) || 0;
+    const roundUpToVal = Number((quote as any).roundUpTo) || 1000;
+
+    if (quote.calculationMode === "FIXED") {
+      const steps = getFixedSimulationSteps(moqCtn, qtyPerCtn, targetQtyPcs);
+      const tempTiers = steps.map((step, idx) => {
+        const calc = calculateCogsAndSellingPrice({
+          importType: quote.importType as "BORONGAN" | "RESMI",
+          beaMasukPercent: Number(quote.beaMasukPercent) || 0,
+          ppnPercent: Number(quote.ppnPercent) || 0,
+          pphPercent: Number(quote.pphPercent) || 0,
+          formECost: Number(quote.formECost) || 0,
+          insurancePercent: Number(quote.insurancePercent) || 0,
+          handlingCost: Number(quote.handlingCost) || 0,
+          otherCost: Number(quote.otherCost) || 0,
+          foreignPrice: Number(quote.foreignPrice) || 0,
+          gzDeliveryCost: Number(quote.gzDeliveryCost) || 0,
+          exchangeRate: exchangeRate,
+          qtyPcs: step.calcQty,
+          qtyPerCtn,
+          length: Number(quote.length) || 0,
+          width: Number(quote.width) || 0,
+          height: Number(quote.height) || 0,
+          weight: Number(quote.weight) || 0,
+          seaFreightRate: Number(quote.seaFreightRate) || 0,
+          airFreightRate: Number(quote.airFreightRate) || 0,
+          localFreight: Number(quote.localFreight) || 0,
+          margin: Number(quote.margin) || 0,
+          sponsorPercent: Number(quote.sponsorPercent) * 100 || 0,
+          roundUpTo: roundUpToVal,
+        });
+
+        const finalPrice = freightMode === "SEA" ? calc.sellPriceSea : calc.sellPriceAir;
+        return {
+          id: `temp-fixed-step-${idx}`,
+          minQuantity: step.minQuantity,
+          maxQuantity: step.maxQuantity,
+          price: finalPrice,
+          discount: 0,
+        };
+      });
+
+      const computedBasePrice = tempTiers[0]?.price || 0;
+      const generatedTiers = tempTiers.map((t) => {
+        const discountVal = Math.max(0, computedBasePrice - t.price);
+        return {
+          ...t,
+          discount: discountVal,
+          price: Math.max(0, computedBasePrice - discountVal),
+        };
+      });
+
+      setBasePrice(computedBasePrice);
+      setTiers(generatedTiers);
+      toast.success("Tiers berhasil disinkronkan dari quote supplier!");
+    } else {
+      const quoteTiers = quote.tiers;
+      if (quoteTiers && Array.isArray(quoteTiers) && quoteTiers.length > 0) {
+        const sorted = [...quoteTiers].sort((a: any, b: any) => (Number(a.totalPcs) || 0) - (Number(b.totalPcs) || 0));
+        const tempTiers = sorted.map((item: any, idx: number) => {
+          const minQuantity = Number(item.totalPcs) || 1;
+          const nextItem = sorted[idx + 1];
+          const maxQuantity = nextItem ? (Number(nextItem.totalPcs) || 0) - 1 : null;
+          const calc = calculateCogsAndSellingPrice({
+            importType: quote.importType as "BORONGAN" | "RESMI",
+            beaMasukPercent: Number(quote.beaMasukPercent) || 0,
+            ppnPercent: Number(quote.ppnPercent) || 0,
+            pphPercent: Number(quote.pphPercent) || 0,
+            formECost: Number(quote.formECost) || 0,
+            insurancePercent: Number(quote.insurancePercent) || 0,
+            handlingCost: Number(quote.handlingCost) || 0,
+            otherCost: Number(quote.otherCost) || 0,
+            foreignPrice: Number(item.pricePcs) || 0,
+            gzDeliveryCost: Number(item.gzCost) || Number(quote.gzDeliveryCost) || 0,
+            exchangeRate: exchangeRate,
+            qtyPcs: minQuantity,
+            qtyPerCtn,
+            length: Number(quote.length) || 0,
+            width: Number(quote.width) || 0,
+            height: Number(quote.height) || 0,
+            weight: Number(quote.weight) || 0,
+            seaFreightRate: Number(quote.seaFreightRate) || 0,
+            airFreightRate: Number(quote.airFreightRate) || 0,
+            localFreight: Number(quote.localFreight) || 0,
+            margin: Number(quote.margin) || 0,
+            sponsorPercent: Number(quote.sponsorPercent) * 100 || 0,
+            roundUpTo: roundUpToVal,
+          });
+          const finalPrice = freightMode === "SEA" ? calc.sellPriceSea : calc.sellPriceAir;
+          return {
+            id: `temp-variable-tier-${idx}`,
+            minQuantity,
+            maxQuantity,
+            price: finalPrice,
+            discount: 0,
+          };
+        });
+
+        const computedBasePrice = tempTiers[0]?.price || 0;
+        const generatedTiers = tempTiers.map((t) => {
+          const discountVal = Math.max(0, computedBasePrice - t.price);
+          return {
+            ...t,
+            discount: discountVal,
+            price: Math.max(0, computedBasePrice - discountVal),
+          };
+        });
+
+        setBasePrice(computedBasePrice);
+        setTiers(generatedTiers);
+        toast.success("Tiers berhasil disinkronkan dari quote supplier!");
       }
     }
   };
@@ -751,15 +868,28 @@ export function ManagePriceModal({
             <div className="border border-stone-200 rounded-lg overflow-hidden bg-white mt-4">
               <div className="p-3 bg-stone-50 border-b flex justify-between items-center">
                 <span className="text-xs font-bold text-stone-700">Tabel Harga Bertingkat (Wholesale Tiers)</span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddTier}
-                  className="text-xs font-semibold border-dashed border-stone-300 text-indigo-600 hover:bg-indigo-50/50">
-                  <PlusCircle className="h-4 w-4 mr-1.5" />
-                  Tambah Tier
-                </Button>
+                <div className="flex items-center gap-2">
+                  {selectedQuoteId !== "NONE" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSyncTiersFromQuote}
+                      className="text-xs font-semibold border-stone-200 text-stone-700 hover:bg-stone-50">
+                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                      Sinkronkan dari Quote
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddTier}
+                    className="text-xs font-semibold border-dashed border-stone-300 text-indigo-600 hover:bg-indigo-50/50">
+                    <PlusCircle className="h-4 w-4 mr-1.5" />
+                    Tambah Tier
+                  </Button>
+                </div>
               </div>
 
               <Table>
