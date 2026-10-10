@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { useUnsavedChangesWarning } from "@/hooks/useUnsavedChangesWarning";
 
 import {
   Form,
@@ -167,6 +168,13 @@ export default function FormProductCore({
       mockupAreaHeight: null,
       colorMockupTrigger: "NONE",
     },
+  });
+
+  useUnsavedChangesWarning({
+    isDirty: form.formState.isDirty,
+    isSubmitting,
+    message:
+      "Perubahan informasi produk belum disimpan. Apakah Anda yakin ingin memuat ulang halaman ini?",
   });
 
   const isCustomProduct = form.watch("isCustom");

@@ -47,6 +47,7 @@ export default function FormUpdateAttributes({
     fileOrUrl: File | string,
     onProgress?: (progress: number) => void,
     altText?: string,
+    extraMeta?: any,
   ) => Promise<any>;
   onRefresh?: () => Promise<void>;
 }) {
@@ -558,6 +559,7 @@ export default function FormUpdateAttributes({
             (side.name || null) !== (initialImg.mockupSideName || null) ||
             (side.attributeValueId || null) !== (initialImg.attributeValueId || null) ||
             (side.printPositionValueId || null) !== (initialImg.printPositionValueId || null) ||
+            initialImg.altText !== "Mockup Image" ||
             (side.colorMaskFile !== undefined) ||
             (!side.colorMaskUrl && initialImg.colorMaskUrl);
 
@@ -783,7 +785,12 @@ export default function FormUpdateAttributes({
                                                     ...prev,
                                                     [item.id]: Math.round(progress),
                                                   }));
-                                                }, "Mockup Image");
+                                                }, "Mockup Image", {
+                                                  mockupSideName: item.name || null,
+                                                  attributeValueId: item.attributeValueId || null,
+                                                  printPositionValueId: item.printPositionValueId || null,
+                                                  printSideValueId: item.printSideValueId || null,
+                                                });
                                                 if (uploadedImg && uploadedImg.id) {
                                                   setMockupSides((prev) =>
                                                     prev.map((m) =>

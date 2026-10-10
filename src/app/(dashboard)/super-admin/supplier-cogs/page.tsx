@@ -65,6 +65,7 @@ import { cn } from "@/lib/utils";
 import { ChevronsUpDown } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { getFixedSimulationSteps } from "@/helper/cogsSimulationHelper";
 
 function calculateCogsAndSellingPrice({
   importType,
@@ -3315,11 +3316,7 @@ export default function SupplierCogsCalculatorPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {[0, 1, 2, 3, 4].map((step) => {
-                            const baseMoqCtn = Math.max(1, moqCtn || 1);
-                            const stepCtn = baseMoqCtn + step;
-                            const stepPcs = stepCtn * (qtyPerCtn || 1);
-                            
+                          {getFixedSimulationSteps(moqCtn, qtyPerCtn, qtyPcs).map((stepItem, idx) => {
                             const stepCalc = calculateCogsAndSellingPrice({
                               importType,
                               beaMasukPercent,
@@ -3332,7 +3329,7 @@ export default function SupplierCogsCalculatorPage() {
                               foreignPrice,
                               gzDeliveryCost,
                               exchangeRate,
-                              qtyPcs: stepPcs,
+                              qtyPcs: stepItem.calcQty,
                               qtyPerCtn,
                               length,
                               width,
@@ -3346,19 +3343,11 @@ export default function SupplierCogsCalculatorPage() {
                               roundUpTo,
                             });
 
-                            const nextStepPcs = (baseMoqCtn + step + 1) * (qtyPerCtn || 1);
-                            const qtyLabel = step < 4
-                              ? `${stepPcs} - ${nextStepPcs - 1} pcs`
-                              : `≥ ${stepPcs} pcs`;
-                            const ctnLabel = step < 4
-                              ? `(${stepCtn} ctn)`
-                              : `(≥ ${stepCtn} ctn)`;
-
                             return (
-                              <TableRow key={step} className="hover:bg-stone-50 text-xs">
+                              <TableRow key={idx} className="hover:bg-stone-50 text-xs">
                                 <TableCell className="font-bold text-stone-800">
-                                  {qtyLabel}
-                                  <span className="block text-[10px] text-stone-500 font-normal">{ctnLabel}</span>
+                                  {stepItem.qtyLabel}
+                                  <span className="block text-[10px] text-stone-500 font-normal">{stepItem.ctnLabel}</span>
                                 </TableCell>
                                 <TableCell className="text-stone-600 font-medium">
                                   Rp {Math.round(stepCalc.seaFreightCostPcs).toLocaleString("id-ID")}

@@ -87,6 +87,8 @@ export type VendorPriceRecord = {
   vendor?: {
     companyName: string;
   } | null;
+  targetQtyPcs?: number | null;
+  roundUpTo?: number | string | null;
   tiers?: any;
 };
 
