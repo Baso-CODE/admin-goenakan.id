@@ -32,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import { ConfirmDeleteDialog } from "@/app/(dashboard)/components/confirmDeleteDialog";
 import { Calendar } from "@/components/ui/calendar";
 import {
   DropdownMenu,
@@ -658,10 +659,17 @@ export default function TableOrder() {
 
                             <DropdownMenuSeparator />
 
-                            {/* ACTION: DELETE */}
                             <DropdownMenuItem
                               className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50"
-                              onSelect={() => setDeleteId(order.id)}>
+                              onSelect={() => {
+                                if (order.status !== "PENDING") {
+                                  toast.error(
+                                    "Maaf, Sales Order tidak dapat dihapus karena sudah dalam proses.",
+                                  );
+                                  return;
+                                }
+                                setDeleteId(order.id);
+                              }}>
                               <Trash2 className="mr-2 h-4 w-4" />
                               <span>Delete</span>
                             </DropdownMenuItem>
@@ -711,6 +719,20 @@ export default function TableOrder() {
           }}
         />
       )}
+
+      <ConfirmDeleteDialog
+        isOpen={!!deleteId}
+        onClose={() => {
+          if (!isDeleting) setDeleteId(null);
+        }}
+        onConfirm={handleDelete}
+        isLoading={isDeleting}
+        title="Hapus Sales Order?"
+        description={`Apakah Anda yakin ingin menghapus Sales Order ${
+          orders.find((order) => order.id === deleteId)?.orderNumber || ""
+        }?`}
+        warningMessage="Sales Order akan dihapus permanen. Penghapusan hanya diperbolehkan jika order belum diproses dan tidak memiliki transaksi terkait."
+      />
     </div>
   );
 }
