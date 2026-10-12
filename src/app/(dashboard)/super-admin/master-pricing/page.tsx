@@ -54,6 +54,7 @@ export type PriceTier = {
   minQuantity: number;
   maxQuantity: number | null;
   price: number | string;
+  freightMode?: string | null;
 };
 
 export type VendorPriceRecord = {
@@ -97,6 +98,8 @@ export type Product = {
   name: string;
   sku: string;
   basePrice: number | string;
+  basePriceAir?: number | string | null;
+  availableFreightModes?: string | null;
   isCustom: boolean;
   category?: Category | null;
   activeVendorPriceRecordId?: string | null;
@@ -993,7 +996,22 @@ export default function MasterPricingPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right text-stone-900 font-bold text-sm">
-                          Rp {Number(p.basePrice).toLocaleString("id-ID")}
+                          {p.availableFreightModes === "BOTH" ? (
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span className="text-indigo-900 text-xs font-semibold">
+                                🚢 SEA: Rp {Number(p.basePrice).toLocaleString("id-ID")}
+                              </span>
+                              <span className="text-sky-900 text-xs font-semibold">
+                                ✈️ AIR: Rp {Number(p.basePriceAir || 0).toLocaleString("id-ID")}
+                              </span>
+                            </div>
+                          ) : p.availableFreightModes === "AIR" ? (
+                            <span className="text-sky-900 text-xs font-semibold">
+                              ✈️ AIR: Rp {Number(p.basePriceAir || p.basePrice).toLocaleString("id-ID")}
+                            </span>
+                          ) : (
+                            <span>Rp {Number(p.basePrice).toLocaleString("id-ID")}</span>
+                          )}
                           {p.currencyCode && p.currencyCode !== "IDR" ? (
                             <span className="block text-[10px] text-stone-500 font-normal mt-0.5">
                               {p.currencyCode}{" "}
@@ -1009,34 +1027,42 @@ export default function MasterPricingPage() {
                         </TableCell>
                         <TableCell className="text-center">
                           {p.priceTiers && p.priceTiers.length > 0 ? (
-                            <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-bold text-xs">
-                              {p.priceTiers.length} Tiers
-                            </Badge>
+                            <div className="flex flex-col items-center gap-1">
+                              <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-bold text-xs">
+                                {p.priceTiers.length} Tiers
+                              </Badge>
+                              {p.availableFreightModes === "BOTH" && (
+                                <span className="text-[10px] text-stone-500 font-medium">
+                                  {p.priceTiers.filter((t: any) => !t.freightMode || t.freightMode === "SEA").length} SEA /{" "}
+                                  {p.priceTiers.filter((t: any) => t.freightMode === "AIR").length} AIR
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-stone-400 text-xs">-</span>
                           )}
                         </TableCell>
                         <TableCell>
-                          {activeQuote ? (
-                            <div className="flex flex-col gap-1">
+                          <div className="flex flex-col gap-1.5">
+                            {p.availableFreightModes === "BOTH" ? (
                               <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50 font-bold text-[10px] w-fit">
-                                {activeQuote.vendor?.companyName ||
-                                  "Supplier Sourcing"}
+                                🚢 Laut & ✈️ Udara
                               </Badge>
-                              <span className="text-[10px] text-stone-500 font-medium">
-                                Mode:{" "}
-                                {freightMode === "SEA"
-                                  ? "🚢 Sea"
-                                  : freightMode === "AIR"
-                                    ? "✈️ Air"
-                                    : "✏️ Custom"}
+                            ) : p.availableFreightModes === "AIR" ? (
+                              <Badge className="bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-50 font-bold text-[10px] w-fit">
+                                ✈️ Hanya Udara
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-bold text-[10px] w-fit">
+                                🚢 Hanya Laut
+                              </Badge>
+                            )}
+                            {activeQuote ? (
+                              <span className="text-[10px] text-stone-500 font-medium truncate max-w-[140px]">
+                                Ref: {activeQuote.vendor?.companyName || "Quote"}
                               </span>
-                            </div>
-                          ) : (
-                            <Badge className="bg-stone-100 text-stone-600 border-stone-200 hover:bg-stone-100 font-bold text-[10px] w-fit">
-                              Manual / Custom
-                            </Badge>
-                          )}
+                            ) : null}
+                          </div>
                         </TableCell>
                         <TableCell className="text-center">
                           <Button
