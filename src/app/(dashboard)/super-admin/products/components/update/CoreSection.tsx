@@ -125,6 +125,8 @@ export default function FormProductCore({
 
   const [tagSearchOpen, setTagSearchOpen] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState("");
+  const [tagGroupSearchOpen, setTagGroupSearchOpen] = useState(false);
+  const [tagGroupSearchQuery, setTagGroupSearchQuery] = useState("");
   const [loadingData, setLoadingData] = useState(true);
   const [isGeneratingSku, setIsGeneratingSku] = useState(false);
   const [isTagCategoryModalOpen, setIsTagCategoryModalOpen] = useState(false);
@@ -1043,81 +1045,228 @@ export default function FormProductCore({
                 render={({ field }) => {
                   const selectedTags = field.value || [];
                   return (
-                    <FormItem className="md:col-span-5">
-                      <div className="flex items-center justify-between">
-                        <FormLabel>Product Tags</FormLabel>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setIsTagCategoryModalOpen(true)}
-                          className="text-xs h-7 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50 px-2 flex items-center gap-1 font-medium">
-                          <Plus className="h-3.5 w-3.5" />
-                          <span>Kelola Group</span>
-                        </Button>
-                      </div>
-
-                      {Array.isArray(tagCategories) &&
-                        tagCategories.length > 0 && (
-                          <div className="flex flex-wrap gap-2 items-center mb-3 mt-1.5 p-2 bg-slate-50 dark:bg-stone-900 rounded-md border border-slate-100 dark:border-stone-800">
-                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mr-1 select-none">
-                              Tag Groups:
-                            </span>
-                            {tagCategories.map((cat) => {
-                              const catTags = cat.tags || [];
-                              const catTagIds = catTags.map((t: any) => t.id);
-                              if (catTagIds.length === 0) return null;
-
-                              const selectedCatTags = catTagIds.filter(
-                                (id: string) => selectedTags.includes(id),
-                              );
-                              const isAllSelected =
-                                selectedCatTags.length === catTagIds.length;
-                              const isPartSelected =
-                                selectedCatTags.length > 0 && !isAllSelected;
-
-                              return (
-                                <button
-                                  key={cat.id}
-                                  type="button"
-                                  onClick={() => {
-                                    if (isAllSelected) {
-                                      field.onChange(
-                                        selectedTags.filter(
-                                          (id: string) =>
-                                            !catTagIds.includes(id),
-                                        ),
-                                      );
-                                    } else {
-                                      field.onChange(
-                                        Array.from(
-                                          new Set([
-                                            ...selectedTags,
-                                            ...catTagIds,
-                                          ]),
-                                        ),
-                                      );
-                                    }
-                                  }}
-                                  className={cn(
-                                    "text-xs px-2.5 py-1 rounded-full border transition-all duration-150 font-medium select-none",
-                                    isAllSelected
-                                      ? "bg-indigo-600 border-indigo-600 text-white font-semibold shadow-xs"
-                                      : isPartSelected
-                                        ? "bg-indigo-50 border-dashed border-indigo-350 text-indigo-755 font-semibold"
-                                        : "bg-white border-slate-200 text-slate-655 hover:bg-slate-100 hover:text-slate-900",
-                                  )}
-                                  title={`${cat.name} (${catTags.map((t: any) => t.name).join(", ")})`}>
-                                  {cat.name}
-                                </button>
-                              );
-                            })}
+                    <FormItem className="md:col-span-5 space-y-4">
+                      {/* 1. Tag Groups Combobox */}
+                      {Array.isArray(tagCategories) && tagCategories.length > 0 && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <FormLabel className="text-xs font-semibold text-stone-700">
+                              Tag Group (Kelompok Tag)
+                            </FormLabel>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsTagCategoryModalOpen(true)}
+                              className="text-xs h-6.5 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50 px-2 flex items-center gap-1 font-medium">
+                              <Plus className="h-3 w-3" />
+                              <span>Kelola Group</span>
+                            </Button>
                           </div>
-                        )}
 
-                      <Popover
-                        open={tagSearchOpen}
-                        onOpenChange={setTagSearchOpen}>
+                          {(() => {
+                            const appliedGroups = (Array.isArray(tagCategories) ? tagCategories : [])
+                              .map((cat) => {
+                                const catTags = cat.tags || [];
+                                const catTagIds = catTags.map((t: any) => t.id);
+                                if (catTagIds.length === 0) return null;
+
+                                const selectedCatTags = catTagIds.filter((id: string) =>
+                                  selectedTags.includes(id),
+                                );
+                                if (selectedCatTags.length === 0) return null;
+
+                                return {
+                                  id: cat.id,
+                                  name: cat.name,
+                                  tagIds: catTagIds,
+                                  selectedCount: selectedCatTags.length,
+                                  totalCount: catTagIds.length,
+                                  isAllSelected: selectedCatTags.length === catTagIds.length,
+                                };
+                              })
+                              .filter(Boolean) as {
+                                id: string;
+                                name: string;
+                                tagIds: string[];
+                                selectedCount: number;
+                                totalCount: number;
+                                isAllSelected: boolean;
+                              }[];
+
+                            return (
+                              <Popover
+                                open={tagGroupSearchOpen}
+                                onOpenChange={setTagGroupSearchOpen}>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    role="combobox"
+                                    className={cn(
+                                      "w-full justify-between h-auto min-h-10 text-left bg-white",
+                                      appliedGroups.length === 0 && "text-muted-foreground",
+                                    )}>
+                                    <div className="flex flex-wrap gap-1.5 items-center py-1">
+                                      {appliedGroups.length > 0 ? (
+                                        appliedGroups.map((cat) => (
+                                          <Badge
+                                            key={cat.id}
+                                            variant="secondary"
+                                            className={cn(
+                                              "flex items-center gap-1 px-2 py-0.5 text-xs font-medium",
+                                              cat.isAllSelected
+                                                ? "bg-indigo-100 text-indigo-800 border-indigo-200"
+                                                : "bg-indigo-50 text-indigo-600 border border-dashed border-indigo-300",
+                                            )}>
+                                            <span>
+                                              {cat.name}
+                                              {!cat.isAllSelected &&
+                                                ` (${cat.selectedCount}/${cat.totalCount})`}
+                                            </span>
+                                            <X
+                                              className="h-3 w-3 cursor-pointer hover:text-red-500"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                field.onChange(
+                                                  selectedTags.filter(
+                                                    (id: string) => !cat.tagIds.includes(id),
+                                                  ),
+                                                );
+                                              }}
+                                            />
+                                          </Badge>
+                                        ))
+                                      ) : (
+                                        <span className="text-muted-foreground text-xs">
+                                          Pilih tag group...
+                                        </span>
+                                      )}
+                                    </div>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  className="w-[--radix-popover-trigger-width] p-0"
+                                  align="start">
+                                  <Command>
+                                    <CommandInput
+                                      placeholder="Cari tag group..."
+                                      value={tagGroupSearchQuery}
+                                      onValueChange={setTagGroupSearchQuery}
+                                    />
+                                    <CommandList>
+                                      <CommandEmpty>Tag group tidak ditemukan.</CommandEmpty>
+                                      <CommandGroup>
+                                        {tagCategories.map((cat) => {
+                                          const catTags = cat.tags || [];
+                                          const catTagIds = catTags.map((t: any) => t.id);
+                                          if (catTagIds.length === 0) return null;
+
+                                          const selectedCatTags = catTagIds.filter(
+                                            (id: string) => selectedTags.includes(id),
+                                          );
+                                          const isAllSelected =
+                                            selectedCatTags.length === catTagIds.length;
+                                          const isPartSelected =
+                                            selectedCatTags.length > 0 && !isAllSelected;
+
+                                          return (
+                                            <CommandItem
+                                              key={cat.id}
+                                              value={`${cat.name} ${catTags.map((t: any) => t.name).join(" ")}`}
+                                              onSelect={() => {
+                                                if (isAllSelected) {
+                                                  field.onChange(
+                                                    selectedTags.filter(
+                                                      (id: string) =>
+                                                        !catTagIds.includes(id),
+                                                    ),
+                                                  );
+                                                } else {
+                                                  field.onChange(
+                                                    Array.from(
+                                                      new Set([
+                                                        ...selectedTags,
+                                                        ...catTagIds,
+                                                      ]),
+                                                    ),
+                                                  );
+                                                }
+                                              }}
+                                              className="flex items-center justify-between cursor-pointer py-2">
+                                              <div className="flex items-center gap-2 min-w-0">
+                                                <CheckCheck
+                                                  className={cn(
+                                                    "h-4 w-4 shrink-0 transition-opacity",
+                                                    isAllSelected
+                                                      ? "opacity-100 text-indigo-600"
+                                                      : isPartSelected
+                                                        ? "opacity-50 text-indigo-400"
+                                                        : "opacity-0",
+                                                  )}
+                                                />
+                                                <div className="flex flex-col min-w-0">
+                                                  <span className="text-xs font-semibold text-stone-800 truncate">
+                                                    {cat.name}
+                                                  </span>
+                                                  <span className="text-[10px] text-stone-400 truncate max-w-[280px]">
+                                                    {catTags
+                                                      .map((t: any) => t.name)
+                                                      .join(", ")}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                              <span className="text-[10px] font-bold text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded-full shrink-0 ml-2">
+                                                {selectedCatTags.length}/{catTagIds.length} tag
+                                              </span>
+                                            </CommandItem>
+                                          );
+                                        })}
+                                      </CommandGroup>
+                                      <div className="h-px bg-stone-100 my-1" />
+                                      <CommandGroup>
+                                        <CommandItem
+                                          value="MANAGE_TAG_GROUPS_ACTION"
+                                          onSelect={() => {
+                                            setTagGroupSearchOpen(false);
+                                            setIsTagCategoryModalOpen(true);
+                                          }}
+                                          className="text-indigo-600 font-bold focus:bg-indigo-50 focus:text-indigo-700 cursor-pointer text-xs">
+                                          + Kelola Kategori Tag
+                                        </CommandItem>
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                      {/* 2. Individual Product Tags Combobox */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <FormLabel>
+                            Product Tags ({selectedTags.length} terpilih)
+                          </FormLabel>
+                          {!(Array.isArray(tagCategories) && tagCategories.length > 0) && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsTagCategoryModalOpen(true)}
+                              className="text-xs h-7 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50 px-2 flex items-center gap-1 font-medium">
+                              <Plus className="h-3.5 w-3.5" />
+                              <span>Kelola Group</span>
+                            </Button>
+                          )}
+                        </div>
+
+                        <Popover
+                          open={tagSearchOpen}
+                          onOpenChange={setTagSearchOpen}>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
@@ -1218,8 +1367,9 @@ export default function FormProductCore({
                           </Command>
                         </PopoverContent>
                       </Popover>
-                      <FormMessage />
-                    </FormItem>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
                   );
                 }}
               />
