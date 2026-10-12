@@ -100,6 +100,7 @@ export type Product = {
   basePrice: number | string;
   basePriceAir?: number | string | null;
   availableFreightModes?: string | null;
+  showFreightSelector?: boolean | null;
   isCustom: boolean;
   category?: Category | null;
   activeVendorPriceRecordId?: string | null;
@@ -1057,6 +1058,13 @@ export default function MasterPricingPage() {
                                 🚢 Hanya Laut
                               </Badge>
                             )}
+                            <span className="text-[10px] text-stone-500 font-medium">
+                              Client: {p.showFreightSelector ? (
+                                <span className="text-emerald-600 font-semibold">Tampil</span>
+                              ) : (
+                                <span className="text-stone-400">Sembunyi</span>
+                              )}
+                            </span>
                             {activeQuote ? (
                               <span className="text-[10px] text-stone-500 font-medium truncate max-w-[140px]">
                                 Ref: {activeQuote.vendor?.companyName || "Quote"}

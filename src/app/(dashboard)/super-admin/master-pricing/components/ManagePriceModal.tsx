@@ -31,6 +31,7 @@ import { ArrowRight, Info, PlusCircle, Trash2, Plus, RefreshCw } from "lucide-re
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Product, VendorPriceRecord } from "../page";
+import { Switch } from "@/components/ui/switch";
 import FastCurrencyForm from "@/app/(dashboard)/admin-invoice/currency/components/formCurrencyFast";
 import { getFixedSimulationSteps } from "@/helper/cogsSimulationHelper";
 
@@ -170,6 +171,7 @@ export function ManagePriceModal({
  
   const [selectedQuoteId, setSelectedQuoteId] = useState<string>("NONE");
   const [availableFreightModes, setAvailableFreightModes] = useState<"SEA" | "AIR" | "BOTH">("SEA");
+  const [showFreightSelector, setShowFreightSelector] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"SEA" | "AIR">("SEA");
 
   const [basePriceSea, setBasePriceSea] = useState<number>(0);
@@ -318,6 +320,7 @@ export function ManagePriceModal({
       const initFreightMode =
         (product.availableFreightModes as "SEA" | "AIR" | "BOTH") || "SEA";
       setAvailableFreightModes(initFreightMode);
+      setShowFreightSelector(Boolean(product.showFreightSelector));
       setActiveTab(initFreightMode === "AIR" ? "AIR" : "SEA");
 
       setSelectedQuoteId(
@@ -671,6 +674,7 @@ export function ManagePriceModal({
             ? Number(basePriceAir) || 0
             : null,
         availableFreightModes: availableFreightModes,
+        showFreightSelector: showFreightSelector,
         foreignPrice: currencyCode === "IDR" ? null : Number(foreignPrice) || 0,
         currencyCode: currencyCode,
         exchangeRate: currencyCode === "IDR" ? 1 : Number(exchangeRate) || 1,
@@ -768,6 +772,25 @@ export function ManagePriceModal({
                   🚢 Laut & ✈️ Udara (Keduanya)
                 </Button>
               </div>
+            </div>
+
+            {/* Enabler Toggle Switch */}
+            <div className="flex items-center justify-between p-3 border border-stone-200/90 rounded-md bg-white">
+              <div className="space-y-0.5 pr-4">
+                <Label
+                  htmlFor="showFreightSelector"
+                  className="text-xs font-bold text-stone-800 cursor-pointer">
+                  Tampilkan Pilihan Jalur Pengiriman ke Pembeli
+                </Label>
+                <p className="text-[11px] text-stone-500 leading-relaxed">
+                  Jika diaktifkan, tombol pilihan jalur pengiriman akan muncul di halaman produk storefront. Jika dinonaktifkan, pilihan disembunyikan.
+                </p>
+              </div>
+              <Switch
+                id="showFreightSelector"
+                checked={showFreightSelector}
+                onCheckedChange={setShowFreightSelector}
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end pt-2 border-t border-stone-200/80">
