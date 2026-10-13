@@ -20,8 +20,6 @@ export default function QuotationPrint() {
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   const [data, setData] = useState<any>(null);
-  console.log("ini adalah data", data);
-
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -289,7 +287,8 @@ export default function QuotationPrint() {
                     const imageUrl = item.imageUrl;
                     const itemQty = Number(item.quantity) || 0;
                     const itemPrice = Number(item.unitPrice) || 0;
-                    const hasTiers = item.tiers && item.tiers.length > 0;
+                    const tiers = Array.isArray(item.tiers) ? item.tiers : [];
+                    const hasTiers = tiers.length > 0;
                     const basePrice = item.product?.basePrice
                       ? Number(item.product.basePrice)
                       : null;
@@ -332,7 +331,7 @@ export default function QuotationPrint() {
                           </div>
 
                           {/* Spesifikasi (Deskripsi & Customization Manual) */}
-                          <div className="space-y-0.5 text-[10px]">
+                          {/* <div className="space-y-0.5 text-[10px]">
                             {item.customization &&
                             typeof item.customization === "object" ? (
                               Object.entries(item.customization).map(
@@ -354,7 +353,7 @@ export default function QuotationPrint() {
                                 {item.description}
                               </div>
                             )}
-                          </div>
+                          </div> */}
 
                           {/* Attributes Available / Selected */}
                           {item.product?.availableAttributes?.map(
@@ -392,46 +391,50 @@ export default function QuotationPrint() {
                         </td>
 
                         {/* Kolom 3: Qty */}
-                        {/*  PERBAIKAN ALIGNMENT: Ubah jadi align-top dan tambahkan elemen transparan pendobrak */}
                         <td className="border-r border-gray-800 p-3 text-center align-top font-medium text-[11px]">
-                          {/* Elemen invisible untuk menyeimbangkan tinggi "Start from" di sebelahnya */}
                           {basePrice !== null && item.isPriceStartFrom && (
                             <div className="text-[10px] mb-1.5 pb-1 border-b border-transparent invisible">
                               Start from:
-                              <br />
-                              <span>0</span>
+                              <div>{formatDynamicCurrency(basePrice)}</div>
                             </div>
                           )}
 
                           {hasTiers ? (
-                            <div className="flex flex-col space-y-1.5">
-                              {item.tiers.map((t: any, idx: number) => (
-                                <div key={idx}>{t.minQuantity}</div>
+                            <div className="flex flex-col">
+                              {tiers.map((tier: any, index: number) => (
+                                <div
+                                  key={tier.id || index}
+                                  className="min-h-7 flex items-center justify-center whitespace-nowrap">
+                                  {tier.quantityRange ||
+                                    (tier.maxQuantity != null
+                                      ? `${tier.minQuantity}-${tier.maxQuantity} unit`
+                                      : `${tier.minQuantity}+ unit`)}
+                                </div>
                               ))}
                             </div>
                           ) : (
-                            <div>{itemQty}</div>
+                            <div>{itemQty} unit</div>
                           )}
                         </td>
 
                         {/* Kolom 4: Unit Price */}
-                        {/*  PERBAIKAN ALIGNMENT: Ubah jadi align-top */}
                         <td className="p-3 text-center align-top font-medium text-gray-800 text-[11px]">
                           {basePrice !== null && item.isPriceStartFrom && (
                             <div className="text-[10px] text-gray-500 mb-1.5 pb-1 border-b border-gray-300">
                               Start from:
-                              <br />
-                              <span className="font-medium text-gray-800">
+                              <div className="font-medium text-gray-800">
                                 {formatDynamicCurrency(basePrice)}
-                              </span>
+                              </div>
                             </div>
                           )}
 
                           {hasTiers ? (
-                            <div className="flex flex-col space-y-1.5">
-                              {item.tiers.map((t: any, idx: number) => (
-                                <div key={idx}>
-                                  {formatDynamicCurrency(t.unitPrice)}
+                            <div className="flex flex-col">
+                              {tiers.map((tier: any, index: number) => (
+                                <div
+                                  key={tier.id || index}
+                                  className="min-h-7 flex items-center justify-center whitespace-nowrap">
+                                  {formatDynamicCurrency(tier.unitPrice)}
                                 </div>
                               ))}
                             </div>
