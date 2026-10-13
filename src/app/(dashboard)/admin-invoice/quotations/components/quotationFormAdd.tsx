@@ -74,7 +74,6 @@ import { cn } from "@/lib/utils";
 import {
   getNotesStore,
   QuotationNotesSection,
-  resetNotesStore,
 } from "./helper/quotationNotesSection";
 import { ClientData, NoteCategory, ProductData } from "./quotationForm";
 
@@ -872,10 +871,6 @@ export default function QuotationAddForm({
     name: "items",
   });
 
-  useEffect(() => {
-    resetNotesStore();
-  }, []);
-
   // === FETCH MASTER DATA ===
   const fetchMaster = async () => {
     if (status !== "authenticated") return;
@@ -917,8 +912,6 @@ export default function QuotationAddForm({
   };
 
   const handleFinalSubmit = (data: AddQuotationFormValues) => {
-    const notes = getNotesStore();
-
     const jsonPayload = {
       date: data.date,
       validUntil: data.validUntil || undefined,
@@ -928,9 +921,8 @@ export default function QuotationAddForm({
       currencyCode: data.currencyCode,
       paymentTerms: data.paymentTerms || undefined,
       items: data.items,
-      notes: notes.length > 0 ? notes : undefined,
+      notes: getNotesStore(),
     };
-
     const formData = new FormData();
     formData.append("data", JSON.stringify(jsonPayload));
 

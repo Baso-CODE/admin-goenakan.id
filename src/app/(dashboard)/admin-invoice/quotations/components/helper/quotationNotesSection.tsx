@@ -4,75 +4,118 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { ChevronDown, FileText, Lock } from "lucide-react";
-import React, { useState } from "react";
+import { ChevronDown, FileText, Lock, RefreshCw, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
+import QuotationNoteContent from "../../notes/components/quotationContent/quotationNoteContent";
+import {
+  buildQuotationNote,
+  QuotationNoteCategory,
+  QuotationNoteValue,
+} from "../../notes/components/quotationNoteUtils";
 
-// ============================================================
-// MODULE-LEVEL STORE — di luar React, tidak trigger render apapun
-// ============================================================
-let _notesStore: any[] = [];
-export function getNotesStore(): any[] {
+let _notesStore: QuotationNoteValue[] = [];
+
+export function getNotesStore(): QuotationNoteValue[] {
   return _notesStore;
 }
-export function resetNotesStore(): void {
-  _notesStore = [];
+
+export function resetNotesStore(initial: QuotationNoteValue[] = []): void {
+  _notesStore = [...initial];
 }
 
-// ============================================================
-// COMPONENT
-// ============================================================
+const EMPTY_NOTES: QuotationNoteValue[] = [];
+
+interface Props {
+  noteCategories: QuotationNoteCategory[];
+  initialNotes?: QuotationNoteValue[];
+}
+
 export function QuotationNotesSection({
   noteCategories,
-}: {
-  noteCategories: any[];
-}) {
-  const [selectedNotes, setSelectedNotes] = useState<any[]>([]);
+  initialNotes = EMPTY_NOTES,
+}: Props) {
+  const [selectedNotes, setSelectedNotes] =
+    useState<QuotationNoteValue[]>(initialNotes);
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setSelectedNotes(initialNotes);
+    resetNotesStore(initialNotes);
+  }, [initialNotes]);
+
+  function saveNotes(next: QuotationNoteValue[]) {
+    _notesStore = next;
+    setSelectedNotes(next);
+  }
 
   function toggleCat(catId: string) {
     setOpenCats((prev) => ({ ...prev, [catId]: !prev[catId] }));
   }
 
-  function handleToggle(categoryId: string, content: string) {
-    const next = selectedNotes.map((n) => ({
-      ...n,
-      contents: [...n.contents],
-    }));
-    const idx = next.findIndex((n) => n.categoryId === categoryId);
-
-    let result: any[];
-    if (idx === -1) {
-      result = [...next, { categoryId, contents: [content] }];
-    } else {
-      const cat = next[idx];
-      const ci = cat.contents.indexOf(content);
-      if (ci === -1) cat.contents.push(content);
-      else cat.contents.splice(ci, 1);
-      result =
-        cat.contents.length === 0 ? next.filter((_, i) => i !== idx) : next;
-    }
-
-    _notesStore = result;
-    setSelectedNotes(result);
-  }
-
-  function isChecked(catId: string, content: string) {
-    const cat = selectedNotes.find((n) => n.categoryId === catId);
-    return cat ? cat.contents.includes(content) : false;
-  }
-
-  function getCount(catId: string) {
-    return (
-      selectedNotes.find((n) => n.categoryId === catId)?.contents.length || 0
+  function isChecked(categoryId: string, templateId: string) {
+    return selectedNotes.some(
+      (note) =>
+        note.categoryId === categoryId && note.templateId === templateId,
     );
   }
 
-  function renderGroup(
-    isPublic: boolean,
+  function handleToggle(
+    categoryId: string,
+    templateId: string,
     title: string,
-    icon: React.ReactNode,
+    content: string,
   ) {
-    const filtered = noteCategories.filter((c) => c.isPublic === isPublic);
+    const existing = isChecked(categoryId, templateId);
+
+    if (existing) {
+      saveNotes(
+        selectedNotes.filter(
+          (note) =>
+            !(note.categoryId === categoryId && note.templateId === templateId),
+        ),
+      );
+      return;
+    }
+
+    saveNotes([
+      ...selectedNotes,
+      {
+        categoryId,
+        templateId,
+        content: buildQuotationNote(title, content),
+      },
+    ]);
+  }
+
+  function refreshTemplate(
+    categoryId: string,
+    templateId: string,
+    title: string,
+    content: string,
+  ) {
+    saveNotes(
+      selectedNotes.map((note) =>
+        note.categoryId === categoryId && note.templateId === templateId
+          ? { ...note, content: buildQuotationNote(title, content) }
+          : note,
+      ),
+    );
+  }
+
+  function removeLegacyNote(index: number) {
+    saveNotes(selectedNotes.filter((_, i) => i !== index));
+  }
+
+  function getCount(categoryId: string) {
+    return selectedNotes.filter((note) => note.categoryId === categoryId)
+      .length;
+  }
+
+  function renderGroup(isPublic: boolean, title: string, icon: ReactNode) {
+    const filtered = noteCategories.filter(
+      (category) => category.isPublic === isPublic,
+    );
     if (filtered.length === 0) return null;
 
     return (
@@ -83,11 +126,22 @@ export function QuotationNotesSection({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-60 pr-2">
-            <div className="space-y-1">
+          <ScrollArea className="h-64 pr-2">
+            <div className="space-y-2">
               {filtered.map((cat) => {
                 const isOpen = !!openCats[cat.id];
                 const count = getCount(cat.id);
+
+                const legacyNotes = selectedNotes
+                  .map((note, index) => ({ note, index }))
+                  .filter(
+                    ({ note }) =>
+                      note.categoryId === cat.id &&
+                      (!note.templateId ||
+                        !cat.templates.some(
+                          (template) => template.id === note.templateId,
+                        )),
+                  );
 
                 return (
                   <div
@@ -95,52 +149,98 @@ export function QuotationNotesSection({
                     className="border rounded-md overflow-hidden">
                     <button
                       type="button"
-                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium hover:bg-muted/40 transition-colors"
+                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium hover:bg-muted/40"
                       onClick={() => toggleCat(cat.id)}>
                       <div className="flex items-center gap-2">
                         <span>{cat.name}</span>
                         {count > 0 && (
-                          <Badge
-                            variant="secondary"
-                            className="text-[10px] h-5 px-1.5">
-                            {count}
-                          </Badge>
+                          <Badge variant="secondary">{count}</Badge>
                         )}
                       </div>
                       <ChevronDown
                         className={cn(
-                          "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
+                          "h-4 w-4 transition-transform",
                           isOpen && "rotate-180",
                         )}
                       />
                     </button>
 
                     {isOpen && (
-                      <div className="border-t bg-white px-2 py-2 space-y-1">
-                        {cat.templates.map((tpl: any, i: number) => {
-                          const checked = isChecked(cat.id, tpl.content);
+                      <div className="border-t bg-white p-2 space-y-2">
+                        {cat.templates.map((tpl) => {
+                          const checked = isChecked(cat.id, tpl.id);
+
                           return (
                             <div
-                              key={`${cat.id}-${i}`}
-                              className="flex items-start space-x-2 border p-2 rounded-md bg-white hover:bg-slate-50 transition-colors cursor-pointer select-none"
-                              onClick={() => handleToggle(cat.id, tpl.content)}>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => {}} // dikontrol via onClick div parent
-                                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 pointer-events-none"
-                              />
-                              <div className="grid gap-0.5 leading-none pointer-events-none">
-                                <span className="text-sm font-medium">
-                                  {tpl.title}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {tpl.content}
-                                </span>
-                              </div>
+                              key={tpl.id}
+                              className="rounded-md border p-3 space-y-2">
+                              <label className="flex gap-3 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() =>
+                                    handleToggle(
+                                      cat.id,
+                                      tpl.id,
+                                      tpl.title,
+                                      tpl.content,
+                                    )
+                                  }
+                                  className="mt-1 h-4 w-4 shrink-0"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-semibold mb-1">
+                                    {tpl.title}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    <QuotationNoteContent
+                                      content={tpl.content}
+                                    />
+                                  </div>
+                                </div>
+                              </label>
+
+                              {checked && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    refreshTemplate(
+                                      cat.id,
+                                      tpl.id,
+                                      tpl.title,
+                                      tpl.content,
+                                    )
+                                  }
+                                  className="flex items-center gap-1 text-xs text-blue-600 hover:underline ml-7">
+                                  <RefreshCw className="h-3 w-3" />
+                                  Perbarui dari Template
+                                </button>
+                              )}
                             </div>
                           );
                         })}
+
+                        {legacyNotes.map(({ note, index }) => (
+                          <div
+                            key={`legacy-${index}`}
+                            className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                            <div className="flex justify-between gap-2 mb-2">
+                              <span className="text-xs font-medium text-amber-800">
+                                Notes lama / template tidak ditemukan
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => removeLegacyNote(index)}
+                                className="text-red-600"
+                                aria-label="Hapus note lama">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                            <div className="text-xs">
+                              <QuotationNoteContent content={note.content} />
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -157,13 +257,13 @@ export function QuotationNotesSection({
     <div className="space-y-4">
       {renderGroup(
         true,
-        "Notes to Client",
-        <FileText className="text-blue-500 w-4 h-4" />,
+        "Notes to Client (Public)",
+        <FileText className="h-4 w-4 text-blue-600" />,
       )}
       {renderGroup(
         false,
-        "Internal Memos",
-        <Lock className="text-amber-500 w-4 h-4" />,
+        "Internal Notes (Private)",
+        <Lock className="h-4 w-4 text-amber-600" />,
       )}
     </div>
   );

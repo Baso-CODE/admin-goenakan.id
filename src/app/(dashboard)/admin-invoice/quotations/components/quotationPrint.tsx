@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useApi } from "@/hooks/useApi";
+import QuotationNoteContent from "../notes/components/quotationContent/quotationNoteContent";
 
 export default function QuotationPrint() {
   const { fetchApi, status } = useApi();
@@ -453,15 +454,20 @@ export default function QuotationPrint() {
               <div className="font-bold text-[13px] uppercase mb-2 text-gray-800 border-b border-gray-800 inline-block pb-0.5">
                 Notes
               </div>
+
               <div className="text-[11px] text-gray-700 leading-relaxed">
-                {data.notes && data.notes.length > 0 ? (
-                  <ul className="list-disc pl-4 space-y-1.5">
-                    {data.notes.map((note: any) => (
-                      <li key={note.id} className="pl-1">
-                        {note.content}
-                      </li>
-                    ))}
-                  </ul>
+                {data.notes?.some(
+                  (note: any) => note.category?.isPublic === true,
+                ) ? (
+                  <div className="space-y-3">
+                    {data.notes
+                      .filter((note: any) => note.category?.isPublic === true)
+                      .map((note: any) => (
+                        <div key={note.id} className="break-inside-avoid">
+                          <QuotationNoteContent content={note.content} />
+                        </div>
+                      ))}
+                  </div>
                 ) : (
                   <p className="italic text-gray-400">Tidak ada catatan.</p>
                 )}

@@ -167,7 +167,7 @@ export default function QuotationNoteCategory() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nama Kategori</TableHead>
-                <TableHead>Tipe</TableHead> {/* Kolom Baru */}
+                <TableHead>Tipe</TableHead>
                 <TableHead>Jumlah Templates</TableHead>
                 <TableHead>Digunakan</TableHead>
                 <TableHead className="text-right">Action</TableHead>
