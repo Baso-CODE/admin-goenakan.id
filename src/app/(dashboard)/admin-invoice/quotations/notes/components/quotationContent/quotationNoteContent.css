@@ -1,0 +1,30 @@
+.quotation-note-content {
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.quotation-note-content p {
+  margin: 0 0 6px;
+}
+
+.quotation-note-content ul {
+  list-style-type: disc;
+  padding-left: 18px;
+  margin: 4px 0 8px;
+}
+
+.quotation-note-content ol {
+  list-style-type: decimal;
+  padding-left: 18px;
+  margin: 4px 0 8px;
+}
+
+.quotation-note-content li {
+  display: list-item;
+  margin-bottom: 3px;
+}
+
+.quotation-note-content li p {
+  margin: 0;
+}

@@ -7,6 +7,7 @@ import { Resolver, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -27,11 +28,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/useApi";
 
 // === SCHEMA ===
 const templateSchema = z.object({
+  id: z.string().uuid().optional(),
   title: z.string().min(1, "Judul wajib diisi"),
   content: z.string().min(1, "Konten wajib diisi"),
 });
@@ -48,7 +49,11 @@ type CategoryData = {
   id: string;
   name: string;
   isPublic: boolean;
-  templates: { title: string; content: string }[];
+  templates: {
+    id?: string;
+    title: string;
+    content: string;
+  }[];
 };
 
 interface QuotationNoteFormProps {
@@ -90,7 +95,10 @@ export function QuotationNoteForm({
           name: initialData.name,
           isPublic: initialData.isPublic ?? true,
           templates: Array.isArray(initialData.templates)
-            ? initialData.templates
+            ? initialData.templates.map((template) => ({
+                ...template,
+                id: template.id ?? crypto.randomUUID(),
+              }))
             : [],
         });
       } else {
@@ -119,11 +127,19 @@ export function QuotationNoteForm({
 
       const method = initialData ? "PATCH" : "POST";
 
+      const payload = {
+        ...values,
+        templates: (values.templates ?? []).map((template) => ({
+          id: template.id ?? crypto.randomUUID(),
+          title: template.title,
+          content: template.content,
+        })),
+      };
+
       const res = await fetchApi(endpoint, {
         method,
-        body: JSON.stringify(values),
+        body: JSON.stringify(payload),
       });
-
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message || "Gagal menyimpan data");
@@ -222,7 +238,13 @@ export function QuotationNoteForm({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => append({ title: "", content: "" })}
+                    onClick={() =>
+                      append({
+                        id: crypto.randomUUID(),
+                        title: "",
+                        content: "",
+                      })
+                    }
                     className="h-8 text-xs gap-1">
                     <Plus className="h-3 w-3" /> Tambah
                   </Button>
@@ -256,15 +278,17 @@ export function QuotationNoteForm({
                           control={form.control}
                           name={`templates.${index}.content`}
                           render={({ field }) => (
-                            <FormItem className="space-y-0">
+                            <FormItem className="space-y-2">
                               <FormControl>
-                                <Textarea
-                                  placeholder="Isi pesan (ex: Pembayaran DP wajib dilakukan di awal...)"
-                                  className="min-h-15 text-sm bg-white resize-none"
-                                  {...field}
-                                />
+                                <div className="overflow-hidden rounded-md border bg-white">
+                                  <SimpleEditor
+                                    value={field.value ?? ""}
+                                    onChange={field.onChange}
+                                    minHeight="200px"
+                                  />
+                                </div>
                               </FormControl>
-                              <FormMessage className="text-[10px]" />
+                              <FormMessage className="text-xs" />
                             </FormItem>
                           )}
                         />
@@ -289,7 +313,13 @@ export function QuotationNoteForm({
                         type="button"
                         variant="link"
                         size="sm"
-                        onClick={() => append({ title: "", content: "" })}
+                        onClick={() =>
+                          append({
+                            id: crypto.randomUUID(),
+                            title: "",
+                            content: "",
+                          })
+                        }
                         className="text-primary">
                         + Tambah Template Pertama
                       </Button>
