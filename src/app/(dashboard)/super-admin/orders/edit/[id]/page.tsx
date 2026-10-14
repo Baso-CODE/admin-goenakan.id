@@ -165,7 +165,6 @@ export default function EditOrderForm() {
         const jsonQ = resQ.ok ? await resQ.json() : null;
         const jsonSamp = resSamp.ok ? await resSamp.json() : null;
         const orderData = await resOrder.json();
-        console.log("📦 [DEBUG] Data Order dari Backend:", orderData);
 
         setClients(c);
         setProducts(p);
@@ -800,14 +799,14 @@ export default function EditOrderForm() {
 
             {/* === SECTION 5: PRODUCTS === */}
             <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-wrap justify-between items-center gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-3">
                   <h3 className="font-semibold text-xl text-gray-800">
                     Order Products
                   </h3>
                   {!isPending && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                      ⚠ Produk tidak dapat diedit — status {orderStatus}
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                      Produk terkunci — status {orderStatus}
                     </span>
                   )}
                 </div>
@@ -834,7 +833,7 @@ export default function EditOrderForm() {
               </div>
 
               {fields.length > 0 && (
-                <div className="hidden md:grid md:grid-cols-12 gap-4 px-4 py-2 bg-[#975a3e] rounded-t-lg font-medium text-sm text-gray-100">
+                <div className="hidden lg:grid lg:grid-cols-12 gap-4 px-4 py-2 bg-[#975a3e] rounded-t-lg font-medium text-sm text-gray-100">
                   <div className="col-span-4">Product Details</div>
                   <div className="col-span-2 text-center">Qty</div>
                   <div className="col-span-3">Unit Price</div>
@@ -853,7 +852,6 @@ export default function EditOrderForm() {
                   const subtotal =
                     (watch(`products.${index}.price`) || 0) * currentQty;
 
-                  //  FUNGSI BARU: Perhitungan Harga yang sudah diperbaiki (Sama dengan AddOrder)
                   const updateCalculatedPrice = async (
                     idx: number,
                     prod: any,
@@ -922,7 +920,7 @@ export default function EditOrderForm() {
                     // 4. Totalkan Harga Dasar dengan Tambahan
                     let baseIdr = baseProductPrice + totalModifiers;
 
-                    // 5. Tier Price (Grosir) dengan Pengaman
+                    // 5. Tier Price (Grosir) -  DENGAN PENGAMAN BARU
                     if (
                       prod.priceTiers &&
                       Array.isArray(prod.priceTiers) &&
@@ -935,6 +933,7 @@ export default function EditOrderForm() {
                         (tier) => qty >= tier.minQuantity,
                       );
 
+                      //  PERBAIKAN: Pastikan tier ditemukan DAN harganya lebih dari 0
                       if (applicableTier && Number(applicableTier.price) > 0) {
                         baseIdr = Number(applicableTier.price) + totalModifiers;
                       }
@@ -969,69 +968,82 @@ export default function EditOrderForm() {
                     // 7. Simpan harga akhir
                     form.setValue(`products.${idx}.price`, finalPrice);
                   };
-
                   return (
                     <div
                       key={field.id}
                       className={cn(
-                        "border rounded-lg bg-white shadow-sm transition-all duration-200",
-                        !isPending
-                          ? "opacity-60 pointer-events-none" // 🔒 Kunci form jika tidak Pending
-                          : "hover:shadow-md",
+                        "border rounded-lg bg-white shadow-sm transition-shadow duration-200",
+                        isPending && "hover:shadow-md",
                       )}>
-                      <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                        <div className="md:col-span-4 space-y-4">
-                          {/* 1. SEARCHABLE PRODUCT DROPDOWN */}
+                      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-start min-w-0">
+                        <div className="sm:col-span-2 lg:col-span-4 min-w-0 space-y-3">
                           <FormField
                             control={control}
                             name={`products.${index}.productId`}
                             render={({ field }) => (
-                              <FormItem className="flex flex-col">
-                                <FormLabel className="md:hidden">
+                              <FormItem className="min-w-0 space-y-1.5">
+                                <FormLabel className="lg:hidden">
                                   Product
                                 </FormLabel>
                                 <Popover
-                                  open={openCombobox[index]}
-                                  onOpenChange={(val) =>
-                                    setOpenCombobox((prev) => ({
-                                      ...prev,
-                                      [index]: val,
-                                    }))
-                                  }>
+                                  open={openCombobox[index] ?? false}
+                                  onOpenChange={(open) => {
+                                    if (isPending)
+                                      setOpenCombobox((prev) => ({
+                                        ...prev,
+                                        [index]: open,
+                                      }));
+                                  }}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
+                                        type="button"
                                         variant="outline"
                                         role="combobox"
                                         disabled={!isPending}
+                                        aria-expanded={
+                                          openCombobox[index] ?? false
+                                        }
                                         className={cn(
-                                          "w-full justify-between h-10 font-normal",
+                                          "w-full min-w-0 h-auto min-h-11 justify-between gap-3 rounded-xl border-slate-200 bg-white px-3 py-2.5 text-left font-normal shadow-sm hover:bg-slate-50",
                                           !field.value &&
                                             "text-muted-foreground",
                                         )}>
-                                        {field.value
-                                          ? products.find(
-                                              (p) => p.id === field.value,
-                                            )?.name
-                                          : "Search Product..."}
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        <span className="min-w-0 flex-1 text-left">
+                                          <span className="block text-[11px] font-medium text-slate-500">
+                                            Produk
+                                          </span>
+                                          <span className="block line-clamp-2 wrap-break-words text-sm font-medium leading-5 text-slate-800">
+                                            {selectedProduct?.name ||
+                                              "Cari dan pilih produk..."}
+                                          </span>
+                                        </span>
+                                        <ChevronsUpDown className="h-4 w-4 shrink-0 text-slate-400" />
                                       </Button>
                                     </FormControl>
                                   </PopoverTrigger>
                                   <PopoverContent
-                                    className="w-75 p-0"
-                                    align="start">
-                                    <Command>
-                                      <CommandInput placeholder="Search by name or SKU..." />
-                                      <CommandList>
-                                        <CommandEmpty>
-                                          Product not found.
+                                    align="start"
+                                    side="bottom"
+                                    sideOffset={6}
+                                    collisionPadding={12}
+                                    className="w-[min(460px,calc(100vw-32px))] max-w-[calc(100vw-32px)] overflow-hidden rounded-xl border border-slate-200 bg-white p-0 shadow-xl">
+                                    <Command className="w-full bg-white">
+                                      <div className="border-b border-slate-100 p-2">
+                                        <CommandInput
+                                          placeholder="Cari nama produk atau SKU..."
+                                          className="h-10 text-sm"
+                                        />
+                                      </div>
+                                      <CommandList className="max-h-72 overflow-y-auto p-1.5">
+                                        <CommandEmpty className="py-8 text-center text-sm text-slate-500">
+                                          Produk tidak ditemukan.
                                         </CommandEmpty>
                                         <CommandGroup>
                                           {products.map((p) => (
                                             <CommandItem
                                               key={p.id}
-                                              value={`${p.name} ${p.sku}`}
+                                              value={`${p.name} ${p.sku || ""}`}
                                               onSelect={() => {
                                                 field.onChange(p.id);
                                                 form.setValue(
@@ -1046,33 +1058,38 @@ export default function EditOrderForm() {
                                                   ...prev,
                                                   [index]: false,
                                                 }));
-
-                                                // Update harga awal & Convert
                                                 updateCalculatedPrice(
                                                   index,
                                                   p,
                                                   {},
                                                   currentQty,
                                                 );
-                                              }}>
-                                              <Check
+                                              }}
+                                              className="mb-1 flex cursor-pointer items-start gap-3 rounded-lg px-3 py-3 text-left data-[selected=true]:bg-amber-50 data-[selected=true]:text-slate-900">
+                                              <span
                                                 className={cn(
-                                                  "mr-2 h-4 w-4",
+                                                  "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border",
                                                   p.id === field.value
-                                                    ? "opacity-100"
-                                                    : "opacity-0",
-                                                )}
-                                              />
-                                              <div className="flex flex-col">
-                                                <span>{p.name}</span>
-                                                <span className="text-xs text-gray-500">
-                                                  SKU: {p.sku}
+                                                    ? "border-[#975a3e] bg-[#975a3e] text-white"
+                                                    : "border-slate-200 bg-white text-transparent",
+                                                )}>
+                                                <Check className="h-3.5 w-3.5" />
+                                              </span>
+                                              <span className="min-w-0 flex-1 space-y-1">
+                                                <span className="block whitespace-normal wrap-break-words text-sm font-medium leading-5 text-slate-800">
+                                                  {p.name}
                                                 </span>
-                                              </div>
+                                                <span className="block break-all text-xs text-slate-500">
+                                                  SKU: {p.sku || "-"}
+                                                </span>
+                                              </span>
                                             </CommandItem>
                                           ))}
                                         </CommandGroup>
                                       </CommandList>
+                                      <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                                        {products.length} produk tersedia
+                                      </div>
                                     </Command>
                                   </PopoverContent>
                                 </Popover>
@@ -1080,18 +1097,17 @@ export default function EditOrderForm() {
                               </FormItem>
                             )}
                           />
-
                           {selectedProduct && (
-                            <div className="flex items-center gap-3 text-xs text-gray-500">
-                              <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                            <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-600">
+                              <span className="max-w-full break-all rounded-md border border-slate-200 bg-slate-50 px-2 py-1">
                                 SKU:{" "}
-                                <span className="font-medium text-gray-800">
+                                <span className="font-medium text-slate-800">
                                   {selectedProduct.sku || "-"}
                                 </span>
                               </span>
-                              <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                              <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1">
                                 UOM:{" "}
-                                <span className="font-medium text-gray-800">
+                                <span className="font-medium text-slate-800">
                                   {selectedProduct.uom || "-"}
                                 </span>
                               </span>
@@ -1099,13 +1115,13 @@ export default function EditOrderForm() {
                           )}
                         </div>
 
-                        <div className="md:col-span-2">
+                        <div className="min-w-0 lg:col-span-2">
                           <FormField
                             control={control}
                             name={`products.${index}.quantity`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="md:hidden">
+                                <FormLabel className="lg:hidden">
                                   Quantity
                                 </FormLabel>
                                 <FormControl>
@@ -1125,6 +1141,7 @@ export default function EditOrderForm() {
                                             form.getValues(
                                               `products.${index}.selectedAttributes`,
                                             ) || {};
+                                          // Update ulang harga jika kuantitas menyentuh batas Price Tier baru
                                           updateCalculatedPrice(
                                             index,
                                             selectedProduct,
@@ -1133,7 +1150,7 @@ export default function EditOrderForm() {
                                           );
                                         }
                                       }}
-                                      className="text-center h-10"
+                                      className="h-11 min-w-0 text-center rounded-lg"
                                     />
                                     <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium pointer-events-none">
                                       {selectedProduct?.uom}
@@ -1146,13 +1163,13 @@ export default function EditOrderForm() {
                           />
                         </div>
 
-                        <div className="md:col-span-3">
+                        <div className="min-w-0 lg:col-span-3">
                           <FormField
                             control={control}
                             name={`products.${index}.price`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="md:hidden">
+                                <FormLabel className="lg:hidden">
                                   Unit Price
                                 </FormLabel>
                                 <FormControl>
@@ -1170,7 +1187,7 @@ export default function EditOrderForm() {
                                         const val = e.target.valueAsNumber;
                                         field.onChange(isNaN(val) ? 0 : val);
                                       }}
-                                      className="pl-9 h-10 text-right font-mono"
+                                      className="h-11 min-w-0 rounded-lg pl-9 text-right font-mono"
                                     />
                                   </div>
                                 </FormControl>
@@ -1180,11 +1197,11 @@ export default function EditOrderForm() {
                           />
                         </div>
 
-                        <div className="md:col-span-2 flex flex-col justify-center items-end h-10 pt-8 md:pt-0">
-                          <span className="md:hidden text-xs text-gray-500 mb-1">
+                        <div className="lg:col-span-2 min-w-0 flex flex-col justify-center items-end min-h-10 pt-2 lg:pt-0">
+                          <span className="lg:hidden text-xs text-gray-500 mb-1">
                             Subtotal
                           </span>
-                          <span className="font-semibold text-gray-900 font-mono">
+                          <span className="max-w-full wrap-break-words text-right font-semibold text-gray-900 font-mono">
                             {currentCurrencySymbol || "Rp"}{" "}
                             {subtotal.toLocaleString("id-ID", {
                               minimumFractionDigits: 0,
@@ -1192,7 +1209,7 @@ export default function EditOrderForm() {
                           </span>
                         </div>
 
-                        <div className="md:col-span-1 flex justify-center pt-8 md:pt-0">
+                        <div className="lg:col-span-1 flex justify-center pt-2 lg:pt-0">
                           {fields.length > 1 && isPending && (
                             <Button
                               type="button"
@@ -1251,10 +1268,10 @@ export default function EditOrderForm() {
                                               <button
                                                 type="button"
                                                 key={val.valueId}
-                                                // 🔒 Hanya disable jika bukan Pending (isAvailable logic dihapus)
                                                 disabled={!isPending}
+                                                // onClick sudah dimodifikasi untuk toggle dan clear!
                                                 onClick={() => {
-                                                  //  FITUR TOGGLE SEPERTI DI ADD ORDER
+                                                  // Buat salinan atribut saat ini
                                                   const newAttrs: Record<
                                                     string,
                                                     string
@@ -1263,15 +1280,17 @@ export default function EditOrderForm() {
                                                   };
 
                                                   if (isSelected) {
+                                                    //  FITUR TOGGLE: Jika sudah terpilih, maka batalkan pilihannya (Hapus)
                                                     delete newAttrs[
                                                       attr.attributeId
                                                     ];
                                                   } else {
+                                                    //  FITUR TOGGLE: Jika belum terpilih, pilih ini
                                                     newAttrs[attr.attributeId] =
                                                       val.valueId;
                                                   }
 
-                                                  // Hapus atribut turunan di bawahnya agar kombinasi tetap bersih
+                                                  // (Opsional UX): Hapus atribut turunan di bawahnya agar kombinasi tetap bersih
                                                   selectedProduct.availableAttributes
                                                     .slice(attrIdx + 1)
                                                     .forEach(
@@ -1287,7 +1306,7 @@ export default function EditOrderForm() {
                                                     newAttrs,
                                                   );
 
-                                                  // Cek & Set Variant ID
+                                                  // Cek & Set Variant ID hanya dari atribut yang BUKAN custom
                                                   const nonCustomAttrsObj =
                                                     Object.fromEntries(
                                                       Object.entries(
@@ -1330,7 +1349,7 @@ export default function EditOrderForm() {
                                                     matchedVariant?.id || "",
                                                   );
 
-                                                  // Hitung harga
+                                                  // Hitung harga (Base + Modifier) dan auto-convert currency
                                                   updateCalculatedPrice(
                                                     index,
                                                     selectedProduct,
@@ -1338,13 +1357,18 @@ export default function EditOrderForm() {
                                                     currentQty,
                                                   );
                                                 }}
+                                                // Tampilan diperbarui agar tidak ada efek abu-abu disabled
                                                 className={cn(
-                                                  "relative px-4 py-2 rounded-md text-sm font-medium transition-all duration-200",
+                                                  "relative max-w-full wrap-break-words whitespace-normal px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed",
                                                   isSelected
                                                     ? "bg-blue-600 text-white shadow-md border-transparent"
                                                     : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:border-blue-400",
                                                 )}>
-                                                {val.value}
+                                                {typeof val.value === "string"
+                                                  ? val.value
+                                                      .split("|")[0]
+                                                      .trim()
+                                                  : val.value}
                                                 {Number(val.priceModifier) >
                                                   0 && (
                                                   <span
