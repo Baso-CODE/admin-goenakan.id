@@ -29,10 +29,10 @@ export interface OrderInvoice {
   createdAt: string;
   dueDate: string | null;
   totalAmount: number;
-  status: "UNPAID" | "PAID" | "OVERDUE" | "CANCELLED";
+  status: "DRAFT" | "UNPAID" | "PAID" | "OVERDUE" | "CANCELLED";
   category: "DP" | "FULL_PAYMENT" | "INSTALLMENT" | "REMAINING_BALANCE";
+  billingMode?: "STANDARD" | "PARTIAL_QUANTITY";
 }
-
 export interface OrderDetail {
   id: string;
   orderNumber: string;
@@ -83,7 +83,7 @@ export interface InvoiceNote {
 }
 
 export interface SplitItem {
-  productId: string;
+  orderProductId: string;
   quantity: number;
   maxQty: number;
   price: number;
