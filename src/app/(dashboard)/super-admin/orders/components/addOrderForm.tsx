@@ -1166,7 +1166,7 @@ export default function AddOrderForm() {
               </div>
 
               {fields.length > 0 && (
-                <div className="hidden md:grid md:grid-cols-12 gap-4 px-4 py-2 bg-[#975a3e] rounded-t-lg font-medium text-sm text-gray-100">
+                <div className="hidden lg:grid lg:grid-cols-12 gap-4 px-4 py-2 bg-[#975a3e] rounded-t-lg font-medium text-sm text-gray-100">
                   <div className="col-span-4">Product Details</div>
                   <div className="col-span-2 text-center">Qty</div>
                   <div className="col-span-3">Unit Price</div>
@@ -1305,63 +1305,74 @@ export default function AddOrderForm() {
                     <div
                       key={field.id}
                       className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
-                      <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                        <div className="md:col-span-4 space-y-4">
-                          {/* 1. SEARCHABLE PRODUCT DROPDOWN */}
+                      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-start min-w-0">
+                        <div className="sm:col-span-2 lg:col-span-4 min-w-0 space-y-3">
                           <FormField
                             control={control}
                             name={`products.${index}.productId`}
                             render={({ field }) => (
-                              <FormItem className="flex flex-col">
-                                <FormLabel className="md:hidden">
+                              <FormItem className="min-w-0 space-y-1.5">
+                                <FormLabel className="lg:hidden">
                                   Product
                                 </FormLabel>
                                 <Popover
-                                  open={openCombobox[index]}
-                                  onOpenChange={(val) =>
+                                  open={openCombobox[index] ?? false}
+                                  onOpenChange={(open) =>
                                     setOpenCombobox((prev) => ({
                                       ...prev,
-                                      [index]: val,
+                                      [index]: open,
                                     }))
                                   }>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
+                                        type="button"
                                         variant="outline"
                                         role="combobox"
+                                        aria-expanded={
+                                          openCombobox[index] ?? false
+                                        }
                                         className={cn(
-                                          "w-full justify-between h-10 font-normal",
+                                          "w-full min-w-0 h-auto min-h-11 justify-between gap-3 rounded-xl border-slate-200 bg-white px-3 py-2.5 text-left font-normal shadow-sm hover:bg-slate-50",
                                           !field.value &&
                                             "text-muted-foreground",
                                         )}>
-                                        {field.value
-                                          ? products.find(
-                                              (p) => p.id === field.value,
-                                            )?.name
-                                          : "Search Product..."}
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        <span className="min-w-0 flex-1 text-left">
+                                          <span className="block text-[11px] font-medium text-slate-500">
+                                            Produk
+                                          </span>
+                                          <span className="block line-clamp-2 wrap-break-words text-sm font-medium leading-5 text-slate-800">
+                                            {selectedProduct?.name ||
+                                              "Cari dan pilih produk..."}
+                                          </span>
+                                        </span>
+                                        <ChevronsUpDown className="h-4 w-4 shrink-0 text-slate-400" />
                                       </Button>
                                     </FormControl>
                                   </PopoverTrigger>
                                   <PopoverContent
-                                    className="w-75 p-0"
-                                    align="start">
-                                    <Command>
-                                      <CommandInput placeholder="Search by name or SKU..." />
-                                      <CommandList>
-                                        <CommandEmpty>
-                                          Product not found.
+                                    align="start"
+                                    side="bottom"
+                                    sideOffset={6}
+                                    collisionPadding={12}
+                                    className="w-[min(460px,calc(100vw-32px))] max-w-[calc(100vw-32px)] overflow-hidden rounded-xl border border-slate-200 bg-white p-0 shadow-xl">
+                                    <Command className="w-full bg-white">
+                                      <div className="border-b border-slate-100 p-2">
+                                        <CommandInput
+                                          placeholder="Cari nama produk atau SKU..."
+                                          className="h-10 text-sm"
+                                        />
+                                      </div>
+                                      <CommandList className="max-h-72 overflow-y-auto p-1.5">
+                                        <CommandEmpty className="py-8 text-center text-sm text-slate-500">
+                                          Produk tidak ditemukan.
                                         </CommandEmpty>
                                         <CommandGroup>
                                           {products.map((p) => (
                                             <CommandItem
                                               key={p.id}
-                                              value={`${p.name} ${p.sku}`}
+                                              value={`${p.name} ${p.sku || ""}`}
                                               onSelect={() => {
-                                                console.log(
-                                                  "👉 [DEBUG] KLIK PRODUK:",
-                                                  p.name,
-                                                );
                                                 field.onChange(p.id);
                                                 form.setValue(
                                                   `products.${index}.variantId`,
@@ -1375,33 +1386,38 @@ export default function AddOrderForm() {
                                                   ...prev,
                                                   [index]: false,
                                                 }));
-
-                                                // Update harga awal & Convert
                                                 updateCalculatedPrice(
                                                   index,
                                                   p,
                                                   {},
                                                   currentQty,
                                                 );
-                                              }}>
-                                              <Check
+                                              }}
+                                              className="mb-1 flex cursor-pointer items-start gap-3 rounded-lg px-3 py-3 text-left data-[selected=true]:bg-amber-50 data-[selected=true]:text-slate-900">
+                                              <span
                                                 className={cn(
-                                                  "mr-2 h-4 w-4",
+                                                  "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border",
                                                   p.id === field.value
-                                                    ? "opacity-100"
-                                                    : "opacity-0",
-                                                )}
-                                              />
-                                              <div className="flex flex-col">
-                                                <span>{p.name}</span>
-                                                <span className="text-xs text-gray-500">
-                                                  SKU: {p.sku}
+                                                    ? "border-[#975a3e] bg-[#975a3e] text-white"
+                                                    : "border-slate-200 bg-white text-transparent",
+                                                )}>
+                                                <Check className="h-3.5 w-3.5" />
+                                              </span>
+                                              <span className="min-w-0 flex-1 space-y-1">
+                                                <span className="block whitespace-normal wrap-break-words text-sm font-medium leading-5 text-slate-800">
+                                                  {p.name}
                                                 </span>
-                                              </div>
+                                                <span className="block break-all text-xs text-slate-500">
+                                                  SKU: {p.sku || "-"}
+                                                </span>
+                                              </span>
                                             </CommandItem>
                                           ))}
                                         </CommandGroup>
                                       </CommandList>
+                                      <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                                        {products.length} produk tersedia
+                                      </div>
                                     </Command>
                                   </PopoverContent>
                                 </Popover>
@@ -1409,18 +1425,17 @@ export default function AddOrderForm() {
                               </FormItem>
                             )}
                           />
-
                           {selectedProduct && (
-                            <div className="flex items-center gap-3 text-xs text-gray-500">
-                              <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                            <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-600">
+                              <span className="max-w-full break-all rounded-md border border-slate-200 bg-slate-50 px-2 py-1">
                                 SKU:{" "}
-                                <span className="font-medium text-gray-800">
+                                <span className="font-medium text-slate-800">
                                   {selectedProduct.sku || "-"}
                                 </span>
                               </span>
-                              <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                              <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1">
                                 UOM:{" "}
-                                <span className="font-medium text-gray-800">
+                                <span className="font-medium text-slate-800">
                                   {selectedProduct.uom || "-"}
                                 </span>
                               </span>
@@ -1428,13 +1443,13 @@ export default function AddOrderForm() {
                           )}
                         </div>
 
-                        <div className="md:col-span-2">
+                        <div className="lg:col-span-2">
                           <FormField
                             control={control}
                             name={`products.${index}.quantity`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="md:hidden">
+                                <FormLabel className="lg:hidden">
                                   Quantity
                                 </FormLabel>
                                 <FormControl>
@@ -1475,13 +1490,13 @@ export default function AddOrderForm() {
                           />
                         </div>
 
-                        <div className="md:col-span-3">
+                        <div className="lg:col-span-3">
                           <FormField
                             control={control}
                             name={`products.${index}.price`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="md:hidden">
+                                <FormLabel className="lg:hidden">
                                   Unit Price
                                 </FormLabel>
                                 <FormControl>
@@ -1508,11 +1523,11 @@ export default function AddOrderForm() {
                           />
                         </div>
 
-                        <div className="md:col-span-2 flex flex-col justify-center items-end h-10 pt-8 md:pt-0">
-                          <span className="md:hidden text-xs text-gray-500 mb-1">
+                        <div className="lg:col-span-2 min-w-0 flex flex-col justify-center items-end min-h-10 pt-2 lg:pt-0">
+                          <span className="lg:hidden text-xs text-gray-500 mb-1">
                             Subtotal
                           </span>
-                          <span className="font-semibold text-gray-900 font-mono">
+                          <span className="max-w-full wrap-break-words text-right font-semibold text-gray-900 font-mono">
                             {currentCurrencySymbol || "Rp"}{" "}
                             {subtotal.toLocaleString("id-ID", {
                               minimumFractionDigits: 0,
@@ -1520,7 +1535,7 @@ export default function AddOrderForm() {
                           </span>
                         </div>
 
-                        <div className="md:col-span-1 flex justify-center pt-8 md:pt-0">
+                        <div className="lg:col-span-1 flex justify-center pt-2 lg:pt-0">
                           {fields.length > 1 && (
                             <Button
                               type="button"
@@ -1674,7 +1689,11 @@ export default function AddOrderForm() {
                                                     ? "bg-blue-600 text-white shadow-md border-transparent"
                                                     : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:border-blue-400",
                                                 )}>
-                                                {val.value}
+                                                {typeof val.value === "string"
+                                                  ? val.value
+                                                      .split("|")[0]
+                                                      .trim()
+                                                  : val.value}
                                                 {Number(val.priceModifier) >
                                                   0 && (
                                                   <span
