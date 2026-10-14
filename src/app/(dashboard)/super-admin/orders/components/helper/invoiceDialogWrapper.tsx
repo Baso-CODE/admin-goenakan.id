@@ -1,14 +1,14 @@
-// file: InvoiceDialogWrapper.tsx
 "use client";
 
 import { useApi } from "@/hooks/useApi";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useInvoiceDialog } from "../../hooks/useInvoiceDialog";
+import type { NoteCategory, OrderDetail } from "../../types/order.types";
 import { GenerateInvoiceDialog } from "./GenerateInvoiceDialog";
 
 interface InvoiceDialogWrapperProps {
-  orderId: string | null; //  Harus mengizinkan null
+  orderId: string | null;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -18,100 +18,163 @@ export function InvoiceDialogWrapper({
   onClose,
   onSuccess,
 }: InvoiceDialogWrapperProps) {
-  const { fetchApi } = useApi();
-  const [order, setOrder] = useState<any | null>(null);
-  const [noteCategories, setNoteCategories] = useState<any[]>([]);
+  const { fetchApi, status } = useApi();
+  const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [noteCategories, setNoteCategories] = useState<NoteCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const requestIdRef = useRef(0);
+  const closedOrderIdRef = useRef<string | null>(null);
+  const onCloseRef = useRef(onClose);
+  const fetchApiRef = useRef(fetchApi);
 
-  // Jalankan fetch JIKA orderId ada isinya
+  onCloseRef.current = onClose;
+  fetchApiRef.current = fetchApi;
+
+  const handleClose = useCallback(() => {
+    requestIdRef.current += 1;
+    closedOrderIdRef.current = orderId;
+    setOrder(null);
+    setNoteCategories([]);
+    setIsLoading(false);
+    onCloseRef.current();
+  }, [orderId]);
+
   useEffect(() => {
-    async function loadData() {
+    if (!orderId) {
+      requestIdRef.current += 1;
+      closedOrderIdRef.current = null;
+      return;
+    }
+
+    if (status !== "authenticated") return;
+
+    if (closedOrderIdRef.current === orderId) return;
+
+    const requestId = ++requestIdRef.current;
+    let cancelled = false;
+
+    const loadData = async () => {
+      setIsLoading(true);
+
       try {
         const [resOrder, resNotes] = await Promise.all([
-          fetchApi(`/orders/${orderId}`),
-          fetchApi("/invoice-notes/categories/list"),
+          fetchApiRef.current(`/orders/${orderId}`),
+          fetchApiRef.current("/invoice-notes/categories/list"),
         ]);
 
-        if (!resOrder.ok) throw new Error("Gagal memuat detail order");
+        if (!resOrder.ok) {
+          throw new Error("Gagal memuat detail order");
+        }
 
-        const orderData = await resOrder.json();
-        setOrder(orderData);
+        const orderData: OrderDetail = await resOrder.json();
+
+        if (!orderData?.id || orderData.id !== orderId) {
+          throw new Error("Data order tidak sesuai");
+        }
+
+        let categories: NoteCategory[] = [];
 
         if (resNotes.ok) {
           const notesData = await resNotes.json();
-          setNoteCategories(notesData || []);
+          categories = Array.isArray(notesData)
+            ? notesData
+            : Array.isArray(notesData?.data)
+              ? notesData.data
+              : [];
         }
+
+        if (cancelled || requestId !== requestIdRef.current) return;
+
+        setOrder(orderData);
+        setNoteCategories(categories);
       } catch (error) {
-        console.error(error);
-        toast.error("Gagal menyiapkan data invoice");
-        handleClose();
+        if (cancelled || requestId !== requestIdRef.current) return;
+
+        console.error("Gagal menyiapkan invoice:", error);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Gagal menyiapkan data invoice",
+        );
+
+        closedOrderIdRef.current = orderId;
+        onCloseRef.current();
+      } finally {
+        if (!cancelled && requestId === requestIdRef.current) {
+          setIsLoading(false);
+        }
       }
-    }
+    };
 
-    if (orderId) {
-      loadData();
-    } else {
-      // Jika orderId kembali menjadi null, bersihkan data order lama
-      setOrder(null);
-    }
-  }, [orderId, fetchApi]);
+    void loadData();
 
-  // Fungsi perantara untuk menutup dialog
-  const handleClose = () => {
-    setOrder(null);
-    onClose();
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId, status]);
 
-  // ... (Kalkulasi Finansial tetap sama)
   const totalOrderAmount = order ? Number(order.totalAmount) : 0;
-  const totalInvoiced =
-    order?.invoices
-      ?.filter((inv: any) => inv.status !== "CANCELLED")
-      .reduce((sum: number, inv: any) => sum + Number(inv.totalAmount), 0) || 0;
 
-  const remainingToInvoice = totalOrderAmount - totalInvoiced;
-  const isFirstInvoice = order ? order.invoices?.length === 0 : true;
+  const activeInvoices = (order?.invoices ?? []).filter(
+    (invoice) => invoice.status !== "CANCELLED" && invoice.status !== "DRAFT",
+  );
 
-  const splitTotalAmountCalc = (selectedItems: any[]) =>
-    selectedItems.reduce((sum, item) => sum + item.quantity * item.price, 0);
+  const totalInvoiced = activeInvoices.reduce(
+    (sum, invoice) => sum + Number(invoice.totalAmount),
+    0,
+  );
+
+  const remainingToInvoice = Math.max(0, totalOrderAmount - totalInvoiced);
+
+  const isFirstInvoice = activeInvoices.length === 0;
 
   const invoiceDialog = useInvoiceDialog({
     order,
     totalOrderAmount,
     remainingToInvoice,
-    splitTotalAmount: splitTotalAmountCalc([] as any),
+    splitTotalAmount: 0,
     onSuccess: () => {
       onSuccess();
       handleClose();
     },
   });
 
-  const splitTotalAmount = invoiceDialog.selectedItems.reduce(
+  const { invoiceDialogOpen, setInvoiceDialogOpen, selectedItems } =
+    invoiceDialog;
+
+  const splitTotalAmount = selectedItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
     0,
   );
 
-  // Auto-open JIKA data order sudah berhasil diambil
   useEffect(() => {
-    if (order && order.id === orderId) {
-      invoiceDialog.setInvoiceDialogOpen(true);
-    }
-  }, [order, orderId]);
+    if (!orderId || !order || isLoading) return;
+    if (order.id !== orderId) return;
+    if (closedOrderIdRef.current === orderId) return;
 
-  // Pantau status onClose dari dialog
-  useEffect(() => {
-    if (order && !invoiceDialog.invoiceDialogOpen) {
-      handleClose();
-    }
-  }, [invoiceDialog.invoiceDialogOpen]);
+    setInvoiceDialogOpen(true);
+  }, [orderId, order?.id, isLoading, setInvoiceDialogOpen]);
 
-  //  Jangan return null, lebih baik return fragment kosong agar mount stabil
-  if (!order) return <></>;
+  const handleOpenChange = (open: boolean) => {
+    if (open) {
+      setInvoiceDialogOpen(true);
+      return;
+    }
+
+    if (invoiceDialog.isCreatingInvoice) return;
+
+    setInvoiceDialogOpen(false);
+    handleClose();
+  };
+
+  if (!order || order.id !== orderId || isLoading) {
+    return null;
+  }
 
   return (
     <GenerateInvoiceDialog
-      open={invoiceDialog.invoiceDialogOpen}
-      onOpenChange={invoiceDialog.setInvoiceDialogOpen}
-      // ... pass props seperti biasa
+      open={invoiceDialogOpen}
+      onOpenChange={handleOpenChange}
       order={order}
       isFirstInvoice={isFirstInvoice}
       remainingToInvoice={remainingToInvoice}
@@ -128,7 +191,7 @@ export function InvoiceDialogWrapper({
       setInvoiceDPAmount={invoiceDialog.setInvoiceDPAmount}
       customAmount={invoiceDialog.customAmount}
       setCustomAmount={invoiceDialog.setCustomAmount}
-      selectedItems={invoiceDialog.selectedItems}
+      selectedItems={selectedItems}
       setSelectedItems={invoiceDialog.setSelectedItems}
       splitPaymentCategory={invoiceDialog.splitPaymentCategory}
       setSplitPaymentCategory={invoiceDialog.setSplitPaymentCategory}

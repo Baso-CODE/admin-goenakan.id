@@ -42,6 +42,7 @@ type InvoiceDetail = {
   invoiceNumber: string | null;
   orderId: string;
   category: "DP" | "FULL_PAYMENT" | "INSTALLMENT" | "REMAINING_BALANCE";
+  billingMode?: "STANDARD" | "PARTIAL_QUANTITY";
   status: "UNPAID" | "PAID" | "OVERDUE" | "CANCELLED" | "DRAFT";
   createdAt: string;
   dueDate: string | null;
@@ -57,6 +58,7 @@ type InvoiceDetail = {
     status: string;
     category: string;
     paidAt: string | null;
+    paymentDate?: string | null;
   } | null;
   totalPreviousPaid?: number;
 
@@ -72,6 +74,19 @@ type InvoiceDetail = {
       status: string;
       totalAmount: number;
       paidAt: string | null;
+      paymentDate?: string | null;
+      billingMode?: "STANDARD" | "PARTIAL_QUANTITY";
+      items?: {
+        quantity: number;
+        orderProductId?: string | null;
+        product?: { name: string } | null;
+      }[];
+    }[];
+    products?: {
+      id: string;
+      quantity: number;
+      unitPrice: number;
+      product?: { name: string } | null;
     }[];
     createdBy?: {
       name: string | null;
@@ -103,6 +118,7 @@ type InvoiceDetail = {
   };
   items: {
     id: number;
+    orderProductId?: string | null;
     quantity: number;
     price: number;
     remarks?: string;
@@ -146,14 +162,13 @@ export default function InvoiceDetailPage() {
   const handlePrint = useReactToPrint({
     contentRef: invoiceRef,
     documentTitle: `Invoice-${invoice?.invoiceNumber || invoice?.id}`,
-    onAfterPrint: () => toast.success("PDF siap disimpan"),
+    onAfterPrint: () => toast.success("Dialog cetak telah ditutup"),
   });
 
   const loadData = useCallback(async () => {
-    if (status === "loading" || status === "unauthenticated") return;
+    if (status !== "authenticated") return;
 
     try {
-      setLoading(true);
       const res = await fetchApi(`/invoices/${id}`);
 
       if (!res.ok) throw new Error("Gagal memuat data");
@@ -173,7 +188,16 @@ export default function InvoiceDetailPage() {
   }, [loadData]);
 
   const handleMarkAsPaid = async () => {
-    if (!invoice || status !== "authenticated") return;
+    if (
+      !invoice ||
+      status !== "authenticated" ||
+      !["UNPAID", "OVERDUE"].includes(invoice.status)
+    )
+      return;
+    if (!paymentDate) {
+      toast.error("Tanggal pembayaran wajib diisi");
+      return;
+    }
     setIsPaying(true);
 
     try {
@@ -181,7 +205,7 @@ export default function InvoiceDetailPage() {
         method: "POST",
         body: JSON.stringify({
           method: paymentMethod,
-          paymentDate: new Date(paymentDate).toISOString(),
+          paymentDate: `${paymentDate}T12:00:00.000Z`,
         }),
       });
 
@@ -192,7 +216,7 @@ export default function InvoiceDetailPage() {
 
       toast.success("Invoice berhasil ditandai LUNAS");
       setIsPayDialogOpen(false);
-      loadData();
+      await loadData();
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Terjadi kesalahan saat update pembayaran");
@@ -257,12 +281,126 @@ export default function InvoiceDetailPage() {
     (acc, item) => acc + Number(item.price) * item.quantity,
     0,
   );
-  const orderTotal = invoice.order?.totalAmount ?? calculatedOrderTotal;
+  const orderTotal = Number(invoice.order?.totalAmount ?? calculatedOrderTotal);
+  const amountDue = Number(invoice.totalAmount);
+  const billingMode = invoice.billingMode ?? "STANDARD";
+  const previousInvoices = (invoice.order?.invoices ?? [])
+    .filter(
+      (inv) =>
+        inv.id < invoice.id && !["CANCELLED", "DRAFT"].includes(inv.status),
+    )
+    .sort((a, b) => a.id - b.id);
+  const priorBilled = previousInvoices.reduce(
+    (sum, inv) => sum + Number(inv.totalAmount),
+    0,
+  );
+  const remainingAfterThis = Math.max(0, orderTotal - priorBilled - amountDue);
+  const priorPaid = previousInvoices.reduce(
+    (sum, inv) => sum + (inv.status === "PAID" ? Number(inv.totalAmount) : 0),
+    0,
+  );
+  const outstandingBefore = Math.max(0, priorBilled - priorPaid);
+  const isFinalInvoice = remainingAfterThis <= 0.01;
+  const datePaid = (inv: {
+    paidAt?: string | null;
+    paymentDate?: string | null;
+  }) => inv.paidAt ?? inv.paymentDate;
+  const formatPaid = (inv: {
+    status: string;
+    paidAt?: string | null;
+    paymentDate?: string | null;
+  }) => {
+    const value = datePaid(inv);
+    return inv.status === "PAID"
+      ? value
+        ? `Paid on ${format(new Date(value), "dd MMM yyyy", { locale: idLocale })}`
+        : "Paid"
+      : "Not yet paid";
+  };
+  const rowSummary = (
+    label: string,
+    value: number,
+    qualifier?: string,
+    strong = false,
+  ) => (
+    <div className="flex gap-2 items-start" key={label}>
+      <span className="w-3 shrink-0">-</span>
+      <div className="flex-1">
+        <span className="font-semibold">{label}: </span>
+        <span className={strong ? "font-bold" : ""}>
+          {formatCurrency(value, currency)}
+        </span>
+        {qualifier && (
+          <span className="italic text-gray-600"> ({qualifier})</span>
+        )}
+      </div>
+    </div>
+  );
 
-  const previousInvoices =
-    invoice.order?.invoices
-      ?.filter((inv) => inv.id < invoice.id && inv.status !== "CANCELLED")
-      .sort((a, b) => a.id - b.id) || [];
+  const isPartial = billingMode === "PARTIAL_QUANTITY";
+  const itemCount = invoice.items.length;
+  const isMultiple = itemCount > 1;
+  const isDirect =
+    !isPartial &&
+    invoice.category === "FULL_PAYMENT" &&
+    previousInvoices.length === 0;
+  const showDueColumn = !isPartial && (!isDirect || isMultiple);
+  const showAmountColumn = !isPartial && !isDirect && isMultiple;
+  const columnCount = 5 + Number(showDueColumn) + Number(showAmountColumn);
+  const invoiceProductsLabel = (
+    items: { quantity: number; product?: { name: string } | null }[],
+  ) =>
+    items.length
+      ? items
+          .map(
+            (item) => `${item.quantity} pcs ${item.product?.name ?? "Product"}`,
+          )
+          .join(", ")
+      : "Items not available";
+  const priorItems = previousInvoices
+    .filter((prior) => prior.billingMode === "PARTIAL_QUANTITY")
+    .flatMap((prior) => prior.items ?? []);
+  const remainingProducts = (invoice.order?.products ?? [])
+    .map((product) => {
+      const billed = priorItems
+        .filter((item) => item.orderProductId === product.id)
+        .reduce((sum, item) => sum + item.quantity, 0);
+      const current = isPartial
+        ? invoice.items
+            .filter((item) => item.orderProductId === product.id)
+            .reduce((sum, item) => sum + item.quantity, 0)
+        : 0;
+      const remaining = Math.max(0, product.quantity - billed - current);
+      return { quantity: remaining, product: product.product };
+    })
+    .filter((item) => item.quantity > 0);
+  const remainingProductLabel = remainingProducts.length
+    ? invoiceProductsLabel(remainingProducts)
+    : "";
+  const summaryPreviousLabel = (
+    prior: (typeof previousInvoices)[number],
+    index: number,
+  ) => {
+    if (isPartial) {
+      const detail = prior.items?.length
+        ? ` - ${invoiceProductsLabel(prior.items)}`
+        : "";
+      return `Previous Payment (${getOrdinal(index + 1)} Partial Shipment${detail})`;
+    }
+    if (invoice.category === "REMAINING_BALANCE" && prior.category === "DP")
+      return "Down Payment";
+    if (
+      invoice.category === "INSTALLMENT" ||
+      previousInvoices.some((x) => x.category === "INSTALLMENT")
+    ) {
+      return index === 0
+        ? "1st Installment (Down Payment)"
+        : `${getOrdinal(index + 1)} Installment`;
+    }
+    return prior.category === "DP"
+      ? "Down Payment"
+      : `Previous Payment (${prior.invoiceNumber || `INV/${prior.id}`})`;
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen pb-20">
@@ -299,7 +437,7 @@ export default function InvoiceDetailPage() {
               Print / Save PDF
             </Button>
 
-            {invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
+            {["UNPAID", "OVERDUE"].includes(invoice.status) && (
               <Button
                 onClick={() => setIsPayDialogOpen(true)}
                 className="bg-green-600 hover:bg-green-700 text-white shadow-md">
@@ -316,7 +454,7 @@ export default function InvoiceDetailPage() {
         <div
           id="invoice-content"
           ref={invoiceRef}
-          className="w-[210mm] min-h-[297mm] h-auto bg-[#ffffff] text-[#1e293b] p-10 flex flex-col font-sans text-[13px] leading-relaxed relative box-border transform scale-90 md:scale-100 origin-top shadow-lg print:shadow-none print:scale-100 print:p-0"
+          className="w-[210mm] min-h-[297mm] h-auto bg-[#ffffff] text-[#1e293b] p-10 flex flex-col font-sans text-[13px] leading-relaxed relative box-border transform scale-90 md:scale-100 origin-top shadow-lg print:shadow-none print:scale-100"
           style={{
             padding: "40px",
           }}>
@@ -559,287 +697,202 @@ export default function InvoiceDetailPage() {
               </table>
             </div>
 
-            {/* 4. PRODUCT TABLE */}
-            <div className="mb-6 page-break-inside-auto">
-              <table className="w-full border-collapse border border-[#94a3b8]">
+            {/* 4. PRODUCT TABLE - Document-specific dynamic structure */}
+            <div className="mb-6">
+              <table className="w-full border-collapse border border-[#94a3b8] text-[11px] table-fixed">
                 <thead className="print:table-header-group">
                   <tr className="bg-[#f3f4f6] text-center font-bold">
-                    <th className="border border-[#94a3b8] py-2 w-8">No</th>
-                    <th className="border border-[#94a3b8] py-2">
+                    <th className="border border-[#94a3b8] p-1 w-[6%]">No.</th>
+                    <th className="border border-[#94a3b8] p-1">
                       Product Description
                     </th>
-                    <th className="border border-[#94a3b8] py-2 w-12">Qty</th>
-                    <th className="border border-[#94a3b8] py-2 w-32">
+                    <th className="border border-[#94a3b8] p-1 w-[11%]">
+                      Quantity
+                    </th>
+                    <th className="border border-[#94a3b8] p-1 w-[18%]">
                       Unit Price
                     </th>
-                    <th className="border border-[#94a3b8] py-2 w-36">
+                    {showAmountColumn && (
+                      <th className="border border-[#94a3b8] p-1 w-[17%]">
+                        Amount
+                      </th>
+                    )}
+                    <th className="border border-[#94a3b8] p-1 w-[19%]">
                       Total Amount
                     </th>
+                    {showDueColumn && (
+                      <th className="border border-[#94a3b8] p-1 w-[19%]">
+                        Amount Due
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
-                  {invoice.items.map((item, index) => (
-                    <tr
-                      key={item.id}
-                      className="text-center align-top h-15 break-inside-avoid page-break-inside-avoid">
-                      <td className="border border-[#94a3b8] py-2">
-                        {index + 1}
-                      </td>
-                      <td className="border border-[#94a3b8] py-2 px-3 text-left">
-                        <div className="font-bold mb-1">
-                          {item.product.name}
-                        </div>
-                        <div className="text-[#475569] text-[11px] space-y-1">
+                  {invoice.items.map((item, index) => {
+                    const lineAmount = Number(item.price) * item.quantity;
+                    return (
+                      <tr
+                        key={item.id}
+                        className="align-top break-inside-avoid">
+                        <td className="border border-[#94a3b8] p-2 text-center">
+                          {index + 1}
+                        </td>
+                        <td className="border border-[#94a3b8] p-2 text-left wrap-break-words">
+                          <div className="font-semibold">
+                            {item.product.name}
+                          </div>
                           {item.product.sku && (
-                            <div>SKU: {item.product.sku}</div>
+                            <div className="text-[10px] text-slate-500">
+                              SKU: {item.product.sku}
+                            </div>
                           )}
                           {item.variant && (
-                            <div>Variant: {item.variant.variantName}</div>
+                            <div className="text-[10px] text-slate-500">
+                              Variant: {item.variant.variantName}
+                            </div>
                           )}
                           {item.customization &&
                             renderCustomization(item.customization)}
                           {item.remarks && (
-                            <div className="italic text-gray-500">
-                              Note: {item.remarks}
+                            <div className="text-[10px] italic">
+                              {item.remarks}
                             </div>
                           )}
-                        </div>
-                      </td>
-                      <td className="border border-[#94a3b8] py-2">
-                        {item.quantity}
-                      </td>
-                      {/*  UPDATE: Format currency menyertakan kode mata uang */}
-                      <td className="border border-[#94a3b8] py-2 text-right px-2">
-                        {formatCurrency(Number(item.price), currency)}
-                      </td>
-                      <td className="border border-[#94a3b8] py-2 text-right px-2 font-medium">
-                        {formatCurrency(
-                          Number(item.price) * item.quantity,
-                          currency,
+                        </td>
+                        <td className="border border-[#94a3b8] p-2 text-center">
+                          {item.quantity}
+                        </td>
+                        <td className="border border-[#94a3b8] p-2 text-right wrap-break-words">
+                          {formatCurrency(Number(item.price), currency)}
+                        </td>
+                        {showAmountColumn && (
+                          <td className="border border-[#94a3b8] p-2 text-right wrap-break-words">
+                            {formatCurrency(lineAmount, currency)}
+                          </td>
                         )}
-                      </td>
-                    </tr>
-                  ))}
-
-                  <tr className="text-center bg-[#f9fafb]">
+                        {!isMultiple ? (
+                          <td className="border border-[#94a3b8] p-2 text-right font-semibold wrap-break-words">
+                            {formatCurrency(
+                              isPartial ? lineAmount : orderTotal,
+                              currency,
+                            )}
+                          </td>
+                        ) : index === 0 ? (
+                          <td
+                            rowSpan={itemCount}
+                            className="border border-[#94a3b8] p-2 text-right align-middle font-bold wrap-break-words">
+                            {formatCurrency(
+                              isPartial ? calculatedOrderTotal : orderTotal,
+                              currency,
+                            )}
+                          </td>
+                        ) : null}
+                        {showDueColumn &&
+                          (index === 0 ? (
+                            <td
+                              rowSpan={itemCount}
+                              className="border border-[#94a3b8] p-2 text-right align-middle font-bold wrap-break-words">
+                              {formatCurrency(amountDue, currency)}
+                            </td>
+                          ) : null)}
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-[#f8fafc] font-bold break-inside-avoid">
                     <td
-                      colSpan={4}
-                      className="border border-[#94a3b8] py-2 text-right px-3 font-bold text-gray-700">
+                      colSpan={columnCount - 1}
+                      className="border border-[#94a3b8] p-2 text-right">
                       Total Amount Due
                     </td>
-                    <td className="border border-[#94a3b8] py-2 text-right px-2 font-bold text-gray-900">
-                      {formatCurrency(calculatedOrderTotal, currency)}
+                    <td className="border border-[#94a3b8] p-2 text-right wrap-break-words">
+                      {formatCurrency(amountDue, currency)}
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            {/* 5. PAYMENT SUMMARY */}
-            <div className="mb-6 p-4 border border-[#94a3b8] bg-[#f8fafc] rounded-sm text-[12px] break-inside-avoid page-break-inside-avoid">
-              <div className="font-bold mb-3 uppercase border-b pb-1.5 border-[#cbd5e1] text-[#1e293b]">
-                Payment Summary
-              </div>
-              <div className="flex flex-col gap-2 text-gray-800">
-                <div className="flex items-start">
-                  <span className="w-4 mr-2">-</span>
-                  <div className="flex-1">
-                    <span className="font-semibold">
-                      Total Purchase Order Value:
-                    </span>
-                    <span>{formatCurrency(orderTotal, currency)}</span>
-                  </div>
+            {/* 5. PAYMENT SUMMARY - Full / DP / BP / Installment / Partial */}
+            {!isDirect && (
+              <div className="mb-6 p-4 border border-[#94a3b8] bg-[#f8fafc] rounded-sm text-[12px] break-inside-avoid">
+                <div className="font-bold mb-3 uppercase border-b pb-1.5 border-[#cbd5e1]">
+                  Payment Summary
                 </div>
-
-                {/* RENDER DYNAMIC PAYMENT SUMMARY BASED ON CATEGORY */}
-                {(() => {
-                  const allOrderInvoices = (invoice.order?.invoices || [])
-                    .filter((inv) => inv.status !== "CANCELLED")
-                    .sort((a, b) => a.id - b.id);
-                  const currentIndex = allOrderInvoices.findIndex(
-                    (inv) => inv.id === invoice.id,
-                  );
-                  const history =
-                    currentIndex !== -1
-                      ? allOrderInvoices.slice(0, currentIndex)
-                      : previousInvoices;
-                  const sumHistory = history.reduce(
-                    (acc, inv) => acc + Number(inv.totalAmount),
-                    0,
-                  );
-                  const remainingAfterThis =
-                    orderTotal - sumHistory - invoice.totalAmount;
-                  const isFinal = remainingAfterThis <= 0;
-
-                  // === SCENARIO: DP ===
-                  if (invoice.category === "DP") {
-                    return (
-                      <>
-                        <div className="flex items-start">
-                          <span className="w-4 mr-2">-</span>
-                          <div className="flex-1">
-                            <span className="font-semibold">
-                              Down Payment:{" "}
-                            </span>
-                            <span className="font-bold">
-                              {formatCurrency(invoice.totalAmount, currency)}
-                            </span>
-                            <span className="italic text-gray-600">
-                              (Due: Immediately)
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-start">
-                          <span className="w-4 mr-2">-</span>
-                          <div className="flex-1">
-                            <span className="font-semibold">
-                              Remaining Balance:
-                            </span>
-                            <span>
-                              {formatCurrency(
-                                remainingAfterThis > 0 ? remainingAfterThis : 0,
-                                currency,
-                              )}
-                            </span>
-                            <span className="italic text-gray-600">
-                              (Due: Upon delivery or completion)
-                            </span>
-                          </div>
-                        </div>
-                      </>
-                    );
-                  }
-
-                  // === SCENARIO: BP (REMAINING_BALANCE / FULL_PAYMENT) ===
-                  if (
-                    invoice.category === "REMAINING_BALANCE" ||
-                    invoice.category === "FULL_PAYMENT"
-                  ) {
-                    return (
-                      <>
-                        {history.map((prev, i) => (
-                          <div key={prev.id} className="flex items-start">
-                            <span className="w-4 mr-2">-</span>
-                            <div className="flex-1">
-                              <span className="font-semibold">
-                                {prev.category === "DP"
-                                  ? "Down Payment"
-                                  : "Previous Payment"}
-                                :
-                              </span>
-                              <span>
-                                {formatCurrency(prev.totalAmount, currency)}
-                              </span>
-                              <span className="italic text-gray-600">
-                                {prev.paidAt
-                                  ? ` (Paid on ${format(new Date(prev.paidAt), "dd MMM yyyy", { locale: idLocale })})`
-                                  : " (Unpaid)"}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                        <div className="flex items-start">
-                          <span className="w-4 mr-2">-</span>
-                          <div className="flex-1">
-                            <span className="font-semibold">
-                              Balance Payment:
-                            </span>
-                            <span className="font-bold">
-                              {formatCurrency(invoice.totalAmount, currency)}
-                            </span>
-                            <span className="italic text-gray-600">
-                              (Due: Immediately)
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-start">
-                          <span className="w-4 mr-2">-</span>
-                          <div className="flex-1">
-                            <span className="font-semibold">
-                              Remaining Balance:
-                            </span>
-                            <span>{formatCurrency(0, currency)}</span>
-                            <span className="italic text-gray-600">
-                              (Fully Paid upon this settlement)
-                            </span>
-                          </div>
-                        </div>
-                      </>
-                    );
-                  }
-
-                  // === SCENARIO: INSTALLMENT (CICILAN) ===
-                  if (invoice.category === "INSTALLMENT") {
-                    return (
-                      <>
-                        {history.map((prev, i) => {
-                          const isFirst = i === 0;
-                          const label = isFirst
-                            ? "1st Installment (Down Payment)"
-                            : `${getOrdinal(i + 1)} Installment`;
-                          return (
-                            <div key={prev.id} className="flex items-start">
-                              <span className="w-4 mr-2">-</span>
-                              <div className="flex-1">
-                                <span className="font-semibold">{label}: </span>
-                                <span>
-                                  {formatCurrency(prev.totalAmount, currency)}
-                                </span>
-                                <span className="italic text-gray-600">
-                                  {prev.paidAt
-                                    ? ` (Paid on ${format(new Date(prev.paidAt), "dd MMM yyyy", { locale: idLocale })})`
-                                    : " (Unpaid)"}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        {/* Current Installment */}
-                        <div className="flex items-start">
-                          <span className="w-4 mr-2">-</span>
-                          <div className="flex-1">
-                            <span className="font-semibold">
-                              {isFinal
+                <div className="flex flex-col gap-2">
+                  {rowSummary("Total Purchase Order Value", orderTotal)}
+                  {previousInvoices.map((prior, index) => (
+                    <div key={prior.id}>
+                      {rowSummary(
+                        summaryPreviousLabel(prior, index),
+                        Number(prior.totalAmount),
+                        formatPaid(prior),
+                      )}
+                    </div>
+                  ))}
+                  {isPartial
+                    ? rowSummary(
+                        `${isFinalInvoice ? "Final Billing (Final Shipment" : previousInvoices.length === 0 ? "Amount Due (1st Partial Shipment" : `Current Billing (${getOrdinal(previousInvoices.length + 1)} Partial Shipment`} - ${invoiceProductsLabel(invoice.items)})`,
+                        amountDue,
+                        invoice.status === "PAID"
+                          ? formatPaid(invoice)
+                          : "Due: Immediately",
+                        true,
+                      )
+                    : invoice.category === "DP"
+                      ? rowSummary(
+                          "Down Payment",
+                          amountDue,
+                          invoice.status === "PAID"
+                            ? formatPaid(invoice)
+                            : "Due: Immediately",
+                          true,
+                        )
+                      : invoice.category === "REMAINING_BALANCE"
+                        ? rowSummary(
+                            "Balance Payment",
+                            amountDue,
+                            invoice.status === "PAID"
+                              ? formatPaid(invoice)
+                              : "Due: Immediately",
+                            true,
+                          )
+                        : invoice.category === "FULL_PAYMENT"
+                          ? rowSummary(
+                              "Full Payment",
+                              amountDue,
+                              invoice.status === "PAID"
+                                ? formatPaid(invoice)
+                                : "Due: Immediately",
+                              true,
+                            )
+                          : rowSummary(
+                              isFinalInvoice
                                 ? "Final Installment (Balance Payment)"
-                                : `${getOrdinal(history.length + 1)} Installment`}
-                              :
-                            </span>
-                            <span className="font-bold">
-                              {formatCurrency(invoice.totalAmount, currency)}
-                            </span>
-                            <span className="italic text-gray-600">
-                              (Due: Immediately)
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Remaining Balance */}
-                        <div className="flex items-start">
-                          <span className="w-4 mr-2">-</span>
-                          <div className="flex-1">
-                            <span className="font-semibold">
-                              Remaining Balance:
-                            </span>
-                            <span>
-                              {isFinal
-                                ? formatCurrency(0, currency)
-                                : formatCurrency(remainingAfterThis, currency)}
-                            </span>
-                            <span className="italic text-gray-600">
-                              {isFinal
-                                ? " (Fully Paid upon this settlement)"
-                                : " (Due: As per Agreement)"}
-                            </span>
-                          </div>
-                        </div>
-                      </>
-                    );
-                  }
-                  return null;
-                })()}
+                                : previousInvoices.length === 0
+                                  ? "1st Installment (Down Payment)"
+                                  : `${getOrdinal(previousInvoices.length + 1)} Installment`,
+                              amountDue,
+                              invoice.status === "PAID"
+                                ? formatPaid(invoice)
+                                : "Due: Immediately",
+                              true,
+                            )}
+                  {rowSummary(
+                    isPartial && remainingProductLabel
+                      ? `Remaining Balance (${remainingProductLabel})`
+                      : "Remaining Balance",
+                    remainingAfterThis,
+                    isFinalInvoice
+                      ? "Fully invoiced upon this settlement; payment subject to confirmation"
+                      : invoice.category === "DP" || isPartial
+                        ? "Due: Upon delivery or completion"
+                        : "Due: As per Agreement",
+                  )}
+                  {outstandingBefore > 0 &&
+                    rowSummary("Previous Unpaid Invoices", outstandingBefore)}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* 6. NOTES SECTION */}
             {invoice.notes && invoice.notes.length > 0 && (
@@ -853,9 +906,9 @@ export default function InvoiceDetailPage() {
                       <span className="font-bold text-black uppercase text-[10px]">
                         {note.category.name}:
                       </span>
-                      <p className="whitespace-pre-wrap leading-relaxed">
+                      <div className="whitespace-pre-wrap leading-relaxed">
                         {note.content}
-                      </p>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -942,7 +995,7 @@ export default function InvoiceDetailPage() {
             </Button>
             <Button
               onClick={handleMarkAsPaid}
-              disabled={isPaying}
+              disabled={isPaying || !paymentDate}
               className="bg-green-600 hover:bg-green-700">
               {isPaying ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

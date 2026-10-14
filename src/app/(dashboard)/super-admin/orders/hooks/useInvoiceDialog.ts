@@ -1,5 +1,6 @@
 import { useApi } from "@/hooks/useApi";
 import { useState } from "react";
+import { toast } from "sonner";
 import { InvoiceNote, OrderDetail, SplitItem } from "../types/order.types";
 
 interface UseInvoiceDialogProps {
@@ -14,184 +15,221 @@ export function useInvoiceDialog({
   order,
   totalOrderAmount,
   remainingToInvoice,
-  splitTotalAmount,
   onSuccess,
 }: UseInvoiceDialogProps) {
-  // Dialog open
   const { fetchApi, status } = useApi();
-
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
-
-  // Standard mode
-  const [invoiceCategory, setInvoiceCategory] = useState<string>("");
+  const [invoiceCategory, setInvoiceCategory] = useState("");
   const [dpType, setDpType] = useState<"PERCENTAGE" | "FIXED">("PERCENTAGE");
-  const [invoiceDPPercent, setInvoiceDPPercent] = useState<number>(0);
-  const [invoiceDPAmount, setInvoiceDPAmount] = useState<number>(0);
-  const [customAmount, setCustomAmount] = useState<number>(0);
-
-  // Split mode
+  const [invoiceDPPercent, setInvoiceDPPercent] = useState(0);
+  const [invoiceDPAmount, setInvoiceDPAmount] = useState(0);
+  const [customAmount, setCustomAmount] = useState(0);
   const [isSplitMode, setIsSplitMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<SplitItem[]>([]);
   const [splitPaymentCategory, setSplitPaymentCategory] =
-    useState<string>("FULL_PAYMENT");
+    useState("FULL_PAYMENT");
   const [splitDpType, setSplitDpType] = useState<"PERCENTAGE" | "FIXED">(
     "PERCENTAGE",
   );
-  const [splitDpPercent, setSplitDpPercent] = useState<number>(0);
-  const [splitDpAmount, setSplitDpAmount] = useState<number>(0);
-  const [paymentDate, setPaymentDate] = useState<string>("");
-  const [paidAt, setPaidAt] = useState<string>("");
-  // Notes
+  const [splitDpPercent, setSplitDpPercent] = useState(0);
+  const [splitDpAmount, setSplitDpAmount] = useState(0);
+  const [paymentDate, setPaymentDate] = useState("");
+  const [paidAt, setPaidAt] = useState("");
   const [invoiceNotes, setInvoiceNotes] = useState<InvoiceNote[]>([]);
   const [manualInputs, setManualInputs] = useState<Record<string, string>>({});
-
-  // Loading
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
 
-  const toggleNoteTemplate = (categoryId: string, templateContent: string) => {
+  const toggleNoteTemplate = (categoryId: string, content: string) => {
     setInvoiceNotes((prev) => {
-      const existingCat = prev.find((n) => n.categoryId === categoryId);
-      if (existingCat) {
-        const contentExists = existingCat.contents.includes(templateContent);
-        const newContents = contentExists
-          ? existingCat.contents.filter((c) => c !== templateContent)
-          : [...existingCat.contents, templateContent];
+      const existing = prev.find((note) => note.categoryId === categoryId);
+      if (!existing) return [...prev, { categoryId, contents: [content] }];
 
-        if (newContents.length === 0) {
-          return prev.filter((n) => n.categoryId !== categoryId);
-        }
-        return prev.map((n) =>
-          n.categoryId === categoryId ? { ...n, contents: newContents } : n,
-        );
+      const contents = existing.contents.includes(content)
+        ? existing.contents.filter((value) => value !== content)
+        : [...existing.contents, content];
+
+      if (!contents.length) {
+        return prev.filter((note) => note.categoryId !== categoryId);
       }
-      return [...prev, { categoryId, contents: [templateContent] }];
+      return prev.map((note) =>
+        note.categoryId === categoryId ? { ...note, contents } : note,
+      );
     });
   };
 
   const addManualNote = (categoryId: string) => {
-    const text = manualInputs[categoryId];
-    if (!text || text.trim() === "") return;
-    toggleNoteTemplate(categoryId, text);
+    const content = manualInputs[categoryId]?.trim();
+    if (!content) return;
+    toggleNoteTemplate(categoryId, content);
     setManualInputs((prev) => ({ ...prev, [categoryId]: "" }));
   };
 
-  const updateItemQty = (productId: string, newQty: number) => {
+  const updateItemQty = (orderProductId: string, quantity: number) => {
     setSelectedItems((prev) =>
       prev.map((item) =>
-        item.productId === productId ? { ...item, quantity: newQty } : item,
+        item.orderProductId === orderProductId
+          ? { ...item, quantity: Math.max(1, Math.min(quantity, item.maxQty)) }
+          : item,
       ),
     );
-  };
-
-  const openDialog = () => {
-    setInvoiceCategory("");
-    setIsSplitMode(false);
-    setSelectedItems([]);
-    setPaymentDate("");
-    setPaidAt("");
-    setInvoiceDialogOpen(true);
   };
 
   const resetAndClose = () => {
     setInvoiceDialogOpen(false);
     setInvoiceCategory("");
-    setIsSplitMode(false);
-    setSelectedItems([]);
-    setSplitPaymentCategory("FULL_PAYMENT");
-    setSplitDpPercent(0);
-    setSplitDpAmount(0);
+    setDpType("PERCENTAGE");
     setInvoiceDPPercent(0);
     setInvoiceDPAmount(0);
     setCustomAmount(0);
-    setInvoiceNotes([]);
-    setManualInputs({});
+    setIsSplitMode(false);
+    setSelectedItems([]);
+    setSplitPaymentCategory("FULL_PAYMENT");
+    setSplitDpType("PERCENTAGE");
+    setSplitDpPercent(0);
+    setSplitDpAmount(0);
     setPaymentDate("");
     setPaidAt("");
+    setInvoiceNotes([]);
+    setManualInputs({});
+  };
+
+  const openDialog = () => {
+    resetAndClose();
+    setInvoiceDialogOpen(true);
   };
 
   const handleCreateInvoice = async () => {
-    if (!order) return;
-    setIsCreatingInvoice(true);
+    if (!order || status !== "authenticated" || isCreatingInvoice) return;
 
     try {
-      let finalDpPercentage: number | undefined = undefined;
-      let finalCustomAmount: number | undefined = undefined;
-      let payloadSelectedItems: any[] | undefined = undefined;
+      const billingMode = isSplitMode ? "PARTIAL_QUANTITY" : "STANDARD";
+      let category = isSplitMode ? splitPaymentCategory : invoiceCategory;
+      let dpPercentage: number | undefined;
+      let finalCustomAmount: number | undefined;
+
+      if (!category) throw new Error("Pilih jenis tagihan terlebih dahulu");
+      if (remainingToInvoice <= 0) {
+        throw new Error(
+          "Order tidak memiliki sisa nilai yang dapat ditagihkan",
+        );
+      }
 
       if (isSplitMode) {
-        if (selectedItems.length === 0) {
-          throw new Error("Pilih minimal 1 produk untuk Split Invoice.");
+        if (
+          !["FULL_PAYMENT", "INSTALLMENT", "REMAINING_BALANCE"].includes(
+            category,
+          )
+        ) {
+          throw new Error("Jenis tagihan tidak sesuai untuk Partial Quantity");
         }
-        payloadSelectedItems = selectedItems.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-        }));
+        if (!selectedItems.length) throw new Error("Pilih minimal satu produk");
 
-        if (splitPaymentCategory === "DP") {
-          if (splitDpType === "PERCENTAGE") {
-            finalDpPercentage = splitDpPercent;
-          } else if (splitTotalAmount > 0) {
-            finalDpPercentage = (splitDpAmount / splitTotalAmount) * 100;
+        const ids = selectedItems.map((item) => item.orderProductId);
+        if (new Set(ids).size !== ids.length) {
+          throw new Error("Produk yang sama tidak boleh dipilih dua kali");
+        }
+
+        for (const item of selectedItems) {
+          if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+            throw new Error("Quantity harus bilangan bulat positif");
           }
-        } else if (splitPaymentCategory === "INSTALLMENT") {
-          finalCustomAmount = customAmount;
+          if (item.quantity > item.maxQty) {
+            throw new Error("Quantity melebihi jumlah produk tersedia");
+          }
+        }
+
+        const total = selectedItems.reduce(
+          (sum, item) => sum + item.quantity * item.price,
+          0,
+        );
+        if (total <= 0 || total > remainingToInvoice + 0.01) {
+          throw new Error("Nilai produk melebihi sisa tagihan order");
         }
       } else {
-        if (invoiceCategory === "DP") {
+        if (category === "DP") {
           if (dpType === "PERCENTAGE") {
-            finalDpPercentage = invoiceDPPercent;
+            dpPercentage = invoiceDPPercent;
           } else {
-            if (totalOrderAmount > 0 && invoiceDPAmount > 0) {
-              finalDpPercentage = (invoiceDPAmount / totalOrderAmount) * 100;
-            } else {
-              throw new Error("Isi nominal DP terlebih dahulu");
-            }
+            dpPercentage = (invoiceDPAmount / totalOrderAmount) * 100;
           }
-        } else if (invoiceCategory === "INSTALLMENT") {
-          if (customAmount <= 0) {
-            throw new Error("Isi nominal tagihan terlebih dahulu");
+          if (
+            !Number.isFinite(dpPercentage) ||
+            dpPercentage <= 0 ||
+            dpPercentage > 100
+          ) {
+            throw new Error("Persentase atau nominal DP tidak valid");
+          }
+          const dpAmount = Math.floor((totalOrderAmount * dpPercentage) / 100);
+          if (dpAmount <= 0 || dpAmount > remainingToInvoice) {
+            throw new Error("DP melebihi sisa tagihan order");
+          }
+        }
+
+        if (category === "INSTALLMENT") {
+          if (
+            !Number.isFinite(customAmount) ||
+            customAmount <= 0 ||
+            customAmount > remainingToInvoice
+          ) {
+            throw new Error("Nominal cicilan tidak valid");
           }
           finalCustomAmount = customAmount;
+        }
+
+        if (
+          category === "FULL_PAYMENT" &&
+          remainingToInvoice < totalOrderAmount
+        ) {
+          throw new Error(
+            "Full Payment hanya untuk order yang belum pernah ditagihkan",
+          );
         }
       }
 
       const payload = {
         orderId: order.id,
-        category: isSplitMode ? splitPaymentCategory : invoiceCategory,
-        dpPercentage: finalDpPercentage,
+        billingMode,
+        category,
+        dpPercentage,
         customAmount: finalCustomAmount,
-        selectedItems: payloadSelectedItems,
-        paymentDate: paymentDate || undefined,
-        paidAt: paidAt || undefined,
+        selectedItems: isSplitMode
+          ? selectedItems.map(({ orderProductId, quantity }) => ({
+              orderProductId,
+              quantity,
+            }))
+          : undefined,
         notes: invoiceNotes
-          .filter((n) => n.contents.length > 0)
-          .map((n) => ({ categoryId: n.categoryId, contents: n.contents })),
+          .filter((note) => note.contents.length > 0)
+          .map((note) => ({
+            categoryId: note.categoryId,
+            contents: note.contents,
+          })),
       };
 
+      setIsCreatingInvoice(true);
       const res = await fetchApi("/invoices", {
         method: "POST",
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Gagal membuat invoice");
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Gagal membuat invoice");
       }
 
-      const { toast } = await import("sonner");
-      toast.success("Invoice berhasil dibuat!");
+      toast.success("Invoice berhasil dibuat");
       resetAndClose();
       onSuccess();
-    } catch (error: any) {
-      const { toast } = await import("sonner");
-      toast.error(error.message);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Gagal membuat invoice",
+      );
     } finally {
       setIsCreatingInvoice(false);
     }
   };
 
   return {
-    // State
     invoiceDialogOpen,
     setInvoiceDialogOpen,
     invoiceCategory,
@@ -224,7 +262,6 @@ export function useInvoiceDialog({
     manualInputs,
     setManualInputs,
     isCreatingInvoice,
-    // Actions
     openDialog,
     resetAndClose,
     handleCreateInvoice,
