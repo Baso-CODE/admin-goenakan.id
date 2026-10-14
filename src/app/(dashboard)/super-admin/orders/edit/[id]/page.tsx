@@ -38,7 +38,7 @@ import { useCurrencyConvert } from "@/hooks/use-currency-convert";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import {
   ArrowLeft,
   Bookmark,
@@ -200,7 +200,9 @@ export default function EditOrderForm() {
         initialPicId.current = orderData.clientB2BPICId || "";
 
         reset({
-          dateOrder: orderData.dateOrder,
+          dateOrder: orderData.dateOrder
+            ? String(orderData.dateOrder).slice(0, 10)
+            : "",
           salesCategory: orderData.salesCategory,
           clientPoNumber: orderData.clientPoNumber || "",
           remark: orderData.remark || "",
@@ -284,31 +286,44 @@ export default function EditOrderForm() {
   const onSubmit = async (data: OrderFormValues) => {
     try {
       setSubmitting(true);
-      const { phone, ...payload } = data;
+
+      const { phone, products, ...orderData } = data;
+
       const finalPayload = {
-        ...payload,
-        sampleFollowUps:
-          salesCategory === "SAMPLE"
-            ? sampleSteps
-                .filter((s) => s.enabled)
-                .map((s) => ({
-                  name: s.name,
-                  date: s.date,
-                  notes: s.notes,
-                  method: s.method,
-                  nextAction: s.nextAction,
-                }))
-            : [],
+        ...orderData,
+        dateOrder: data.dateOrder,
+        ...(isPending && form.formState.dirtyFields.products
+          ? { products }
+          : {}),
+        ...(salesCategory === "SAMPLE" && sampleSteps.length > 0
+          ? {
+              sampleFollowUps: sampleSteps
+                .filter((step) => step.enabled)
+                .map((step) => ({
+                  name: step.name,
+                  date: step.date,
+                  notes: step.notes,
+                  method: step.method,
+                  nextAction: step.nextAction,
+                })),
+            }
+          : {}),
       };
+
       await updateOrder(fetchApi, orderId, finalPayload);
-      toast.success("Order berhasil diupdate!");
-      if (data.salesCategory === "SAMPLE") {
-        router.push("/super-admin/orders?tab=sample");
-      } else {
-        router.push("/super-admin/orders?tab=all");
-      }
-    } catch {
-      toast.error("Gagal mengupdate order");
+
+      toast.success("Order berhasil diperbarui!");
+
+      router.push(
+        data.salesCategory === "SAMPLE"
+          ? "/super-admin/orders?tab=sample"
+          : "/super-admin/orders?tab=all",
+      );
+    } catch (error) {
+      console.error("Gagal memperbarui order:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Gagal memperbarui order",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -363,17 +378,19 @@ export default function EditOrderForm() {
                   <FormItem className="flex flex-col gap-1 mt-1.5">
                     <FormLabel>Date Order</FormLabel>
                     <DatePickerHelper
-                      date={field.value ? new Date(field.value) : undefined}
+                      date={field.value ? parseISO(field.value) : undefined}
                       setDate={(date) => {
                         field.onChange(date ? format(date, "yyyy-MM-dd") : "");
                       }}
                       placeholder="Pilih Tanggal Order"
                     />
+                    <FormDescription>
+                      Tanggal order dapat diperbarui tanpa mengubah produk.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={control}
                 name="salesCategory"
