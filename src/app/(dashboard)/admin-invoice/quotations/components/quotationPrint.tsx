@@ -62,34 +62,168 @@ export default function QuotationPrint() {
 
   const handleDownloadPDF = async () => {
     const element = invoiceRef.current;
-    if (!element) return;
+    if (!element || isDownloading) return;
 
     try {
       setIsDownloading(true);
-      toast.info("Sedang membuat PDF...");
+      toast.info("Sedang membuat PDF quotation...");
+
+      // Pastikan gambar dan font selesai dimuat sebelum membuat PDF.
+      await document.fonts.ready;
+
+      await Promise.all(
+        Array.from(element.querySelectorAll("img")).map(async (img) => {
+          if (img.complete) return;
+
+          await new Promise<void>((resolve) => {
+            img.addEventListener("load", () => resolve(), { once: true });
+            img.addEventListener("error", () => resolve(), { once: true });
+          });
+        }),
+      );
 
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
+        allowTaint: false,
         backgroundColor: "#ffffff",
+        logging: false,
+        windowWidth: Math.max(window.innerWidth, element.scrollWidth),
       });
 
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+      });
 
       const pdfWidth = 210;
-      const imgProps = pdf.getImageProperties(imgData);
-      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pdfHeight = 297;
 
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, imgHeight);
+      // Lebar gambar mengikuti kertas A4.
+      const pageWidthPx = canvas.width;
+      const pageHeightPx = Math.floor((canvas.width * pdfHeight) / pdfWidth);
 
-      const fileName = `Quotation_${data?.quotationNumber || "Draft"}.pdf`;
-      pdf.save(fileName.replace(/\//g, "-"));
+      // Konversi posisi elemen HTML ke koordinat canvas.
+      const elementRect = element.getBoundingClientRect();
+      const scaleY = canvas.height / elementRect.height;
 
-      toast.success("PDF Berhasil didownload!");
+      // Titik aman untuk memisahkan halaman:
+      // awal baris produk, notes, dan footer.
+      const breakElements = element.querySelectorAll(
+        "tbody tr[data-pdf-row], [data-pdf-section]",
+      );
+
+      const safeBreaks = Array.from(breakElements)
+        .map((node) => {
+          const rect = node.getBoundingClientRect();
+
+          return Math.floor((rect.top - elementRect.top) * scaleY);
+        })
+        .filter((position) => position > 0 && position < canvas.height)
+        .sort((a, b) => a - b);
+
+      const pageStarts: number[] = [0];
+      let currentY = 0;
+
+      while (currentY < canvas.height) {
+        const targetY = Math.min(currentY + pageHeightPx, canvas.height);
+
+        if (targetY >= canvas.height) break;
+
+        // Beri ruang 8 mm sebelum batas kertas.
+        const safetyMarginPx = Math.floor((canvas.width * 8) / pdfWidth);
+
+        // Usahakan pindah halaman sebelum baris produk.
+        const candidates = safeBreaks.filter(
+          (position) =>
+            position > currentY + pageHeightPx * 0.35 &&
+            position <= targetY - safetyMarginPx,
+        );
+
+        const nextY =
+          candidates.length > 0 ? candidates[candidates.length - 1] : targetY;
+
+        // Pengaman agar loop tidak berjalan tanpa akhir.
+        if (nextY <= currentY) break;
+
+        pageStarts.push(nextY);
+        currentY = nextY;
+      }
+
+      for (let index = 0; index < pageStarts.length; index++) {
+        const startY = pageStarts[index];
+
+        const endY =
+          index + 1 < pageStarts.length ? pageStarts[index + 1] : canvas.height;
+
+        const sliceHeight = endY - startY;
+
+        if (sliceHeight <= 0) continue;
+
+        const pageCanvas = document.createElement("canvas");
+
+        pageCanvas.width = pageWidthPx;
+        pageCanvas.height = sliceHeight;
+
+        const ctx = pageCanvas.getContext("2d");
+
+        if (!ctx) {
+          throw new Error("Gagal membuat canvas halaman PDF.");
+        }
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+
+        ctx.drawImage(
+          canvas,
+          0,
+          startY,
+          pageWidthPx,
+          sliceHeight,
+          0,
+          0,
+          pageWidthPx,
+          sliceHeight,
+        );
+
+        const imgData = pageCanvas.toDataURL("image/jpeg", 0.82);
+
+        const imgHeight = (sliceHeight * pdfWidth) / pageWidthPx;
+
+        if (index > 0) {
+          pdf.addPage();
+        }
+
+        pdf.addImage(
+          imgData,
+          "JPEG",
+          0,
+          0,
+          pdfWidth,
+          imgHeight,
+          undefined,
+          "FAST",
+        );
+
+        // Bersihkan canvas sementara.
+        pageCanvas.width = 0;
+        pageCanvas.height = 0;
+      }
+
+      const fileName =
+        `Quotation_${data?.quotationNumber || "Draft"}.pdf`.replace(
+          /[\\/:"*?<>|]/g,
+          "-",
+        );
+
+      pdf.save(fileName);
+
+      toast.success(`PDF berhasil dibuat (${pdf.getNumberOfPages()} halaman).`);
     } catch (error) {
-      console.error("PDF Error:", error);
-      toast.error("Gagal membuat PDF");
+      console.error("[Quotation PDF Error]", error);
+      toast.error("Gagal membuat PDF quotation.");
     } finally {
       setIsDownloading(false);
     }
@@ -297,6 +431,7 @@ export default function QuotationPrint() {
                     return (
                       <tr
                         key={item.id || index}
+                        data-pdf-row
                         className="align-top text-[11px] border-b border-gray-800">
                         {/* Kolom 1: Product Detail (Hanya Gambar & Link URL) */}
                         <td className="border-r border-gray-800 p-2 text-center align-top">
@@ -450,7 +585,7 @@ export default function QuotationPrint() {
               </table>
             </div>
             {/* 5. NOTES */}
-            <div className="mb-10">
+            <div data-pdf-section className="mb-10">
               <div className="font-bold text-[13px] uppercase mb-2 text-gray-800 border-b border-gray-800 inline-block pb-0.5">
                 Notes
               </div>
@@ -476,7 +611,7 @@ export default function QuotationPrint() {
           </div>
 
           {/* 6. FOOTER */}
-          <div className="mt-auto break-inside-avoid pt-4">
+          <div data-pdf-section className="mt-auto break-inside-avoid pt-4">
             <div className="flex justify-end text-center px-4">
               <div className="flex flex-col items-center">
                 <div className="mb-4 text-[12px] font-medium">
