@@ -20,6 +20,7 @@ import {
   ChevronUp,
   Clock,
   CornerDownLeft,
+  DownloadCloud,
   FileText,
   Image as ImageIcon,
   Info,
@@ -388,20 +389,39 @@ export function WaChatRoomManager({
         }));
         const sorted = [...normalized].sort((a, b) => a.timestamp - b.timestamp);
 
+        // Deduplicate messages by id or by exact (body + fromMe + timestamp within 4s)
+        const seenIds = new Set<string>();
+        const deduplicated: WaChatMessage[] = [];
+        for (const m of sorted) {
+          const mId = extractMessageId(m.id);
+          if (!mId || seenIds.has(mId)) continue;
+
+          const isDup = deduplicated.some(
+            (d) =>
+              d.fromMe === m.fromMe &&
+              d.body === m.body &&
+              Math.abs(d.timestamp - m.timestamp) <= 4
+          );
+          if (isDup) continue;
+
+          seenIds.add(mId);
+          deduplicated.push(m);
+        }
+
         // Save into local memory cache
-        messageCacheRef.current.set(chatId, sorted);
+        messageCacheRef.current.set(chatId, deduplicated);
 
         // If user is currently looking at this room, update state smoothly
         if (selectedRoomRef.current?.id === chatId) {
           setMessages((prev) => {
             if (
-              prev.length === sorted.length &&
-              prev[prev.length - 1]?.id === sorted[sorted.length - 1]?.id &&
-              prev[prev.length - 1]?.ack === sorted[sorted.length - 1]?.ack
+              prev.length === deduplicated.length &&
+              prev[prev.length - 1]?.id === deduplicated[deduplicated.length - 1]?.id &&
+              prev[prev.length - 1]?.ack === deduplicated[deduplicated.length - 1]?.ack
             ) {
               return prev; // Identical, avoid re-render
             }
-            return sorted;
+            return deduplicated;
           });
         }
       } catch {
@@ -487,19 +507,40 @@ export function WaChatRoomManager({
 
         setMessages((prev) => {
           if (prev.some((m) => extractMessageId(m.id) === payloadMsgId)) return prev;
-          // Replace matching temporary optimistic message if present
+
+          // 1. Replace matching temporary optimistic message if present
           const tempIdx = prev.findIndex(
             (m) =>
               isTempMessageId(m.id) &&
               m.fromMe &&
               m.body === payload.body
           );
-          let nextMessages: WaChatMessage[];
           if (tempIdx !== -1) {
-            nextMessages = prev.map((m, idx) => (idx === tempIdx ? newMessage : m));
-          } else {
-            nextMessages = [...prev, newMessage];
+            const nextMessages = prev.map((m, idx) => (idx === tempIdx ? newMessage : m));
+            messageCacheRef.current.set(curRoom.id, nextMessages);
+            return nextMessages;
           }
+
+          // 2. Prevent duplicate bubble if an identical outbound message was recently rendered
+          const isDuplicateOutbound = prev.some(
+            (m) =>
+              m.fromMe &&
+              m.body === payload.body &&
+              Math.abs((m.timestamp || 0) - (payload.timestamp || 0)) < 15
+          );
+          if (isDuplicateOutbound) {
+            const nextMessages = prev.map((m) =>
+              m.fromMe &&
+              m.body === payload.body &&
+              Math.abs((m.timestamp || 0) - (payload.timestamp || 0)) < 15
+                ? { ...m, id: payloadMsgId, ack: payload.ack || m.ack || 1 }
+                : m
+            );
+            messageCacheRef.current.set(curRoom.id, nextMessages);
+            return nextMessages;
+          }
+
+          const nextMessages = [...prev, newMessage];
           messageCacheRef.current.set(curRoom.id, nextMessages);
           return nextMessages;
         });
@@ -720,6 +761,39 @@ export function WaChatRoomManager({
     [selectedRoom, selectedSessionId]
   );
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncHistory = async () => {
+    if (!selectedSessionId) {
+      toast.error("Pilih sesi WhatsApp terlebih dahulu");
+      return;
+    }
+    try {
+      setIsSyncing(true);
+      const res = await fetch(
+        `/api/wa/chats/sync?sessionId=${encodeURIComponent(selectedSessionId)}`,
+        { method: "POST" }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || "Gagal menyinkronkan riwayat chat");
+      }
+      const { messagesSynced = 0, messagesSkipped = 0 } = data?.data || {};
+      toast.success(
+        `Sinkronisasi selesai! ${messagesSynced} pesan baru berhasil disimpan ke database (${messagesSkipped} sudah ada).`,
+        { duration: 5000 }
+      );
+      await fetchChatRooms(selectedSessionId);
+      if (selectedRoomRef.current) {
+        await fetchRoomMessages(selectedRoomRef.current.id);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menyinkronkan riwayat");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const filteredRooms = useMemo(() => {
     if (!searchQuery.trim()) return rooms;
     const q = searchQuery.toLowerCase();
@@ -791,8 +865,24 @@ export function WaChatRoomManager({
           <Button
             size="sm"
             variant="outline"
+            onClick={handleSyncHistory}
+            disabled={isSyncing || !isSessionConnected}
+            className="h-8 text-xs text-stone-700 bg-white hover:bg-stone-50 border-stone-300 gap-1.5"
+            title="Tarik seluruh riwayat obrolan dari WhatsApp ke database PostgreSQL"
+          >
+            {isSyncing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+            ) : (
+              <DownloadCloud className="w-3.5 h-3.5 text-stone-500" />
+            )}
+            <span>{isSyncing ? "Menyinkronkan..." : "Tarik Riwayat"}</span>
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
             onClick={() => fetchChatRooms(selectedSessionId)}
-            disabled={isRoomsLoading}
+            disabled={isRoomsLoading || isSyncing}
             className="h-8 text-xs text-stone-600"
             title="Segarkan daftar obrolan"
           >
@@ -876,6 +966,14 @@ export function WaChatRoomManager({
                             </span>
                           </div>
 
+                          {room.phoneNumber && room.phoneNumber !== room.name && (
+                            <p className="text-[10px] text-stone-400 font-mono leading-none truncate mt-0.5">
+                              {room.phoneNumber.startsWith("62")
+                                ? `+62 ${room.phoneNumber.slice(2)}`
+                                : room.phoneNumber}
+                            </p>
+                          )}
+
                           <div className="flex items-center justify-between gap-2 mt-1">
                             <p className="text-[11px] text-stone-500 truncate leading-tight">
                               {room.lastMessage?.fromMe && (
@@ -923,7 +1021,11 @@ export function WaChatRoomManager({
                           )}
                         </h3>
                         <p className="text-[10px] text-stone-400 font-mono">
-                          {selectedRoom.id.replace("@c.us", "").replace("@lid", "")}
+                          {selectedRoom.phoneNumber
+                            ? (selectedRoom.phoneNumber.startsWith("62")
+                                ? `+62 ${selectedRoom.phoneNumber.slice(2)}`
+                                : selectedRoom.phoneNumber)
+                            : selectedRoom.id.replace("@c.us", "").replace("@lid", "")}
                         </p>
                       </div>
                     </div>

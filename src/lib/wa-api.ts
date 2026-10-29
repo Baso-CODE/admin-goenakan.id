@@ -9,7 +9,11 @@ const getBaseUrl = (): string => {
 };
 
 const getApiKey = (): string => {
-  return process.env.WA_API_KEY || "";
+  return (
+    process.env.WA_API_KEY ||
+    process.env.API_KEY ||
+    "catha_secret_key_change_me"
+  );
 };
 
 export class WaApiError extends Error {
