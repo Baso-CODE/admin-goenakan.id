@@ -1,10 +1,10 @@
 /**
- * Server-side helper to communicate with Catha WhatsApp Middleware API (wa-api.goenakan.tech)
+ * Server-side helper to communicate with Catha WhatsApp Middleware API (wa-api.goenakan.id)
  * Injects WA_API_KEY header and enforces timeouts.
  */
 
 const getBaseUrl = (): string => {
-  const url = process.env.WA_API_URL || "https://wa-api.goenakan.tech";
+  const url = process.env.WA_API_URL || "https://wa-api.goenakan.id";
   return url.replace(/\/+$/, "");
 };
 
