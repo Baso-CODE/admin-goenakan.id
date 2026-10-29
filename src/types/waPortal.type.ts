@@ -103,6 +103,7 @@ export interface CreateWebhookPayload {
 export interface WaChatRoom {
   id: string;
   name: string;
+  phoneNumber?: string;
   picture?: string | null;
   isGroup: boolean;
   unreadCount: number;
