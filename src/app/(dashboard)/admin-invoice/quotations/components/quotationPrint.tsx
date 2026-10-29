@@ -124,6 +124,24 @@ export default function QuotationPrint() {
         .filter((position) => position > 0 && position < canvas.height)
         .sort((a, b) => a - b);
 
+      // Ambil posisi hyperlink dari HTML sebelum membuat halaman PDF.
+      const pdfLinks = Array.from(
+        element.querySelectorAll<HTMLAnchorElement>("a[data-pdf-link]"),
+      ).map((anchor) => {
+        const rect = anchor.getBoundingClientRect();
+
+        const scaleX = canvas.width / elementRect.width;
+        const scaleY = canvas.height / elementRect.height;
+
+        return {
+          url: anchor.dataset.pdfLink || anchor.href,
+          x: (rect.left - elementRect.left) * scaleX,
+          y: (rect.top - elementRect.top) * scaleY,
+          width: rect.width * scaleX,
+          height: rect.height * scaleY,
+        };
+      });
+
       const pageStarts: number[] = [0];
       let currentY = 0;
 
@@ -206,6 +224,27 @@ export default function QuotationPrint() {
           undefined,
           "FAST",
         );
+
+        // Tambahkan hyperlink yang dapat diklik pada halaman PDF.
+        const mmPerPixel = pdfWidth / pageWidthPx;
+
+        for (const link of pdfLinks) {
+          // Pastikan link berada sepenuhnya pada halaman saat ini.
+          if (link.y < startY || link.y + link.height > endY) {
+            continue;
+          }
+
+          const xMm = link.x * mmPerPixel;
+          const yMm = (link.y - startY) * mmPerPixel;
+          const widthMm = link.width * mmPerPixel;
+          const heightMm = link.height * mmPerPixel;
+
+          if (widthMm <= 0 || heightMm <= 0) continue;
+
+          pdf.link(xMm, yMm, widthMm, heightMm, {
+            url: link.url,
+          });
+        }
 
         // Bersihkan canvas sementara.
         pageCanvas.width = 0;
@@ -419,7 +458,17 @@ export default function QuotationPrint() {
                 </thead>
                 <tbody>
                   {data.items?.map((item: any, index: number) => {
-                    const imageUrl = item.imageUrl;
+                    const imageUrl =
+                      item.imageUrl ||
+                      item.variant?.images?.[0]?.url ||
+                      item.product?.images?.[0]?.url ||
+                      null;
+
+                    const productUrl =
+                      item.productUrl ||
+                      (item.product?.slug
+                        ? `https://goenakan.id/en/products/${encodeURIComponent(item.product.slug)}`
+                        : null);
                     const itemQty = Number(item.quantity) || 0;
                     const itemPrice = Number(item.unitPrice) || 0;
                     const tiers = Array.isArray(item.tiers) ? item.tiers : [];
@@ -433,30 +482,39 @@ export default function QuotationPrint() {
                         key={item.id || index}
                         data-pdf-row
                         className="align-top text-[11px] border-b border-gray-800">
-                        {/* Kolom 1: Product Detail (Hanya Gambar & Link URL) */}
+                        {/* Kolom 1: Product Detail */}
                         <td className="border-r border-gray-800 p-2 text-center align-top">
-                          {imageUrl ? (
-                            <img
-                              src={imageUrl}
-                              alt={item.productName}
-                              className="w-24 h-24 object-contain mx-auto"
-                              crossOrigin="anonymous"
-                            />
-                          ) : (
-                            <div className="text-gray-400 italic text-[9px] mt-8">
-                              No Image
-                            </div>
-                          )}
+                          <div className="flex flex-col items-center justify-start gap-2">
+                            {imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={
+                                  item.productName ||
+                                  item.product?.name ||
+                                  "Product Image"
+                                }
+                                className="w-24 h-24 object-contain mx-auto"
+                                crossOrigin="anonymous"
+                                referrerPolicy="no-referrer"
+                                loading="eager"
+                              />
+                            ) : (
+                              <div className="w-24 h-24 flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-400 text-[10px] italic">
+                                No Image
+                              </div>
+                            )}
 
-                          {item.product?.slug && (
-                            <a
-                              href={`https://goenakan.id/en/products/${item.product.slug}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-1.5 block text-[9px] text-blue-600 hover:underline">
-                              View Product Page
-                            </a>
-                          )}
+                            {productUrl && (
+                              <a
+                                href={productUrl}
+                                data-pdf-link={productUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block text-[10px] text-blue-600 underline break-all">
+                                View Product Page
+                              </a>
+                            )}
+                          </div>
                         </td>
 
                         {/* Kolom 2: Product Specification */}
