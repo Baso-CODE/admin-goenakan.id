@@ -2,7 +2,14 @@
 
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
-import { CalendarIcon, Eye, FileText, NotebookPen, Search } from "lucide-react";
+import {
+  CalendarIcon,
+  Eye,
+  FileText,
+  NotebookPen,
+  Search,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -36,6 +43,7 @@ import {
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
+import { ConfirmDeleteDialog } from "../../components/confirmDeleteDialog";
 
 //  UPDATE: Sesuaikan tipe data dengan kembalian API terbaru
 type Invoice = {
@@ -91,6 +99,10 @@ export default function InvoicesPage() {
   // === STATE ===
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
+  // Delete Invoice
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -144,6 +156,61 @@ export default function InvoicesPage() {
     status,
     fetchApi,
   ]);
+
+  // ============================================
+  // DELETE INVOICE
+  // ============================================
+
+  const handleCloseDeleteDialog = () => {
+    if (isDeleting) return;
+
+    setSelectedInvoice(null);
+  };
+
+  const handleDeleteInvoice = async () => {
+    if (!selectedInvoice || isDeleting) return;
+
+    if (selectedInvoice.status === "PAID") {
+      toast.error("Invoice yang sudah dibayar tidak dapat dihapus.");
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      const response = await fetchApi(`/invoices/${selectedInvoice.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+
+        throw new Error(errorData.message || "Gagal menghapus invoice.");
+      }
+
+      toast.success("Invoice berhasil dihapus.");
+
+      setSelectedInvoice(null);
+
+      // Jika invoice terakhir pada halaman ini dihapus,
+      // kembali ke halaman sebelumnya.
+      if (invoices.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        await fetchInvoices();
+      }
+    } catch (error) {
+      console.error("Delete invoice error:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Terjadi kesalahan saat menghapus invoice.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   useEffect(() => {
     fetchInvoices();
@@ -459,14 +526,33 @@ export default function InvoicesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Link href={`/admin-invoice/invoices/${inv.id}`}>
+                        <div className="flex items-center justify-center gap-1">
+                          {/* DETAIL INVOICE */}
                           <Button
+                            asChild
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-blue-600 hover:bg-blue-50">
-                            <Eye className="h-4 w-4" />
+                            className="h-8 w-8 text-blue-600 hover:bg-blue-50"
+                            title="Detail Invoice">
+                            <Link href={`/admin-invoice/invoices/${inv.id}`}>
+                              <Eye className="h-4 w-4" />
+                            </Link>
                           </Button>
-                        </Link>
+
+                          {/* DELETE INVOICE */}
+                          {inv.status !== "PAID" && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              disabled={isDeleting}
+                              onClick={() => setSelectedInvoice(inv)}
+                              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              title="Hapus Invoice">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -505,6 +591,20 @@ export default function InvoicesPage() {
           </div>
         </div>
       )}
+      {/* ============================================
+          CONFIRM DELETE INVOICE
+          ============================================ */}
+      <ConfirmDeleteDialog
+        isOpen={selectedInvoice !== null}
+        onClose={handleCloseDeleteDialog}
+        onConfirm={handleDeleteInvoice}
+        isLoading={isDeleting}
+        title="Hapus Invoice?"
+        description={`Apakah Anda yakin ingin menghapus invoice ${
+          selectedInvoice?.invoiceNumber || `INV/${selectedInvoice?.id ?? "-"}`
+        }?`}
+        warningMessage="Invoice beserta semua item dan catatannya akan dihapus permanen. Tindakan ini tidak dapat dibatalkan."
+      />
     </div>
   );
 }

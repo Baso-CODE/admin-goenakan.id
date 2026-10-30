@@ -121,10 +121,17 @@ type InvoiceDetail = {
     orderProductId?: string | null;
     quantity: number;
     price: number;
-    remarks?: string;
-    customization?: any;
-    product: { name: string; sku: string };
-    variant?: { variantName: string; sku: string };
+    remarks?: string | null;
+    selectedAttributes?: unknown;
+    customization?: unknown;
+    product: {
+      name: string;
+      sku: string;
+    };
+    variant?: {
+      variantName: string;
+      sku: string;
+    } | null;
   }[];
   notes: {
     id: string;
@@ -133,8 +140,110 @@ type InvoiceDetail = {
   }[];
 };
 
-const renderCustomization = (customization: any) => {
-  return null;
+const renderCustomization = (
+  selectedAttributes: unknown,
+  customization?: unknown,
+) => {
+  const parseValue = (value: unknown): unknown => {
+    if (typeof value !== "string") return value;
+
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  };
+
+  const formatValue = (value: unknown): string => {
+    if (value === null || value === undefined) return "";
+
+    if (typeof value === "string" || typeof value === "number") {
+      return String(value);
+    }
+
+    if (typeof value === "boolean") {
+      return value ? "Yes" : "No";
+    }
+
+    if (Array.isArray(value)) {
+      return value.map(formatValue).filter(Boolean).join(", ");
+    }
+
+    if (typeof value === "object") {
+      const record = value as Record<string, unknown>;
+
+      if (record.value !== undefined) {
+        return formatValue(record.value);
+      }
+
+      if (record.name !== undefined) {
+        return formatValue(record.name);
+      }
+
+      return Object.values(record).map(formatValue).filter(Boolean).join(", ");
+    }
+
+    return "";
+  };
+
+  const renderEntries = (value: unknown) => {
+    const parsed = parseValue(value);
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+
+    return Object.entries(parsed as Record<string, unknown>)
+      .filter(([key, val]) => {
+        return (
+          !["freightMode", "resolvedAttributes"].includes(key) &&
+          val !== null &&
+          val !== undefined &&
+          val !== ""
+        );
+      })
+      .map(([key, val]) => {
+        const text = formatValue(val);
+
+        if (!text) return null;
+
+        return (
+          <div key={key} className="text-[10px] text-slate-600">
+            <span className="font-medium">{key}: </span>
+            <span>{text}</span>
+          </div>
+        );
+      });
+  };
+
+  const attributes = renderEntries(selectedAttributes);
+  const customizations = renderEntries(customization);
+
+  if (!attributes?.some(Boolean) && !customizations?.some(Boolean)) {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 space-y-1">
+      {attributes?.some(Boolean) && (
+        <div>
+          <div className="text-[10px] font-semibold text-slate-700">
+            Selected Attributes
+          </div>
+          {attributes}
+        </div>
+      )}
+
+      {customizations?.some(Boolean) && (
+        <div>
+          <div className="text-[10px] font-semibold text-slate-700">
+            Customization
+          </div>
+          {customizations}
+        </div>
+      )}
+    </div>
+  );
 };
 
 // Helper untuk format (1st, 2nd, 3rd, 4th)
@@ -751,8 +860,10 @@ export default function InvoiceDetailPage() {
                               Variant: {item.variant.variantName}
                             </div>
                           )}
-                          {item.customization &&
-                            renderCustomization(item.customization)}
+                          {renderCustomization(
+                            item.selectedAttributes,
+                            item.customization,
+                          )}
                           {item.remarks && (
                             <div className="text-[10px] italic">
                               {item.remarks}
