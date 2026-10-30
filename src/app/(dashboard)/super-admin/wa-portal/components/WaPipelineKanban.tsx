@@ -34,10 +34,12 @@ export const WaPipelineKanban: React.FC<WaPipelineKanbanProps> = ({
   const [activeDragOverStageId, setActiveDragOverStageId] = useState<string | null>(null);
 
   const fetchBoard = useCallback(async (silent = false) => {
-    if (!sessionId) return;
     try {
       if (!silent) setIsLoading(true);
-      const res = await fetch(`/api/wa/pipeline/board?sessionId=${encodeURIComponent(sessionId)}`);
+      const url = sessionId
+        ? `/api/wa/pipeline/board?sessionId=${encodeURIComponent(sessionId)}`
+        : `/api/wa/pipeline/board`;
+      const res = await fetch(url);
       if (!res.ok) {
         throw new Error("Gagal mengambil data board");
       }
