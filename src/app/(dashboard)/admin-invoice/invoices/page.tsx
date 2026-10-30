@@ -11,7 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +42,9 @@ import {
 } from "@/components/ui/table";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
+import { useCachedApi } from "@/hooks/useCachedApi";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
 import { ConfirmDeleteDialog } from "../../components/confirmDeleteDialog";
 
 //  UPDATE: Sesuaikan tipe data dengan kembalian API terbaru
@@ -96,70 +98,100 @@ const getStatusBadgeVariant = (status: string) => {
 
 export default function InvoicesPage() {
   const { fetchApi, status } = useApi();
-  // === STATE ===
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const queryClient = useQueryClient();
 
-  // Delete Invoice
+  // ==========================================
+  // STATE DELETE INVOICE
+  // ==========================================
+
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [loading, setLoading] = useState(true);
+  // ==========================================
+  // FILTER STATE
+  // ==========================================
 
-  // Filters State
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 800);
+
   const [page, setPage] = useState(1);
+
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
 
-  // === FETCH INVOICES ===
-  const fetchInvoices = useCallback(async () => {
-    if (status === "loading" || status === "unauthenticated") return;
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-    setLoading(true);
-    try {
-      // Build Query Params
-      const params = new URLSearchParams({
-        page: page.toString(),
-        take: "10",
-      });
+  // ==========================================
+  // BUILD QUERY PARAMS
+  // ==========================================
 
-      if (debouncedSearch) params.append("search", debouncedSearch);
-      if (statusFilter !== "ALL") params.append("status", statusFilter);
-      if (categoryFilter !== "ALL") params.append("category", categoryFilter);
-      if (startDate) params.append("startDate", startDate);
-      if (endDate) params.append("endDate", endDate);
+  const params = new URLSearchParams({
+    page: String(page),
+    take: "10",
+  });
 
-      const res = await fetchApi(`/invoices?${params}`);
+  const searchValue = String(debouncedSearch ?? "").trim();
 
-      if (!res.ok) throw new Error("Failed to fetch invoices");
+  if (searchValue) {
+    params.set("search", searchValue);
+  }
 
-      const result = await res.json();
-      setInvoices(result.data || []);
-      setMeta(result.meta);
-    } catch (error) {
-      console.error(error);
-      toast.error("Gagal memuat data invoice");
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    page,
-    debouncedSearch,
-    statusFilter,
-    categoryFilter,
-    startDate,
-    endDate,
-    status,
-    fetchApi,
-  ]);
+  if (statusFilter !== "ALL") {
+    params.set("status", statusFilter);
+  }
 
-  // ============================================
-  // DELETE INVOICE
-  // ============================================
+  if (categoryFilter !== "ALL") {
+    params.set("category", categoryFilter);
+  }
+
+  if (startDate) {
+    params.set("startDate", startDate);
+  }
+
+  if (endDate) {
+    params.set("endDate", endDate);
+  }
+
+  const endpoint = `/invoices?${params.toString()}`;
+
+  // ==========================================
+  // TANSTACK QUERY - INVOICE LIST
+  // ==========================================
+
+  type InvoiceResponse = {
+    data: Invoice[];
+    meta: Meta;
+  };
+
+  const {
+    data: invoiceResponse,
+    isLoading: loading,
+    isFetching,
+    error: queryError,
+  } = useCachedApi<InvoiceResponse>(["invoices", "list", endpoint], endpoint, {
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ==========================================
+  // DATA UNTUK JSX
+  // ==========================================
+
+  const invoices: Invoice[] = invoiceResponse?.data ?? [];
+
+  const meta: Meta | null = invoiceResponse?.meta ?? null;
+
+  const error = queryError
+    ? queryError instanceof Error
+      ? queryError.message
+      : "Gagal mengambil data invoice."
+    : null;
+
+  // ==========================================
+  // CLOSE DELETE DIALOG
+  // ==========================================
 
   const handleCloseDeleteDialog = () => {
     if (isDeleting) return;
@@ -167,37 +199,63 @@ export default function InvoicesPage() {
     setSelectedInvoice(null);
   };
 
+  // ==========================================
+  // DELETE INVOICE
+  // ==========================================
+
   const handleDeleteInvoice = async () => {
-    if (!selectedInvoice || isDeleting) return;
+    if (!selectedInvoice || isDeleting || status !== "authenticated") {
+      return;
+    }
 
     if (selectedInvoice.status === "PAID") {
       toast.error("Invoice yang sudah dibayar tidak dapat dihapus.");
       return;
     }
 
-    setIsDeleting(true);
+    const invoiceId = selectedInvoice.id;
 
     try {
-      const response = await fetchApi(`/invoices/${selectedInvoice.id}`, {
+      setIsDeleting(true);
+
+      const response = await fetchApi(`/invoices/${invoiceId}`, {
         method: "DELETE",
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+      const result = await response.json().catch(() => ({}));
 
-        throw new Error(errorData.message || "Gagal menghapus invoice.");
+      if (!response.ok) {
+        throw new Error(result.message || "Gagal menghapus invoice.");
       }
 
-      toast.success("Invoice berhasil dihapus.");
+      toast.success(result.message || "Invoice berhasil dihapus.");
 
+      // Tutup dialog setelah berhasil
       setSelectedInvoice(null);
 
-      // Jika invoice terakhir pada halaman ini dihapus,
+      // ======================================
+      // INVALIDASI CACHE
+      // ======================================
+
+      // Perbarui daftar invoice.
+      await queryClient.invalidateQueries({
+        queryKey: ["invoices"],
+      });
+
+      // Invoice berkaitan dengan data Order.
+      await queryClient.invalidateQueries({
+        queryKey: ["orders"],
+      });
+
+      // Invalidasi cache detail invoice.
+      await queryClient.invalidateQueries({
+        queryKey: ["invoice-detail", invoiceId],
+      });
+
+      // Jika invoice terakhir di halaman terhapus,
       // kembali ke halaman sebelumnya.
       if (invoices.length === 1 && page > 1) {
         setPage((prev) => prev - 1);
-      } else {
-        await fetchInvoices();
       }
     } catch (error) {
       console.error("Delete invoice error:", error);
@@ -211,11 +269,6 @@ export default function InvoicesPage() {
       setIsDeleting(false);
     }
   };
-
-  useEffect(() => {
-    fetchInvoices();
-  }, [fetchInvoices]);
-
   // === RENDER ===
   return (
     <div className="space-y-6 w-full mx-auto pb-10">
@@ -466,6 +519,14 @@ export default function InvoicesPage() {
                       </TableCell>
                     </TableRow>
                   ))
+                ) : error ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={8}
+                      className="h-24 text-center text-red-600">
+                      Gagal memuat invoice: {error}
+                    </TableCell>
+                  </TableRow>
                 ) : invoices.length === 0 ? (
                   <TableRow>
                     <TableCell
@@ -567,33 +628,32 @@ export default function InvoicesPage() {
       {meta && (
         <div className="flex items-center justify-between px-2 pt-4">
           <div className="text-xs text-muted-foreground">
-            Halaman <strong>{meta.page}</strong> dari
-            <strong>{meta.totalPage}</strong> • Total
-            <strong>{meta.total}</strong> Data
+            Halaman <strong>{meta.page}</strong> dari{" "}
+            <strong>{Math.max(1, meta.totalPage)}</strong>
+            {" • "} Total <strong>{meta.total}</strong> Data
           </div>
+
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => p - 1)}
+              disabled={!meta.hasPrevious || loading || isFetching}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
               className="h-8 text-xs">
               Previous
             </Button>
+
             <Button
               variant="outline"
               size="sm"
-              disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
+              disabled={!meta.hasNext || loading || isFetching}
+              onClick={() => setPage((prev) => prev + 1)}
               className="h-8 text-xs">
               Next
             </Button>
           </div>
         </div>
       )}
-      {/* ============================================
-          CONFIRM DELETE INVOICE
-          ============================================ */}
       <ConfirmDeleteDialog
         isOpen={selectedInvoice !== null}
         onClose={handleCloseDeleteDialog}

@@ -4,7 +4,7 @@ import { useApi } from "@/hooks/useApi";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmCancelDialog } from "@/app/(dashboard)/components/confirmCancelDialog";
@@ -43,8 +43,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useDebounce } from "@/helper/debounce";
+import { useCachedApi } from "@/hooks/useCachedApi";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/formatCurrency";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarIcon,
   Eye,
@@ -118,123 +120,185 @@ const getStatusColor = (status: string) => {
 };
 
 export default function TableCombinedOrder() {
-  const { fetchApi, status } = useApi();
+  const { fetchApi } = useApi();
+  const queryClient = useQueryClient();
 
-  // === STATE ===
-  const [orders, setOrders] = useState<CombinedOrder[]>([]);
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [loading, setLoading] = useState(true);
+  // ==========================================
+  // STATE UI
+  // ==========================================
+
   const [exporting, setExporting] = useState(false);
 
-  // Filters State
+  // ==========================================
+  // FILTERS STATE
+  // ==========================================
+
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 800);
+
   const [page, setPage] = useState(1);
+
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
-    [],
-  );
+
   const [selectedChannelId, setSelectedChannelId] = useState<string>("ALL");
+
   const [selectedInvoiceOrderId, setSelectedInvoiceOrderId] = useState<
     string | null
   >(null);
 
-  //  State tambahan untuk Dialog Cancel Order
+  // ==========================================
+  // CANCEL ORDER STATE
+  // ==========================================
+
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
+
   const [isCancelling, setIsCancelling] = useState(false);
 
-  useEffect(() => {
-    const fetchPurchaseChannels = async () => {
-      if (status !== "authenticated") return;
-      try {
-        const res = await fetchApi("/purchase-channels/list");
-        if (res.ok) {
-          const data = await res.json();
-          setPurchaseChannels(Array.isArray(data) ? data : data.data || []);
-        }
-      } catch (error) {
-        console.error("Gagal memuat purchase channels", error);
-      }
-    };
+  // ==========================================
+  // FETCH PURCHASE CHANNELS - TANSTACK QUERY
+  // ==========================================
 
-    fetchPurchaseChannels();
-  }, [status, fetchApi]);
+  type PurchaseChannelResponse =
+    | PurchaseChannel[]
+    | {
+        data: PurchaseChannel[];
+      };
 
-  // === FETCH ORDERS ===
-  const fetchOrders = async () => {
-    if (status !== "authenticated") return;
+  const { data: purchaseChannelsResponse, isLoading: isLoadingChannels } =
+    useCachedApi<PurchaseChannelResponse>(
+      ["purchase-channels", "list"],
+      "/purchase-channels/list",
+      {
+        staleTime: 10 * 60 * 1000,
+      },
+    );
 
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        take: "10",
-      });
+  const purchaseChannels: PurchaseChannel[] = Array.isArray(
+    purchaseChannelsResponse,
+  )
+    ? purchaseChannelsResponse
+    : (purchaseChannelsResponse?.data ?? []);
 
-      if (debouncedSearch && debouncedSearch[0])
-        params.append("search", debouncedSearch[0]);
-      if (startDate) params.append("startDate", startDate);
-      if (endDate) params.append("endDate", endDate);
-      if (selectedChannelId && selectedChannelId !== "ALL") {
-        params.append("purchaseChannelId", selectedChannelId);
-      }
+  // ==========================================
+  // BUILD ORDER QUERY PARAMS
+  // ==========================================
 
-      const res = await fetchApi(`/orders/combined?${params}`);
+  const params = new URLSearchParams({
+    page: String(page),
+    take: "10",
+  });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to fetch combined orders");
-      }
+  // useDebounce yang sudah kamu gunakan
+  // menghasilkan array, sehingga memakai [0].
+  const searchValue = debouncedSearch?.[0] || "";
 
-      const result = await res.json();
+  if (searchValue) {
+    params.set("search", searchValue);
+  }
 
-      setOrders(result.data || []);
-      setMeta(result.meta);
-    } catch (error) {
-      console.error(error);
-      toast.error("Gagal memuat data order gabungan");
-    } finally {
-      setLoading(false);
-    }
+  if (startDate) {
+    params.set("startDate", startDate);
+  }
+
+  if (endDate) {
+    params.set("endDate", endDate);
+  }
+
+  if (selectedChannelId !== "ALL") {
+    params.set("purchaseChannelId", selectedChannelId);
+  }
+
+  const endpoint = `/orders/combined?${params.toString()}`;
+
+  // ==========================================
+  // FETCH COMBINED ORDERS - TANSTACK QUERY
+  // ==========================================
+
+  type CombinedOrderResponse = {
+    data: CombinedOrder[];
+    meta: Meta;
   };
 
-  useEffect(() => {
-    fetchOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    page,
-    debouncedSearch,
-    startDate,
-    endDate,
-    selectedChannelId,
-    status,
-    fetchApi,
-  ]);
+  const {
+    data: orderResponse,
+    isLoading: loading,
+    isFetching,
+    refetch: fetchOrders,
+    error: ordersError,
+  } = useCachedApi<CombinedOrderResponse>(
+    ["orders", "combined", endpoint],
+    endpoint,
+    {
+      staleTime: 5 * 60 * 1000,
+    },
+  );
 
-  // === HANDLER EXPORT ===
+  // ==========================================
+  // DATA UNTUK JSX TABEL
+  // ==========================================
+
+  const orders: CombinedOrder[] = orderResponse?.data ?? [];
+
+  const meta: Meta | null = orderResponse?.meta ?? null;
+
+  // ==========================================
+  // HANDLER EXPORT
+  // ==========================================
+
   const handleExport = async () => {
     toast.info("Fitur export untuk tabel gabungan sedang disiapkan!");
   };
 
-  // ===  HANDLER CONFIRM CANCEL ORDER ===
+  // ==========================================
+  // HANDLER CONFIRM CANCEL ORDER
+  // ==========================================
+
   const handleConfirmCancel = async () => {
-    if (!cancelOrderId) return;
+    if (!cancelOrderId || isCancelling) return;
+
+    const orderId = cancelOrderId;
 
     try {
       setIsCancelling(true);
-      const res = await fetchApi(`/orders/${cancelOrderId}/cancel`, {
+
+      const res = await fetchApi(`/orders/${orderId}/cancel`, {
         method: "PATCH",
       });
 
-      if (!res.ok) throw new Error("Gagal membatalkan order");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+
+        throw new Error(errorData.message || "Gagal membatalkan order");
+      }
 
       toast.success("Order berhasil dibatalkan");
+
       setCancelOrderId(null);
-      fetchOrders(); // Muat ulang tabel
+
+      // ======================================
+      // INVALIDASI CACHE ORDER LIST
+      // ======================================
+
+      await queryClient.invalidateQueries({
+        queryKey: ["orders"],
+      });
+
+      // ======================================
+      // INVALIDASI CACHE ORDER DETAIL
+      // ======================================
+
+      await queryClient.invalidateQueries({
+        queryKey: ["order-detail", orderId],
+      });
     } catch (error) {
-      console.error(error);
-      toast.error("Terjadi kesalahan saat membatalkan order");
+      console.error("Cancel order error:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Terjadi kesalahan saat membatalkan order",
+      );
     } finally {
       setIsCancelling(false);
     }
@@ -702,47 +766,77 @@ export default function TableCombinedOrder() {
         </CardContent>
       </Card>
 
-      {/* Pagination Footer */}
+      {/* ==========================================
+    PAGINATION FOOTER
+========================================== */}
       {meta && (
         <div className="flex items-center justify-between px-2">
           <div className="text-sm text-muted-foreground">
             Showing Page <strong>{meta.page}</strong> of{" "}
-            <strong>{Math.ceil(meta.total / meta.perPage)}</strong> (
-            {meta.total} items)
+            <strong>{Math.max(1, Math.ceil(meta.total / meta.perPage))}</strong>{" "}
+            ({meta.total} items)
           </div>
+
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => p - 1)}>
+              disabled={!meta.hasPrevious || loading}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
               Previous
             </Button>
+
             <Button
               variant="outline"
               size="sm"
-              disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}>
+              disabled={!meta.hasNext || loading}
+              onClick={() => setPage((prev) => prev + 1)}>
               Next
             </Button>
           </div>
         </div>
       )}
 
+      {/* ==========================================
+    CREATE INVOICE DIALOG
+========================================== */}
       {selectedInvoiceOrderId && (
         <InvoiceDialogWrapper
           orderId={selectedInvoiceOrderId}
           onClose={() => setSelectedInvoiceOrderId(null)}
-          onSuccess={() => {
-            fetchOrders();
+          onSuccess={async () => {
+            const orderId = selectedInvoiceOrderId;
+
+            setSelectedInvoiceOrderId(null);
+
+            // Refresh cache semua tabel order.
+            await queryClient.invalidateQueries({
+              queryKey: ["orders"],
+            });
+
+            // Refresh cache detail order terkait.
+            await queryClient.invalidateQueries({
+              queryKey: ["order-detail", orderId],
+            });
+
+            // Refresh cache daftar invoice.
+            await queryClient.invalidateQueries({
+              queryKey: ["invoices"],
+            });
           }}
         />
       )}
 
-      {/*  DIALOG KONFIRMASI CANCEL ORDER */}
+      {/* ==========================================
+    CONFIRM CANCEL ORDER
+========================================== */}
       <ConfirmCancelDialog
         isOpen={Boolean(cancelOrderId)}
-        onClose={() => setCancelOrderId(null)}
+        onClose={() => {
+          if (!isCancelling) {
+            setCancelOrderId(null);
+          }
+        }}
         onConfirm={handleConfirmCancel}
         isLoading={isCancelling}
       />

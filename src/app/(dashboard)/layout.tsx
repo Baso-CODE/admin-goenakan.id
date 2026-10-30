@@ -1,3 +1,4 @@
+import { QueryProvider } from "@/components/providers/ query-provider";
 import { authOptions } from "@/lib/authOptions";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
@@ -23,7 +24,9 @@ export default async function DashboardGuardLayout({
 
   return (
     <PermissionRouteGuard>
-      <DashboardLayoutClient>{children}</DashboardLayoutClient>
+      <DashboardLayoutClient>
+        <QueryProvider>{children}</QueryProvider>
+      </DashboardLayoutClient>
     </PermissionRouteGuard>
   );
 }

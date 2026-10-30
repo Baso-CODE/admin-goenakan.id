@@ -14,7 +14,7 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,9 @@ import {
 } from "@/components/ui/popover";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
+import { useCachedApi } from "@/hooks/useCachedApi";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
 type ReplacementOrder = {
@@ -83,65 +85,88 @@ interface ReplacementExportQuery {
 
 export default function TableReplacementOrder() {
   const { fetchApi, status } = useApi();
+  const queryClient = useQueryClient();
 
-  // === STATE ===
-  const [replacements, setReplacements] = useState<ReplacementOrder[]>([]);
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [loading, setLoading] = useState(true);
+  // ==========================================
+  // UI STATE
+  // ==========================================
+
   const [exporting, setExporting] = useState(false);
 
-  // State untuk Hapus Data
+  // ==========================================
+  // DELETE STATE
+  // ==========================================
+
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Filters State
+  // ==========================================
+  // FILTER STATE
+  // ==========================================
+
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 800);
+
   const [page, setPage] = useState(1);
+
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
-  // === FETCH REPLACEMENT ORDERS ===
-  const fetchReplacements = async () => {
-    if (status !== "authenticated") return;
+  // ==========================================
+  // BUILD QUERY PARAMS
+  // ==========================================
 
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        take: "10",
-      });
+  const params = new URLSearchParams({
+    page: String(page),
+    take: "10",
+  });
 
-      if (debouncedSearch) params.append("search", debouncedSearch);
-      if (startDate) params.append("startDate", startDate);
-      if (endDate) params.append("endDate", endDate);
+  const searchValue = String(debouncedSearch ?? "").trim();
 
-      // Endpoint API mengarah ke router replacement-orders
-      const res = await fetchApi(`/replacement-orders/all?${params}`);
+  if (searchValue) {
+    params.set("search", searchValue);
+  }
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(
-          errData.message || "Failed to fetch replacement orders",
-        );
-      }
+  if (startDate) {
+    params.set("startDate", startDate);
+  }
 
-      const result = await res.json();
-      setReplacements(result.data || []);
-      setMeta(result.meta);
-    } catch (error) {
-      console.error(error);
-      toast.error("Gagal memuat data Replacement Order");
-    } finally {
-      setLoading(false);
-    }
+  if (endDate) {
+    params.set("endDate", endDate);
+  }
+
+  const endpoint = `/replacement-orders/all?${params.toString()}`;
+
+  // ==========================================
+  // TANSTACK QUERY - REPLACEMENT ORDERS
+  // ==========================================
+
+  type ReplacementOrderResponse = {
+    data: ReplacementOrder[];
+    meta: Meta;
   };
 
-  useEffect(() => {
-    fetchReplacements();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, startDate, endDate, status, fetchApi]);
+  const {
+    data: replacementResponse,
+    isLoading: loading,
+    isFetching,
+    isError,
+    error,
+  } = useCachedApi<ReplacementOrderResponse>(
+    ["replacement-orders", "list", endpoint],
+    endpoint,
+    {
+      staleTime: 5 * 60 * 1000,
+    },
+  );
 
+  // ==========================================
+  // DATA UNTUK JSX
+  // ==========================================
+
+  const replacements: ReplacementOrder[] = replacementResponse?.data ?? [];
+
+  const meta: Meta | null = replacementResponse?.meta ?? null;
   // === HANDLER EXPORT (Persiapan jika backend sudah ada endpoint export) ===
   const handleExport = async () => {
     setExporting(true);
@@ -150,7 +175,9 @@ export default function TableReplacementOrder() {
 
       if (startDate) exportFilters.startDate = startDate;
       if (endDate) exportFilters.endDate = endDate;
-      if (debouncedSearch) exportFilters.search = debouncedSearch;
+      if (searchValue) {
+        exportFilters.search = searchValue;
+      }
 
       const queryString = new URLSearchParams(
         exportFilters as Record<string, string>,
@@ -194,30 +221,64 @@ export default function TableReplacementOrder() {
     }
   };
 
-  // === HANDLER DELETE ===
-  const handleDelete = async () => {
-    if (!deleteId || status !== "authenticated") return;
+  // ==========================================
+  // DELETE REPLACEMENT ORDER
+  // ==========================================
 
-    setIsDeleting(true);
+  const handleDelete = async () => {
+    if (!deleteId || isDeleting || status !== "authenticated") {
+      return;
+    }
+
+    const replacementId = deleteId;
+
     try {
-      const response = await fetchApi(`/replacement-orders/${deleteId}`, {
-        method: "DELETE", // Pastikan endpoint DELETE sudah dibuat di backend ya!
+      setIsDeleting(true);
+
+      const response = await fetchApi(`/replacement-orders/${replacementId}`, {
+        method: "DELETE",
       });
 
+      const result = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || "Gagal menghapus data");
+        throw new Error(result.message || "Gagal menghapus Replacement Order");
       }
 
-      toast.success("Data Replacement Order berhasil dihapus");
-      setPage(1);
-      fetchReplacements();
-    } catch (error: any) {
-      console.error("❌ Error delete data:", error);
-      toast.error(error.message || "Terjadi kesalahan saat menghapus data");
+      toast.success(result.message || "Replacement Order berhasil dihapus");
+
+      // Tutup dialog setelah berhasil.
+      setDeleteId(null);
+
+      // ==========================================
+      // INVALIDASI CACHE
+      // ==========================================
+
+      await queryClient.invalidateQueries({
+        queryKey: ["replacement-orders"],
+      });
+
+      // Jika penghapusan memengaruhi data Order Management,
+      // tandai cache daftar order sebagai stale.
+      await queryClient.invalidateQueries({
+        queryKey: ["orders"],
+      });
+
+      // Jika data terakhir di halaman ini terhapus,
+      // kembali ke halaman sebelumnya.
+      if (replacements.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      }
+    } catch (error) {
+      console.error("Delete Replacement Order error:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Terjadi kesalahan saat menghapus Replacement Order",
+      );
     } finally {
       setIsDeleting(false);
-      setDeleteId(null);
     }
   };
 
@@ -526,23 +587,27 @@ export default function TableReplacementOrder() {
       {meta && (
         <div className="flex items-center justify-between px-2">
           <div className="text-sm text-muted-foreground">
-            Showing Page <strong>{meta.page}</strong> of
-            <strong>{Math.ceil(meta.total / meta.perPage) || 1}</strong> (
-            {meta.total} total items)
+            Showing Page <strong>{meta.page}</strong> of{" "}
+            <strong>
+              {Math.max(1, Math.ceil(meta.total / (meta.perPage || 10)))}
+            </strong>{" "}
+            ({meta.total} total items)
           </div>
+
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => p - 1)}>
+              disabled={!meta.hasPrevious || loading || isFetching}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
               Previous
             </Button>
+
             <Button
               variant="outline"
               size="sm"
-              disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}>
+              disabled={!meta.hasNext || loading || isFetching}
+              onClick={() => setPage((prev) => prev + 1)}>
               Next
             </Button>
           </div>

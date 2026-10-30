@@ -13,7 +13,7 @@ import {
   Search,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ import {
 import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
+import { useCachedApi } from "@/hooks/useCachedApi";
 import { cn } from "@/lib/utils";
 
 // === TYPES ===
@@ -97,55 +98,78 @@ const getStatusColor = (status: string) => {
 export default function TableOrderSample() {
   const { fetchApi, status } = useApi();
 
-  // === STATE ===
-  const [orders, setOrders] = useState<OrderSample[]>([]);
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [loading, setLoading] = useState(true);
+  // ==========================================
+  // STATE UI
+  // ==========================================
+
   const [exporting, setExporting] = useState(false);
+
+  // ==========================================
+  // FILTER STATE
+  // ==========================================
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 800);
+
   const [page, setPage] = useState(1);
+
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
 
-  // === FETCH ORDERS (SAMPLE ONLY) ===
-  const fetchOrders = async () => {
-    if (status !== "authenticated") return;
+  // ==========================================
+  // BUILD QUERY PARAMS
+  // ==========================================
 
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        take: "10",
-        salesCategory: "SAMPLE",
-      });
+  const params = new URLSearchParams({
+    page: String(page),
+    take: "10",
+    salesCategory: "SAMPLE",
+  });
 
-      if (debouncedSearch) params.append("search", debouncedSearch);
-      if (startDate)
-        params.append("startDate", format(startDate, "yyyy-MM-dd"));
-      if (endDate) params.append("endDate", format(endDate, "yyyy-MM-dd"));
-      const res = await fetchApi(`/orders/all?${params}`);
+  const searchValue = String(debouncedSearch ?? "").trim();
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to fetch orders");
-      }
+  if (searchValue) {
+    params.set("search", searchValue);
+  }
 
-      const result = await res.json();
-      setOrders(result.data || []);
-      setMeta(result.meta);
-    } catch (error) {
-      console.error(error);
-      toast.error("Gagal memuat data sample");
-    } finally {
-      setLoading(false);
-    }
+  if (startDate) {
+    params.set("startDate", format(startDate, "yyyy-MM-dd"));
+  }
+
+  if (endDate) {
+    params.set("endDate", format(endDate, "yyyy-MM-dd"));
+  }
+
+  const endpoint = `/orders/all?${params.toString()}`;
+
+  // ==========================================
+  // TANSTACK QUERY - SAMPLE ORDERS
+  // ==========================================
+
+  type SampleOrderResponse = {
+    data: OrderSample[];
+    meta: Meta;
   };
 
-  useEffect(() => {
-    fetchOrders();
-  }, [page, debouncedSearch, startDate, endDate, status, fetchApi]);
+  const {
+    data: sampleResponse,
+    isLoading: loading,
+    isFetching,
+  } = useCachedApi<SampleOrderResponse>(
+    ["orders", "sample", endpoint],
+    endpoint,
+    {
+      staleTime: 5 * 60 * 1000,
+    },
+  );
+
+  // ==========================================
+  // DATA UNTUK JSX
+  // ==========================================
+
+  const orders: OrderSample[] = sampleResponse?.data ?? [];
+
+  const meta: Meta | null = sampleResponse?.meta ?? null;
 
   // === HANDLER EXPORT (SAMPLE ONLY) ===
   const handleExport = async () => {
@@ -158,8 +182,9 @@ export default function TableOrderSample() {
 
       if (startDate) exportFilters.startDate = format(startDate, "yyyy-MM-dd");
       if (endDate) exportFilters.endDate = format(endDate, "yyyy-MM-dd");
-      if (debouncedSearch) exportFilters.search = debouncedSearch;
-
+      if (searchValue) {
+        exportFilters.search = searchValue;
+      }
       const queryString = new URLSearchParams(
         exportFilters as Record<string, string>,
       ).toString();
@@ -491,23 +516,27 @@ export default function TableOrderSample() {
       {meta && (
         <div className="flex items-center justify-between px-2">
           <div className="text-sm text-muted-foreground">
-            Page <strong>{meta.page}</strong> of
-            <strong>{Math.ceil(meta.total / meta.perPage)}</strong> (
-            {meta.total} samples)
+            Page <strong>{meta.page}</strong> of{" "}
+            <strong>
+              {Math.max(1, Math.ceil(meta.total / (meta.perPage || 10)))}
+            </strong>{" "}
+            ({meta.total} samples)
           </div>
+
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => p - 1)}>
+              disabled={!meta.hasPrevious || loading || isFetching}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
               Previous
             </Button>
+
             <Button
               variant="outline"
               size="sm"
-              disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}>
+              disabled={!meta.hasNext || loading || isFetching}
+              onClick={() => setPage((prev) => prev + 1)}>
               Next
             </Button>
           </div>

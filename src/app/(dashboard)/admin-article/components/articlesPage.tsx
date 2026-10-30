@@ -22,10 +22,12 @@ import {
 } from "@/components/ui/table";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
+import { useCachedApi } from "@/hooks/useCachedApi";
 import { formatDate } from "@/utils/formatDate";
+import { useQueryClient } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 type Article = {
@@ -60,131 +62,187 @@ type Meta = {
 
 export default function ArticlesSection() {
   const { fetchApi, status } = useApi();
+  const queryClient = useQueryClient();
 
-  // --- STATE UNTUK TABLE & FILTER ---
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [loading, setLoading] = useState(false);
+  // ==========================================
+  // STATE FILTER & PAGINATION
+  // ==========================================
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 800);
+
   const [page, setPage] = useState(1);
 
-  //  STATE UNTUK NILAI FILTER
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedAuthor, setSelectedAuthor] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
 
-  //  STATE UNTUK DATA MASTER DROPDOWN
-  const [categories, setCategories] = useState<any[]>([]);
-  const [authors, setAuthors] = useState<any[]>([]);
+  // ==========================================
+  // DELETE STATE
+  // ==========================================
 
-  // --- STATE UNTUK DELETE ---
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  //  FUNGSI LOAD MASTER DATA (Untuk Dropdown)
-  useEffect(() => {
-    async function loadFilters() {
-      if (status !== "authenticated") return;
-      try {
-        // Sesuaikan endpoint /users dengan API kamu yang mengembalikan list author
-        const [catRes, authRes] = await Promise.all([
-          fetchApi("/article-categories/list"),
-          fetchApi("/articles/authors"),
-        ]);
+  // ==========================================
+  // FETCH ARTICLE CATEGORIES
+  // ==========================================
 
-        if (catRes.ok) {
-          const catData = await catRes.json();
-          setCategories(catData.data || catData);
-        }
-        if (authRes.ok) {
-          const authData = await authRes.json();
-          setAuthors(authData.data || authData);
-        }
-      } catch (err) {
-        console.error("Gagal memuat data filter", err);
-      }
-    }
-    loadFilters();
-  }, [status, fetchApi]);
+  type ArticleCategory = {
+    id: string;
+    name_id: string;
+    name_en?: string | null;
+  };
 
-  // --- FUNGSI FETCH DATA ---
-  const fetchArticles = useCallback(async () => {
-    if (status === "loading" || status === "unauthenticated") return;
+  type ArticleAuthor = {
+    id: string;
+    name: string;
+  };
 
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        take: "10",
-      });
+  type ListResponse<T> =
+    | T[]
+    | {
+        data: T[];
+      };
 
-      if (debouncedSearch.trim()) {
-        params.append("search", debouncedSearch.trim());
-      }
+  const { data: categoryResponse } = useCachedApi<
+    ListResponse<ArticleCategory>
+  >(["article-categories", "list"], "/article-categories/list", {
+    staleTime: 10 * 60 * 1000,
+  });
 
-      //  Masukkan filter ke dalam parameter API
-      if (selectedCategory !== "all")
-        params.append("categoryId", selectedCategory);
-      if (selectedAuthor !== "all") params.append("authorId", selectedAuthor);
-      if (selectedStatus !== "all") params.append("published", selectedStatus);
+  const categories: ArticleCategory[] = Array.isArray(categoryResponse)
+    ? categoryResponse
+    : (categoryResponse?.data ?? []);
 
-      const res = await fetchApi(`/articles?${params}`);
+  // ==========================================
+  // FETCH ARTICLE AUTHORS
+  // ==========================================
 
-      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+  const { data: authorResponse } = useCachedApi<ListResponse<ArticleAuthor>>(
+    ["articles", "authors"],
+    "/articles/authors",
+    {
+      staleTime: 10 * 60 * 1000,
+    },
+  );
 
-      const result = await res.json();
-      setArticles(result.data || []);
-      setMeta(result.meta);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Unknown error");
-      toast.error("Failed to load articles");
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    page,
-    debouncedSearch,
-    selectedCategory,
-    selectedAuthor,
-    selectedStatus,
-    status,
-    fetchApi,
-  ]);
+  const authors: ArticleAuthor[] = Array.isArray(authorResponse)
+    ? authorResponse
+    : (authorResponse?.data ?? []);
 
-  //  Reset halaman ke 1 jika filter berubah
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, selectedCategory, selectedAuthor, selectedStatus]);
+  // ==========================================
+  // BUILD QUERY PARAMS
+  // ==========================================
 
-  useEffect(() => {
-    fetchArticles();
-  }, [fetchArticles]);
+  const params = new URLSearchParams({
+    page: String(page),
+    take: "10",
+  });
 
-  // --- FUNGSI HANDLE DELETE ---
+  const searchValue = String(debouncedSearch ?? "").trim();
+
+  if (searchValue) {
+    params.set("search", searchValue);
+  }
+
+  if (selectedCategory !== "all") {
+    params.set("categoryId", selectedCategory);
+  }
+
+  if (selectedAuthor !== "all") {
+    params.set("authorId", selectedAuthor);
+  }
+
+  if (selectedStatus !== "all") {
+    params.set("published", selectedStatus);
+  }
+
+  const endpoint = `/articles?${params.toString()}`;
+
+  // ==========================================
+  // TANSTACK QUERY - ARTICLES
+  // ==========================================
+
+  type ArticleResponse = {
+    data: Article[];
+    meta: Meta;
+  };
+
+  const {
+    data: articleResponse,
+    isLoading: loading,
+    isFetching,
+    error: queryError,
+  } = useCachedApi<ArticleResponse>(["articles", "list", endpoint], endpoint, {
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ==========================================
+  // DATA UNTUK JSX
+  // ==========================================
+
+  const articles: Article[] = articleResponse?.data ?? [];
+
+  const meta: Meta | null = articleResponse?.meta ?? null;
+
+  const error = queryError
+    ? queryError instanceof Error
+      ? queryError.message
+      : "Gagal mengambil data artikel."
+    : null;
+
+  // ==========================================
+  // DELETE ARTICLE
+  // ==========================================
+
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || isDeleting || status !== "authenticated") {
+      return;
+    }
 
-    setIsDeleting(true);
+    const articleId = deleteId;
+
     try {
-      const res = await fetchApi(`/articles/${deleteId}`, {
+      setIsDeleting(true);
+
+      const res = await fetchApi(`/articles/${articleId}`, {
         method: "DELETE",
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to delete article");
+        const errorData = await res.json().catch(() => ({}));
+
+        throw new Error(errorData.message || "Gagal menghapus artikel.");
       }
 
-      toast.success("Article berhasil dihapus!");
+      toast.success("Artikel berhasil dihapus!");
+
       setDeleteId(null);
-      fetchArticles();
+
+      // ==========================================
+      // INVALIDASI CACHE
+      // ==========================================
+
+      await queryClient.invalidateQueries({
+        queryKey: ["articles", "list"],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["article-detail", articleId],
+      });
+
+      // Jika artikel terakhir pada halaman dihapus,
+      // kembali ke halaman sebelumnya.
+      if (articles.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      }
     } catch (error) {
-      console.error("Delete Error:", error);
-      toast.error("Gagal menghapus Article.");
+      console.error("Delete Article Error:", error);
+
+      toast.error(
+        error instanceof Error ? error.message : "Gagal menghapus artikel.",
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -217,7 +275,10 @@ export default function ArticlesSection() {
                 type="text"
                 placeholder="Search article title..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
                 className="pl-9 w-full"
               />
             </div>
@@ -228,7 +289,10 @@ export default function ArticlesSection() {
               <div className="w-full sm:w-44">
                 <Select
                   value={selectedCategory}
-                  onValueChange={setSelectedCategory}>
+                  onValueChange={(value) => {
+                    setSelectedCategory(value);
+                    setPage(1);
+                  }}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Semua Kategori" />
                   </SelectTrigger>
@@ -247,7 +311,10 @@ export default function ArticlesSection() {
               <div className="w-full sm:w-44">
                 <Select
                   value={selectedAuthor}
-                  onValueChange={setSelectedAuthor}>
+                  onValueChange={(value) => {
+                    setSelectedAuthor(value);
+                    setPage(1);
+                  }}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Semua Penulis" />
                   </SelectTrigger>
@@ -266,7 +333,10 @@ export default function ArticlesSection() {
               <div className="w-full sm:w-44">
                 <Select
                   value={selectedStatus}
-                  onValueChange={setSelectedStatus}>
+                  onValueChange={(value) => {
+                    setSelectedStatus(value);
+                    setPage(1);
+                  }}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Semua Status" />
                   </SelectTrigger>
@@ -416,26 +486,32 @@ export default function ArticlesSection() {
         </CardContent>
       </Card>
 
-      {/* === PAGINATION === */}
+      {/* ==========================================
+          PAGINATION - TANSTACK QUERY
+          ========================================== */}
       {meta && (
         <div className="flex justify-between items-center p-4 border-t text-sm text-muted-foreground">
-          <p className="text-sm text-muted-foreground">
-            Page {meta.page} of {Math.ceil(meta.total / meta.perPage) || 1}
+          <p>
+            Page <strong>{meta.page}</strong> of{" "}
+            <strong>
+              {Math.max(1, Math.ceil(meta.total / (meta.perPage || 10)))}
+            </strong>
           </p>
 
           <div className="space-x-2">
             <Button
               size="sm"
               variant="outline"
-              disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              disabled={!meta.hasPrevious || loading || isFetching}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
               Previous
             </Button>
+
             <Button
               size="sm"
               variant="outline"
-              disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}>
+              disabled={!meta.hasNext || loading || isFetching}
+              onClick={() => setPage((prev) => prev + 1)}>
               Next
             </Button>
           </div>
@@ -445,10 +521,16 @@ export default function ArticlesSection() {
       {/* === DELETE DIALOG === */}
       <ConfirmDeleteDialog
         isOpen={deleteId !== null}
-        onClose={() => setDeleteId(null)}
+        onClose={() => {
+          if (!isDeleting) {
+            setDeleteId(null);
+          }
+        }}
         onConfirm={handleDelete}
         isLoading={isDeleting}
-        warningMessage="Apakah Anda yakin ingin menghapus artikel ini? Data yang sudah dihapus tidak dapat dikembalikan."
+        title="Hapus Artikel?"
+        description="Apakah Anda yakin ingin menghapus artikel ini secara permanen?"
+        warningMessage="Data yang sudah dihapus tidak dapat dikembalikan."
       />
     </div>
   );
