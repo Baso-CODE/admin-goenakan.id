@@ -100,6 +100,45 @@ export interface CreateWebhookPayload {
   events: string[];
 }
 
+export interface WaPipelineStage {
+  id: string;
+  sessionId: string;
+  name: string;
+  color: string;
+  orderIndex: number;
+  isWon: boolean;
+  isLost: boolean;
+  leadCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WaLabel {
+  id: string;
+  sessionId: string;
+  name: string;
+  color: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WaPipelineLead {
+  id: string;
+  phoneNumber: string;
+  name: string;
+  pushName?: string | null;
+  pictureUrl?: string | null;
+  stageId?: string | null;
+  labels: WaLabel[];
+  lastMessage?: string;
+  lastMessageTimestamp?: number;
+  updatedAt?: string;
+}
+
+export interface WaPipelineBoardStage extends WaPipelineStage {
+  leads: WaPipelineLead[];
+}
+
 export interface WaChatRoom {
   id: string;
   name: string;
@@ -108,6 +147,12 @@ export interface WaChatRoom {
   isGroup: boolean;
   unreadCount: number;
   timestamp: number;
+  stage?: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
+  labels?: WaLabel[];
   lastMessage?: {
     id: string;
     body: string;
