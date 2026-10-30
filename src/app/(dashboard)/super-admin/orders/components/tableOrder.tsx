@@ -15,7 +15,7 @@ import {
   ShoppingCart,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +56,9 @@ import {
 } from "@/components/ui/select";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
+import { useCachedApi } from "@/hooks/useCachedApi";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { PurchaseChannel } from "../types/order.types";
 import { InvoiceDialogWrapper } from "./helper/invoiceDialogWrapper";
@@ -132,103 +134,116 @@ const getStatusColor = (status: string) => {
 
 export default function TableOrder() {
   const { fetchApi, status } = useApi();
+  const queryClient = useQueryClient();
 
-  // === STATE ===
-  const [orders, setOrders] = useState<Order[]>([]);
+  // ==========================================
+  // UI STATE
+  // ==========================================
 
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  // Filters State
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 800);
-  const [page, setPage] = useState(1);
 
   const [selectedInvoiceOrderId, setSelectedInvoiceOrderId] = useState<
     string | null
   >(null);
-  const salesCategory = "SALES";
 
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  // ==========================================
+  // FILTER STATE
+  // ==========================================
 
-  //  2. STATE UNTUK MENYIMPAN DAFTAR PURCHASE CHANNEL
-  const [purchaseChannels, setPurchaseChannels] = useState<PurchaseChannel[]>(
-    [],
-  );
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 800);
+
+  const [page, setPage] = useState(1);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   const [selectedChannelId, setSelectedChannelId] = useState<string>("ALL");
 
-  //  3. FETCH PURCHASE CHANNELS SAAT HALAMAN DIMUAT
-  useEffect(() => {
-    const fetchPurchaseChannels = async () => {
-      if (status !== "authenticated") return;
-      try {
-        const res = await fetchApi("/purchase-channels/list");
-        if (res.ok) {
-          const data = await res.json();
-          // Menyesuaikan apakah response berupa array langsung atau terbungkus di dalam property .data
-          setPurchaseChannels(Array.isArray(data) ? data : data.data || []);
-        }
-      } catch (error) {
-        console.error("Gagal memuat purchase channels", error);
-      }
-    };
+  const salesCategory = "SALES";
 
-    fetchPurchaseChannels();
-  }, [status, fetchApi]);
-  // === FETCH ORDERS ===
-  const fetchOrders = async () => {
-    if (status !== "authenticated") return;
+  // ==========================================
+  // FETCH PURCHASE CHANNELS
+  // ==========================================
 
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        take: "10",
-        salesCategory: salesCategory, // Selalu kirim "SALES"
-      });
+  type PurchaseChannelResponse =
+    | PurchaseChannel[]
+    | {
+        data: PurchaseChannel[];
+      };
 
-      if (debouncedSearch) params.append("search", debouncedSearch);
-      if (startDate) params.append("startDate", startDate);
-      if (endDate) params.append("endDate", endDate);
+  const { data: purchaseChannelsResponse } =
+    useCachedApi<PurchaseChannelResponse>(
+      ["purchase-channels", "list"],
+      "/purchase-channels/list",
+      {
+        staleTime: 10 * 60 * 1000,
+      },
+    );
 
-      //  4. MASUKKAN PURCHASE CHANNEL KE PARAMETER URL JIKA DIPILIH DAN BUKAN "ALL"
-      if (selectedChannelId && selectedChannelId !== "ALL") {
-        params.append("purchaseChannelId", selectedChannelId);
-      }
+  const purchaseChannels: PurchaseChannel[] = Array.isArray(
+    purchaseChannelsResponse,
+  )
+    ? purchaseChannelsResponse
+    : (purchaseChannelsResponse?.data ?? []);
 
-      const res = await fetchApi(`/orders/all?${params}`);
+  // ==========================================
+  // BUILD QUERY PARAMS
+  // ==========================================
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to fetch orders");
-      }
+  const params = new URLSearchParams({
+    page: String(page),
+    take: "10",
+    salesCategory,
+  });
 
-      const result = await res.json();
-      setOrders(result.data || []);
-      setMeta(result.meta);
-    } catch (error) {
-      console.error(error);
-      toast.error("Gagal memuat data order");
-    } finally {
-      setLoading(false);
-    }
+  // useDebounce pada TableOrder sebelumnya digunakan
+  // langsung sebagai string.
+  const searchValue = String(debouncedSearch ?? "").trim();
+
+  if (searchValue) {
+    params.set("search", searchValue);
+  }
+
+  if (startDate) {
+    params.set("startDate", startDate);
+  }
+
+  if (endDate) {
+    params.set("endDate", endDate);
+  }
+
+  if (selectedChannelId !== "ALL") {
+    params.set("purchaseChannelId", selectedChannelId);
+  }
+
+  const endpoint = `/orders/all?${params.toString()}`;
+
+  // ==========================================
+  // TANSTACK QUERY - SALES ORDERS
+  // ==========================================
+
+  type OrderResponse = {
+    data: Order[];
+    meta: Meta;
   };
 
-  useEffect(() => {
-    fetchOrders();
-  }, [
-    page,
-    debouncedSearch,
-    startDate,
-    endDate,
-    selectedChannelId,
-    status,
-    fetchApi,
-  ]);
+  const {
+    data: orderResponse,
+    isLoading: loading,
+    refetch: fetchOrders,
+  } = useCachedApi<OrderResponse>(["orders", "sales", endpoint], endpoint, {
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ==========================================
+  // DATA UNTUK JSX
+  // ==========================================
+
+  const orders: Order[] = orderResponse?.data ?? [];
+  const meta: Meta | null = orderResponse?.meta ?? null;
 
   // === HANDLER EXPORT ===
   const handleExport = async () => {
@@ -287,9 +302,12 @@ export default function TableOrder() {
   const handleDelete = async () => {
     if (!deleteId || isDeleting || status !== "authenticated") return;
 
-    setIsDeleting(true);
+    const orderId = deleteId;
+
     try {
-      const response = await fetchApi(`/orders/${deleteId}`, {
+      setIsDeleting(true);
+
+      const response = await fetchApi(`/orders/${orderId}`, {
         method: "DELETE",
       });
 
@@ -300,15 +318,29 @@ export default function TableOrder() {
       }
 
       toast.success(result.message || "Sales Order berhasil dihapus");
+
       setDeleteId(null);
 
-      if (page !== 1) {
-        setPage(1);
-      } else {
-        await fetchOrders();
+      // ==========================================
+      // INVALIDASI CACHE
+      // ==========================================
+
+      await queryClient.invalidateQueries({
+        queryKey: ["orders"],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["order-detail", orderId],
+      });
+
+      // Jika halaman saat ini menjadi kosong,
+      // kembali ke halaman sebelumnya.
+      if (orders.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
       }
     } catch (error) {
       console.error("Error delete Sales Order:", error);
+
       toast.error(
         error instanceof Error
           ? error.message
@@ -699,34 +731,55 @@ export default function TableOrder() {
       {meta && (
         <div className="flex items-center justify-between px-2">
           <div className="text-sm text-muted-foreground">
-            Showing Page <strong>{meta.page}</strong> of
-            <strong>{Math.ceil(meta.total / meta.perPage)}</strong> (
-            {meta.total} total items)
+            Showing Page <strong>{meta.page}</strong> of{" "}
+            <strong>
+              {Math.max(1, Math.ceil(meta.total / (meta.perPage || 10)))}
+            </strong>{" "}
+            ({meta.total} total items)
           </div>
+
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => p - 1)}>
+              disabled={!meta.hasPrevious || loading}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
               Previous
             </Button>
+
             <Button
               variant="outline"
               size="sm"
-              disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}>
+              disabled={!meta.hasNext || loading}
+              onClick={() => setPage((prev) => prev + 1)}>
               Next
             </Button>
           </div>
         </div>
       )}
+
       {selectedInvoiceOrderId && (
         <InvoiceDialogWrapper
           orderId={selectedInvoiceOrderId}
           onClose={() => setSelectedInvoiceOrderId(null)}
-          onSuccess={() => {
-            fetchOrders();
+          onSuccess={async () => {
+            const orderId = selectedInvoiceOrderId;
+
+            setSelectedInvoiceOrderId(null);
+
+            await Promise.all([
+              queryClient.invalidateQueries({
+                queryKey: ["orders"],
+              }),
+
+              queryClient.invalidateQueries({
+                queryKey: ["order-detail", orderId],
+              }),
+
+              queryClient.invalidateQueries({
+                queryKey: ["invoices"],
+              }),
+            ]);
           }}
         />
       )}

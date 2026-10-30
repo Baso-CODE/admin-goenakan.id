@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/table";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
+import { useCachedApi } from "@/hooks/useCachedApi";
+import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import {
@@ -47,7 +49,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 // === TYPES ===
@@ -163,60 +165,146 @@ const renderFollowUpProgress = (
 export default function QuotationsTable() {
   const { fetchApi, status } = useApi();
   const router = useRouter();
-  const [quotations, setQuotations] = useState<Quotation[]>([]);
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  // ==========================================
+  // FILTER STATE
+  // ==========================================
+
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 800);
+
   const [page, setPage] = useState(1);
+
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
-  //  State untuk delete dialog
+  // ==========================================
+  // DELETE STATE
+  // ==========================================
+
   const [deleteTarget, setDeleteTarget] = useState<Quotation | null>(null);
+
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const fetchQuotations = useCallback(async () => {
-    if (status === "loading" || status === "unauthenticated") return;
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ page: page.toString(), take: "10" });
-      if (debouncedSearch) params.append("search", debouncedSearch);
-      if (statusFilter !== "ALL") params.append("status", statusFilter);
+  // ==========================================
+  // BUILD QUERY PARAMS
+  // ==========================================
 
-      const res = await fetchApi(`/quotations?${params}`);
-      if (!res.ok) throw new Error("Gagal mengambil data");
-      const result = await res.json();
-      setQuotations(result.data || []);
-      setMeta(result.meta);
-    } catch (error) {
-      console.error(error);
-      toast.error("Gagal memuat data penawaran");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, debouncedSearch, statusFilter, status, fetchApi]);
+  const params = new URLSearchParams({
+    page: String(page),
+    take: "10",
+  });
 
-  useEffect(() => {
-    fetchQuotations();
-  }, [fetchQuotations]);
+  const searchValue = String(debouncedSearch ?? "").trim();
 
-  //  Handler delete
+  if (searchValue) {
+    params.set("search", searchValue);
+  }
+
+  if (statusFilter !== "ALL") {
+    params.set("status", statusFilter);
+  }
+
+  const endpoint = `/quotations?${params.toString()}`;
+
+  // ==========================================
+  // TANSTACK QUERY - QUOTATION LIST
+  // ==========================================
+
+  type QuotationResponse = {
+    data: Quotation[];
+    meta: Meta;
+  };
+
+  const {
+    data: quotationResponse,
+    isLoading: loading,
+    isFetching,
+    error: queryError,
+  } = useCachedApi<QuotationResponse>(
+    ["quotations", "list", endpoint],
+    endpoint,
+    {
+      staleTime: 5 * 60 * 1000,
+    },
+  );
+
+  // ==========================================
+  // DATA UNTUK JSX TABEL
+  // ==========================================
+
+  const quotations: Quotation[] = quotationResponse?.data ?? [];
+
+  const meta: Meta | null = quotationResponse?.meta ?? null;
+
+  const errorMessage = queryError
+    ? queryError instanceof Error
+      ? queryError.message
+      : "Gagal mengambil data quotation."
+    : null;
+
+  // ==========================================
+  // DELETE QUOTATION
+  // ==========================================
+
   const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
+    if (!deleteTarget || isDeleting || status !== "authenticated") {
+      return;
+    }
+
+    const quotationId = deleteTarget.id;
+    const quotationNumber = deleteTarget.quotationNumber;
+
     try {
-      const res = await fetchApi(`/quotations/${deleteTarget.id}`, {
+      setIsDeleting(true);
+
+      const res = await fetchApi(`/quotations/${quotationId}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error("Gagal menghapus quotation");
-      toast.success(
-        `Quotation ${deleteTarget.quotationNumber} berhasil dihapus`,
-      );
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+
+        throw new Error(errorData.message || "Gagal menghapus quotation");
+      }
+
+      toast.success(`Quotation ${quotationNumber} berhasil dihapus`);
+
       setDeleteTarget(null);
-      fetchQuotations();
+
+      // ======================================
+      // INVALIDASI CACHE QUOTATION LIST
+      // ======================================
+
+      await queryClient.invalidateQueries({
+        queryKey: ["quotations", "list"],
+      });
+
+      // ======================================
+      // HAPUS CACHE DETAIL QUOTATION
+      // ======================================
+
+      // Jika detail menggunakan key ini,
+      // jangan simpan data quotation yang sudah dihapus.
+      queryClient.removeQueries({
+        queryKey: ["quotation-detail", quotationId],
+      });
+
+      // ======================================
+      // PAGINATION
+      // ======================================
+
+      // Jika item terakhir pada halaman ini dihapus,
+      // kembali ke halaman sebelumnya.
+      if (quotations.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      }
     } catch (error) {
-      console.error(error);
-      toast.error("Gagal menghapus quotation");
+      console.error("Delete Quotation Error:", error);
+
+      toast.error(
+        error instanceof Error ? error.message : "Gagal menghapus quotation",
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -326,6 +414,14 @@ export default function QuotationsTable() {
                       ))}
                     </TableRow>
                   ))
+                ) : errorMessage ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={15}
+                      className="h-32 text-center text-red-600">
+                      Gagal memuat quotation: {errorMessage}
+                    </TableCell>
+                  </TableRow>
                 ) : quotations.length === 0 ? (
                   <TableRow>
                     <TableCell
@@ -550,23 +646,25 @@ export default function QuotationsTable() {
         <div className="flex items-center justify-between px-2 pt-4">
           <div className="text-xs text-muted-foreground">
             Halaman <strong>{meta.page}</strong> dari{" "}
-            <strong>{meta.totalPage}</strong> • Total{" "}
-            <strong>{meta.total}</strong> Data
+            <strong>{Math.max(1, meta.totalPage)}</strong>
+            {" • "} Total <strong>{meta.total}</strong> Data
           </div>
+
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => p - 1)}
+              disabled={!meta.hasPrevious || loading || isFetching}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
               className="h-8 text-xs">
               Previous
             </Button>
+
             <Button
               variant="outline"
               size="sm"
-              disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
+              disabled={!meta.hasNext || loading || isFetching}
+              onClick={() => setPage((prev) => prev + 1)}
               className="h-8 text-xs">
               Next
             </Button>
@@ -575,12 +673,18 @@ export default function QuotationsTable() {
       )}
 
       <ConfirmDeleteDialog
-        isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
+        isOpen={deleteTarget !== null}
+        onClose={() => {
+          if (!isDeleting) {
+            setDeleteTarget(null);
+          }
+        }}
         onConfirm={handleDelete}
         isLoading={isDeleting}
         title="Hapus Quotation?"
-        description={`Quotation ${deleteTarget?.quotationNumber} akan dihapus permanen.`}
+        description={`Quotation ${
+          deleteTarget?.quotationNumber ?? ""
+        } akan dihapus permanen.`}
         warningMessage="Semua data item dan notes terkait juga akan ikut terhapus."
       />
     </div>

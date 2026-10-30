@@ -48,9 +48,11 @@ import {
 import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
+import { useCachedApi } from "@/hooks/useCachedApi";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { formatDate } from "@/utils/formatDate";
 import { DropdownMenu } from "@radix-ui/react-dropdown-menu";
+import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   FileDown,
@@ -64,7 +66,7 @@ import {
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { ProductSeoForm } from "./productSeoForm";
 
@@ -119,163 +121,231 @@ interface ProductExportQuery {
 
 export default function ProductsAll() {
   const { fetchApi, status } = useApi();
+  const queryClient = useQueryClient();
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // ==========================================
+  // STATE UI
+  // ==========================================
+
   const [exporting, setExporting] = useState(false);
+
+  // ==========================================
+  // DELETE PRODUCT STATE
+  // ==========================================
+
+  const [productToDelete, setProductToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // ==========================================
+  // FILTER STATE
+  // ==========================================
+
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 800);
+
+  const [page, setPage] = useState(1);
+
+  const [isCustomFilter, setIsCustomFilter] = useState<string>("ALL");
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
+
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
+
+  // ==========================================
+  // FETCH PRODUCT CATEGORIES
+  // ==========================================
+
+  type CategoryResponse =
+    | Category[]
+    | {
+        data: Category[];
+      };
+
+  const { data: categoryResponse } = useCachedApi<CategoryResponse>(
+    ["product-categories", "list"],
+    "/product-categories/list",
+    {
+      staleTime: 10 * 60 * 1000,
+    },
+  );
+
+  const categories: Category[] = Array.isArray(categoryResponse)
+    ? categoryResponse
+    : (categoryResponse?.data ?? []);
+
+  // ==========================================
+  // BUILD PRODUCT QUERY PARAMS
+  // ==========================================
+
+  const params = new URLSearchParams({
+    page: String(page),
+    take: "10",
+  });
+
+  if (isCustomFilter !== "ALL") {
+    params.set("isCustom", isCustomFilter);
+  }
+
+  if (categoryFilter !== "ALL") {
+    params.set("categoryId", categoryFilter);
+  }
+
+  const searchValue = String(debouncedSearch ?? "").trim();
+
+  if (searchValue) {
+    params.set("search", searchValue);
+  }
+
+  if (startDate) {
+    params.set("startDate", format(startDate, "yyyy-MM-dd"));
+  }
+
+  if (endDate) {
+    params.set("endDate", format(endDate, "yyyy-MM-dd"));
+  }
+
+  const endpoint = `/products?${params.toString()}`;
+
+  // ==========================================
+  // TANSTACK QUERY - PRODUCTS
+  // ==========================================
+
+  type ProductResponse = {
+    data: Product[];
+    meta: Meta;
+  };
+
+  const {
+    data: productResponse,
+    isLoading: loading,
+    isFetching,
+    error: queryError,
+  } = useCachedApi<ProductResponse>(["products", "list", endpoint], endpoint, {
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ==========================================
+  // DATA UNTUK JSX
+  // ==========================================
+
+  const products: Product[] = productResponse?.data ?? [];
+
+  const meta: Meta | null = productResponse?.meta ?? null;
+
+  const error = queryError
+    ? queryError instanceof Error
+      ? queryError.message
+      : "Gagal mengambil data produk."
+    : null;
+
+  // ==========================================
+  // TOGGLE ACTIVE / INACTIVE PRODUCT
+  // ==========================================
 
   const handleToggleActive = async (
     productId: string,
     currentStatus: boolean,
   ) => {
+    if (status !== "authenticated") return;
+
     try {
       const res = await fetchApi(`/products/${productId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ isActive: !currentStatus }),
+        body: JSON.stringify({
+          isActive: !currentStatus,
+        }),
       });
+
       if (!res.ok) {
-        throw new Error("Gagal mengubah status aktif produk");
+        const errorData = await res.json().catch(() => ({}));
+
+        throw new Error(
+          errorData.message || "Gagal mengubah status aktif produk",
+        );
       }
+
       toast.success("Status aktif produk berhasil diubah");
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === productId ? { ...p, isActive: !currentStatus } : p,
-        ),
+
+      // Perbarui seluruh cache daftar produk.
+      await queryClient.invalidateQueries({
+        queryKey: ["products"],
+      });
+
+      // Perbarui cache detail produk apabila tersedia.
+      await queryClient.invalidateQueries({
+        queryKey: ["product-detail", productId],
+      });
+    } catch (error) {
+      console.error("Toggle product status error:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Gagal mengubah status aktif produk",
       );
-    } catch (err: any) {
-      toast.error(err.message || "Gagal mengubah status aktif");
     }
   };
 
-  // === Delete Product State & Handler ===
-  const [productToDelete, setProductToDelete] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  // ==========================================
+  // DELETE PRODUCT
+  // ==========================================
 
   const handleDeleteProduct = async () => {
-    if (!productToDelete) return;
+    if (!productToDelete || isDeleting || status !== "authenticated") {
+      return;
+    }
+
+    const productId = productToDelete.id;
+
     try {
       setIsDeleting(true);
-      const res = await fetchApi(`/products/${productToDelete.id}`, {
+
+      const res = await fetchApi(`/products/${productId}`, {
         method: "DELETE",
       });
 
-      const data = await res.json();
+      const result = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        throw new Error(data.message || "Gagal menghapus produk.");
+        throw new Error(result.message || "Gagal menghapus produk.");
       }
 
-      toast.success(data.message || "Produk berhasil dihapus.");
+      toast.success(result.message || "Produk berhasil dihapus.");
+
       setProductToDelete(null);
-      fetchProducts();
-    } catch (err: any) {
-      toast.error(err.message || "Gagal menghapus produk.");
+
+      // ==========================================
+      // INVALIDASI CACHE
+      // ==========================================
+
+      await queryClient.invalidateQueries({
+        queryKey: ["products"],
+      });
+
+      // Jika produk terakhir pada halaman dihapus,
+      // pindah ke halaman sebelumnya.
+      if (products.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      }
+    } catch (error) {
+      console.error("Delete product error:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Terjadi kesalahan saat menghapus produk",
+      );
     } finally {
       setIsDeleting(false);
     }
   };
-
-  // === State Filter Gabungan ===
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [isCustomFilter, setIsCustomFilter] = useState<string>("ALL");
-  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [endDate, setEndDate] = useState<Date | undefined>();
-
-  const debouncedSearch = useDebounce(search, 800);
-
-  // === Fetch Categories ===
-  const fetchCategories = async () => {
-    try {
-      const res = await fetchApi("/product-categories/list");
-      if (!res.ok) {
-        setCategories([]);
-        return;
-      }
-      const data = await res.json();
-      const items = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.data)
-        ? data.data
-        : [];
-      setCategories(items);
-    } catch (error) {
-      console.error("Failed to load categories", error);
-      setCategories([]);
-    }
-  };
-
-  // === Fetch Products ===
-  const fetchProducts = async () => {
-    if (status === "loading") return;
-
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        take: "10",
-      });
-
-      if (isCustomFilter !== "ALL") params.append("isCustom", isCustomFilter);
-      if (categoryFilter !== "ALL") params.append("categoryId", categoryFilter);
-      if (debouncedSearch.trim())
-        params.append("search", debouncedSearch.trim());
-
-      // Tambahkan filter tanggal jika ada
-      if (startDate)
-        params.append("startDate", format(startDate, "yyyy-MM-dd"));
-      if (endDate) params.append("endDate", format(endDate, "yyyy-MM-dd"));
-
-      const res = await fetchApi(`/products?${params}`);
-      const result = await res.json();
-
-      if (!res.ok) {
-        throw new Error(result.message || "Failed to fetch product data.");
-      }
-
-      const items = Array.isArray(result.data)
-        ? result.data
-        : Array.isArray(result)
-        ? result
-        : [];
-      setProducts(items);
-      setMeta(result.meta);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Unknown error");
-      toast.error("Failed to load products");
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchApi]);
-
-  useEffect(() => {
-    fetchProducts();
-  }, [
-    page,
-    debouncedSearch,
-    isCustomFilter,
-    categoryFilter,
-    startDate,
-    endDate,
-    status,
-    fetchApi,
-  ]);
-
   // === Handle Export ===
   const handleExport = async () => {
     setExporting(true);
@@ -287,7 +357,9 @@ export default function ProductsAll() {
       if (endDate) exportFilters.endDate = format(endDate, "yyyy-MM-dd");
       if (isCustomFilter !== "ALL") exportFilters.isCustom = isCustomFilter;
       if (categoryFilter !== "ALL") exportFilters.categoryId = categoryFilter;
-      if (debouncedSearch.trim()) exportFilters.search = debouncedSearch.trim();
+      if (searchValue) {
+        exportFilters.search = searchValue;
+      }
 
       const queryString = new URLSearchParams(exportFilters).toString();
 
@@ -700,27 +772,31 @@ export default function ProductsAll() {
       {meta && (
         <div className="flex justify-between items-center p-4 border-t text-sm text-muted-foreground">
           <p>
-            Page {meta.page} of {Math.ceil(meta.total / meta.perPage)}
+            Page <strong>{meta.page}</strong> of{" "}
+            <strong>
+              {Math.max(1, Math.ceil(meta.total / (meta.perPage || 10)))}
+            </strong>
           </p>
+
           <div className="space-x-2">
             <Button
               size="sm"
               variant="outline"
-              disabled={!meta.hasPrevious}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              disabled={!meta.hasPrevious || loading || isFetching}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
               Previous
             </Button>
+
             <Button
               size="sm"
               variant="outline"
-              disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}>
+              disabled={!meta.hasNext || loading || isFetching}
+              onClick={() => setPage((prev) => prev + 1)}>
               Next
             </Button>
           </div>
         </div>
       )}
-
       {/* === Dialog Konfirmasi Hapus Produk === */}
       <AlertDialog
         open={!!productToDelete}
