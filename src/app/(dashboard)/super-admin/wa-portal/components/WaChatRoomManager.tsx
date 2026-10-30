@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { WaChatMessage, WaChatRoom, WaSession } from "@/types/waPortal.type";
+import { WaChatMessage, WaChatRoom, WaLabel, WaPipelineStage, WaSession } from "@/types/waPortal.type";
 import {
   Check,
   CheckCheck,
@@ -24,6 +24,7 @@ import {
   FileText,
   Image as ImageIcon,
   Info,
+  Kanban,
   Loader2,
   MessageCircle,
   MessageSquare,
@@ -31,13 +32,19 @@ import {
   RefreshCw,
   Search,
   Send,
+  Settings2,
   Smartphone,
+  Tag,
   User,
   Users,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useWaEvents } from "../hooks/useWaEvents";
+import { WaContactStageSelector } from "./WaContactStageSelector";
+import { WaContactLabelsTagger } from "./WaContactLabelsTagger";
+import { WaPipelineKanban } from "./WaPipelineKanban";
+import { WaPipelineSettingsDialog } from "./WaPipelineSettingsDialog";
 
 const formatMessageTime = (unixTs: number) => {
   if (!unixTs) return "";
@@ -290,6 +297,13 @@ export function WaChatRoomManager({
   const selectedRoomRef = useRef<WaChatRoom | null>(selectedRoom);
   selectedRoomRef.current = selectedRoom;
 
+  // View Mode: Inbox chat vs Kanban pipeline board
+  const [viewMode, setViewMode] = useState<"INBOX" | "KANBAN">("INBOX");
+  const [stages, setStages] = useState<WaPipelineStage[]>([]);
+  const [labels, setLabels] = useState<WaLabel[]>([]);
+  const [selectedStageFilter, setSelectedStageFilter] = useState<string | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   const [messages, setMessages] = useState<WaChatMessage[]>([]);
   const [visibleCount, setVisibleCount] = useState(30);
   const messageCacheRef = useRef<Map<string, WaChatMessage[]>>(new Map());
@@ -365,6 +379,129 @@ export function WaChatRoomManager({
       }
     },
     []
+  );
+
+  // Fetch pipeline stages for the selected session
+  const fetchStages = useCallback(async () => {
+    if (!selectedSessionId) return;
+    try {
+      const res = await fetch(`/api/wa/pipeline/stages?sessionId=${encodeURIComponent(selectedSessionId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.success && Array.isArray(data.stages)) {
+        setStages(data.stages);
+      }
+    } catch {
+      // ignore
+    }
+  }, [selectedSessionId]);
+
+  // Fetch labels for the selected session
+  const fetchLabels = useCallback(async () => {
+    if (!selectedSessionId) return;
+    try {
+      const res = await fetch(`/api/wa/labels?sessionId=${encodeURIComponent(selectedSessionId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.success && Array.isArray(data.labels)) {
+        setLabels(data.labels);
+      }
+    } catch {
+      // ignore
+    }
+  }, [selectedSessionId]);
+
+  useEffect(() => {
+    fetchStages();
+    fetchLabels();
+  }, [fetchStages, fetchLabels]);
+
+  // Handle stage selection for current active contact
+  const handleSelectStage = useCallback(
+    async (stageId: string | null) => {
+      if (!selectedRoom) return;
+      const contactId = selectedRoom.id;
+      const targetStage = stageId ? stages.find((s) => s.id === stageId) || null : null;
+
+      // 0ms optimistic update
+      setSelectedRoom((prev) => (prev ? { ...prev, stage: targetStage } : null));
+      setRooms((prev) =>
+        prev.map((r) => (r.id === contactId ? { ...r, stage: targetStage } : r))
+      );
+
+      try {
+        const res = await fetch(`/api/wa/contacts/${encodeURIComponent(contactId)}/stage`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stageId, sessionId: selectedSessionId }),
+        });
+        if (!res.ok) throw new Error("Gagal memperbarui status stage");
+        fetchStages();
+      } catch (err: any) {
+        toast.error(err.message || "Gagal mengubah stage");
+        fetchChatRooms(selectedSessionId, true);
+      }
+    },
+    [selectedRoom, stages, fetchStages, fetchChatRooms, selectedSessionId]
+  );
+
+  // Handle labels updating for current active contact
+  const handleUpdateLabels = useCallback(
+    async (labelIds: string[]) => {
+      if (!selectedRoom) return;
+      const contactId = selectedRoom.id;
+      const targetLabels = labels.filter((l) => labelIds.includes(l.id));
+
+      // 0ms optimistic update
+      setSelectedRoom((prev) => (prev ? { ...prev, labels: targetLabels } : null));
+      setRooms((prev) =>
+        prev.map((r) => (r.id === contactId ? { ...r, labels: targetLabels } : r))
+      );
+
+      try {
+        const res = await fetch(`/api/wa/contacts/${encodeURIComponent(contactId)}/labels`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ labelIds, sessionId: selectedSessionId }),
+        });
+        if (!res.ok) throw new Error("Gagal memperbarui label");
+      } catch (err: any) {
+        toast.error(err.message || "Gagal mengubah label");
+        fetchChatRooms(selectedSessionId, true);
+      }
+    },
+    [selectedRoom, labels, fetchChatRooms, selectedSessionId]
+  );
+
+  // Handle inline creation of new label directly from tagger
+  const handleCreateLabel = useCallback(
+    async (name: string, color: string) => {
+      if (!selectedSessionId) return;
+      try {
+        const res = await fetch("/api/wa/labels", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: selectedSessionId,
+            name,
+            color,
+          }),
+        });
+        if (!res.ok) throw new Error("Gagal membuat label");
+        const data = await res.json();
+        if (data?.label) {
+          setLabels((prev) => [...prev, data.label]);
+          toast.success(`Label "${name}" berhasil dibuat`);
+          if (selectedRoom) {
+            const currentIds = (selectedRoom.labels || []).map((l) => l.id);
+            await handleUpdateLabels([...currentIds, data.label.id]);
+          }
+        }
+      } catch (err: any) {
+        toast.error(err.message || "Gagal membuat label");
+      }
+    },
+    [selectedSessionId, selectedRoom, handleUpdateLabels]
   );
 
   // Fetch messages for the selected room with in-memory caching
@@ -659,6 +796,34 @@ export function WaChatRoomManager({
         }
       }
     },
+
+    onContactUpdated: (payload) => {
+      if (!payload?.contactId) return;
+      const { contactId, stage, labels: updatedLabels } = payload;
+      setRooms((prev) =>
+        prev.map((r) => {
+          if (r.id === contactId) {
+            return {
+              ...r,
+              stage: stage !== undefined ? stage : r.stage,
+              labels: updatedLabels !== undefined ? updatedLabels : r.labels,
+            };
+          }
+          return r;
+        })
+      );
+      if (selectedRoomRef.current?.id === contactId) {
+        setSelectedRoom((prev) =>
+          prev
+            ? {
+                ...prev,
+                stage: stage !== undefined ? stage : prev.stage,
+                labels: updatedLabels !== undefined ? updatedLabels : prev.labels,
+              }
+            : null
+        );
+      }
+    },
   });
 
   // Handle Send Reply Message with instant 0ms optimistic UI update
@@ -795,23 +960,30 @@ export function WaChatRoomManager({
   };
 
   const filteredRooms = useMemo(() => {
-    if (!searchQuery.trim()) return rooms;
-    const q = searchQuery.toLowerCase();
-    return rooms.filter((r) => {
-      return (
-        r.name?.toLowerCase().includes(q) ||
-        r.id?.toLowerCase().includes(q) ||
-        r.lastMessage?.body?.toLowerCase().includes(q)
-      );
-    });
-  }, [rooms, searchQuery]);
+    let result = rooms;
+    if (selectedStageFilter) {
+      result = result.filter((r) => r.stage?.id === selectedStageFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((r) => {
+        return (
+          r.name?.toLowerCase().includes(q) ||
+          r.id?.toLowerCase().includes(q) ||
+          (r.phoneNumber && r.phoneNumber.includes(q)) ||
+          r.lastMessage?.body?.toLowerCase().includes(q)
+        );
+      });
+    }
+    return result;
+  }, [rooms, searchQuery, selectedStageFilter]);
 
   const activeSessionObj = sessions.find((s) => s.id === selectedSessionId);
   const isSessionConnected = activeSessionObj?.status === "WORKING";
 
   return (
     <div className="space-y-4">
-      {/* ── Top Bar: Session Switcher & Status ── */}
+      {/* ── Top Bar: Session Switcher, Mode Toggle & Actions ── */}
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-white p-3.5 rounded-xl border border-stone-200 shadow-2xs">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100">
@@ -819,7 +991,7 @@ export function WaChatRoomManager({
           </div>
           <div>
             <h2 className="text-sm font-bold text-stone-900 flex items-center gap-2">
-              WhatsApp Live Chat Inbox
+              WhatsApp Conversational CRM
               {isSessionConnected ? (
                 <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-200 text-[10px]">
                   Online
@@ -831,14 +1003,43 @@ export function WaChatRoomManager({
               )}
             </h2>
             <p className="text-xs text-stone-500">
-              Lihat riwayat obrolan dan balas pesan langsung dari nomor WhatsApp yang tertaut.
+              Kelola obrolan, perbarui tahapan prospek penjualan (pipeline), dan beri tag merchandise klien.
             </p>
           </div>
         </div>
 
-        {/* Session Selector Dropdown */}
-        <div className="flex items-center gap-2">
-          <div className="w-56">
+        {/* Center/Right: View Switcher & Action Controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* View Mode Toggle */}
+          <div className="flex items-center bg-stone-100 p-0.5 rounded-lg border border-stone-200 shrink-0">
+            <button
+              type="button"
+              onClick={() => setViewMode("INBOX")}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                viewMode === "INBOX"
+                  ? "bg-white text-stone-900 shadow-2xs font-semibold"
+                  : "text-stone-600 hover:text-stone-900"
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Chat Inbox</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("KANBAN")}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                viewMode === "KANBAN"
+                  ? "bg-white text-stone-900 shadow-2xs font-semibold"
+                  : "text-stone-600 hover:text-stone-900"
+              }`}
+            >
+              <Kanban className="w-3.5 h-3.5 text-primary" />
+              <span>Pipeline Kanban</span>
+            </button>
+          </div>
+
+          {/* Session Selector Dropdown */}
+          <div className="w-48">
             <Select
               value={selectedSessionId}
               onValueChange={(val) => {
@@ -865,9 +1066,20 @@ export function WaChatRoomManager({
           <Button
             size="sm"
             variant="outline"
+            onClick={() => setIsSettingsOpen(true)}
+            className="h-8 text-xs text-stone-700 bg-white hover:bg-stone-50 border-stone-300 gap-1.5 shrink-0"
+            title="Kelola alur pipeline stages dan tag labels"
+          >
+            <Settings2 className="w-3.5 h-3.5 text-stone-500" />
+            <span className="hidden sm:inline">Atur Stage & Label</span>
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
             onClick={handleSyncHistory}
             disabled={isSyncing || !isSessionConnected}
-            className="h-8 text-xs text-stone-700 bg-white hover:bg-stone-50 border-stone-300 gap-1.5"
+            className="h-8 text-xs text-stone-700 bg-white hover:bg-stone-50 border-stone-300 gap-1.5 shrink-0"
             title="Tarik seluruh riwayat obrolan dari WhatsApp ke database PostgreSQL"
           >
             {isSyncing ? (
@@ -881,9 +1093,13 @@ export function WaChatRoomManager({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => fetchChatRooms(selectedSessionId)}
+            onClick={() => {
+              fetchChatRooms(selectedSessionId);
+              fetchStages();
+              fetchLabels();
+            }}
             disabled={isRoomsLoading || isSyncing}
-            className="h-8 text-xs text-stone-600"
+            className="h-8 text-xs text-stone-600 shrink-0"
             title="Segarkan daftar obrolan"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRoomsLoading ? "animate-spin" : ""}`} />
@@ -901,218 +1117,336 @@ export function WaChatRoomManager({
         </div>
       )}
 
-      {/* ── Main Chat Interface: Dual Pane ── */}
-      <Card className="border-stone-200 shadow-sm overflow-hidden">
-        <CardContent className="p-0">
-          <div className={`grid grid-cols-1 md:grid-cols-12 min-h-0 ${isDedicatedPage ? "h-[calc(100vh-230px)] min-h-[460px]" : "h-[680px]"}`}>
-            {/* ── LEFT PANE: Chat Room List (4 cols) ── */}
-            <div className="md:col-span-4 border-r border-stone-200 flex flex-col h-full min-h-0 bg-stone-50/50">
-              {/* Search Bar */}
-              <div className="p-3 border-b border-stone-200 bg-white shrink-0">
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-stone-400" />
-                  <Input
-                    placeholder="Cari kontak atau pesan..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-8 h-8 text-xs bg-stone-50 border-stone-200"
-                  />
+      {/* ── Main View: Toggle between Inbox Dual Pane and Kanban Pipeline Board ── */}
+      {viewMode === "KANBAN" ? (
+        <div className={`min-h-0 ${isDedicatedPage ? "h-[calc(100vh-230px)] min-h-[460px]" : "h-[680px]"}`}>
+          <WaPipelineKanban
+            sessionId={selectedSessionId}
+            onOpenChat={(roomId) => {
+              setViewMode("INBOX");
+              const target = rooms.find((r) => r.id === roomId);
+              if (target) setSelectedRoom(target);
+            }}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+          />
+        </div>
+      ) : (
+        <Card className="border-stone-200 shadow-sm overflow-hidden">
+          <CardContent className="p-0">
+            <div className={`grid grid-cols-1 md:grid-cols-12 min-h-0 ${isDedicatedPage ? "h-[calc(100vh-230px)] min-h-[460px]" : "h-[680px]"}`}>
+              {/* ── LEFT PANE: Chat Room List (4 cols) ── */}
+              <div className="md:col-span-4 border-r border-stone-200 flex flex-col h-full min-h-0 bg-stone-50/50">
+                {/* Search Bar */}
+                <div className="p-3 border-b border-stone-200 bg-white shrink-0">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-stone-400" />
+                    <Input
+                      placeholder="Cari kontak atau pesan..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-8 h-8 text-xs bg-stone-50 border-stone-200"
+                    />
+                  </div>
+                </div>
+
+                {/* Stage Filter Scrollable Bar */}
+                <div className="px-3 py-2 border-b border-stone-200 bg-white shrink-0 overflow-x-auto flex items-center gap-1.5 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStageFilter(null)}
+                    className={`shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors cursor-pointer ${
+                      selectedStageFilter === null
+                        ? "bg-stone-900 text-white"
+                        : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                    }`}
+                  >
+                    Semua ({rooms.length})
+                  </button>
+                  {stages.map((st) => {
+                    const countInStage = rooms.filter((r) => r.stage?.id === st.id).length;
+                    const isFilterActive = selectedStageFilter === st.id;
+                    return (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedStageFilter(isFilterActive ? null : st.id)
+                        }
+                        className={`shrink-0 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors cursor-pointer ${
+                          isFilterActive
+                            ? "bg-stone-900 text-white"
+                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                        }`}
+                      >
+                        <span
+                          className="w-1.5 h-1.5 rounded-full shrink-0"
+                          style={{ backgroundColor: st.color }}
+                        />
+                        <span>{st.name}</span>
+                        <span className="opacity-70 text-[10px]">({countInStage})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Chat List Scrollable */}
+                <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-stone-100">
+                  {isRoomsLoading && rooms.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-48 gap-2 text-stone-400">
+                      <Loader2 className="w-5 h-5 animate-spin text-stone-500" />
+                      <span className="text-xs">Memuat obrolan WhatsApp...</span>
+                    </div>
+                  ) : filteredRooms.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-stone-400">
+                      {searchQuery ? "Tidak ditemukan obrolan yang cocok" : "Belum ada obrolan aktif pada akun ini."}
+                    </div>
+                  ) : (
+                    filteredRooms.map((room) => {
+                      const isSelected = selectedRoom?.id === room.id;
+                      const contactInitial = room.name ? room.name.charAt(0).toUpperCase() : "?";
+
+                      return (
+                        <button
+                          key={room.id}
+                          type="button"
+                          onClick={() => setSelectedRoom(room)}
+                          className={`w-full text-left p-3 flex items-start gap-3 transition-colors ${
+                            isSelected
+                              ? "bg-emerald-50/80 border-l-4 border-emerald-600"
+                              : "hover:bg-stone-100/70"
+                          }`}
+                        >
+                          <Avatar className="w-10 h-10 border shrink-0">
+                            {room.picture ? (
+                              <AvatarImage src={room.picture} alt={room.name} />
+                            ) : null}
+                            <AvatarFallback className="bg-emerald-100 text-emerald-800 text-xs font-bold">
+                              {room.isGroup ? <Users className="w-4 h-4" /> : contactInitial}
+                            </AvatarFallback>
+                          </Avatar>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-semibold text-xs text-stone-900 truncate">
+                                {room.name}
+                              </span>
+                              <span className="text-[10px] text-stone-400 shrink-0">
+                                {formatRoomTime(room.timestamp)}
+                              </span>
+                            </div>
+
+                            {room.phoneNumber && room.phoneNumber !== room.name && (
+                              <p className="text-[10px] text-stone-400 font-mono leading-none truncate mt-0.5">
+                                {room.phoneNumber.startsWith("62")
+                                  ? `+62 ${room.phoneNumber.slice(2)}`
+                                  : room.phoneNumber}
+                              </p>
+                            )}
+
+                            <div className="flex items-center justify-between gap-2 mt-1">
+                              <p className="text-[11px] text-stone-500 truncate leading-tight">
+                                {room.lastMessage?.fromMe && (
+                                  <span className="font-medium text-stone-700">Anda: </span>
+                                )}
+                                {room.lastMessage?.body || "Obrolan dibuka"}
+                              </p>
+                              {room.unreadCount > 0 && (
+                                <span className="bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                                  {room.unreadCount}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Stage & Labels Badges */}
+                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                              {room.stage && (
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
+                                  style={{
+                                    backgroundColor: `${room.stage.color}15`,
+                                    color: room.stage.color,
+                                  }}
+                                >
+                                  <span
+                                    className="w-1.5 h-1.5 rounded-full"
+                                    style={{ backgroundColor: room.stage.color }}
+                                  />
+                                  <span className="truncate max-w-[90px]">{room.stage.name}</span>
+                                </span>
+                              )}
+                              {room.labels?.slice(0, 2).map((l) => (
+                                <span
+                                  key={l.id}
+                                  className="inline-flex px-1.5 py-0.2 rounded text-[10px] font-medium bg-stone-100 text-stone-600 truncate max-w-[70px]"
+                                >
+                                  {l.name}
+                                </span>
+                              ))}
+                              {room.labels && room.labels.length > 2 && (
+                                <span className="text-[9px] text-stone-400">
+                                  +{room.labels.length - 2}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
-              {/* Chat List Scrollable */}
-              <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-stone-100">
-                {isRoomsLoading && rooms.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-48 gap-2 text-stone-400">
-                    <Loader2 className="w-5 h-5 animate-spin text-stone-500" />
-                    <span className="text-xs">Memuat obrolan WhatsApp...</span>
-                  </div>
-                ) : filteredRooms.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-stone-400">
-                    {searchQuery ? "Tidak ditemukan obrolan yang cocok" : "Belum ada obrolan aktif pada akun ini."}
-                  </div>
-                ) : (
-                  filteredRooms.map((room) => {
-                    const isSelected = selectedRoom?.id === room.id;
-                    const contactInitial = room.name ? room.name.charAt(0).toUpperCase() : "?";
-
-                    return (
-                      <button
-                        key={room.id}
-                        type="button"
-                        onClick={() => setSelectedRoom(room)}
-                        className={`w-full text-left p-3 flex items-start gap-3 transition-colors ${
-                          isSelected
-                            ? "bg-emerald-50/80 border-l-4 border-emerald-600"
-                            : "hover:bg-stone-100/70"
-                        }`}
-                      >
-                        <Avatar className="w-10 h-10 border shrink-0">
-                          {room.picture ? (
-                            <AvatarImage src={room.picture} alt={room.name} />
+              {/* ── RIGHT PANE: Active Conversation View (8 cols) ── */}
+              <div className="md:col-span-8 flex flex-col h-full min-h-0 bg-[#f0f2f5] relative">
+                {selectedRoom ? (
+                  <>
+                    {/* Conversation Header */}
+                    <div className="p-3 bg-white border-b border-stone-200 flex items-center justify-between shrink-0 shadow-2xs z-10 gap-2 flex-wrap">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar className="w-9 h-9 border shrink-0">
+                          {selectedRoom.picture ? (
+                            <AvatarImage src={selectedRoom.picture} alt={selectedRoom.name} />
                           ) : null}
                           <AvatarFallback className="bg-emerald-100 text-emerald-800 text-xs font-bold">
-                            {room.isGroup ? <Users className="w-4 h-4" /> : contactInitial}
+                            {selectedRoom.isGroup ? <Users className="w-4 h-4" /> : selectedRoom.name.charAt(0)}
                           </AvatarFallback>
                         </Avatar>
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="font-semibold text-xs text-stone-900 truncate">
-                              {room.name}
-                            </span>
-                            <span className="text-[10px] text-stone-400 shrink-0">
-                              {formatRoomTime(room.timestamp)}
-                            </span>
-                          </div>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-xs text-stone-900 flex items-center gap-1.5 truncate">
+                            <span className="truncate">{selectedRoom.name}</span>
+                            {selectedRoom.isGroup && (
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0">
+                                Grup
+                              </Badge>
+                            )}
+                          </h3>
+                          <p className="text-[10px] text-stone-400 font-mono truncate">
+                            {selectedRoom.phoneNumber
+                              ? (selectedRoom.phoneNumber.startsWith("62")
+                                  ? `+62 ${selectedRoom.phoneNumber.slice(2)}`
+                                  : selectedRoom.phoneNumber)
+                              : selectedRoom.id.replace("@c.us", "").replace("@lid", "")}
+                          </p>
+                        </div>
+                      </div>
 
-                          {room.phoneNumber && room.phoneNumber !== room.name && (
-                            <p className="text-[10px] text-stone-400 font-mono leading-none truncate mt-0.5">
-                              {room.phoneNumber.startsWith("62")
-                                ? `+62 ${room.phoneNumber.slice(2)}`
-                                : room.phoneNumber}
-                            </p>
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
+                        {/* Lead Pipeline Stage Selector */}
+                        <WaContactStageSelector
+                          stages={stages}
+                          currentStage={selectedRoom.stage}
+                          onSelectStage={handleSelectStage}
+                          disabled={!isSessionConnected}
+                        />
+
+                        {/* Custom Labels / Tags Popover */}
+                        <WaContactLabelsTagger
+                          availableLabels={labels}
+                          currentLabels={selectedRoom.labels || []}
+                          onUpdateLabels={handleUpdateLabels}
+                          onCreateLabel={handleCreateLabel}
+                          disabled={!isSessionConnected}
+                        />
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => fetchRoomMessages(selectedRoom.id)}
+                          disabled={isMessagesLoading}
+                          className="h-7 text-xs text-stone-600"
+                          title="Segarkan pesan obrolan"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isMessagesLoading ? "animate-spin" : ""}`} />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Messages Bubble Feed */}
+                    <div
+                      ref={messagesContainerRef}
+                      onScroll={handleMessagesScroll}
+                      className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2.5 bg-repeat"
+                      style={{
+                        backgroundImage: `radial-gradient(circle, #e2e8f0 10%, transparent 11%)`,
+                        backgroundSize: "20px 20px",
+                      }}
+                    >
+                      {isMessagesLoading && messages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full gap-2 text-stone-400">
+                          <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
+                          <span className="text-xs">Memuat riwayat pesan...</span>
+                        </div>
+                      ) : messages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-center text-xs text-stone-400">
+                          <MessageSquare className="w-8 h-8 mb-2 text-stone-300" />
+                          <p>Belum ada riwayat pesan dalam obrolan ini.</p>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Lazy load older messages button */}
+                          {messages.length > visibleCount && (
+                            <div className="flex justify-center py-1 shrink-0">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setVisibleCount((prev) => prev + 30)}
+                                className="text-[11px] h-7 px-3 bg-white/90 hover:bg-white text-stone-600 rounded-full shadow-2xs border-stone-200 gap-1.5"
+                              >
+                                <ChevronUp className="w-3.5 h-3.5" />
+                                Muat riwayat lebih lama ({messages.length - visibleCount} lagi)
+                              </Button>
+                            </div>
                           )}
 
-                          <div className="flex items-center justify-between gap-2 mt-1">
-                            <p className="text-[11px] text-stone-500 truncate leading-tight">
-                              {room.lastMessage?.fromMe && (
-                                <span className="font-medium text-stone-700">Anda: </span>
-                              )}
-                              {room.lastMessage?.body || "Obrolan dibuka"}
-                            </p>
-                            {room.unreadCount > 0 && (
-                              <span className="bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
-                                {room.unreadCount}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })
+                          {visibleMessages.map((msg, index) => (
+                            <MessageBubble key={extractMessageId(msg.id) || index} msg={msg} />
+                          ))}
+                        </>
+                      )}
+                    </div>
+
+                    {/* Message Input Bar (Isolated & Memoized for zero typing lag) */}
+                    <WaMessageInput
+                      onSendMessage={handleSendMessage}
+                      disabled={!isSessionConnected || isSending}
+                      placeholder={`Balas ke ${selectedRoom.name}... (Enter untuk kirim, Shift+Enter untuk baris baru)`}
+                    />
+                  </>
+                ) : (
+                  /* Empty Selection Placeholder */
+                  <div className="flex flex-col items-center justify-center h-full text-center p-8 text-stone-400">
+                    <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mb-3">
+                      <MessageSquare className="w-8 h-8 text-stone-400" />
+                    </div>
+                    <h4 className="text-sm font-bold text-stone-700 mb-1">
+                      Pilih Ruang Obrolan
+                    </h4>
+                    <p className="text-xs max-w-sm leading-relaxed">
+                      Pilih salah satu kontak atau grup di panel kiri untuk membuka riwayat percakapan dan membalas pesan WhatsApp secara langsung.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
 
-            {/* ── RIGHT PANE: Active Conversation View (8 cols) ── */}
-            <div className="md:col-span-8 flex flex-col h-full min-h-0 bg-[#f0f2f5] relative">
-              {selectedRoom ? (
-                <>
-                  {/* Conversation Header */}
-                  <div className="p-3 bg-white border-b border-stone-200 flex items-center justify-between shrink-0 shadow-2xs z-10">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-9 h-9 border">
-                        {selectedRoom.picture ? (
-                          <AvatarImage src={selectedRoom.picture} alt={selectedRoom.name} />
-                        ) : null}
-                        <AvatarFallback className="bg-emerald-100 text-emerald-800 text-xs font-bold">
-                          {selectedRoom.isGroup ? <Users className="w-4 h-4" /> : selectedRoom.name.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      <div>
-                        <h3 className="font-bold text-xs text-stone-900 flex items-center gap-1.5">
-                          {selectedRoom.name}
-                          {selectedRoom.isGroup && (
-                            <Badge variant="outline" className="text-[9px] px-1 py-0">
-                              Grup
-                            </Badge>
-                          )}
-                        </h3>
-                        <p className="text-[10px] text-stone-400 font-mono">
-                          {selectedRoom.phoneNumber
-                            ? (selectedRoom.phoneNumber.startsWith("62")
-                                ? `+62 ${selectedRoom.phoneNumber.slice(2)}`
-                                : selectedRoom.phoneNumber)
-                            : selectedRoom.id.replace("@c.us", "").replace("@lid", "")}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => fetchRoomMessages(selectedRoom.id)}
-                        disabled={isMessagesLoading}
-                        className="h-7 text-xs text-stone-600"
-                        title="Segarkan pesan obrolan"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isMessagesLoading ? "animate-spin" : ""}`} />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Messages Bubble Feed */}
-                  <div
-                    ref={messagesContainerRef}
-                    onScroll={handleMessagesScroll}
-                    className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2.5 bg-repeat"
-                    style={{
-                      backgroundImage: `radial-gradient(circle, #e2e8f0 10%, transparent 11%)`,
-                      backgroundSize: "20px 20px",
-                    }}
-                  >
-                    {isMessagesLoading && messages.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full gap-2 text-stone-400">
-                        <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
-                        <span className="text-xs">Memuat riwayat pesan...</span>
-                      </div>
-                    ) : messages.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full text-center text-xs text-stone-400">
-                        <MessageSquare className="w-8 h-8 mb-2 text-stone-300" />
-                        <p>Belum ada riwayat pesan dalam obrolan ini.</p>
-                      </div>
-                    ) : (
-                      <>
-                        {/* Lazy load older messages button */}
-                        {messages.length > visibleCount && (
-                          <div className="flex justify-center py-1 shrink-0">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setVisibleCount((prev) => prev + 30)}
-                              className="text-[11px] h-7 px-3 bg-white/90 hover:bg-white text-stone-600 rounded-full shadow-2xs border-stone-200 gap-1.5"
-                            >
-                              <ChevronUp className="w-3.5 h-3.5" />
-                              Muat riwayat lebih lama ({messages.length - visibleCount} lagi)
-                            </Button>
-                          </div>
-                        )}
-
-                        {visibleMessages.map((msg, index) => (
-                          <MessageBubble key={extractMessageId(msg.id) || index} msg={msg} />
-                        ))}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Message Input Bar (Isolated & Memoized for zero typing lag) */}
-                  <WaMessageInput
-                    onSendMessage={handleSendMessage}
-                    disabled={!isSessionConnected || isSending}
-                    placeholder={`Balas ke ${selectedRoom.name}... (Enter untuk kirim, Shift+Enter untuk baris baru)`}
-                  />
-                </>
-              ) : (
-                /* Empty Selection Placeholder */
-                <div className="flex flex-col items-center justify-center h-full text-center p-8 text-stone-400">
-                  <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mb-3">
-                    <MessageSquare className="w-8 h-8 text-stone-400" />
-                  </div>
-                  <h4 className="text-sm font-bold text-stone-700 mb-1">
-                    Pilih Ruang Obrolan
-                  </h4>
-                  <p className="text-xs max-w-sm leading-relaxed">
-                    Pilih salah satu kontak atau grup di panel kiri untuk membuka riwayat percakapan dan membalas pesan WhatsApp secara langsung.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Pipeline Stages & Labels Customization Modal */}
+      <WaPipelineSettingsDialog
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        sessionId={selectedSessionId}
+        onStagesChanged={() => {
+          fetchStages();
+          fetchChatRooms(selectedSessionId, true);
+        }}
+        onLabelsChanged={() => {
+          fetchLabels();
+          fetchChatRooms(selectedSessionId, true);
+        }}
+      />
     </div>
   );
 }

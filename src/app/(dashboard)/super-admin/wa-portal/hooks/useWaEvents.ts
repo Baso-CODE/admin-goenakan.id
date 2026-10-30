@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 export interface WaEventData {
-  type: "message" | "message.ack" | "session.status" | "connected";
+  type: "message" | "message.ack" | "session.status" | "contact.updated" | "connected";
   session: string;
   data: any;
   timestamp: number;
@@ -15,6 +15,7 @@ export function useWaEvents(
     onMessage?: (payload: any) => void;
     onMessageAck?: (payload: any) => void;
     onSessionStatus?: (payload: any) => void;
+    onContactUpdated?: (payload: any) => void;
   }
 ) {
   const callbacksRef = useRef(callbacks);
@@ -52,6 +53,15 @@ export function useWaEvents(
       try {
         const parsed = JSON.parse(e.data);
         callbacksRef.current?.onSessionStatus?.(parsed.data || parsed);
+      } catch {
+        // ignore
+      }
+    });
+
+    eventSource.addEventListener("contact.updated", (e: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(e.data);
+        callbacksRef.current?.onContactUpdated?.(parsed.data || parsed);
       } catch {
         // ignore
       }
