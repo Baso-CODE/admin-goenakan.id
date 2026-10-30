@@ -70,10 +70,12 @@ export const WaPipelineSettingsDialog: React.FC<WaPipelineSettingsDialogProps> =
   const [isSubmittingLabel, setIsSubmittingLabel] = useState(false);
 
   const fetchStages = async () => {
-    if (!sessionId) return;
     try {
       setIsLoadingStages(true);
-      const res = await fetch(`/api/wa/pipeline/stages?sessionId=${encodeURIComponent(sessionId)}`);
+      const url = sessionId
+        ? `/api/wa/pipeline/stages?sessionId=${encodeURIComponent(sessionId)}`
+        : `/api/wa/pipeline/stages`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Gagal mengambil daftar stage");
       const data = await res.json();
       if (data?.success && Array.isArray(data.stages)) {
@@ -87,10 +89,12 @@ export const WaPipelineSettingsDialog: React.FC<WaPipelineSettingsDialogProps> =
   };
 
   const fetchLabels = async () => {
-    if (!sessionId) return;
     try {
       setIsLoadingLabels(true);
-      const res = await fetch(`/api/wa/labels?sessionId=${encodeURIComponent(sessionId)}`);
+      const url = sessionId
+        ? `/api/wa/labels?sessionId=${encodeURIComponent(sessionId)}`
+        : `/api/wa/labels`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Gagal mengambil daftar label");
       const data = await res.json();
       if (data?.success && Array.isArray(data.labels)) {

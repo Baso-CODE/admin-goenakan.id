@@ -381,11 +381,13 @@ export function WaChatRoomManager({
     []
   );
 
-  // Fetch pipeline stages for the selected session
+  // Fetch pipeline stages globally across company
   const fetchStages = useCallback(async () => {
-    if (!selectedSessionId) return;
     try {
-      const res = await fetch(`/api/wa/pipeline/stages?sessionId=${encodeURIComponent(selectedSessionId)}`);
+      const url = selectedSessionId
+        ? `/api/wa/pipeline/stages?sessionId=${encodeURIComponent(selectedSessionId)}`
+        : `/api/wa/pipeline/stages`;
+      const res = await fetch(url);
       if (!res.ok) return;
       const data = await res.json();
       if (data?.success && Array.isArray(data.stages)) {
@@ -396,11 +398,13 @@ export function WaChatRoomManager({
     }
   }, [selectedSessionId]);
 
-  // Fetch labels for the selected session
+  // Fetch labels globally across company
   const fetchLabels = useCallback(async () => {
-    if (!selectedSessionId) return;
     try {
-      const res = await fetch(`/api/wa/labels?sessionId=${encodeURIComponent(selectedSessionId)}`);
+      const url = selectedSessionId
+        ? `/api/wa/labels?sessionId=${encodeURIComponent(selectedSessionId)}`
+        : `/api/wa/labels`;
+      const res = await fetch(url);
       if (!res.ok) return;
       const data = await res.json();
       if (data?.success && Array.isArray(data.labels)) {
