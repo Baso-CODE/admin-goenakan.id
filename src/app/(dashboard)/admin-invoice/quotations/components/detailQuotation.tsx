@@ -21,6 +21,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { WhatsappCodeMatcher } from "@/components/tracking/whatsappCodeMatcher";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -248,6 +249,8 @@ export default function QuotationDetail() {
         </div>
       </div>
 
+      {/* WHATSAPP ATTRIBUTION */}
+      <WhatsappCodeMatcher targetType="quotation" targetId={data.id} />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* KOLOM KIRI: INFO UTAMA & CLIENT */}
         <div className="lg:col-span-2 space-y-6">
