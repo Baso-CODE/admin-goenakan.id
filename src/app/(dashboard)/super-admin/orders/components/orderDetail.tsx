@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmCancelDialog } from "@/app/(dashboard)/components/confirmCancelDialog";
+import { WhatsappCodeMatcher } from "@/components/tracking/whatsappCodeMatcher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -225,6 +226,9 @@ export default function OrderDetailPage() {
           paymentProgress={paymentProgress}
           onGenerateInvoice={invoiceDialog.openDialog}
         />
+
+        {/* WHATSAPP ATTRIBUTION */}
+        <WhatsappCodeMatcher targetType="order" targetId={order.id} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* LEFT COLUMN */}

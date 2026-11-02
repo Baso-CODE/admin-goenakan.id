@@ -6,6 +6,7 @@ import { Eye, MessageCircle, Search, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { WhatsappCodeMatcher } from "@/components/tracking/whatsappCodeMatcher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -376,10 +377,18 @@ export default function AdminContactMessage() {
                 <span className="block text-gray-500 text-xs mb-1">
                   Isi Pesan:
                 </span>
+
                 <div className="p-3 bg-stone-50 border rounded-md text-sm text-gray-700 whitespace-pre-wrap min-h-25">
                   {selectedMessage.message}
                 </div>
               </div>
+
+              {/* WHATSAPP ATTRIBUTION */}
+              <WhatsappCodeMatcher
+                key={`lead-${selectedMessage.id}`}
+                targetType="lead"
+                targetId={selectedMessage.id}
+              />
 
               <div className="pt-4 flex justify-end gap-2">
                 <Button
