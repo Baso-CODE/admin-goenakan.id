@@ -62,13 +62,18 @@ export default function QuotationPrint() {
 
   const handleDownloadPDF = async () => {
     const element = invoiceRef.current;
+
     if (!element || isDownloading) return;
 
     try {
       setIsDownloading(true);
+
       toast.info("Sedang membuat PDF quotation...");
 
-      // Pastikan gambar dan font selesai dimuat sebelum membuat PDF.
+      // ==========================================
+      // 1. WAIT FOR FONTS & IMAGES
+      // ==========================================
+
       await document.fonts.ready;
 
       await Promise.all(
@@ -76,11 +81,20 @@ export default function QuotationPrint() {
           if (img.complete) return;
 
           await new Promise<void>((resolve) => {
-            img.addEventListener("load", () => resolve(), { once: true });
-            img.addEventListener("error", () => resolve(), { once: true });
+            img.addEventListener("load", () => resolve(), {
+              once: true,
+            });
+
+            img.addEventListener("error", () => resolve(), {
+              once: true,
+            });
           });
         }),
       );
+
+      // ==========================================
+      // 2. GENERATE FULL CANVAS
+      // ==========================================
 
       const canvas = await html2canvas(element, {
         scale: 1.5,
@@ -91,6 +105,14 @@ export default function QuotationPrint() {
         windowWidth: Math.max(window.innerWidth, element.scrollWidth),
       });
 
+      if (!canvas.width || !canvas.height) {
+        throw new Error("Canvas quotation tidak valid.");
+      }
+
+      // ==========================================
+      // 3. PDF CONFIGURATION
+      // ==========================================
+
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -98,91 +120,202 @@ export default function QuotationPrint() {
         compress: true,
       });
 
-      const pdfWidth = 210;
-      const pdfHeight = 297;
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      // Lebar gambar mengikuti kertas A4.
-      const pageWidthPx = canvas.width;
-      const pageHeightPx = Math.floor((canvas.width * pdfHeight) / pdfWidth);
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
 
-      // Konversi posisi elemen HTML ke koordinat canvas.
+      const pageHeightPx = Math.floor((canvasWidth * pdfHeight) / pdfWidth);
+
+      // Beri batas aman 8mm di bagian bawah
+      // untuk semua halaman kecuali halaman terakhir.
+
+      const safetyMarginPx = Math.floor((canvasWidth * 8) / pdfWidth);
+
+      // ==========================================
+      // 4. CALCULATE ELEMENT POSITIONS
+      // ==========================================
+
       const elementRect = element.getBoundingClientRect();
-      const scaleY = canvas.height / elementRect.height;
 
-      // Titik aman untuk memisahkan halaman:
-      // awal baris produk, notes, dan footer.
-      const breakElements = element.querySelectorAll(
-        "tbody tr[data-pdf-row], [data-pdf-section]",
+      const scaleY = canvasHeight / elementRect.height;
+      const scaleX = canvasWidth / elementRect.width;
+
+      const getCanvasPosition = (htmlElement: Element) => {
+        const rect = htmlElement.getBoundingClientRect();
+
+        return {
+          top: Math.max(0, Math.floor((rect.top - elementRect.top) * scaleY)),
+
+          bottom: Math.min(
+            canvasHeight,
+            Math.ceil((rect.bottom - elementRect.top) * scaleY),
+          ),
+        };
+      };
+
+      // ==========================================
+      // 5. COLLECT SAFE BREAK ELEMENTS
+      // ==========================================
+
+      const breakElements = Array.from(
+        element.querySelectorAll(
+          ["tr[data-pdf-row]", "[data-pdf-section]", "[data-pdf-note]"].join(
+            ", ",
+          ),
+        ),
       );
 
-      const safeBreaks = Array.from(breakElements)
+      const blocks = breakElements
         .map((node) => {
-          const rect = node.getBoundingClientRect();
+          const position = getCanvasPosition(node);
 
-          return Math.floor((rect.top - elementRect.top) * scaleY);
+          return {
+            top: position.top,
+            bottom: position.bottom,
+            height: position.bottom - position.top,
+          };
         })
-        .filter((position) => position > 0 && position < canvas.height)
-        .sort((a, b) => a - b);
+        .filter(
+          (block) =>
+            block.height > 0 && block.top >= 0 && block.bottom <= canvasHeight,
+        )
+        .sort((a, b) => a.top - b.top);
 
-      // Ambil posisi hyperlink dari HTML sebelum membuat halaman PDF.
+      // ==========================================
+      // 6. COLLECT PDF HYPERLINKS
+      // ==========================================
+
       const pdfLinks = Array.from(
         element.querySelectorAll<HTMLAnchorElement>("a[data-pdf-link]"),
       ).map((anchor) => {
         const rect = anchor.getBoundingClientRect();
 
-        const scaleX = canvas.width / elementRect.width;
-        const scaleY = canvas.height / elementRect.height;
-
         return {
           url: anchor.dataset.pdfLink || anchor.href,
+
           x: (rect.left - elementRect.left) * scaleX,
+
           y: (rect.top - elementRect.top) * scaleY,
+
           width: rect.width * scaleX,
+
           height: rect.height * scaleY,
         };
       });
 
+      // ==========================================
+      // 7. SMART PAGE BREAK
+      // ==========================================
+
       const pageStarts: number[] = [0];
+
       let currentY = 0;
 
-      while (currentY < canvas.height) {
-        const targetY = Math.min(currentY + pageHeightPx, canvas.height);
+      while (currentY < canvasHeight) {
+        const remainingHeight = canvasHeight - currentY;
 
-        if (targetY >= canvas.height) break;
+        // Seluruh sisa konten muat di halaman.
+        // Tidak perlu membuat halaman tambahan.
 
-        // Beri ruang 8 mm sebelum batas kertas.
-        const safetyMarginPx = Math.floor((canvas.width * 8) / pdfWidth);
+        if (remainingHeight <= pageHeightPx) {
+          break;
+        }
 
-        // Usahakan pindah halaman sebelum baris produk.
-        const candidates = safeBreaks.filter(
-          (position) =>
-            position > currentY + pageHeightPx * 0.35 &&
-            position <= targetY - safetyMarginPx,
+        const targetY = Math.min(
+          currentY + pageHeightPx - safetyMarginPx,
+          canvasHeight,
         );
 
-        const nextY =
-          candidates.length > 0 ? candidates[candidates.length - 1] : targetY;
+        let nextY = targetY;
 
-        // Pengaman agar loop tidak berjalan tanpa akhir.
-        if (nextY <= currentY) break;
+        // Cari elemen yang sedang melewati batas halaman.
+
+        const crossingBlocks = blocks.filter(
+          (block) =>
+            block.top < targetY &&
+            block.bottom > targetY &&
+            block.top > currentY &&
+            block.height <= pageHeightPx - safetyMarginPx,
+        );
+
+        if (crossingBlocks.length > 0) {
+          // Pilih posisi awal elemen yang paling atas
+          // agar seluruh elemen tetap pada halaman berikutnya.
+
+          const earliestBlock = crossingBlocks.reduce((earliest, block) =>
+            block.top < earliest.top ? block : earliest,
+          );
+
+          nextY = earliestBlock.top;
+        } else {
+          // Jika tidak ada elemen yang melewati batas,
+          // cari titik pemisahan aman terdekat.
+
+          const candidates = blocks
+            .map((block) => block.top)
+            .filter(
+              (position) =>
+                position > currentY + pageHeightPx * 0.35 &&
+                position <= targetY,
+            )
+            .sort((a, b) => b - a);
+
+          if (candidates.length > 0) {
+            const closestBreak = candidates[0];
+
+            // Hindari ruang kosong berlebihan.
+            if (targetY - closestBreak < pageHeightPx * 0.2) {
+              nextY = closestBreak;
+            }
+          }
+        }
+
+        // Hindari halaman kosong atau loop tanpa akhir.
+        // Elemen yang lebih tinggi dari satu halaman
+        // tetap harus dibagi menggunakan batas halaman.
+
+        if (nextY <= currentY + 1) {
+          nextY = targetY;
+        }
+
+        if (nextY <= currentY) {
+          throw new Error("Gagal menentukan pemisahan halaman PDF.");
+        }
 
         pageStarts.push(nextY);
+
         currentY = nextY;
       }
 
-      for (let index = 0; index < pageStarts.length; index++) {
-        const startY = pageStarts[index];
+      // ==========================================
+      // 8. RENDER EACH PDF PAGE
+      // ==========================================
+
+      for (let pageIndex = 0; pageIndex < pageStarts.length; pageIndex++) {
+        const startY = pageStarts[pageIndex];
 
         const endY =
-          index + 1 < pageStarts.length ? pageStarts[index + 1] : canvas.height;
+          pageIndex + 1 < pageStarts.length
+            ? pageStarts[pageIndex + 1]
+            : canvasHeight;
 
         const sliceHeight = endY - startY;
 
         if (sliceHeight <= 0) continue;
 
+        // Pastikan hasil tidak melebihi tinggi A4.
+
+        if (sliceHeight > pageHeightPx) {
+          throw new Error(
+            `Tinggi halaman PDF ke-${pageIndex + 1} melebihi A4.`,
+          );
+        }
+
         const pageCanvas = document.createElement("canvas");
 
-        pageCanvas.width = pageWidthPx;
+        pageCanvas.width = canvasWidth;
         pageCanvas.height = sliceHeight;
 
         const ctx = pageCanvas.getContext("2d");
@@ -191,26 +324,31 @@ export default function QuotationPrint() {
           throw new Error("Gagal membuat canvas halaman PDF.");
         }
 
+        // Background putih.
+
         ctx.fillStyle = "#ffffff";
+
         ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+
+        // Ambil bagian canvas sesuai halaman.
 
         ctx.drawImage(
           canvas,
           0,
           startY,
-          pageWidthPx,
+          canvasWidth,
           sliceHeight,
           0,
           0,
-          pageWidthPx,
+          canvasWidth,
           sliceHeight,
         );
 
-        const imgData = pageCanvas.toDataURL("image/jpeg", 0.82);
+        const imgData = pageCanvas.toDataURL("image/jpeg", 0.85);
 
-        const imgHeight = (sliceHeight * pdfWidth) / pageWidthPx;
+        const imgHeight = (sliceHeight * pdfWidth) / canvasWidth;
 
-        if (index > 0) {
+        if (pageIndex > 0) {
           pdf.addPage();
         }
 
@@ -225,11 +363,16 @@ export default function QuotationPrint() {
           "FAST",
         );
 
-        // Tambahkan hyperlink yang dapat diklik pada halaman PDF.
-        const mmPerPixel = pdfWidth / pageWidthPx;
+        // ==========================================
+        // 9. RESTORE PRODUCT HYPERLINKS
+        // ==========================================
+
+        const mmPerPixel = pdfWidth / canvasWidth;
 
         for (const link of pdfLinks) {
-          // Pastikan link berada sepenuhnya pada halaman saat ini.
+          // Tambahkan hyperlink hanya apabila
+          // seluruh area hyperlink berada pada halaman.
+
           if (link.y < startY || link.y + link.height > endY) {
             continue;
           }
@@ -238,8 +381,9 @@ export default function QuotationPrint() {
           const yMm = (link.y - startY) * mmPerPixel;
           const widthMm = link.width * mmPerPixel;
           const heightMm = link.height * mmPerPixel;
-
-          if (widthMm <= 0 || heightMm <= 0) continue;
+          if (widthMm <= 0 || heightMm <= 0) {
+            continue;
+          }
 
           pdf.link(xMm, yMm, widthMm, heightMm, {
             url: link.url,
@@ -247,9 +391,14 @@ export default function QuotationPrint() {
         }
 
         // Bersihkan canvas sementara.
+
         pageCanvas.width = 0;
         pageCanvas.height = 0;
       }
+
+      // ==========================================
+      // 10. SAVE PDF
+      // ==========================================
 
       const fileName =
         `Quotation_${data?.quotationNumber || "Draft"}.pdf`.replace(
@@ -262,12 +411,12 @@ export default function QuotationPrint() {
       toast.success(`PDF berhasil dibuat (${pdf.getNumberOfPages()} halaman).`);
     } catch (error) {
       console.error("[Quotation PDF Error]", error);
+
       toast.error("Gagal membuat PDF quotation.");
     } finally {
       setIsDownloading(false);
     }
   };
-
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -518,60 +667,106 @@ export default function QuotationPrint() {
                         </td>
 
                         {/* Kolom 2: Product Specification */}
-                        {/*  PERBAIKAN JARAK: align-top dan class margin diperkecil */}
                         <td className="border-r border-gray-800 p-3 align-top text-gray-800">
+                          {/* Product Name */}
                           <div className="font-bold text-[12px] mb-1">
-                            {item.productName}
+                            {item.productName ||
+                              item.product?.name ||
+                              "Unnamed Product"}
                           </div>
 
-                          {/* Spesifikasi (Deskripsi & Customization Manual) */}
-                          {/* <div className="space-y-0.5 text-[10px]">
-                            {item.customization &&
-                            typeof item.customization === "object" ? (
-                              Object.entries(item.customization).map(
-                                ([key, value]) => (
-                                  <div key={key}>
-                                    <span className="font-medium">{key}:</span>{" "}
-                                    {String(value)}
-                                  </div>
-                                ),
-                              )
-                            ) : item.customization ? (
-                              <div className="whitespace-pre-line">
-                                {item.customization}
-                              </div>
-                            ) : null}
+                          {(() => {
+                            const isManualProduct =
+                              !item.productId && !item.product;
 
-                            {item.description && (
-                              <div className="whitespace-pre-line mt-1">
-                                {item.description}
-                              </div>
-                            )}
-                          </div> */}
+                            const description =
+                              typeof item.description === "string"
+                                ? item.description.trim()
+                                : "";
 
-                          {/* Attributes Available / Selected */}
-                          {item.product?.availableAttributes?.map(
-                            (attr: any, attrIdx: number) => {
+                            const variantName =
+                              typeof item.variant?.variantName === "string"
+                                ? item.variant.variantName.trim()
+                                : "";
+
+                            const availableAttributes = Array.isArray(
+                              item.product?.availableAttributes,
+                            )
+                              ? item.product.availableAttributes
+                              : [];
+
+                            // ==========================================
+                            // 1. MANUAL PRODUCT
+                            // ==========================================
+                            if (isManualProduct) {
                               return (
-                                <div
-                                  key={attrIdx}
-                                  className="mt-1 text-[10px] text-gray-700">
-                                  {attr.hasSelection
-                                    ? `${attr.attributeName} : `
-                                    : `Available in ${attr.attributeName} : `}
-
-                                  {attr.values.map((v: any, vIdx: number) => (
-                                    <span key={v.valueId}>
-                                      {v.value}
-                                      {vIdx < attr.values.length - 2 && ", "}
-                                      {vIdx === attr.values.length - 2 &&
-                                        " and "}
-                                    </span>
-                                  ))}
+                                <div className="space-y-1 text-[10px] text-gray-700">
+                                  {description && (
+                                    <div className="whitespace-pre-line wrap-break-words leading-relaxed">
+                                      {description}
+                                    </div>
+                                  )}
                                 </div>
                               );
-                            },
-                          )}
+                            }
+
+                            // ==========================================
+                            // 2. DATABASE PRODUCT
+                            // ==========================================
+                            return (
+                              <div className="space-y-1 text-[10px] text-gray-700">
+                                {/* Product Variant */}
+                                {variantName && (
+                                  <div className="wrap-break-words">
+                                    <span className="font-semibold">
+                                      Variant :{" "}
+                                    </span>
+                                    <span>{variantName}</span>
+                                  </div>
+                                )}
+
+                                {/* Product Attributes */}
+                                {availableAttributes.map(
+                                  (attr: any, attrIdx: number) => {
+                                    const values = Array.isArray(attr.values)
+                                      ? attr.values
+                                          .map((value: any) =>
+                                            String(value.value ?? "").trim(),
+                                          )
+                                          .filter(Boolean)
+                                      : [];
+
+                                    if (values.length === 0) return null;
+
+                                    const formattedValues = values.join(", ");
+
+                                    return (
+                                      <div
+                                        key={attr.attributeId || attrIdx}
+                                        className="wrap-break-words leading-relaxed">
+                                        <span className="font-semibold">
+                                          {attr.hasSelection
+                                            ? `${attr.attributeName} : `
+                                            : `Available in ${attr.attributeName} : `}
+                                        </span>
+
+                                        <span>{formattedValues}</span>
+                                      </div>
+                                    );
+                                  },
+                                )}
+
+                                {/* Optional Product Description */}
+                                {description &&
+                                  !variantName &&
+                                  availableAttributes.length === 0 && (
+                                    <div className="whitespace-pre-line wrap-break-words leading-relaxed">
+                                      {description}
+                                    </div>
+                                  )}
+                              </div>
+                            );
+                          })()}
 
                           {/* Remarks */}
                           {item.remarks && (
@@ -656,7 +851,10 @@ export default function QuotationPrint() {
                     {data.notes
                       .filter((note: any) => note.category?.isPublic === true)
                       .map((note: any) => (
-                        <div key={note.id} className="break-inside-avoid">
+                        <div
+                          key={note.id}
+                          data-pdf-note
+                          className="break-inside-avoid">
                           <QuotationNoteContent content={note.content} />
                         </div>
                       ))}
