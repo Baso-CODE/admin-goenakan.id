@@ -50,24 +50,33 @@ export default function AddProductPage() {
       }
 
       // Extract size default mockup images (which have URLs instead of local files)
-      const sizeDefaultSides = (data.mockupSides || []).filter((m: any) => m.imageId && m.imageId.startsWith("size-default-"));
-      
+      const sizeDefaultSides = (data.mockupSides || []).filter(
+        (m: any) => m.imageId && m.imageId.startsWith("size-default-"),
+      );
+
       // Stage 1: Add default size mockup images to imagesMetadata so the server creates ProductImage rows for them
       const extraImagesMetadata = sizeDefaultSides.map((side: any) => ({
         url: side.url,
         isFeatured: false,
-        altText: "Mockup Image"
+        altText: "Mockup Image",
       }));
 
       const cleanImagesMetadata = [
         ...extraImagesMetadata,
-        ...(data.imagesMetadata || [])
+        ...(data.imagesMetadata || []),
       ];
 
-      const { mockupSides, ...cleanData } = data as any;
-      cleanData.imagesMetadata = cleanImagesMetadata;
-      const productDataJson = JSON.stringify(cleanData);
-      formData.append("data", productDataJson);
+      // Pisahkan konfigurasi mockup dari data produk
+      const { mockupSides, ...cleanData } = data;
+
+      // Pastikan English Title ikut dikirim ke backend
+      const productPayload = {
+        ...cleanData,
+        name_en: cleanData.name_en?.trim() ?? "",
+        imagesMetadata: cleanImagesMetadata,
+      };
+
+      formData.append("data", JSON.stringify(productPayload));
 
       const res = await fetchApi("/products", {
         method: "POST",
@@ -81,13 +90,20 @@ export default function AddProductPage() {
       }
 
       // If there are mockup sides defined locally, update them sequentially
-      if (mockupSides && mockupSides.length > 0 && result.images && result.images.length > 0) {
+      if (
+        mockupSides &&
+        mockupSides.length > 0 &&
+        result.images &&
+        result.images.length > 0
+      ) {
         for (const side of mockupSides) {
           if (!side.imageId) continue;
 
           let createdImage = null;
           if (side.imageId.startsWith("size-default-")) {
-            const defaultIndex = sizeDefaultSides.findIndex((m: any) => m.id === side.id);
+            const defaultIndex = sizeDefaultSides.findIndex(
+              (m: any) => m.id === side.id,
+            );
             if (defaultIndex !== -1) {
               createdImage = result.images[defaultIndex];
             }
@@ -147,7 +163,10 @@ export default function AddProductPage() {
         Tambah Produk Baru (V2)
       </h2>
 
-      <ProductFormV2 onSubmit={handleAddProduct} isSubmitting={isSubmitting || isSuccess} />
+      <ProductFormV2
+        onSubmit={handleAddProduct}
+        isSubmitting={isSubmitting || isSuccess}
+      />
     </div>
   );
 }

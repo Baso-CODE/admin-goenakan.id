@@ -49,6 +49,12 @@ export const videoMetaSchema = z.object({
 
 export const productSchema = z.object({
   name: z.string().min(2),
+  name_en: z
+    .string()
+    .trim()
+    .max(255, "Nama produk bahasa Inggris maksimal 255 karakter")
+    .optional(),
+
   sku: z.string().min(1),
   categoryId: z.string().min(1),
   itemCategoryId: z.string().min(1, "Item Category wajib dipilih"),
