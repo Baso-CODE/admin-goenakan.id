@@ -1,16 +1,15 @@
 import { MaterialTypeFormValues } from "@/app/(dashboard)/super-admin/product-materials/components/materialTypeForm";
 import {
-  cartesianProduct,
   Category,
   ProductFormValues,
   productSchema,
 } from "@/app/(dashboard)/super-admin/products-v2/components/product.schema";
 import { useApi } from "@/hooks/useApi";
+import { parseColorValue } from "@/utils/colorConverter";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { parseColorValue } from "@/utils/colorConverter";
 
 export function useProductFormV2(
   onSubmitProps: (data: ProductFormValues, files: any) => Promise<void>,
@@ -44,7 +43,12 @@ export function useProductFormV2(
 
   // === VARIANT STATES ===
   const [attributeSelections, setAttributeSelections] = useState<
-    { attributeId: string; valueIds: string[]; priceModifiers?: Record<string, number>; isVariantGenerator?: boolean }[]
+    {
+      attributeId: string;
+      valueIds: string[];
+      priceModifiers?: Record<string, number>;
+      isVariantGenerator?: boolean;
+    }[]
   >([]);
   const [combinations, setCombinations] = useState<
     { label: string; valueIds: string[] }[]
@@ -54,7 +58,9 @@ export function useProductFormV2(
   const [variantFilesMap, setVariantFilesMap] = useState<File[][]>([]);
   const [productImagesFiles, setProductImagesFiles] = useState<File[]>([]);
   const [isGenModalOpen, setIsGenModalOpen] = useState<boolean>(false);
-  const [activeGroupFilters, setActiveGroupFilters] = useState<Record<string, Record<string, string[]>>>({});
+  const [activeGroupFilters, setActiveGroupFilters] = useState<
+    Record<string, Record<string, string[]>>
+  >({});
   const [createdAttributeIds, setCreatedAttributeIds] = useState<string[]>([]);
 
   // === FORM INITIALIZATION ===
@@ -62,6 +68,7 @@ export function useProductFormV2(
     resolver: zodResolver(productSchema) as Resolver<ProductFormValues>,
     defaultValues: {
       name: "",
+      name_en: "",
       sku: "",
       categoryId: "",
       itemCategoryId: "",
@@ -142,9 +149,7 @@ export function useProductFormV2(
   useEffect(() => {
     const fetchItemNames = async () => {
       try {
-        const res = await fetchApi(
-          "/item-names?take=500",
-        );
+        const res = await fetchApi("/item-names?take=500");
         const result = await res.json();
         setItemNames(result.data || []);
       } catch (error) {
@@ -315,7 +320,7 @@ export function useProductFormV2(
       return toast.error("Tambahkan minimal 1 attribute.");
 
     const variantGeneratingSelections = attributeSelections.filter(
-      (a) => a.isVariantGenerator !== false
+      (a) => a.isVariantGenerator !== false,
     );
 
     if (!variantGeneratingSelections.length) {
@@ -324,7 +329,9 @@ export function useProductFormV2(
 
     const primarySelection = variantGeneratingSelections[0];
     if (!primarySelection.valueIds.length) {
-      return toast.error(`Harap isi nilai untuk atribut utama: ${attributesList.find(a => a.id === primarySelection.attributeId)?.name || ""}`);
+      return toast.error(
+        `Harap isi nilai untuk atribut utama: ${attributesList.find((a) => a.id === primarySelection.attributeId)?.name || ""}`,
+      );
     }
 
     const initialFilters: Record<string, Record<string, string[]>> = {};
@@ -341,20 +348,24 @@ export function useProductFormV2(
 
   const handleConfirmVariantGeneration = () => {
     const variantGeneratingSelections = attributeSelections.filter(
-      (a) => a.isVariantGenerator !== false
+      (a) => a.isVariantGenerator !== false,
     );
     const primarySelection = variantGeneratingSelections[0];
     const otherSelections = variantGeneratingSelections.slice(1);
 
     const cartesianProduct = (a: any[]): any[] => {
-      return a.reduce((co, b) => co.flatMap((d: any) => b.map((e: any) => [d, e].flat())));
+      return a.reduce((co, b) =>
+        co.flatMap((d: any) => b.map((e: any) => [d, e].flat())),
+      );
     };
 
     const finalCombos: { valueIds: string[]; label: string }[] = [];
 
     primarySelection.valueIds.forEach((primValId) => {
-      const activeGroups = otherSelections.map((sel) => activeGroupFilters[primValId]?.[sel.attributeId] || []);
-      
+      const activeGroups = otherSelections.map(
+        (sel) => activeGroupFilters[primValId]?.[sel.attributeId] || [],
+      );
+
       let primCombos: string[][] = [];
       if (activeGroups.length === 0) {
         primCombos = [[primValId]];
@@ -362,7 +373,10 @@ export function useProductFormV2(
         return; // skip if any other attribute has 0 selected values
       } else {
         const product = cartesianProduct(activeGroups);
-        primCombos = product.map((p) => [primValId, ...(Array.isArray(p) ? p : [p])]);
+        primCombos = product.map((p) => [
+          primValId,
+          ...(Array.isArray(p) ? p : [p]),
+        ]);
       }
 
       // Filter based on parentValueId constraint
@@ -389,7 +403,9 @@ export function useProductFormV2(
       filteredPrimCombos.forEach((combo) => {
         const names: string[] = [];
         attributesList.forEach((attr: any) => {
-          const selection = attributeSelections.find((s) => s.attributeId === attr.id);
+          const selection = attributeSelections.find(
+            (s) => s.attributeId === attr.id,
+          );
           if (selection && selection.isVariantGenerator !== false) {
             combo.forEach((valueId) => {
               const found = attr.values.find((v: any) => v.id === valueId);
@@ -445,7 +461,12 @@ export function useProductFormV2(
     setIsGenModalOpen(false);
   };
 
-  const handleAddAttributeValueInline = async (attributeId: string, newValueName: string, primValId: string, priceModifier?: string) => {
+  const handleAddAttributeValueInline = async (
+    attributeId: string,
+    newValueName: string,
+    primValId: string,
+    priceModifier?: string,
+  ) => {
     const attr = attributesList.find((a) => a.id === attributeId);
     if (!attr) return toast.error("Attribute not found.");
 
@@ -478,11 +499,15 @@ export function useProductFormV2(
       }
 
       const updatedAttr = await res.json();
-      
-      const nextFullList = attributesList.map((a) => (a.id === attributeId ? updatedAttr : a));
+
+      const nextFullList = attributesList.map((a) =>
+        a.id === attributeId ? updatedAttr : a,
+      );
       setAttributesList(nextFullList);
 
-      const newValueObj = updatedAttr.values.find((v: any) => v.value === newValueName.trim());
+      const newValueObj = updatedAttr.values.find(
+        (v: any) => v.value === newValueName.trim(),
+      );
       if (newValueObj) {
         const nextSelections = attributeSelections.map((sel) => {
           if (sel.attributeId === attributeId) {
@@ -507,7 +532,10 @@ export function useProductFormV2(
             if (!nextFilters[primValId][attributeId]) {
               nextFilters[primValId][attributeId] = [];
             }
-            nextFilters[primValId][attributeId] = [...nextFilters[primValId][attributeId], newValueObj.id];
+            nextFilters[primValId][attributeId] = [
+              ...nextFilters[primValId][attributeId],
+              newValueObj.id,
+            ];
           }
           return nextFilters;
         });
@@ -605,7 +633,7 @@ export function useProductFormV2(
 
   const handleUpdateVariantLabel = (idx: number, newLabel: string) => {
     setCombinations((prev) =>
-      prev.map((c, i) => (i === idx ? { ...c, label: newLabel } : c))
+      prev.map((c, i) => (i === idx ? { ...c, label: newLabel } : c)),
     );
   };
 

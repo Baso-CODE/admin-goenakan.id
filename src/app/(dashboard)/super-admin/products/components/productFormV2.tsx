@@ -46,6 +46,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useProductFormV2 } from "@/hooks/useProductFormV2";
+import { useUnsavedChangesWarning } from "@/hooks/useUnsavedChangesWarning";
 import { cn } from "@/lib/utils";
 import { parseColorValue } from "@/utils/colorConverter";
 import {
@@ -60,9 +61,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useUnsavedChangesWarning } from "@/hooks/useUnsavedChangesWarning";
 import { AddItemCategoryModal } from "../../item-categories-product/components/addItemCategoryModal";
 import { AddItemNameModal } from "../../item-names-product/components/addItemNameModal";
 import CreateCategoryModal from "../../product-categories/components/createCategoryModal";
@@ -158,8 +158,7 @@ export default function ProductFormV2({
     // C. Uploaded files or variants in state
     if (state.productImagesFiles && state.productImagesFiles.length > 0)
       return true;
-    if (state.variantMetas && state.variantMetas.length > 0)
-      return true;
+    if (state.variantMetas && state.variantMetas.length > 0) return true;
 
     // D. Mockup sides or variant combinations
     if (mockupSides && mockupSides.length > 0) return true;
@@ -461,6 +460,32 @@ export default function ProductFormV2({
                                   {...field}
                                 />
                               </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="name_en"
+                          render={({ field }) => (
+                            <FormItem className="md:col-span-2">
+                              <FormLabel>Nama Produk (English)</FormLabel>
+
+                              <FormControl>
+                                <Input
+                                  placeholder="Example: Premium Stainless Steel Tumbler"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                />
+                              </FormControl>
+
+                              <p className="text-xs text-muted-foreground">
+                                Opsional. Jika diisi, nama ini akan digunakan
+                                untuk bahasa Inggris tanpa diterjemahkan
+                                otomatis.
+                              </p>
+
                               <FormMessage />
                             </FormItem>
                           )}
@@ -1177,9 +1202,7 @@ export default function ProductFormV2({
                                                             e.stopPropagation();
                                                             field.onChange(
                                                               selectedTags.filter(
-                                                                (
-                                                                  id: string,
-                                                                ) =>
+                                                                (id: string) =>
                                                                   !cat.tagIds.includes(
                                                                     id,
                                                                   ),
@@ -1303,9 +1326,7 @@ export default function ProductFormV2({
                                                                 selectedCatTags.length
                                                               }
                                                               /
-                                                              {
-                                                                catTagIds.length
-                                                              }{" "}
+                                                              {catTagIds.length}{" "}
                                                               tag
                                                             </span>
                                                           </CommandItem>
@@ -1366,107 +1387,115 @@ export default function ProductFormV2({
                                   <Popover
                                     open={state.tagSearchOpen}
                                     onOpenChange={setters.setTagSearchOpen}>
-                                  <PopoverTrigger asChild>
-                                    <FormControl>
-                                      <Button
-                                        variant="outline"
-                                        role="combobox"
-                                        className={cn(
-                                          "w-full justify-between h-auto min-h-10 text-left bg-white dark:bg-stone-950",
-                                          selectedTags.length === 0 &&
-                                            "text-muted-foreground",
-                                        )}>
-                                        <div className="flex flex-wrap gap-1.5 items-center py-1">
-                                          {selectedTags.length > 0
-                                            ? selectedTags.map((tagId) => {
-                                                const tagInfo = state.tags.find(
-                                                  (t) => t.id === tagId,
-                                                );
-                                                if (!tagInfo) return null;
-                                                return (
-                                                  <Badge
-                                                    key={tagId}
-                                                    variant="secondary"
-                                                    className="flex items-center gap-1 px-2 py-1">
-                                                    {tagInfo.name}
-                                                    <X
-                                                      className="h-3 w-3 cursor-pointer hover:text-red-500"
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        field.onChange(
-                                                          selectedTags.filter(
-                                                            (id) =>
-                                                              id !== tagId,
-                                                          ),
-                                                        );
-                                                      }}
-                                                    />
-                                                  </Badge>
-                                                );
-                                              })
-                                            : "Pilih tag produk..."}
-                                        </div>
-                                        <ChevronsUpDown className="h-4 w-4 opacity-50" />
-                                      </Button>
-                                    </FormControl>
-                                  </PopoverTrigger>
-                                  <PopoverContent
-                                    align="start"
-                                    className="w-[--radix-popover-trigger-width] p-0">
-                                    <Command>
-                                      <CommandInput
-                                        placeholder="Cari tag..."
-                                        value={state.tagSearchQuery}
-                                        onValueChange={
-                                          setters.setTagSearchQuery
-                                        }
-                                      />
-                                      <CommandList>
-                                        <CommandEmpty>
-                                          Tag tidak ditemukan.
-                                        </CommandEmpty>
-                                        <CommandGroup>
-                                          {state.tags.map((tag) => (
-                                            <CommandItem
-                                              key={tag.id}
-                                              onSelect={() => {
-                                                field.onChange(
-                                                  selectedTags.includes(tag.id)
-                                                    ? selectedTags.filter(
-                                                        (id) => id !== tag.id,
-                                                      )
-                                                    : [...selectedTags, tag.id],
-                                                );
-                                                setters.setTagSearchQuery("");
-                                              }}>
-                                              <Check
-                                                className={cn(
-                                                  "mr-2 h-4 w-4",
-                                                  selectedTags.includes(tag.id)
-                                                    ? "opacity-100"
-                                                    : "opacity-0",
-                                                )}
-                                              />
-                                              {tag.name}
-                                            </CommandItem>
-                                          ))}
-                                        </CommandGroup>
-                                        <div className="h-px bg-stone-200 my-1 mx-1" />
-                                        <CommandItem
-                                          onSelect={() => {
-                                            setters.setIsTagModalOpen(true);
-                                            setters.setTagSearchOpen(false);
-                                          }}
-                                          className="text-blue-600 font-bold justify-center text-xs">
-                                          + Tambah Tag Baru Sekaligus
-                                        </CommandItem>
-                                      </CommandList>
-                                    </Command>
-                                  </PopoverContent>
-                                </Popover>
-                              </div>
-                              <FormMessage />
-                            </FormItem>
+                                    <PopoverTrigger asChild>
+                                      <FormControl>
+                                        <Button
+                                          variant="outline"
+                                          role="combobox"
+                                          className={cn(
+                                            "w-full justify-between h-auto min-h-10 text-left bg-white dark:bg-stone-950",
+                                            selectedTags.length === 0 &&
+                                              "text-muted-foreground",
+                                          )}>
+                                          <div className="flex flex-wrap gap-1.5 items-center py-1">
+                                            {selectedTags.length > 0
+                                              ? selectedTags.map((tagId) => {
+                                                  const tagInfo =
+                                                    state.tags.find(
+                                                      (t) => t.id === tagId,
+                                                    );
+                                                  if (!tagInfo) return null;
+                                                  return (
+                                                    <Badge
+                                                      key={tagId}
+                                                      variant="secondary"
+                                                      className="flex items-center gap-1 px-2 py-1">
+                                                      {tagInfo.name}
+                                                      <X
+                                                        className="h-3 w-3 cursor-pointer hover:text-red-500"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          field.onChange(
+                                                            selectedTags.filter(
+                                                              (id) =>
+                                                                id !== tagId,
+                                                            ),
+                                                          );
+                                                        }}
+                                                      />
+                                                    </Badge>
+                                                  );
+                                                })
+                                              : "Pilih tag produk..."}
+                                          </div>
+                                          <ChevronsUpDown className="h-4 w-4 opacity-50" />
+                                        </Button>
+                                      </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                      align="start"
+                                      className="w-[--radix-popover-trigger-width] p-0">
+                                      <Command>
+                                        <CommandInput
+                                          placeholder="Cari tag..."
+                                          value={state.tagSearchQuery}
+                                          onValueChange={
+                                            setters.setTagSearchQuery
+                                          }
+                                        />
+                                        <CommandList>
+                                          <CommandEmpty>
+                                            Tag tidak ditemukan.
+                                          </CommandEmpty>
+                                          <CommandGroup>
+                                            {state.tags.map((tag) => (
+                                              <CommandItem
+                                                key={tag.id}
+                                                onSelect={() => {
+                                                  field.onChange(
+                                                    selectedTags.includes(
+                                                      tag.id,
+                                                    )
+                                                      ? selectedTags.filter(
+                                                          (id) => id !== tag.id,
+                                                        )
+                                                      : [
+                                                          ...selectedTags,
+                                                          tag.id,
+                                                        ],
+                                                  );
+                                                  setters.setTagSearchQuery("");
+                                                }}>
+                                                <Check
+                                                  className={cn(
+                                                    "mr-2 h-4 w-4",
+                                                    selectedTags.includes(
+                                                      tag.id,
+                                                    )
+                                                      ? "opacity-100"
+                                                      : "opacity-0",
+                                                  )}
+                                                />
+                                                {tag.name}
+                                              </CommandItem>
+                                            ))}
+                                          </CommandGroup>
+                                          <div className="h-px bg-stone-200 my-1 mx-1" />
+                                          <CommandItem
+                                            onSelect={() => {
+                                              setters.setIsTagModalOpen(true);
+                                              setters.setTagSearchOpen(false);
+                                            }}
+                                            className="text-blue-600 font-bold justify-center text-xs">
+                                            + Tambah Tag Baru Sekaligus
+                                          </CommandItem>
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
+                                <FormMessage />
+                              </FormItem>
                             );
                           }}
                         />
