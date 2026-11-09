@@ -51,6 +51,7 @@ import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import {
   Check,
+  Eye,
   FileImage,
   Languages,
   Loader2,
@@ -60,6 +61,7 @@ import {
   Search,
   Smartphone,
   TagIcon,
+  UploadCloud,
   X,
   ZoomIn,
 } from "lucide-react";
@@ -363,10 +365,6 @@ export default function FormArticle({
                           <img
                             src={URL.createObjectURL(coverFile)}
                             className="w-full h-full object-cover rounded-lg"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePreview(URL.createObjectURL(coverFile));
-                            }}
                           />
                           <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg pointer-events-none">
                             <ZoomIn className="text-white w-8 h-8" />
@@ -384,19 +382,49 @@ export default function FormArticle({
                           </Button>
                         </div>
                       ) : isEditing && initialData?.coverImage ? (
-                        <div
-                          className="relative group w-full h-44 cursor-zoom-in"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePreview(initialData.coverImage);
-                          }}>
+                        <div className="relative group w-full h-44 cursor-pointer">
                           <img
                             src={initialData.coverImage}
+                            alt="Cover artikel desktop"
                             className="w-full h-full object-cover rounded-lg"
                           />
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
-                            <ZoomIn className="text-white w-8 h-8" />
+
+                          {/* Overlay untuk mengganti gambar */}
+                          <div
+                            className="
+      absolute inset-0
+      bg-black/50
+      opacity-0 group-hover:opacity-100
+      transition-opacity
+      flex flex-col items-center justify-center
+      rounded-lg
+      pointer-events-none
+    ">
+                            <UploadCloud className="text-white w-7 h-7 mb-2" />
+
+                            <span className="text-white text-sm font-semibold">
+                              Ganti Cover Desktop
+                            </span>
+
+                            <span className="text-white/80 text-xs mt-1">
+                              Klik untuk upload & crop
+                            </span>
                           </div>
+
+                          {/* Tombol preview terpisah */}
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="absolute bottom-2 right-2 z-20 gap-2"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handlePreview(initialData.coverImage);
+                            }}>
+                            <Eye className="w-4 h-4" />
+                            Preview
+                          </Button>
                         </div>
                       ) : (
                         <div className="text-center text-stone-400 p-4">
@@ -430,12 +458,6 @@ export default function FormArticle({
                           <img
                             src={URL.createObjectURL(coverMobileFile)}
                             className="w-full h-full object-cover rounded-lg"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePreview(
-                                URL.createObjectURL(coverMobileFile),
-                              );
-                            }}
                           />
                           <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg pointer-events-none">
                             <ZoomIn className="text-white w-8 h-8" />
@@ -453,19 +475,49 @@ export default function FormArticle({
                           </Button>
                         </div>
                       ) : isEditing && initialData?.coverImageMobile ? (
-                        <div
-                          className="relative group w-32 h-44 cursor-zoom-in"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePreview(initialData.coverImageMobile);
-                          }}>
+                        <div className="relative group w-32 h-44 cursor-pointer">
                           <img
                             src={initialData.coverImageMobile}
+                            alt="Cover artikel mobile"
                             className="w-full h-full object-cover rounded-lg"
                           />
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
-                            <ZoomIn className="text-white w-8 h-8" />
+
+                          {/* Overlay untuk mengganti gambar */}
+                          <div
+                            className="
+      absolute inset-0
+      bg-black/50
+      opacity-0 group-hover:opacity-100
+      transition-opacity
+      flex flex-col items-center justify-center
+      rounded-lg
+      pointer-events-none
+    ">
+                            <UploadCloud className="text-white w-6 h-6 mb-2" />
+
+                            <span className="text-white text-xs font-semibold text-center">
+                              Ganti Cover Mobile
+                            </span>
+
+                            <span className="text-white/80 text-[10px] mt-1">
+                              Klik untuk upload
+                            </span>
                           </div>
+
+                          {/* Tombol preview */}
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="absolute bottom-2 right-2 z-20 gap-1 text-xs px-2"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handlePreview(initialData.coverImageMobile);
+                            }}>
+                            <Eye className="w-3 h-3" />
+                            Preview
+                          </Button>
                         </div>
                       ) : (
                         <div className="text-center text-stone-400 p-4">
