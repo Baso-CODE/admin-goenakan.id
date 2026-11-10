@@ -55,7 +55,9 @@ const articleBannerSchema = z.object({
 });
 
 export type ArticleBannerFormValues = z.infer<typeof articleBannerSchema>;
-
+const buildArticleUrl = (slug: string) => {
+  return `https://goenakan.id/id/article/${encodeURIComponent(slug)}`;
+};
 export default function FormArticleBanner({
   initialData,
   onSubmit,
@@ -69,7 +71,7 @@ export default function FormArticleBanner({
 }) {
   const { fetchApi, status } = useApi();
   const [articles, setArticles] = useState<any[]>([]);
-  console.log("ini adalah articles", articles);
+  const [articleDropdownOpen, setArticleDropdownOpen] = useState(false);
 
   const [loadingArticles, setLoadingArticles] = useState(true);
 
@@ -148,10 +150,13 @@ export default function FormArticleBanner({
                           Memuat daftar artikel...
                         </div>
                       ) : (
-                        <Popover>
+                        <Popover
+                          open={articleDropdownOpen}
+                          onOpenChange={setArticleDropdownOpen}>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
+                                type="button"
                                 variant="outline"
                                 role="combobox"
                                 className="w-full justify-between">
@@ -174,8 +179,23 @@ export default function FormArticleBanner({
                                   {articles.map((art) => (
                                     <CommandItem
                                       key={art.id}
-                                      value={art.id}
-                                      onSelect={() => field.onChange(art.id)}>
+                                      value={`${art.title_id} ${art.slug ?? ""}`}
+                                      onSelect={() => {
+                                        field.onChange(art.id);
+                                        setArticleDropdownOpen(false);
+
+                                        form.setValue(
+                                          "ctaLink",
+                                          art.slug
+                                            ? buildArticleUrl(art.slug)
+                                            : "",
+                                          {
+                                            shouldDirty: true,
+                                            shouldValidate: true,
+                                            shouldTouch: true,
+                                          },
+                                        );
+                                      }}>
                                       <Check
                                         className={cn(
                                           "mr-2 h-4 w-4",
@@ -265,7 +285,7 @@ export default function FormArticleBanner({
                       </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="https://websiteanda.com/article/slug-artikel"
+                          placeholder="https://goenakan.id/id/article/slug-artikel"
                           {...field}
                           disabled={isLoading || isSubmitting}
                         />
