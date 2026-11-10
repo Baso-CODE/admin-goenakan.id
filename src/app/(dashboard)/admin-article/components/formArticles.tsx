@@ -1141,7 +1141,15 @@ export default function FormArticle({
                       </span>
                     </div>
                     <FormControl>
-                      <div className="w-full border rounded-xl bg-white shadow-sm min-h-125">
+                      <div
+                        className="
+      article-editor-container
+      relative w-full min-w-0
+      overflow-visible
+      rounded-xl
+      bg-white
+      shadow-sm
+    ">
                         <SimpleEditor
                           value={field.value}
                           onChange={field.onChange}

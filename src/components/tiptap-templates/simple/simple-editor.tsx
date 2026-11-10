@@ -86,9 +86,7 @@ import {
 } from "lucide-react";
 
 // --- Hooks ---
-import { useCursorVisibility } from "@/hooks/use-cursor-visibility";
 import { useIsBreakpoint } from "@/hooks/use-is-breakpoint";
-import { useWindowSize } from "@/hooks/use-window-size";
 
 // --- Styles & Component ---
 import "@/components/tiptap-templates/simple/simple-editor.scss";
@@ -539,11 +537,27 @@ export function SimpleEditor({
 }: SimpleEditorProps) {
   const { fetchApi, status } = useApi();
   const isMobile = useIsBreakpoint();
-  const { height } = useWindowSize();
+
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
     "main",
   );
+  // =====================================================
+  // FLOATING TOOLBAR POSITION
+  // =====================================================
+
+  const editorWrapperRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
+
+  const [toolbarPosition, setToolbarPosition] = useState({
+    fixed: false,
+    left: 0,
+    width: 0,
+    height: 0,
+  });
+
+  // Ubah ke 0 jika navbar admin tidak fixed.
+  // 64 = tinggi navbar admin 64px.
+  const TOOLBAR_TOP = 64;
 
   // ─── CUSTOM UPLOAD CLOUDINARY LOGIC ───
   const customCloudinaryUpload = async (file: File): Promise<string> => {
@@ -640,10 +654,79 @@ export function SimpleEditor({
     },
   });
 
-  const rect = useCursorVisibility({
-    editor,
-    overlayHeight: toolbarRef.current?.getBoundingClientRect().height ?? 0,
-  });
+  // =====================================================
+  // KEEP TOOLBAR VISIBLE WHILE SCROLLING EDITOR
+  // =====================================================
+
+  useEffect(() => {
+    if (!editor) return;
+
+    let frameId = 0;
+
+    const updateToolbarPosition = () => {
+      const wrapper = editorWrapperRef.current;
+      const toolbar = toolbarRef.current;
+
+      if (!wrapper || !toolbar) return;
+
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const toolbarHeight = toolbar.getBoundingClientRect().height;
+
+      const shouldFix =
+        wrapperRect.top <= TOOLBAR_TOP &&
+        wrapperRect.bottom > TOOLBAR_TOP + toolbarHeight;
+
+      setToolbarPosition((previous) => {
+        const next = {
+          fixed: shouldFix,
+          left: wrapperRect.left,
+          width: wrapperRect.width,
+          height: toolbarHeight,
+        };
+
+        if (
+          previous.fixed === next.fixed &&
+          Math.abs(previous.left - next.left) < 1 &&
+          Math.abs(previous.width - next.width) < 1 &&
+          Math.abs(previous.height - next.height) < 1
+        ) {
+          return previous;
+        }
+
+        return next;
+      });
+    };
+    const requestUpdate = () => {
+      cancelAnimationFrame(frameId);
+
+      frameId = requestAnimationFrame(updateToolbarPosition);
+    };
+
+    // Capture scroll dari window DAN nested scroll containers.
+    document.addEventListener("scroll", requestUpdate, true);
+    window.addEventListener("resize", requestUpdate);
+
+    const resizeObserver = new ResizeObserver(requestUpdate);
+
+    if (editorWrapperRef.current) {
+      resizeObserver.observe(editorWrapperRef.current);
+    }
+
+    if (toolbarRef.current) {
+      resizeObserver.observe(toolbarRef.current);
+    }
+
+    requestUpdate();
+
+    return () => {
+      cancelAnimationFrame(frameId);
+
+      document.removeEventListener("scroll", requestUpdate, true);
+      window.removeEventListener("resize", requestUpdate);
+
+      resizeObserver.disconnect();
+    };
+  }, [editor]);
 
   useEffect(() => {
     if (editor && value && editor.getHTML() !== value) {
@@ -662,19 +745,40 @@ export function SimpleEditor({
   if (!editor) return null;
 
   return (
-    <div className="simple-editor-wrapper border rounded-md shadow-sm  relative">
+    <div
+      ref={editorWrapperRef}
+      className="simple-editor-wrapper relative min-w-0 overflow-visible rounded-md border shadow-sm">
       <EditorContext.Provider value={{ editor }}>
-        <div className="bg-stone-50 border-b sticky top-0 z-50">
+        {/* PLACEHOLDER: MENCEGAH LAYOUT BERGESER */}
+        {toolbarPosition.fixed && (
+          <div
+            aria-hidden="true"
+            style={{
+              height: toolbarPosition.height,
+            }}
+          />
+        )}
+
+        {/* FLOATING / NORMAL TOOLBAR */}
+        <div
+          className={`
+          border-b border-stone-200
+          bg-stone-50
+          shadow-sm
+          ${toolbarPosition.fixed ? "fixed z-[100]" : "relative z-10"}
+        `}
+          style={
+            toolbarPosition.fixed
+              ? {
+                  top: TOOLBAR_TOP,
+                  left: toolbarPosition.left,
+                  width: toolbarPosition.width,
+                }
+              : undefined
+          }>
           <Toolbar
             ref={toolbarRef}
-            className="flex-wrap px-2 py-1"
-            style={{
-              ...(isMobile
-                ? {
-                    bottom: `calc(100% - ${height - rect.y}px)`,
-                  }
-                : {}),
-            }}>
+            className="flex w-full flex-wrap items-center gap-1 px-2 py-1">
             {mobileView === "main" ? (
               <MainToolbarContent
                 onHighlighterClick={() => setMobileView("highlighter")}
@@ -691,8 +795,8 @@ export function SimpleEditor({
           </Toolbar>
         </div>
 
-        {/* Content Area */}
-        <div className="">
+        {/* CONTENT AREA */}
+        <div className="min-w-0">
           <EditorContent
             editor={editor}
             role="presentation"
