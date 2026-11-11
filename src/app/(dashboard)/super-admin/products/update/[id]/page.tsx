@@ -1,13 +1,8 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { ColorValueInput } from "@/components/ui/color-value-input";
-import { parseColorValue } from "@/utils/colorConverter";
 import {
   Dialog,
   DialogContent,
@@ -16,11 +11,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { parseColorValue } from "@/utils/colorConverter";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
+import ProductUrlChangeForm from "@/components/products/productUrlChangeForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useApi } from "@/hooks/useApi";
 import { apiUrl } from "@/helper/apiurl";
+import { isMockupImage } from "@/helper/mediaFilter";
+import { useApi } from "@/hooks/useApi";
 import { getSession } from "next-auth/react";
+import { ModelShapeValueInput } from "../../components/AttributeSelector";
 import FormUpdateAttributes from "../../components/update/AttributesSection";
 import FormProductCore, {
   ProductCoreFormValues,
@@ -30,8 +33,6 @@ import FormUpdateProductMedia from "../../components/update/VariantMediaSection"
 import FormUpdateVariants, {
   VariantFormValues,
 } from "../../components/update/VariantsSection";
-import { ModelShapeValueInput } from "../../components/AttributeSelector";
-import { isMockupImage } from "@/helper/mediaFilter";
 
 const CLOUDINARY_CLOUD_NAME = "do9sfnf5k";
 const CLOUDINARY_UPLOAD_PRESET = "ml_default";
@@ -46,9 +47,15 @@ export default function EditProductPage() {
   const [currentSelections, setCurrentSelections] = useState<any[]>([]);
   const [currentFullList, setCurrentFullList] = useState<any[]>([]);
   const [isGenModalOpen, setIsGenModalOpen] = useState<boolean>(false);
-  const [activeGroupFilters, setActiveGroupFilters] = useState<Record<string, Record<string, string[]>>>({});
-  const [inlineInputAttrId, setInlineInputAttrId] = useState<string | null>(null);
-  const [inlineInputGroupId, setInlineInputGroupId] = useState<string | null>(null);
+  const [activeGroupFilters, setActiveGroupFilters] = useState<
+    Record<string, Record<string, string[]>>
+  >({});
+  const [inlineInputAttrId, setInlineInputAttrId] = useState<string | null>(
+    null,
+  );
+  const [inlineInputGroupId, setInlineInputGroupId] = useState<string | null>(
+    null,
+  );
   const [inlineInputValue, setInlineInputValue] = useState<string>("");
   const [inlineInputPrice, setInlineInputPrice] = useState<string>("");
 
@@ -231,10 +238,13 @@ export default function EditProductPage() {
       if (updates.colorMaskFile) {
         const maskFormData = new FormData();
         maskFormData.append("colorMask", updates.colorMaskFile);
-        const uploadRes = await fetchApi(`/products/image/${mediaId}/color-mask`, {
-          method: "POST",
-          body: maskFormData,
-        });
+        const uploadRes = await fetchApi(
+          `/products/image/${mediaId}/color-mask`,
+          {
+            method: "POST",
+            body: maskFormData,
+          },
+        );
         if (!uploadRes.ok) {
           throw new Error("Failed to upload color mask");
         }
@@ -452,7 +462,10 @@ export default function EditProductPage() {
           formData.append("attributeValueId", extraMeta.attributeValueId);
         }
         if (extraMeta?.printPositionValueId) {
-          formData.append("printPositionValueId", extraMeta.printPositionValueId);
+          formData.append(
+            "printPositionValueId",
+            extraMeta.printPositionValueId,
+          );
         }
         if (extraMeta?.printSideValueId) {
           formData.append("printSideValueId", extraMeta.printSideValueId);
@@ -489,15 +502,20 @@ export default function EditProductPage() {
             }
           };
 
-          xhr.onerror = () => reject(new Error("Network Error saat upload image"));
+          xhr.onerror = () =>
+            reject(new Error("Network Error saat upload image"));
           xhr.send(formData);
         });
 
         setProductData(uploadData);
         toast.success("Gambar berhasil ditambahkan!");
 
-        const oldImageIds = new Set((productData?.images || []).map((img: any) => img.id));
-        const newImage = uploadData.images.find((img: any) => !oldImageIds.has(img.id)) || uploadData.images[uploadData.images.length - 1];
+        const oldImageIds = new Set(
+          (productData?.images || []).map((img: any) => img.id),
+        );
+        const newImage =
+          uploadData.images.find((img: any) => !oldImageIds.has(img.id)) ||
+          uploadData.images[uploadData.images.length - 1];
         return newImage;
       } else {
         const formData = new FormData();
@@ -512,7 +530,10 @@ export default function EditProductPage() {
           formData.append("attributeValueId", extraMeta.attributeValueId);
         }
         if (extraMeta?.printPositionValueId) {
-          formData.append("printPositionValueId", extraMeta.printPositionValueId);
+          formData.append(
+            "printPositionValueId",
+            extraMeta.printPositionValueId,
+          );
         }
         if (extraMeta?.printSideValueId) {
           formData.append("printSideValueId", extraMeta.printSideValueId);
@@ -532,8 +553,12 @@ export default function EditProductPage() {
         setProductData(updatedProduct);
         toast.success("Gambar berhasil ditambahkan!");
 
-        const oldImageIds = new Set((productData?.images || []).map((img: any) => img.id));
-        const newImage = updatedProduct.images.find((img: any) => !oldImageIds.has(img.id)) || updatedProduct.images[updatedProduct.images.length - 1];
+        const oldImageIds = new Set(
+          (productData?.images || []).map((img: any) => img.id),
+        );
+        const newImage =
+          updatedProduct.images.find((img: any) => !oldImageIds.has(img.id)) ||
+          updatedProduct.images[updatedProduct.images.length - 1];
         return newImage;
       }
     } catch (err) {
@@ -586,7 +611,8 @@ export default function EditProductPage() {
           }
         };
 
-        xhr.onerror = () => reject(new Error("Network Error saat upload images"));
+        xhr.onerror = () =>
+          reject(new Error("Network Error saat upload images"));
         xhr.send(formData);
       });
 
@@ -612,12 +638,20 @@ export default function EditProductPage() {
       if (!prev) return prev;
       if (type === "image") {
         const mockupImages = (prev.images || []).filter(isMockupImage);
-        const map = new Map((prev.images || []).map((img: any) => [img.id, img]));
-        const reordered = orderedIds.map((imgId) => map.get(imgId)).filter(Boolean);
+        const map = new Map(
+          (prev.images || []).map((img: any) => [img.id, img]),
+        );
+        const reordered = orderedIds
+          .map((imgId) => map.get(imgId))
+          .filter(Boolean);
         return { ...prev, images: [...reordered, ...mockupImages] };
       } else {
-        const map = new Map((prev.videos || []).map((vid: any) => [vid.id, vid]));
-        const reordered = orderedIds.map((vidId) => map.get(vidId)).filter(Boolean);
+        const map = new Map(
+          (prev.videos || []).map((vid: any) => [vid.id, vid]),
+        );
+        const reordered = orderedIds
+          .map((vidId) => map.get(vidId))
+          .filter(Boolean);
         return { ...prev, videos: reordered };
       }
     });
@@ -636,7 +670,9 @@ export default function EditProductPage() {
 
       const updated = await res.json();
       setProductData(updated);
-      toast.success(`Urutan ${type === "image" ? "gambar" : "video"} berhasil diperbarui!`);
+      toast.success(
+        `Urutan ${type === "image" ? "gambar" : "video"} berhasil diperbarui!`,
+      );
     } catch (err) {
       console.error("Error reordering media:", err);
       // Rollback
@@ -834,7 +870,7 @@ export default function EditProductPage() {
 
   const handleGenerateVariants = () => {
     const variantGeneratingSelections = currentSelections.filter(
-      (sel) => sel.isVariantGenerator !== false
+      (sel) => sel.isVariantGenerator !== false,
     );
     if (variantGeneratingSelections.length === 0) return;
 
@@ -857,19 +893,26 @@ export default function EditProductPage() {
 
   const handleConfirmVariantGeneration = () => {
     const variantGeneratingSelections = currentSelections.filter(
-      (sel) => sel.isVariantGenerator !== false
+      (sel) => sel.isVariantGenerator !== false,
     );
     const primarySelection = variantGeneratingSelections[0];
     const otherSelections = variantGeneratingSelections.slice(1);
 
     const cartesianProduct = (a: any[]): any[] => {
-      return a.reduce((co, b) => co.flatMap((d: any) => b.map((e: any) => [d, e].flat())));
+      return a.reduce((co, b) =>
+        co.flatMap((d: any) => b.map((e: any) => [d, e].flat())),
+      );
     };
 
-    const finalCombos: { attributeMap: Record<string, string>; variantName: string }[] = [];
+    const finalCombos: {
+      attributeMap: Record<string, string>;
+      variantName: string;
+    }[] = [];
 
     primarySelection.valueIds.forEach((primValId: string) => {
-      const activeGroups = otherSelections.map((sel) => activeGroupFilters[primValId]?.[sel.attributeId] || []);
+      const activeGroups = otherSelections.map(
+        (sel) => activeGroupFilters[primValId]?.[sel.attributeId] || [],
+      );
 
       let primCombos: string[][] = [];
       if (activeGroups.length === 0) {
@@ -878,7 +921,10 @@ export default function EditProductPage() {
         return; // skip
       } else {
         const product = cartesianProduct(activeGroups);
-        primCombos = product.map((p) => [primValId, ...(Array.isArray(p) ? p : [p])]);
+        primCombos = product.map((p) => [
+          primValId,
+          ...(Array.isArray(p) ? p : [p]),
+        ]);
       }
 
       // Filter based on parentValueId
@@ -912,7 +958,9 @@ export default function EditProductPage() {
             const val = attr.values.find((v: any) => v.id === valueId);
             if (val) {
               foundAttr = attr;
-              const valText = val.value.includes("|") ? val.value.split("|")[0] : val.value;
+              const valText = val.value.includes("|")
+                ? val.value.split("|")[0]
+                : val.value;
               nameParts.push(valText);
               attributeMap[attr.id] = val.id;
               break;
@@ -1015,13 +1063,16 @@ export default function EditProductPage() {
       productVariants: finalVariantsState,
     }));
 
-    toast.info(
-      `Generated ${finalCombos.length} variants. Check form below.`,
-    );
+    toast.info(`Generated ${finalCombos.length} variants. Check form below.`);
     setIsGenModalOpen(false);
   };
 
-  const handleAddAttributeValueInline = async (attributeId: string, newValueName: string, primValId: string, priceModifier?: string) => {
+  const handleAddAttributeValueInline = async (
+    attributeId: string,
+    newValueName: string,
+    primValId: string,
+    priceModifier?: string,
+  ) => {
     const attr = currentFullList.find((a) => a.id === attributeId);
     if (!attr) return toast.error("Attribute not found.");
 
@@ -1054,11 +1105,15 @@ export default function EditProductPage() {
       }
 
       const updatedAttr = await res.json();
-      
-      const nextFullList = currentFullList.map((a) => (a.id === attributeId ? updatedAttr : a));
+
+      const nextFullList = currentFullList.map((a) =>
+        a.id === attributeId ? updatedAttr : a,
+      );
       setCurrentFullList(nextFullList);
 
-      const newValueObj = updatedAttr.values.find((v: any) => v.value === newValueName.trim());
+      const newValueObj = updatedAttr.values.find(
+        (v: any) => v.value === newValueName.trim(),
+      );
       if (newValueObj) {
         const nextSelections = currentSelections.map((sel) => {
           if (sel.attributeId === attributeId) {
@@ -1082,7 +1137,10 @@ export default function EditProductPage() {
             if (!nextFilters[primValId][attributeId]) {
               nextFilters[primValId][attributeId] = [];
             }
-            nextFilters[primValId][attributeId] = [...nextFilters[primValId][attributeId], newValueObj.id];
+            nextFilters[primValId][attributeId] = [
+              ...nextFilters[primValId][attributeId],
+              newValueObj.id,
+            ];
           }
           return nextFilters;
         });
@@ -1168,6 +1226,16 @@ export default function EditProductPage() {
             onSubmit={handleUpdateProduct}
             isSubmitting={isSubmitting}
           />
+
+          {productData?.id && (
+            <div className="mt-6">
+              <ProductUrlChangeForm
+                productId={String(productData.id)}
+                currentSlug={productData.slug ?? ""}
+                productName={productData.name ?? ""}
+              />
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent
@@ -1176,10 +1244,16 @@ export default function EditProductPage() {
           className="space-y-6 animate-fade-in focus-visible:outline-none data-[state=inactive]:hidden">
           <FormUpdateProductMedia
             productId={id as string}
-            initialData={productData ? {
-              ...productData,
-              images: (productData.images || []).filter((img: any) => !isMockupImage(img))
-            } : undefined}
+            initialData={
+              productData
+                ? {
+                    ...productData,
+                    images: (productData.images || []).filter(
+                      (img: any) => !isMockupImage(img),
+                    ),
+                  }
+                : undefined
+            }
             isSubmitting={isSubmitting}
             onAddImage={handleAddImage}
             onAddMultipleImages={handleAddMultipleImages}
@@ -1231,34 +1305,47 @@ export default function EditProductPage() {
       </Tabs>
 
       {/* CHECKLIST GROUPED FILTER MODAL */}
-      <Dialog open={isGenModalOpen} onOpenChange={isGenModalOpen ? () => setIsGenModalOpen(false) : setIsGenModalOpen}>
+      <Dialog
+        open={isGenModalOpen}
+        onOpenChange={
+          isGenModalOpen ? () => setIsGenModalOpen(false) : setIsGenModalOpen
+        }>
         <DialogContent className="max-w-3xl bg-white border shadow-2xl rounded-xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-extrabold text-slate-900">
               Atur Filter Kombinasi Varian
             </DialogTitle>
             <DialogDescription className="text-sm text-slate-500 mt-1.5">
-              Pilih kombinasi atribut yang valid untuk masing-masing item utama di bawah ini.
+              Pilih kombinasi atribut yang valid untuk masing-masing item utama
+              di bawah ini.
             </DialogDescription>
           </DialogHeader>
 
           <div className="max-h-[60vh] overflow-y-auto space-y-6 pr-2 py-4">
             {(() => {
-              const variantGeneratingSelections = currentSelections.filter((sel) => sel.isVariantGenerator !== false);
+              const variantGeneratingSelections = currentSelections.filter(
+                (sel) => sel.isVariantGenerator !== false,
+              );
               const primarySelection = variantGeneratingSelections[0];
               const otherSelections = variantGeneratingSelections.slice(1);
-              const primaryAttr = currentFullList.find((a) => a.id === primarySelection?.attributeId);
+              const primaryAttr = currentFullList.find(
+                (a) => a.id === primarySelection?.attributeId,
+              );
 
               if (!primarySelection || !primaryAttr) return null;
 
               return primarySelection.valueIds.map((primValId: string) => {
-                const primVal = primaryAttr.values.find((v: any) => v.id === primValId);
+                const primVal = primaryAttr.values.find(
+                  (v: any) => v.id === primValId,
+                );
                 if (!primVal) return null;
 
                 const primValLabel = primVal.value.split("|")[0];
 
                 return (
-                  <div key={primValId} className="border rounded-xl p-5 bg-stone-50/50 space-y-4">
+                  <div
+                    key={primValId}
+                    className="border rounded-xl p-5 bg-stone-50/50 space-y-4">
                     <div className="flex justify-between items-center border-b pb-2">
                       <h4 className="font-bold text-slate-900 flex items-center gap-2">
                         <span className="h-2 w-2 rounded-full bg-indigo-650"></span>
@@ -1274,13 +1361,14 @@ export default function EditProductPage() {
                               const next = { ...prev };
                               next[primValId] = {};
                               otherSelections.forEach((sel: any) => {
-                                next[primValId][sel.attributeId] = [...sel.valueIds];
+                                next[primValId][sel.attributeId] = [
+                                  ...sel.valueIds,
+                                ];
                               });
                               return next;
                             });
                           }}
-                          className="text-[10px] h-6 px-2 font-bold"
-                        >
+                          className="text-[10px] h-6 px-2 font-bold">
                           Pilih Semua
                         </Button>
                         <Button
@@ -1297,28 +1385,38 @@ export default function EditProductPage() {
                               return next;
                             });
                           }}
-                          className="text-[10px] h-6 px-2 font-bold text-red-650 hover:bg-red-50"
-                        >
+                          className="text-[10px] h-6 px-2 font-bold text-red-650 hover:bg-red-50">
                           Kosongkan
                         </Button>
                       </div>
                     </div>
 
                     {otherSelections.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic">Tidak ada sub-atribut untuk difilter.</p>
+                      <p className="text-xs text-muted-foreground italic">
+                        Tidak ada sub-atribut untuk difilter.
+                      </p>
                     ) : (
                       <div className="space-y-4">
                         {otherSelections.map((sel: any) => {
-                          const attr = currentFullList.find((a: any) => a.id === sel.attributeId);
+                          const attr = currentFullList.find(
+                            (a: any) => a.id === sel.attributeId,
+                          );
                           if (!attr) return null;
 
-                          const activeList = activeGroupFilters[primValId]?.[sel.attributeId] || [];
+                          const activeList =
+                            activeGroupFilters[primValId]?.[sel.attributeId] ||
+                            [];
 
                           return (
                             <div key={sel.attributeId} className="space-y-1.5">
                               <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{attr.name}</span>
-                                {!(inlineInputAttrId === sel.attributeId && inlineInputGroupId === primValId) && (
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                  {attr.name}
+                                </span>
+                                {!(
+                                  inlineInputAttrId === sel.attributeId &&
+                                  inlineInputGroupId === primValId
+                                ) && (
                                   <Button
                                     type="button"
                                     variant="link"
@@ -1329,111 +1427,133 @@ export default function EditProductPage() {
                                       setInlineInputGroupId(primValId);
                                       setInlineInputValue("");
                                       setInlineInputPrice("");
-                                    }}
-                                  >
+                                    }}>
                                     + Tambah Nilai
                                   </Button>
                                 )}
                               </div>
 
-                              {inlineInputAttrId === sel.attributeId && inlineInputGroupId === primValId && (
-                                <div className="p-3 border border-stone-200 bg-stone-50/50 rounded-xl space-y-3 w-full max-w-sm">
-                                  <span className="text-[10px] font-bold text-stone-700 uppercase tracking-wider block">
-                                    Tambah Nilai untuk {attr.name}
-                                  </span>
-                                  {attr.type === "COLOR" ? (
-                                    <ColorValueInput
-                                      value={inlineInputValue}
-                                      onChange={(val) => setInlineInputValue(val)}
-                                    />
-                                  ) : (attr.type === "MODEL_SHAPE" || attr.type === "SIZE") ? (
-                                    <ModelShapeValueInput
-                                      value={inlineInputValue}
-                                      onChange={(val) => setInlineInputValue(val)}
-                                      placeholder={attr.type === "SIZE" ? "Nama Ukuran (e.g. 500ml, XL)" : "Nama Model / Shape (e.g. Oval, Bulat)"}
-                                      type={attr.type}
-                                    />
-                                  ) : (
-                                    <Input
-                                      type="text"
-                                      placeholder="Masukkan nilai baru..."
-                                      value={inlineInputValue}
-                                      onChange={(e: any) => setInlineInputValue(e.target.value)}
-                                      className="h-8 text-xs bg-white text-slate-800"
-                                      autoFocus
-                                    />
-                                  )}
+                              {inlineInputAttrId === sel.attributeId &&
+                                inlineInputGroupId === primValId && (
+                                  <div className="p-3 border border-stone-200 bg-stone-50/50 rounded-xl space-y-3 w-full max-w-sm">
+                                    <span className="text-[10px] font-bold text-stone-700 uppercase tracking-wider block">
+                                      Tambah Nilai untuk {attr.name}
+                                    </span>
+                                    {attr.type === "COLOR" ? (
+                                      <ColorValueInput
+                                        value={inlineInputValue}
+                                        onChange={(val) =>
+                                          setInlineInputValue(val)
+                                        }
+                                      />
+                                    ) : attr.type === "MODEL_SHAPE" ||
+                                      attr.type === "SIZE" ? (
+                                      <ModelShapeValueInput
+                                        value={inlineInputValue}
+                                        onChange={(val) =>
+                                          setInlineInputValue(val)
+                                        }
+                                        placeholder={
+                                          attr.type === "SIZE"
+                                            ? "Nama Ukuran (e.g. 500ml, XL)"
+                                            : "Nama Model / Shape (e.g. Oval, Bulat)"
+                                        }
+                                        type={attr.type}
+                                      />
+                                    ) : (
+                                      <Input
+                                        type="text"
+                                        placeholder="Masukkan nilai baru..."
+                                        value={inlineInputValue}
+                                        onChange={(e: any) =>
+                                          setInlineInputValue(e.target.value)
+                                        }
+                                        className="h-8 text-xs bg-white text-slate-800"
+                                        autoFocus
+                                      />
+                                    )}
 
-                                  <div className="space-y-1">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                      Penyesuaian Harga (Opsional)
-                                    </label>
-                                    <Input
-                                      type="number"
-                                      placeholder="Contoh: 5000 atau -2000"
-                                      value={inlineInputPrice}
-                                      onChange={(e: any) => setInlineInputPrice(e.target.value)}
-                                      className="h-8 text-xs bg-white text-slate-800"
-                                    />
-                                  </div>
+                                    <div className="space-y-1">
+                                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                        Penyesuaian Harga (Opsional)
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        placeholder="Contoh: 5000 atau -2000"
+                                        value={inlineInputPrice}
+                                        onChange={(e: any) =>
+                                          setInlineInputPrice(e.target.value)
+                                        }
+                                        className="h-8 text-xs bg-white text-slate-800"
+                                      />
+                                    </div>
 
-                                  <div className="flex justify-end gap-2">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-7 px-3 text-xs text-stone-500 font-bold border-stone-250 bg-white"
-                                      onClick={() => {
-                                        setInlineInputAttrId(null);
-                                        setInlineInputGroupId(null);
-                                        setInlineInputValue("");
-                                        setInlineInputPrice("");
-                                      }}
-                                    >
-                                      Batal
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      className="h-7 px-3 text-xs bg-primary hover:bg-primary/90 text-white font-bold"
-                                      onClick={async () => {
-                                        if (!inlineInputValue.trim()) return;
-                                        await handleAddAttributeValueInline(
-                                          sel.attributeId,
-                                          inlineInputValue,
-                                          primValId,
-                                          inlineInputPrice
-                                        );
-                                        setInlineInputAttrId(null);
-                                        setInlineInputGroupId(null);
-                                        setInlineInputValue("");
-                                        setInlineInputPrice("");
-                                      }}
-                                    >
-                                      Simpan
-                                    </Button>
+                                    <div className="flex justify-end gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 px-3 text-xs text-stone-500 font-bold border-stone-250 bg-white"
+                                        onClick={() => {
+                                          setInlineInputAttrId(null);
+                                          setInlineInputGroupId(null);
+                                          setInlineInputValue("");
+                                          setInlineInputPrice("");
+                                        }}>
+                                        Batal
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        className="h-7 px-3 text-xs bg-primary hover:bg-primary/90 text-white font-bold"
+                                        onClick={async () => {
+                                          if (!inlineInputValue.trim()) return;
+                                          await handleAddAttributeValueInline(
+                                            sel.attributeId,
+                                            inlineInputValue,
+                                            primValId,
+                                            inlineInputPrice,
+                                          );
+                                          setInlineInputAttrId(null);
+                                          setInlineInputGroupId(null);
+                                          setInlineInputValue("");
+                                          setInlineInputPrice("");
+                                        }}>
+                                        Simpan
+                                      </Button>
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
                               <div className="flex flex-wrap gap-2">
                                 {attr.values
-                                  .filter((v: any) => sel.valueIds.includes(v.id))
+                                  .filter((v: any) =>
+                                    sel.valueIds.includes(v.id),
+                                  )
                                   .map((v: any) => {
                                     const isChecked = activeList.includes(v.id);
-                                    
+
                                     const isColorType = attr.type === "COLOR";
-                                    const isModelShape = attr.type === "MODEL_SHAPE" || attr.type === "SIZE";
+                                    const isModelShape =
+                                      attr.type === "MODEL_SHAPE" ||
+                                      attr.type === "SIZE";
 
                                     const priceMod = sel.priceModifiers?.[v.id];
-                                    const priceModLabel = priceMod && Number(priceMod) !== 0
-                                      ? ` (${Number(priceMod) > 0 ? "+" : ""}Rp ${Number(priceMod).toLocaleString("id-ID")})`
-                                      : "";
+                                    const priceModLabel =
+                                      priceMod && Number(priceMod) !== 0
+                                        ? ` (${Number(priceMod) > 0 ? "+" : ""}Rp ${Number(priceMod).toLocaleString("id-ID")})`
+                                        : "";
 
                                     let contentNode = null;
 
                                     if (isColorType) {
                                       const parsed = parseColorValue(v.value);
-                                      const isCustomColor = parsed.name.toLowerCase().includes("custom") || parsed.name.toLowerCase().includes("kustom");
+                                      const isCustomColor =
+                                        parsed.name
+                                          .toLowerCase()
+                                          .includes("custom") ||
+                                        parsed.name
+                                          .toLowerCase()
+                                          .includes("kustom");
                                       contentNode = (
                                         <span className="truncate flex items-center gap-1.5 flex-1 font-medium text-xs text-slate-700">
                                           <span
@@ -1444,10 +1564,15 @@ export default function EditProductPage() {
                                                 : parsed.hex,
                                             }}
                                           />
-                                          <span className="truncate">{parsed.name || parsed.hex}{priceModLabel}</span>
+                                          <span className="truncate">
+                                            {parsed.name || parsed.hex}
+                                            {priceModLabel}
+                                          </span>
                                           {!isCustomColor && (
                                             <span className="text-[9px] text-slate-450 font-mono shrink-0">
-                                              CMYK({parsed.cmyk.c},{parsed.cmyk.m},{parsed.cmyk.y},{parsed.cmyk.k})
+                                              CMYK({parsed.cmyk.c},
+                                              {parsed.cmyk.m},{parsed.cmyk.y},
+                                              {parsed.cmyk.k})
                                             </span>
                                           )}
                                         </span>
@@ -1465,12 +1590,20 @@ export default function EditProductPage() {
                                               className="w-4 h-4 object-cover rounded-sm border shrink-0 bg-slate-50"
                                             />
                                           )}
-                                          <span className="truncate">{mName}{priceModLabel}</span>
+                                          <span className="truncate">
+                                            {mName}
+                                            {priceModLabel}
+                                          </span>
                                         </span>
                                       );
                                     } else {
                                       const label = v.value.split("|")[0];
-                                      contentNode = <span className="truncate font-medium text-xs text-slate-700">{label}{priceModLabel}</span>;
+                                      contentNode = (
+                                        <span className="truncate font-medium text-xs text-slate-700">
+                                          {label}
+                                          {priceModLabel}
+                                        </span>
+                                      );
                                     }
 
                                     return (
@@ -1480,21 +1613,31 @@ export default function EditProductPage() {
                                           isChecked
                                             ? "border-indigo-650 bg-indigo-50/50 text-indigo-750"
                                             : "border-stone-200 bg-white hover:bg-stone-50 text-stone-600"
-                                        }`}
-                                      >
+                                        }`}>
                                         <Checkbox
                                           checked={isChecked}
                                           onCheckedChange={(checked) => {
-                                            setActiveGroupFilters((prev: any) => {
-                                              const next = { ...prev };
-                                              const currentList = next[primValId]?.[sel.attributeId] || [];
-                                              if (checked) {
-                                                next[primValId][sel.attributeId] = [...currentList, v.id];
-                                              } else {
-                                                next[primValId][sel.attributeId] = currentList.filter((id: string) => id !== v.id);
-                                              }
-                                              return next;
-                                            });
+                                            setActiveGroupFilters(
+                                              (prev: any) => {
+                                                const next = { ...prev };
+                                                const currentList =
+                                                  next[primValId]?.[
+                                                    sel.attributeId
+                                                  ] || [];
+                                                if (checked) {
+                                                  next[primValId][
+                                                    sel.attributeId
+                                                  ] = [...currentList, v.id];
+                                                } else {
+                                                  next[primValId][
+                                                    sel.attributeId
+                                                  ] = currentList.filter(
+                                                    (id: string) => id !== v.id,
+                                                  );
+                                                }
+                                                return next;
+                                              },
+                                            );
                                           }}
                                           className="h-3.5 w-3.5 border-stone-300 text-indigo-600 focus:ring-indigo-500"
                                         />
@@ -1519,15 +1662,13 @@ export default function EditProductPage() {
               variant="outline"
               type="button"
               onClick={() => setIsGenModalOpen(false)}
-              className="font-bold text-xs uppercase"
-            >
+              className="font-bold text-xs uppercase">
               Batal
             </Button>
             <Button
               type="button"
               onClick={handleConfirmVariantGeneration}
-              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs uppercase"
-            >
+              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs uppercase">
               Generate Varian Terpilih
             </Button>
           </DialogFooter>
