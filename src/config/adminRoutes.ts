@@ -450,6 +450,14 @@ export const ADMIN_ROUTES: AdminRoute[] = [
     group: "WA Portal",
   },
 
+  {
+    title: "SEO Redirect Tasks",
+    url: "/super-admin/seo-redirect-tasks",
+    superAdminOnly: true,
+    section: "Marketing & Content",
+    group: "Product SEO",
+  },
+
   // OTHER
   {
     title: "Purchase Channel",
