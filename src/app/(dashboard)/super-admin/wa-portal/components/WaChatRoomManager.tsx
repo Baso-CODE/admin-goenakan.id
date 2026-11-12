@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -20,7 +21,9 @@ import {
   ChevronUp,
   Clock,
   CornerDownLeft,
+  Download,
   DownloadCloud,
+  Eye,
   FileText,
   Image as ImageIcon,
   Info,
@@ -37,6 +40,7 @@ import {
   Tag,
   User,
   Users,
+  X,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -145,29 +149,95 @@ function isTempMessageId(id: any): boolean {
   return str.startsWith("temp_");
 }
 
+export interface PendingAttachment {
+  file: File;
+  dataUrl: string;
+  name: string;
+  sizeFormatted: string;
+  isImage: boolean;
+  mimetype: string;
+}
+
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function downloadAttachment(url: string, filename?: string) {
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename || "lampiran";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (err: any) {
+    toast.error("Gagal mengunduh file: " + (err.message || "Unknown error"));
+  }
+}
+
+function processAttachmentFile(file: File): Promise<PendingAttachment | null> {
+  return new Promise((resolve) => {
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      toast.error(`Ukuran file melebihi batas maksimal 10 MB (${formatFileSize(file.size)})`);
+      resolve(null);
+      return;
+    }
+    const isImage = file.type.startsWith("image/");
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve({
+        file,
+        dataUrl: reader.result as string,
+        name: file.name,
+        sizeFormatted: formatFileSize(file.size),
+        isImage,
+        mimetype: file.type || (isImage ? "image/jpeg" : "application/octet-stream"),
+      });
+    };
+    reader.onerror = () => {
+      toast.error("Gagal membaca file");
+      resolve(null);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 interface WaMessageInputProps {
-  onSendMessage: (text: string) => Promise<void>;
+  onSendMessage: (text: string, attachment?: PendingAttachment | null) => Promise<void>;
   disabled?: boolean;
   placeholder?: string;
+  pendingAttachment: PendingAttachment | null;
+  onClearAttachment: () => void;
+  onSelectFile: (file: File) => void;
 }
 
 const WaMessageInput = React.memo(function WaMessageInput({
   onSendMessage,
   disabled = false,
   placeholder = "Ketik pesan...",
+  pendingAttachment,
+  onClearAttachment,
+  onSelectFile,
 }: WaMessageInputProps) {
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!text.trim() || disabled || isSubmitting) return;
+    if ((!text.trim() && !pendingAttachment) || disabled || isSubmitting) return;
 
-    const toSend = text.trim();
+    const toSendText = text.trim();
+    const toSendAttachment = pendingAttachment;
     setText("");
+    onClearAttachment();
     setIsSubmitting(true);
     try {
-      await onSendMessage(toSend);
+      await onSendMessage(toSendText, toSendAttachment);
     } finally {
       setIsSubmitting(false);
     }
@@ -180,15 +250,102 @@ const WaMessageInput = React.memo(function WaMessageInput({
     }
   };
 
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      onSelectFile(files[0]);
+    }
+    e.target.value = "";
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          onSelectFile(file);
+          break;
+        }
+      }
+    }
+  };
+
   return (
     <div className="p-3 bg-white border-t border-stone-200 shrink-0 z-10">
+      {/* Inline Pending Attachment Preview */}
+      {pendingAttachment && (
+        <div className="mb-2 flex items-center justify-between gap-3 p-2 bg-stone-100/90 border border-stone-200 rounded-lg animate-in fade-in slide-in-from-bottom-1 duration-150">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {pendingAttachment.isImage ? (
+              <div className="relative w-10 h-10 rounded-md overflow-hidden bg-stone-200 shrink-0 border border-stone-300">
+                <img
+                  src={pendingAttachment.dataUrl}
+                  alt={pendingAttachment.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-md bg-stone-200/80 flex items-center justify-center shrink-0 border border-stone-300 text-stone-600">
+                <FileText className="w-5 h-5" />
+              </div>
+            )}
+            <div className="min-w-0 text-left">
+              <p className="text-xs font-medium text-stone-800 truncate max-w-[200px] sm:max-w-xs">
+                {pendingAttachment.name}
+              </p>
+              <p className="text-[10px] text-stone-500">
+                {pendingAttachment.sizeFormatted}
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClearAttachment}
+            disabled={disabled || isSubmitting}
+            className="h-7 w-7 p-0 text-stone-400 hover:text-stone-700 hover:bg-stone-200 rounded-full shrink-0 cursor-pointer"
+            title="Hapus lampiran"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="flex items-end gap-2">
+        {/* Hidden Native File Input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileInputChange}
+          accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
+          className="hidden"
+        />
+
+        {/* Paperclip Button */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={disabled || isSubmitting}
+          className="h-10 w-10 p-0 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg shrink-0 cursor-pointer"
+          title="Lampirkan File / Dokumen / Gambar (Maks. 10 MB)"
+        >
+          <Paperclip className="w-4 h-4" />
+        </Button>
+
         <div className="flex-1 relative min-w-0">
           <Textarea
             placeholder={placeholder}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             rows={1}
             disabled={disabled || isSubmitting}
             className="min-h-[40px] max-h-32 text-xs resize-none pr-3 py-2.5 bg-stone-50 border-stone-200"
@@ -198,7 +355,7 @@ const WaMessageInput = React.memo(function WaMessageInput({
         <Button
           type="submit"
           size="sm"
-          disabled={!text.trim() || disabled || isSubmitting}
+          disabled={(!text.trim() && !pendingAttachment) || disabled || isSubmitting}
           className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 cursor-pointer"
         >
           {isSubmitting ? (
@@ -214,50 +371,83 @@ const WaMessageInput = React.memo(function WaMessageInput({
 
 interface MessageBubbleProps {
   msg: WaChatMessage;
+  onPreviewImage: (url: string, filename?: string) => void;
 }
 
-const MessageBubble = React.memo(function MessageBubble({ msg }: MessageBubbleProps) {
+const MessageBubble = React.memo(function MessageBubble({
+  msg,
+  onPreviewImage,
+}: MessageBubbleProps) {
   const isMe = msg.fromMe;
+  const hasMedia = msg.hasMedia && !!msg.media?.url;
+  const isImage =
+    msg.media?.mimetype?.startsWith("image/") ||
+    (msg.media?.url?.startsWith("data:image/"));
 
   return (
     <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[75%] sm:max-w-[65%] rounded-xl px-3 py-2 text-xs shadow-2xs relative ${
+        className={`max-w-[80%] sm:max-w-[70%] rounded-xl px-3 py-2 text-xs shadow-2xs relative ${
           isMe
             ? "bg-emerald-600 text-white rounded-br-xs"
             : "bg-white text-stone-900 border border-stone-200/80 rounded-bl-xs"
         }`}
       >
         {/* Media Attachment if present */}
-        {msg.hasMedia && msg.media?.url && (
-          <div className="mb-1.5 rounded-lg overflow-hidden border border-black/10 bg-black/5">
-            {msg.media.mimetype?.startsWith("image/") ? (
-              <img
-                src={msg.media.url}
-                alt="Media lampiran"
-                className="max-h-48 w-full object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <a
-                href={msg.media.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 p-2 text-[11px] underline"
+        {hasMedia && msg.media?.url && (
+          <div className="mb-2 rounded-lg overflow-hidden border border-black/10 bg-black/5">
+            {isImage ? (
+              <div
+                className="relative group cursor-pointer overflow-hidden rounded-md"
+                onClick={() => onPreviewImage(msg.media!.url!, msg.media?.filename)}
               >
-                <FileText className="w-4 h-4 shrink-0" />
-                <span className="truncate">
-                  {msg.media.filename || "Unduh Dokumen"}
-                </span>
-              </a>
+                <img
+                  src={msg.media.url}
+                  alt={msg.media.filename || "Lampiran gambar"}
+                  className="max-h-64 w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white font-medium text-xs">
+                  <Eye className="w-4 h-4" />
+                  <span>Lihat Gambar</span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-2.5 flex items-center justify-between gap-3 bg-stone-50/90 rounded-md border border-stone-200/60 text-stone-800">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded bg-stone-200/80 flex items-center justify-center shrink-0 text-stone-700">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 text-left">
+                    <p className="text-xs font-medium truncate max-w-[180px] sm:max-w-[220px]">
+                      {msg.media.filename || "Dokumen"}
+                    </p>
+                    <p className="text-[10px] text-stone-500 uppercase">
+                      {msg.media.mimetype?.split("/")[1]?.replace(/^vnd\./, "") || "FILE"}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadAttachment(msg.media!.url!, msg.media?.filename)}
+                  className="h-7 px-2 text-[11px] shrink-0 text-stone-700 bg-white hover:bg-stone-100 border-stone-300 gap-1 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Unduh
+                </Button>
+              </div>
             )}
           </div>
         )}
 
         {/* Message Text Content */}
-        <p className="whitespace-pre-wrap break-words leading-relaxed">
-          {msg.body}
-        </p>
+        {msg.body && (
+          <p className="whitespace-pre-wrap break-words leading-relaxed">
+            {msg.body}
+          </p>
+        )}
 
         {/* Timestamp and Delivery Ack */}
         <div
@@ -310,6 +500,10 @@ export function WaChatRoomManager({
 
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const dragCounterRef = useRef(0);
+  const [lightboxMedia, setLightboxMedia] = useState<{ url: string; filename?: string } | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const isNearBottomRef = useRef(true);
 
@@ -541,6 +735,7 @@ export function WaChatRoomManager({
             (d) =>
               d.fromMe === m.fromMe &&
               d.body === m.body &&
+              (!d.hasMedia && !m.hasMedia ? true : d.media?.url === m.media?.url) &&
               Math.abs(d.timestamp - m.timestamp) <= 4
           );
           if (isDup) continue;
@@ -578,6 +773,7 @@ export function WaChatRoomManager({
   useEffect(() => {
     if (selectedSessionId) {
       setSelectedRoom(null);
+      setPendingAttachment(null);
       setMessages([]);
       messageCacheRef.current.clear();
       fetchChatRooms(selectedSessionId);
@@ -587,6 +783,7 @@ export function WaChatRoomManager({
   // Seamless room selection: instant 0ms cache display + background sync
   useEffect(() => {
     if (!selectedRoom?.id) return;
+    setPendingAttachment(null);
     setVisibleCount(30);
     isNearBottomRef.current = true;
 
@@ -654,7 +851,7 @@ export function WaChatRoomManager({
             (m) =>
               isTempMessageId(m.id) &&
               m.fromMe &&
-              m.body === payload.body
+              (m.body ? m.body === payload.body : m.hasMedia && payload.hasMedia)
           );
           if (tempIdx !== -1) {
             const nextMessages = prev.map((m, idx) => (idx === tempIdx ? newMessage : m));
@@ -666,13 +863,13 @@ export function WaChatRoomManager({
           const isDuplicateOutbound = prev.some(
             (m) =>
               m.fromMe &&
-              m.body === payload.body &&
+              (m.body ? m.body === payload.body : m.hasMedia && payload.hasMedia) &&
               Math.abs((m.timestamp || 0) - (payload.timestamp || 0)) < 15
           );
           if (isDuplicateOutbound) {
             const nextMessages = prev.map((m) =>
               m.fromMe &&
-              m.body === payload.body &&
+              (m.body ? m.body === payload.body : m.hasMedia && payload.hasMedia) &&
               Math.abs((m.timestamp || 0) - (payload.timestamp || 0)) < 15
                 ? { ...m, id: payloadMsgId, ack: payload.ack || m.ack || 1 }
                 : m
@@ -830,10 +1027,63 @@ export function WaChatRoomManager({
     },
   });
 
+  // Attachment file selection & drag-and-drop callbacks
+  const handleSelectFile = useCallback(async (file: File) => {
+    const processed = await processAttachmentFile(file);
+    if (processed) {
+      setPendingAttachment(processed);
+    }
+  }, []);
+
+  const handleClearAttachment = useCallback(() => {
+    setPendingAttachment(null);
+  }, []);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer?.types?.includes("Files")) {
+      setIsDraggingFile(true);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDraggingFile(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDraggingFile(false);
+
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      const processed = await processAttachmentFile(file);
+      if (processed) {
+        setPendingAttachment(processed);
+      }
+    }
+  }, []);
+
   // Handle Send Reply Message with instant 0ms optimistic UI update
   const handleSendMessage = useCallback(
-    async (messageText: string) => {
-      if (!messageText.trim() || !selectedRoom || !selectedSessionId) return;
+    async (messageText: string, attachment?: PendingAttachment | null) => {
+      if ((!messageText.trim() && !attachment) || !selectedRoom || !selectedSessionId) return;
 
       const currentRoomId = selectedRoom.id;
       const tempId = "temp_" + Date.now();
@@ -844,7 +1094,14 @@ export function WaChatRoomManager({
         from: selectedSessionId,
         to: currentRoomId,
         fromMe: true,
-        hasMedia: false,
+        hasMedia: !!attachment,
+        media: attachment
+          ? {
+              url: attachment.dataUrl,
+              filename: attachment.name,
+              mimetype: attachment.mimetype,
+            }
+          : null,
         ack: 0,
         ackName: "PENDING",
       };
@@ -865,10 +1122,12 @@ export function WaChatRoomManager({
           timestamp: Math.floor(Date.now() / 1000),
           lastMessage: {
             id: tempId,
-            body: messageText,
+            body:
+              messageText ||
+              (attachment ? (attachment.isImage ? "[Gambar]" : "[Dokumen]") : ""),
             timestamp: Math.floor(Date.now() / 1000),
             fromMe: true,
-            hasMedia: false,
+            hasMedia: !!attachment,
             ack: 0,
           },
         };
@@ -890,6 +1149,8 @@ export function WaChatRoomManager({
           body: JSON.stringify({
             sessionId: selectedSessionId,
             text: messageText,
+            mediaUrl: attachment?.dataUrl,
+            mediaFilename: attachment?.name,
           }),
         });
 
@@ -1301,7 +1562,28 @@ export function WaChatRoomManager({
               </div>
 
               {/* ── RIGHT PANE: Active Conversation View (8 cols) ── */}
-              <div className="md:col-span-8 flex flex-col h-full min-h-0 bg-[#f0f2f5] relative">
+              <div
+                onDragEnter={selectedRoom ? handleDragEnter : undefined}
+                onDragOver={selectedRoom ? handleDragOver : undefined}
+                onDragLeave={selectedRoom ? handleDragLeave : undefined}
+                onDrop={selectedRoom ? handleDrop : undefined}
+                className="md:col-span-8 flex flex-col h-full min-h-0 bg-[#f0f2f5] relative"
+              >
+                {/* Drag-and-drop Visual Overlay */}
+                {isDraggingFile && (
+                  <div className="absolute inset-0 z-50 bg-emerald-600/15 backdrop-blur-[2px] border-2 border-dashed border-emerald-500 rounded-lg flex flex-col items-center justify-center p-6 text-center pointer-events-none transition-all">
+                    <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 shadow-md animate-bounce">
+                      <Paperclip className="w-8 h-8" />
+                    </div>
+                    <p className="text-sm font-semibold text-emerald-900">
+                      Lepaskan file di sini untuk melampirkan
+                    </p>
+                    <p className="text-xs text-emerald-700 mt-1">
+                      Maksimal 10 MB (Gambar atau Dokumen)
+                    </p>
+                  </div>
+                )}
+
                 {selectedRoom ? (
                   <>
                     {/* Conversation Header */}
@@ -1321,6 +1603,7 @@ export function WaChatRoomManager({
                             <span className="truncate">{selectedRoom.name}</span>
                             {selectedRoom.isGroup && (
                               <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0">
+                                <Users className="w-3 h-3 mr-1" />
                                 Grup
                               </Badge>
                             )}
@@ -1404,7 +1687,11 @@ export function WaChatRoomManager({
                           )}
 
                           {visibleMessages.map((msg, index) => (
-                            <MessageBubble key={extractMessageId(msg.id) || index} msg={msg} />
+                            <MessageBubble
+                              key={extractMessageId(msg.id) || index}
+                              msg={msg}
+                              onPreviewImage={(url, filename) => setLightboxMedia({ url, filename })}
+                            />
                           ))}
                         </>
                       )}
@@ -1415,6 +1702,9 @@ export function WaChatRoomManager({
                       onSendMessage={handleSendMessage}
                       disabled={!isSessionConnected || isSending}
                       placeholder={`Balas ke ${selectedRoom.name}... (Enter untuk kirim, Shift+Enter untuk baris baru)`}
+                      pendingAttachment={pendingAttachment}
+                      onClearAttachment={handleClearAttachment}
+                      onSelectFile={handleSelectFile}
                     />
                   </>
                 ) : (
@@ -1451,6 +1741,38 @@ export function WaChatRoomManager({
           fetchChatRooms(selectedSessionId, true);
         }}
       />
+
+      {/* Image Preview Lightbox Dialog */}
+      <Dialog open={!!lightboxMedia} onOpenChange={(open) => !open && setLightboxMedia(null)}>
+        <DialogContent className="max-w-3xl p-3 bg-stone-950/95 border-stone-800 text-white sm:rounded-xl">
+          <DialogTitle className="sr-only">Pratinjau Gambar</DialogTitle>
+          {lightboxMedia && (
+            <div className="flex flex-col items-center w-full">
+              <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-stone-800 text-xs text-stone-300">
+                <span className="truncate max-w-md font-medium">
+                  {lightboxMedia.filename || "Gambar WhatsApp"}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => downloadAttachment(lightboxMedia.url, lightboxMedia.filename)}
+                  className="h-7 text-xs bg-stone-800 hover:bg-stone-700 border-stone-700 text-white gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Unduh
+                </Button>
+              </div>
+              <div className="p-1 max-h-[75vh] w-full flex items-center justify-center overflow-auto">
+                <img
+                  src={lightboxMedia.url}
+                  alt={lightboxMedia.filename || "Pratinjau"}
+                  className="max-h-[72vh] max-w-full object-contain rounded-md shadow-lg"
+                />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
