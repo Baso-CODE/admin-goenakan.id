@@ -169,6 +169,8 @@ export interface WaChatMessage {
   timestamp: number;
   from: string;
   to: string;
+  participant?: string | null;
+  senderName?: string | null;
   fromMe: boolean;
   hasMedia: boolean;
   media?: {

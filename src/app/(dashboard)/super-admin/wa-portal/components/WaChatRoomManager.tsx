@@ -130,6 +130,14 @@ function normalizeJid(jid?: string | null): string {
   return jid.replace(/@(c\.us|s\.whatsapp\.net|lid|g\.us)$/i, "").trim();
 }
 
+function formatParticipantNumber(participant: string): string {
+  const clean = participant.replace(/@(c\.us|s\.whatsapp\.net|lid|g\.us)$/i, "").trim();
+  if (clean.startsWith("62")) {
+    return `+62 ${clean.slice(2)}`;
+  }
+  return clean;
+}
+
 function isMatchingChat(
   roomJid: string,
   eventChatId?: string,
@@ -144,12 +152,15 @@ function isMatchingChat(
   ) {
     return true;
   }
+  // Group chats must match on exact JID
+  if (roomJid.endsWith("@g.us")) return false;
+
   const normRoom = normalizeJid(roomJid);
   if (!normRoom) return false;
   if (
-    (eventChatId && normalizeJid(eventChatId) === normRoom) ||
-    (eventFrom && normalizeJid(eventFrom) === normRoom) ||
-    (eventTo && normalizeJid(eventTo) === normRoom)
+    (eventChatId && !eventChatId.endsWith("@g.us") && normalizeJid(eventChatId) === normRoom) ||
+    (eventFrom && !eventFrom.endsWith("@g.us") && normalizeJid(eventFrom) === normRoom) ||
+    (eventTo && !eventTo.endsWith("@g.us") && normalizeJid(eventTo) === normRoom)
   ) {
     return true;
   }
@@ -572,11 +583,13 @@ const WaMessageInput = React.memo(function WaMessageInput({
 interface MessageBubbleProps {
   msg: WaChatMessage;
   onPreviewImage: (url: string, filename?: string) => void;
+  isGroup?: boolean;
 }
 
 const MessageBubble = React.memo(function MessageBubble({
   msg,
   onPreviewImage,
+  isGroup = false,
 }: MessageBubbleProps) {
   const isMe = msg.fromMe;
   const hasMedia = msg.hasMedia && !!msg.media?.url;
@@ -598,6 +611,17 @@ const MessageBubble = React.memo(function MessageBubble({
             : "bg-white text-stone-900 border border-stone-200/80 rounded-bl-xs"
         }`}
       >
+        {/* WhatsApp Group Sender Author Label */}
+        {isGroup && !isMe && (
+          <div className="text-[11px] font-bold text-emerald-800 mb-1 flex items-center gap-1.5 truncate">
+            <span>{msg.senderName || (msg.participant ? formatParticipantNumber(msg.participant) : "Anggota Grup")}</span>
+            {msg.senderName && msg.participant && (
+              <span className="text-[9.5px] font-normal text-stone-400 font-mono">
+                ({formatParticipantNumber(msg.participant)})
+              </span>
+            )}
+          </div>
+        )}
         {/* Media Attachment if present */}
         {hasMedia && msg.media?.url && (
           <div className="mb-2 rounded-lg overflow-hidden border border-black/10 bg-black/5">
@@ -697,6 +721,7 @@ export function WaChatRoomManager({
   const [stages, setStages] = useState<WaPipelineStage[]>([]);
   const [labels, setLabels] = useState<WaLabel[]>([]);
   const [selectedStageFilter, setSelectedStageFilter] = useState<string | null>(null);
+  const [chatTypeFilter, setChatTypeFilter] = useState<"ALL" | "DIRECT" | "GROUP">("ALL");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const [messages, setMessages] = useState<WaChatMessage[]>([]);
@@ -1045,6 +1070,8 @@ export function WaChatRoomManager({
           timestamp: payload.timestamp || Math.floor(Date.now() / 1000),
           from: payload.from,
           to: payload.to,
+          participant: payload.participant || payload.author || null,
+          senderName: payload.senderName || payload.pushName || payload._data?.pushName || null,
           fromMe: !!payload.fromMe,
           hasMedia: !!payload.hasMedia,
           media: payload.media || null,
@@ -1115,6 +1142,8 @@ export function WaChatRoomManager({
                 timestamp: payload.timestamp || Math.floor(Date.now() / 1000),
                 from: payload.from,
                 to: payload.to,
+                participant: payload.participant || payload.author || null,
+                senderName: payload.senderName || payload.pushName || payload._data?.pushName || null,
                 fromMe: !!payload.fromMe,
                 hasMedia: !!payload.hasMedia,
                 media: payload.media || null,
@@ -1463,6 +1492,11 @@ export function WaChatRoomManager({
 
   const filteredRooms = useMemo(() => {
     let result = rooms;
+    if (chatTypeFilter === "DIRECT") {
+      result = result.filter((r) => !r.isGroup);
+    } else if (chatTypeFilter === "GROUP") {
+      result = result.filter((r) => r.isGroup);
+    }
     if (selectedStageFilter) {
       result = result.filter((r) => r.stage?.id === selectedStageFilter);
     }
@@ -1478,7 +1512,7 @@ export function WaChatRoomManager({
       });
     }
     return result;
-  }, [rooms, searchQuery, selectedStageFilter]);
+  }, [rooms, searchQuery, selectedStageFilter, chatTypeFilter]);
 
   const activeSessionObj = sessions.find((s) => s.id === selectedSessionId);
   const isSessionConnected = activeSessionObj?.status === "WORKING";
@@ -1643,12 +1677,50 @@ export function WaChatRoomManager({
                   <div className="relative">
                     <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-stone-400" />
                     <Input
-                      placeholder="Cari kontak atau pesan..."
+                      placeholder="Cari kontak, grup, atau pesan..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-8 h-8 text-xs bg-stone-50 border-stone-200"
                     />
                   </div>
+                </div>
+
+                {/* WhatsApp-Style Chat Type Filter Pills: Semua / Personal / Grup */}
+                <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-stone-200/80 bg-stone-50/80 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setChatTypeFilter("ALL")}
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                      chatTypeFilter === "ALL"
+                        ? "bg-emerald-600 text-white shadow-2xs font-semibold"
+                        : "bg-white text-stone-600 hover:bg-stone-200/70 border border-stone-200"
+                    }`}
+                  >
+                    Semua ({rooms.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChatTypeFilter("DIRECT")}
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                      chatTypeFilter === "DIRECT"
+                        ? "bg-emerald-600 text-white shadow-2xs font-semibold"
+                        : "bg-white text-stone-600 hover:bg-stone-200/70 border border-stone-200"
+                    }`}
+                  >
+                    Personal ({rooms.filter((r) => !r.isGroup).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChatTypeFilter("GROUP")}
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
+                      chatTypeFilter === "GROUP"
+                        ? "bg-emerald-600 text-white shadow-2xs font-semibold"
+                        : "bg-white text-stone-600 hover:bg-stone-200/70 border border-stone-200"
+                    }`}
+                  >
+                    <Users className="w-3 h-3" />
+                    Grup ({rooms.filter((r) => r.isGroup).length})
+                  </button>
                 </div>
 
                 {/* Stage Filter Scrollable Bar */}
@@ -1737,11 +1809,18 @@ export function WaChatRoomManager({
                               </span>
                             </div>
 
-                            {room.phoneNumber && room.phoneNumber !== room.name && (
+                            {room.phoneNumber && room.phoneNumber !== room.name && !room.isGroup && (
                               <p className="text-[10px] text-stone-400 font-mono leading-none truncate mt-0.5">
                                 {room.phoneNumber.startsWith("62")
                                   ? `+62 ${room.phoneNumber.slice(2)}`
                                   : room.phoneNumber}
+                              </p>
+                            )}
+
+                            {room.isGroup && (
+                              <p className="text-[10px] text-emerald-600 font-medium leading-none truncate mt-0.5 flex items-center gap-1">
+                                <Users className="w-2.5 h-2.5" />
+                                Grup WhatsApp
                               </p>
                             )}
 
@@ -1839,14 +1918,16 @@ export function WaChatRoomManager({
                           <h3 className="font-bold text-xs text-stone-900 flex items-center gap-1.5 truncate">
                             <span className="truncate">{selectedRoom.name}</span>
                             {selectedRoom.isGroup && (
-                              <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0">
+                              <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] px-1.5 py-0 shrink-0 font-medium">
                                 <Users className="w-3 h-3 mr-1" />
-                                Grup
+                                Grup WhatsApp
                               </Badge>
                             )}
                           </h3>
                           <p className="text-[10px] text-stone-400 font-mono truncate">
-                            {selectedRoom.phoneNumber
+                            {selectedRoom.isGroup
+                              ? "Grup WhatsApp"
+                              : selectedRoom.phoneNumber
                               ? (selectedRoom.phoneNumber.startsWith("62")
                                   ? `+62 ${selectedRoom.phoneNumber.slice(2)}`
                                   : selectedRoom.phoneNumber)
@@ -1927,6 +2008,7 @@ export function WaChatRoomManager({
                             <MessageBubble
                               key={extractMessageId(msg.id) || index}
                               msg={msg}
+                              isGroup={selectedRoom.isGroup}
                               onPreviewImage={(url, filename) => setLightboxMedia({ url, filename })}
                             />
                           ))}
@@ -1940,7 +2022,7 @@ export function WaChatRoomManager({
                       disabled={!isSessionConnected}
                       isSending={isSending}
                       selectedRoomId={selectedRoom.id}
-                      placeholder={`Balas ke ${selectedRoom.name}... (Enter untuk kirim, Shift+Enter untuk baris baru)`}
+                      placeholder={`Balas ke ${selectedRoom.isGroup ? "grup " + selectedRoom.name : selectedRoom.name}... (Enter untuk kirim, Shift+Enter untuk baris baru)`}
                       pendingAttachment={pendingAttachment}
                       onClearAttachment={handleClearAttachment}
                       onToggleSendAsDocument={handleToggleSendAsDocument}
