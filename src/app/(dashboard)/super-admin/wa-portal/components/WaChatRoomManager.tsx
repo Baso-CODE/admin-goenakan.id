@@ -217,6 +217,8 @@ function processAttachmentFile(file: File, forceAsDocument = false): Promise<Pen
 interface WaMessageInputProps {
   onSendMessage: (text: string, attachment?: PendingAttachment | null) => Promise<void>;
   disabled?: boolean;
+  isSending?: boolean;
+  selectedRoomId?: string;
   placeholder?: string;
   pendingAttachment: PendingAttachment | null;
   onClearAttachment: () => void;
@@ -228,6 +230,8 @@ interface WaMessageInputProps {
 const WaMessageInput = React.memo(function WaMessageInput({
   onSendMessage,
   disabled = false,
+  isSending = false,
+  selectedRoomId,
   placeholder = "Ketik pesan...",
   pendingAttachment,
   onClearAttachment,
@@ -237,9 +241,20 @@ const WaMessageInput = React.memo(function WaMessageInput({
 }: WaMessageInputProps) {
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const docInputRef = useRef<HTMLInputElement | null>(null);
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Automatically keep focus in the textarea on room select
+  useEffect(() => {
+    if (!disabled) {
+      const timer = setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedRoomId, disabled]);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
@@ -254,7 +269,7 @@ const WaMessageInput = React.memo(function WaMessageInput({
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if ((!text.trim() && !pendingAttachment) || disabled || isSubmitting) return;
+    if ((!text.trim() && !pendingAttachment) || disabled || isSubmitting || isSending) return;
 
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     if (onTyping) onTyping(false);
@@ -264,10 +279,17 @@ const WaMessageInput = React.memo(function WaMessageInput({
     setText("");
     onClearAttachment();
     setIsSubmitting(true);
+
+    // Keep active focus on the chat field immediately
+    textareaRef.current?.focus();
+
     try {
       await onSendMessage(toSendText, toSendAttachment);
     } finally {
       setIsSubmitting(false);
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
     }
   };
 
@@ -431,13 +453,14 @@ const WaMessageInput = React.memo(function WaMessageInput({
 
         <div className="flex-1 relative min-w-0">
           <Textarea
+            ref={textareaRef}
             placeholder={placeholder}
             value={text}
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             rows={1}
-            disabled={disabled || isSubmitting}
+            disabled={disabled}
             className="min-h-[40px] max-h-32 text-xs resize-none pr-3 py-2.5 bg-stone-50 border-stone-200"
           />
         </div>
@@ -445,10 +468,10 @@ const WaMessageInput = React.memo(function WaMessageInput({
         <Button
           type="submit"
           size="sm"
-          disabled={(!text.trim() && !pendingAttachment) || disabled || isSubmitting}
+          disabled={(!text.trim() && !pendingAttachment) || disabled || isSubmitting || isSending}
           className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 cursor-pointer"
         >
-          {isSubmitting ? (
+          {isSubmitting || isSending ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <Send className="w-4 h-4" />
@@ -1827,7 +1850,9 @@ export function WaChatRoomManager({
                     {/* Message Input Bar (Isolated & Memoized for zero typing lag) */}
                     <WaMessageInput
                       onSendMessage={handleSendMessage}
-                      disabled={!isSessionConnected || isSending}
+                      disabled={!isSessionConnected}
+                      isSending={isSending}
+                      selectedRoomId={selectedRoom.id}
                       placeholder={`Balas ke ${selectedRoom.name}... (Enter untuk kirim, Shift+Enter untuk baris baru)`}
                       pendingAttachment={pendingAttachment}
                       onClearAttachment={handleClearAttachment}
