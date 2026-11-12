@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WaHealthResponse, WaMessage, WaSession } from "@/types/waPortal.type";
 import {
   Calendar,
+  FileText,
   History,
   MessageSquare,
   Rss,
@@ -17,6 +18,7 @@ import { WaMessageLogs } from "./components/WaMessageLogs";
 import { WaMessageScheduler } from "./components/WaMessageScheduler";
 import { WaMessageSender } from "./components/WaMessageSender";
 import { WaSessionManager } from "./components/WaSessionManager";
+import { WaTemplateManager } from "./components/WaTemplateManager";
 import { WaWebhookManager } from "./components/WaWebhookManager";
 
 function WaPortalContent() {
@@ -205,6 +207,14 @@ function WaPortalContent() {
           </TabsTrigger>
 
           <TabsTrigger
+            value="templates"
+            className="text-xs data-[state=active]:bg-white data-[state=active]:text-stone-900 data-[state=active]:shadow-2xs font-semibold px-3 py-1.5 gap-1.5"
+          >
+            <FileText className="w-3.5 h-3.5 text-stone-500" />
+            Template & Otomasi
+          </TabsTrigger>
+
+          <TabsTrigger
             value="webhooks"
             className="text-xs data-[state=active]:bg-white data-[state=active]:text-stone-900 data-[state=active]:shadow-2xs font-semibold px-3 py-1.5 gap-1.5"
           >
@@ -251,7 +261,15 @@ function WaPortalContent() {
           <WaMessageLogs activeSessionId={activeSessionId} />
         </TabsContent>
 
-        {/* Tab 5: Webhooks */}
+        {/* Tab 5: Templates & Automation */}
+        <TabsContent value="templates" className="space-y-4 focus-visible:outline-none">
+          <WaTemplateManager
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+          />
+        </TabsContent>
+
+        {/* Tab 6: Webhooks */}
         <TabsContent value="webhooks" className="space-y-4 focus-visible:outline-none">
           <WaWebhookManager />
         </TabsContent>

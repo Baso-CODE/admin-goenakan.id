@@ -181,3 +181,43 @@ export interface WaChatMessage {
   ack?: number;
   ackName?: string;
 }
+
+export type WaTemplateCategory = "SOP" | "BILLING" | "SHIPPING" | "GENERAL" | (string & {});
+
+export interface WaTemplate {
+  id: string;
+  code: string;
+  name: string;
+  category: WaTemplateCategory;
+  content: string;
+  description?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SendWaTemplatePayload {
+  to: string;
+  templateCode: string;
+  variables?: Record<string, any>;
+  mediaUrl?: string;
+  mediaFilename?: string;
+  asDocument?: boolean;
+  sessionId?: string;
+}
+
+export interface WaTemplateResponse {
+  success: boolean;
+  data?: {
+    id: string;
+    status: string;
+    to: string;
+    templateCode: string;
+    templateName: string;
+    renderedContent: string;
+    hasMedia: boolean;
+    scheduledAt: string;
+  };
+  error?: string;
+  message?: string;
+}
