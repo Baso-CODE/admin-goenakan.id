@@ -130,12 +130,34 @@ function normalizeJid(jid?: string | null): string {
   return jid.replace(/@(c\.us|s\.whatsapp\.net|lid|g\.us)$/i, "").trim();
 }
 
-function formatParticipantNumber(participant: string): string {
+function formatParticipantNumber(participant?: string | null): string | null {
+  if (!participant) return null;
   const clean = participant.replace(/@(c\.us|s\.whatsapp\.net|lid|g\.us)$/i, "").trim();
+  if (!clean) return null;
+
+  // Indonesian phone numbers
   if (clean.startsWith("62")) {
-    return `+62 ${clean.slice(2)}`;
+    const rest = clean.slice(2);
+    if (rest.length >= 9) {
+      return `+62 ${rest.slice(0, 3)}-${rest.slice(3, 7)}-${rest.slice(7)}`;
+    }
+    return `+62 ${rest}`;
   }
-  return clean;
+  if (clean.startsWith("08")) {
+    const rest = clean.slice(2);
+    if (rest.length >= 9) {
+      return `+62 8${rest.slice(0, 2)}-${rest.slice(2, 6)}-${rest.slice(6)}`;
+    }
+    return `+62 8${rest}`;
+  }
+
+  // Other standard international phone numbers (8-14 digits)
+  if (/^\d{8,14}$/.test(clean)) {
+    return `+${clean}`;
+  }
+
+  // Do NOT display raw internal LID hashes as IDs
+  return null;
 }
 
 function isMatchingChat(
@@ -592,6 +614,7 @@ const MessageBubble = React.memo(function MessageBubble({
   isGroup = false,
 }: MessageBubbleProps) {
   const isMe = msg.fromMe;
+  const participantNumber = formatParticipantNumber(msg.participant);
   const hasMedia = msg.hasMedia && !!msg.media?.url;
   const isDocMime =
     msg.media?.mimetype?.startsWith("application/") ||
@@ -611,13 +634,13 @@ const MessageBubble = React.memo(function MessageBubble({
             : "bg-white text-stone-900 border border-stone-200/80 rounded-bl-xs"
         }`}
       >
-        {/* WhatsApp Group Sender Author Label */}
+        {/* WhatsApp Group Sender Author Label: Nama (nomor) */}
         {isGroup && !isMe && (
           <div className="text-[11px] font-bold text-emerald-800 mb-1 flex items-center gap-1.5 truncate">
-            <span>{msg.senderName || (msg.participant ? formatParticipantNumber(msg.participant) : "Anggota Grup")}</span>
-            {msg.senderName && msg.participant && (
-              <span className="text-[9.5px] font-normal text-stone-400 font-mono">
-                ({formatParticipantNumber(msg.participant)})
+            <span>{msg.senderName || participantNumber || "Anggota Grup"}</span>
+            {msg.senderName && participantNumber && (
+              <span className="text-[9.5px] font-normal text-stone-500 font-mono">
+                ({participantNumber})
               </span>
             )}
           </div>
