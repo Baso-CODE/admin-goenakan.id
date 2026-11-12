@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -43,11 +44,14 @@ import {
   Send,
   Settings2,
   Smartphone,
+  Smile,
   Tag,
   User,
   Users,
   X,
 } from "lucide-react";
+import dynamic from "next/dynamic";
+import { EmojiStyle, Theme, type EmojiClickData } from "emoji-picker-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useWaEvents } from "../hooks/useWaEvents";
@@ -55,6 +59,17 @@ import { WaContactStageSelector } from "./WaContactStageSelector";
 import { WaContactLabelsTagger } from "./WaContactLabelsTagger";
 import { WaPipelineKanban } from "./WaPipelineKanban";
 import { WaPipelineSettingsDialog } from "./WaPipelineSettingsDialog";
+
+// WhatsApp-like full emoji picker, lazily imported to ensure 0ms initial lag & Next.js SSR safety
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-[350px] h-[400px] flex flex-col items-center justify-center bg-white rounded-2xl shadow-lg border border-stone-200 text-stone-400 gap-2">
+      <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+      <span className="text-xs">Memuat emoji WhatsApp...</span>
+    </div>
+  ),
+});
 
 const formatMessageTime = (unixTs: number) => {
   if (!unixTs) return "";
@@ -241,6 +256,7 @@ const WaMessageInput = React.memo(function WaMessageInput({
 }: WaMessageInputProps) {
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const docInputRef = useRef<HTMLInputElement | null>(null);
@@ -267,6 +283,36 @@ const WaMessageInput = React.memo(function WaMessageInput({
     }
   };
 
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    const emoji = emojiData.emoji;
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setText((prev) => prev + emoji);
+      return;
+    }
+
+    const start = textarea.selectionStart ?? text.length;
+    const end = textarea.selectionEnd ?? text.length;
+
+    const newText = text.substring(0, start) + emoji + text.substring(end);
+    setText(newText);
+
+    if (onTyping) {
+      onTyping(true);
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = setTimeout(() => {
+        onTyping(false);
+      }, 3000);
+    }
+
+    // Keep active focus on textarea and move cursor after the emoji
+    const nextCursorPos = start + emoji.length;
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(nextCursorPos, nextCursorPos);
+    });
+  };
+
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if ((!text.trim() && !pendingAttachment) || disabled || isSubmitting || isSending) return;
@@ -274,6 +320,7 @@ const WaMessageInput = React.memo(function WaMessageInput({
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     if (onTyping) onTyping(false);
 
+    setIsEmojiPickerOpen(false);
     const toSendText = text.trim();
     const toSendAttachment = pendingAttachment;
     setText("");
@@ -418,6 +465,46 @@ const WaMessageInput = React.memo(function WaMessageInput({
           accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
           className="hidden"
         />
+
+        {/* WhatsApp-Style Full Emoji Picker */}
+        <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={disabled || isSubmitting}
+              className={`h-10 w-10 p-0 rounded-lg shrink-0 cursor-pointer transition-colors ${
+                isEmojiPickerOpen
+                  ? "text-emerald-600 bg-emerald-50"
+                  : "text-stone-500 hover:text-stone-700 hover:bg-stone-100"
+              }`}
+              title="Pilih Emoji"
+            >
+              <Smile className="w-5 h-5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            side="top"
+            sideOffset={8}
+            className="p-0 border border-stone-200 shadow-2xl rounded-2xl overflow-hidden w-auto z-50 bg-white"
+          >
+            <EmojiPicker
+              onEmojiClick={handleEmojiClick}
+              autoFocusSearch={false}
+              theme={Theme.LIGHT}
+              emojiStyle={EmojiStyle.APPLE}
+              searchPlaceHolder="Cari emoji..."
+              width={350}
+              height={400}
+              lazyLoadEmojis={true}
+              previewConfig={{
+                showPreview: false,
+              }}
+            />
+          </PopoverContent>
+        </Popover>
 
         {/* Paperclip Button with WhatsApp-like Dropdown Menu */}
         <DropdownMenu>
