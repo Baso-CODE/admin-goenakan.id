@@ -5,6 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -156,6 +162,7 @@ export interface PendingAttachment {
   sizeFormatted: string;
   isImage: boolean;
   mimetype: string;
+  sendAsDocument?: boolean;
 }
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -179,7 +186,7 @@ function downloadAttachment(url: string, filename?: string) {
   }
 }
 
-function processAttachmentFile(file: File): Promise<PendingAttachment | null> {
+function processAttachmentFile(file: File, forceAsDocument = false): Promise<PendingAttachment | null> {
   return new Promise((resolve) => {
     if (file.size > MAX_ATTACHMENT_BYTES) {
       toast.error(`Ukuran file melebihi batas maksimal 10 MB (${formatFileSize(file.size)})`);
@@ -196,6 +203,7 @@ function processAttachmentFile(file: File): Promise<PendingAttachment | null> {
         sizeFormatted: formatFileSize(file.size),
         isImage,
         mimetype: file.type || (isImage ? "image/jpeg" : "application/octet-stream"),
+        sendAsDocument: forceAsDocument || !isImage,
       });
     };
     reader.onerror = () => {
@@ -212,7 +220,8 @@ interface WaMessageInputProps {
   placeholder?: string;
   pendingAttachment: PendingAttachment | null;
   onClearAttachment: () => void;
-  onSelectFile: (file: File) => void;
+  onToggleSendAsDocument?: (sendAsDoc: boolean) => void;
+  onSelectFile: (file: File, forceAsDocument?: boolean) => void;
 }
 
 const WaMessageInput = React.memo(function WaMessageInput({
@@ -221,11 +230,13 @@ const WaMessageInput = React.memo(function WaMessageInput({
   placeholder = "Ketik pesan...",
   pendingAttachment,
   onClearAttachment,
+  onToggleSendAsDocument,
   onSelectFile,
 }: WaMessageInputProps) {
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const docInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -250,10 +261,10 @@ const WaMessageInput = React.memo(function WaMessageInput({
     }
   };
 
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>, forceAsDocument = false) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      onSelectFile(files[0]);
+      onSelectFile(files[0], forceAsDocument);
     }
     e.target.value = "";
   };
@@ -267,7 +278,7 @@ const WaMessageInput = React.memo(function WaMessageInput({
         const file = item.getAsFile();
         if (file) {
           e.preventDefault();
-          onSelectFile(file);
+          onSelectFile(file, false);
           break;
         }
       }
@@ -280,7 +291,7 @@ const WaMessageInput = React.memo(function WaMessageInput({
       {pendingAttachment && (
         <div className="mb-2 flex items-center justify-between gap-3 p-2 bg-stone-100/90 border border-stone-200 rounded-lg animate-in fade-in slide-in-from-bottom-1 duration-150">
           <div className="flex items-center gap-2.5 min-w-0">
-            {pendingAttachment.isImage ? (
+            {pendingAttachment.isImage && !pendingAttachment.sendAsDocument ? (
               <div className="relative w-10 h-10 rounded-md overflow-hidden bg-stone-200 shrink-0 border border-stone-300">
                 <img
                   src={pendingAttachment.dataUrl}
@@ -294,50 +305,112 @@ const WaMessageInput = React.memo(function WaMessageInput({
               </div>
             )}
             <div className="min-w-0 text-left">
-              <p className="text-xs font-medium text-stone-800 truncate max-w-[200px] sm:max-w-xs">
+              <p className="text-xs font-medium text-stone-800 truncate max-w-[180px] sm:max-w-xs">
                 {pendingAttachment.name}
               </p>
               <p className="text-[10px] text-stone-500">
                 {pendingAttachment.sizeFormatted}
+                {pendingAttachment.isImage && (
+                  <span className="ml-1 text-[9px] text-emerald-600 font-medium">
+                    ({pendingAttachment.sendAsDocument ? "Kirim sbg Dokumen" : "Kirim sbg Gambar"})
+                  </span>
+                )}
               </p>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onClearAttachment}
-            disabled={disabled || isSubmitting}
-            className="h-7 w-7 p-0 text-stone-400 hover:text-stone-700 hover:bg-stone-200 rounded-full shrink-0 cursor-pointer"
-            title="Hapus lampiran"
-          >
-            <X className="w-4 h-4" />
-          </Button>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {pendingAttachment.isImage && (
+              <div className="flex items-center bg-stone-200/90 p-0.5 rounded-md text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => onToggleSendAsDocument?.(false)}
+                  className={`px-2 py-0.5 rounded transition-all cursor-pointer font-medium ${
+                    !pendingAttachment.sendAsDocument
+                      ? "bg-white text-emerald-700 shadow-2xs font-semibold"
+                      : "text-stone-600 hover:text-stone-900"
+                  }`}
+                  title="Kirim sebagai gambar (inline preview di WhatsApp)"
+                >
+                  Gambar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onToggleSendAsDocument?.(true)}
+                  className={`px-2 py-0.5 rounded transition-all cursor-pointer font-medium ${
+                    pendingAttachment.sendAsDocument
+                      ? "bg-white text-emerald-700 shadow-2xs font-semibold"
+                      : "text-stone-600 hover:text-stone-900"
+                  }`}
+                  title="Kirim sebagai dokumen (kualitas asli tanpa kompresi)"
+                >
+                  Dokumen
+                </button>
+              </div>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onClearAttachment}
+              disabled={disabled || isSubmitting}
+              className="h-7 w-7 p-0 text-stone-400 hover:text-stone-700 hover:bg-stone-200 rounded-full shrink-0 cursor-pointer"
+              title="Hapus lampiran"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="flex items-end gap-2">
-        {/* Hidden Native File Input */}
+        {/* Hidden Native File Inputs */}
         <input
           type="file"
-          ref={fileInputRef}
-          onChange={handleFileInputChange}
+          ref={imageInputRef}
+          onChange={(e) => handleFileInputChange(e, false)}
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hidden"
+        />
+        <input
+          type="file"
+          ref={docInputRef}
+          onChange={(e) => handleFileInputChange(e, true)}
           accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
           className="hidden"
         />
 
-        {/* Paperclip Button */}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || isSubmitting}
-          className="h-10 w-10 p-0 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg shrink-0 cursor-pointer"
-          title="Lampirkan File / Dokumen / Gambar (Maks. 10 MB)"
-        >
-          <Paperclip className="w-4 h-4" />
-        </Button>
+        {/* Paperclip Button with WhatsApp-like Dropdown Menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={disabled || isSubmitting}
+              className="h-10 w-10 p-0 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg shrink-0 cursor-pointer"
+              title="Lampirkan File / Dokumen / Gambar"
+            >
+              <Paperclip className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" side="top" className="w-44 p-1 shadow-lg border-stone-200">
+            <DropdownMenuItem
+              onClick={() => imageInputRef.current?.click()}
+              className="flex items-center gap-2.5 text-xs py-2 cursor-pointer text-stone-700 hover:text-stone-900"
+            >
+              <ImageIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Foto & Gambar</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => docInputRef.current?.click()}
+              className="flex items-center gap-2.5 text-xs py-2 cursor-pointer text-stone-700 hover:text-stone-900"
+            >
+              <FileText className="w-4 h-4 text-sky-600 shrink-0" />
+              <span>Dokumen</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <div className="flex-1 relative min-w-0">
           <Textarea
@@ -380,9 +453,14 @@ const MessageBubble = React.memo(function MessageBubble({
 }: MessageBubbleProps) {
   const isMe = msg.fromMe;
   const hasMedia = msg.hasMedia && !!msg.media?.url;
+  const isDocMime =
+    msg.media?.mimetype?.startsWith("application/") ||
+    msg.media?.mimetype?.includes("pdf") ||
+    msg.media?.mimetype?.includes("document") ||
+    !!msg.media?.filename?.match(/\.(pdf|docx?|xlsx?|txt|zip)$/i);
   const isImage =
-    msg.media?.mimetype?.startsWith("image/") ||
-    (msg.media?.url?.startsWith("data:image/"));
+    !isDocMime &&
+    (msg.media?.mimetype?.startsWith("image/") || (msg.media?.url?.startsWith("data:image/")));
 
   return (
     <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
@@ -718,10 +796,23 @@ export function WaChatRoomManager({
           : Array.isArray(data?.data)
           ? data.data
           : [];
-        const normalized: WaChatMessage[] = items.map((m) => ({
-          ...m,
-          id: extractMessageId(m.id),
-        }));
+
+        // Safety fallback: preserve any permanent Base64 media already cached in memory
+        const prevCached = messageCacheRef.current.get(chatId) || [];
+        const cachedById = new Map(prevCached.map((m) => [extractMessageId(m.id), m]));
+
+        const normalized: WaChatMessage[] = items.map((m) => {
+          const mId = extractMessageId(m.id);
+          const cached = cachedById.get(mId);
+          const hasMedia = !!m.hasMedia || !!cached?.hasMedia;
+          const media = m.media?.url ? m.media : (cached?.media?.url ? cached.media : m.media);
+          return {
+            ...m,
+            id: mId,
+            hasMedia,
+            media: hasMedia ? media : null,
+          };
+        });
         const sorted = [...normalized].sort((a, b) => a.timestamp - b.timestamp);
 
         // Deduplicate messages by id or by exact (body + fromMe + timestamp within 4s)
@@ -749,16 +840,7 @@ export function WaChatRoomManager({
 
         // If user is currently looking at this room, update state smoothly
         if (selectedRoomRef.current?.id === chatId) {
-          setMessages((prev) => {
-            if (
-              prev.length === deduplicated.length &&
-              prev[prev.length - 1]?.id === deduplicated[deduplicated.length - 1]?.id &&
-              prev[prev.length - 1]?.ack === deduplicated[deduplicated.length - 1]?.ack
-            ) {
-              return prev; // Identical, avoid re-render
-            }
-            return deduplicated;
-          });
+          setMessages(deduplicated);
         }
       } catch {
         // ignore
@@ -1028,11 +1110,15 @@ export function WaChatRoomManager({
   });
 
   // Attachment file selection & drag-and-drop callbacks
-  const handleSelectFile = useCallback(async (file: File) => {
-    const processed = await processAttachmentFile(file);
+  const handleSelectFile = useCallback(async (file: File, forceAsDocument = false) => {
+    const processed = await processAttachmentFile(file, forceAsDocument);
     if (processed) {
       setPendingAttachment(processed);
     }
+  }, []);
+
+  const handleToggleSendAsDocument = useCallback((sendAsDoc: boolean) => {
+    setPendingAttachment((prev) => (prev ? { ...prev, sendAsDocument: sendAsDoc } : null));
   }, []);
 
   const handleClearAttachment = useCallback(() => {
@@ -1073,7 +1159,7 @@ export function WaChatRoomManager({
     const files = e.dataTransfer?.files;
     if (files && files.length > 0) {
       const file = files[0];
-      const processed = await processAttachmentFile(file);
+      const processed = await processAttachmentFile(file, false);
       if (processed) {
         setPendingAttachment(processed);
       }
@@ -1087,6 +1173,8 @@ export function WaChatRoomManager({
 
       const currentRoomId = selectedRoom.id;
       const tempId = "temp_" + Date.now();
+      const sendAsDoc = attachment?.sendAsDocument ?? !attachment?.isImage;
+
       const optimisticMessage: WaChatMessage = {
         id: tempId,
         body: messageText,
@@ -1099,7 +1187,7 @@ export function WaChatRoomManager({
           ? {
               url: attachment.dataUrl,
               filename: attachment.name,
-              mimetype: attachment.mimetype,
+              mimetype: sendAsDoc ? "application/octet-stream" : attachment.mimetype,
             }
           : null,
         ack: 0,
@@ -1124,7 +1212,7 @@ export function WaChatRoomManager({
             id: tempId,
             body:
               messageText ||
-              (attachment ? (attachment.isImage ? "[Gambar]" : "[Dokumen]") : ""),
+              (attachment ? (attachment.isImage && !sendAsDoc ? "[Gambar]" : "[Dokumen]") : ""),
             timestamp: Math.floor(Date.now() / 1000),
             fromMe: true,
             hasMedia: !!attachment,
@@ -1151,6 +1239,7 @@ export function WaChatRoomManager({
             text: messageText,
             mediaUrl: attachment?.dataUrl,
             mediaFilename: attachment?.name,
+            asDocument: sendAsDoc,
           }),
         });
 
@@ -1704,6 +1793,7 @@ export function WaChatRoomManager({
                       placeholder={`Balas ke ${selectedRoom.name}... (Enter untuk kirim, Shift+Enter untuk baris baru)`}
                       pendingAttachment={pendingAttachment}
                       onClearAttachment={handleClearAttachment}
+                      onToggleSendAsDocument={handleToggleSendAsDocument}
                       onSelectFile={handleSelectFile}
                     />
                   </>
@@ -1744,19 +1834,19 @@ export function WaChatRoomManager({
 
       {/* Image Preview Lightbox Dialog */}
       <Dialog open={!!lightboxMedia} onOpenChange={(open) => !open && setLightboxMedia(null)}>
-        <DialogContent className="max-w-3xl p-3 bg-stone-950/95 border-stone-800 text-white sm:rounded-xl">
+        <DialogContent className="max-w-3xl p-3 bg-stone-950/95 border-stone-800 text-white sm:rounded-xl [&_button[data-slot=dialog-close]]:text-stone-300 [&_button[data-slot=dialog-close]]:hover:text-white">
           <DialogTitle className="sr-only">Pratinjau Gambar</DialogTitle>
           {lightboxMedia && (
             <div className="flex flex-col items-center w-full">
-              <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-stone-800 text-xs text-stone-300">
-                <span className="truncate max-w-md font-medium">
+              <div className="w-full flex items-center justify-between pb-2 mb-2 pr-12 border-b border-stone-800 text-xs text-stone-300">
+                <span className="truncate max-w-[200px] sm:max-w-md font-medium">
                   {lightboxMedia.filename || "Gambar WhatsApp"}
                 </span>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => downloadAttachment(lightboxMedia.url, lightboxMedia.filename)}
-                  className="h-7 text-xs bg-stone-800 hover:bg-stone-700 border-stone-700 text-white gap-1.5 cursor-pointer"
+                  className="h-7 text-xs bg-stone-800 hover:bg-stone-700 border-stone-700 text-white gap-1.5 cursor-pointer mr-2 shrink-0"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Unduh
