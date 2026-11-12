@@ -222,6 +222,7 @@ interface WaMessageInputProps {
   onClearAttachment: () => void;
   onToggleSendAsDocument?: (sendAsDoc: boolean) => void;
   onSelectFile: (file: File, forceAsDocument?: boolean) => void;
+  onTyping?: (isTyping: boolean) => void;
 }
 
 const WaMessageInput = React.memo(function WaMessageInput({
@@ -232,15 +233,31 @@ const WaMessageInput = React.memo(function WaMessageInput({
   onClearAttachment,
   onToggleSendAsDocument,
   onSelectFile,
+  onTyping,
 }: WaMessageInputProps) {
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const docInputRef = useRef<HTMLInputElement | null>(null);
+  const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setText(e.target.value);
+    if (onTyping) {
+      onTyping(true);
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = setTimeout(() => {
+        onTyping(false);
+      }, 3000);
+    }
+  };
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if ((!text.trim() && !pendingAttachment) || disabled || isSubmitting) return;
+
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    if (onTyping) onTyping(false);
 
     const toSendText = text.trim();
     const toSendAttachment = pendingAttachment;
@@ -416,7 +433,7 @@ const WaMessageInput = React.memo(function WaMessageInput({
           <Textarea
             placeholder={placeholder}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={handleTextChange}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             rows={1}
@@ -1166,6 +1183,27 @@ export function WaChatRoomManager({
     }
   }, []);
 
+  // Real-time typing indicator dispatcher to emulate human behavior and avoid spam flags
+  const lastTypingCallRef = useRef<number>(0);
+  const handleSendTyping = useCallback(
+    async (isTyping: boolean) => {
+      if (!selectedRoom?.id || !selectedSessionId) return;
+      const now = Date.now();
+      if (isTyping && now - lastTypingCallRef.current < 4000) return;
+      lastTypingCallRef.current = now;
+
+      fetch(`/api/wa/chats/${encodeURIComponent(selectedRoom.id)}/typing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: selectedSessionId,
+          isTyping,
+        }),
+      }).catch(() => {});
+    },
+    [selectedRoom?.id, selectedSessionId]
+  );
+
   // Handle Send Reply Message with instant 0ms optimistic UI update
   const handleSendMessage = useCallback(
     async (messageText: string, attachment?: PendingAttachment | null) => {
@@ -1795,6 +1833,7 @@ export function WaChatRoomManager({
                       onClearAttachment={handleClearAttachment}
                       onToggleSendAsDocument={handleToggleSendAsDocument}
                       onSelectFile={handleSelectFile}
+                      onTyping={handleSendTyping}
                     />
                   </>
                 ) : (
