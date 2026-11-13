@@ -159,6 +159,9 @@ export default function FormArticle({
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const [isTagCategoryModalOpen, setIsTagCategoryModalOpen] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState("");
+  const [productSearchQuery, setProductSearchQuery] = useState("");
+  const [productCategoryFilter, setProductCategoryFilter] = useState("all");
+  const [itemCategoryFilter, setItemCategoryFilter] = useState("all");
 
   const form = useForm<any>({
     resolver: zodResolver(articleSchema),
@@ -228,8 +231,52 @@ export default function FormArticle({
         }
 
         if (prodRes.ok) {
-          const p = await prodRes.json();
-          setProducts(Array.isArray(p) ? p : p.data || []);
+          const response = await prodRes.json();
+
+          const productData = Array.isArray(response)
+            ? response
+            : Array.isArray(response.data)
+              ? response.data
+              : [];
+
+          console.log("[Article] Total products:", productData.length);
+
+          console.table(
+            productData.slice(0, 10).map((product: any) => ({
+              name: product.name,
+              sku: product.sku,
+              categoryId: product.categoryId ?? product.category?.id,
+              categoryName: product.category?.name ?? product.category?.name_id,
+              itemCategoryId:
+                product.itemCategoryId ?? product.itemCategory?.id,
+              itemCategoryName: product.itemCategory?.name,
+            })),
+          );
+
+          console.log(
+            "[Article] Unique Product Categories:",
+            new Set(
+              productData
+                .map(
+                  (product: any) => product.categoryId ?? product.category?.id,
+                )
+                .filter(Boolean),
+            ).size,
+          );
+
+          console.log(
+            "[Article] Unique Item Categories:",
+            new Set(
+              productData
+                .map(
+                  (product: any) =>
+                    product.itemCategoryId ?? product.itemCategory?.id,
+                )
+                .filter(Boolean),
+            ).size,
+          );
+
+          setProducts(productData);
         }
 
         if (tagRes.ok) {
@@ -831,101 +878,300 @@ export default function FormArticle({
                   control={form.control}
                   name="productIds"
                   render={({ field }) => {
-                    const selectedProductIds = field.value || [];
-                    const selectedProducts = products.filter((p) =>
-                      selectedProductIds.includes(p.id),
+                    const selectedProductIds: string[] = field.value || [];
+
+                    const selectedProducts = products.filter((product) =>
+                      selectedProductIds.includes(product.id),
                     );
+
+                    // Mendukung respons API yang memiliki categoryId langsung
+                    // maupun respons lama yang hanya mengembalikan relasi.
+                    const getProductCategoryId = (
+                      product: any,
+                    ): string | null =>
+                      product.categoryId ?? product.category?.id ?? null;
+
+                    const getItemCategoryId = (product: any): string | null =>
+                      product.itemCategoryId ??
+                      product.itemCategory?.id ??
+                      null;
+
+                    // Daftar Product Category unik.
+                    const productCategories = Array.from(
+                      new Map(
+                        products
+                          .filter((product) => product.category?.id)
+                          .map((product) => [
+                            product.category.id,
+                            {
+                              id: product.category.id,
+                              name:
+                                product.category.name ??
+                                product.category.name_id ??
+                                "Tanpa nama kategori",
+                            },
+                          ]),
+                      ).values(),
+                    ).sort((a, b) => a.name.localeCompare(b.name));
+
+                    // Daftar Item Category berdasarkan Product Category.
+                    const itemCategories = Array.from(
+                      new Map(
+                        products
+                          .filter((product) => {
+                            if (!product.itemCategory?.id) return false;
+
+                            if (productCategoryFilter === "all") return true;
+
+                            return (
+                              getProductCategoryId(product) ===
+                              productCategoryFilter
+                            );
+                          })
+                          .map((product) => [
+                            product.itemCategory.id,
+                            {
+                              id: product.itemCategory.id,
+                              name: product.itemCategory.name,
+                              productCategoryId:
+                                product.itemCategory.productCategoryId,
+                            },
+                          ]),
+                      ).values(),
+                    ).sort((a, b) => a.name.localeCompare(b.name));
+
+                    // Filter gabungan Product Category + Item Category + Search.
+                    const searchTerm = productSearchQuery.trim().toLowerCase();
+
+                    const filteredProducts = products.filter((product) => {
+                      const categoryId = getProductCategoryId(product);
+                      const itemCategoryId = getItemCategoryId(product);
+
+                      const matchesCategory =
+                        productCategoryFilter === "all" ||
+                        categoryId === productCategoryFilter;
+
+                      const matchesItemCategory =
+                        itemCategoryFilter === "all" ||
+                        itemCategoryId === itemCategoryFilter;
+
+                      const matchesSearch =
+                        !searchTerm ||
+                        String(product.name ?? "")
+                          .toLowerCase()
+                          .includes(searchTerm) ||
+                        String(product.sku ?? "")
+                          .toLowerCase()
+                          .includes(searchTerm);
+
+                      return (
+                        matchesCategory && matchesItemCategory && matchesSearch
+                      );
+                    });
 
                     return (
                       <FormItem className="flex flex-col pt-4">
                         <div className="flex flex-col mb-2">
                           <FormLabel className="text-base font-bold flex items-center gap-2">
-                            <PackageSearch className="w-4 h-4" /> Produk Terkait
+                            <PackageSearch className="w-4 h-4" />
+                            Produk Terkait
                           </FormLabel>
+
                           <p className="text-[11px] text-muted-foreground mt-1">
-                            Cari dan pilih produk yang akan direkomendasikan di
-                            artikel ini.
+                            Filter berdasarkan Product Category dan Item
+                            Category, kemudian pilih produk untuk
+                            direkomendasikan.
                           </p>
                         </div>
+
+                        {/* FILTER KATEGORI PRODUK */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                          <div className="space-y-1.5">
+                            <p className="text-xs font-semibold text-stone-700">
+                              Product Category
+                            </p>
+
+                            <Select
+                              value={productCategoryFilter}
+                              onValueChange={(value) => {
+                                setProductCategoryFilter(value);
+
+                                // Reset subkategori, bukan produk terpilih.
+                                setItemCategoryFilter("all");
+                              }}>
+                              <SelectTrigger className="w-full bg-white">
+                                <SelectValue placeholder="Pilih kategori produk" />
+                              </SelectTrigger>
+
+                              <SelectContent>
+                                <SelectItem value="all">
+                                  Semua Product Category
+                                </SelectItem>
+
+                                {productCategories.map((category) => (
+                                  <SelectItem
+                                    key={category.id}
+                                    value={category.id}>
+                                    {category.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <p className="text-xs font-semibold text-stone-700">
+                              Item Category
+                            </p>
+
+                            <Select
+                              value={itemCategoryFilter}
+                              onValueChange={setItemCategoryFilter}>
+                              <SelectTrigger className="w-full bg-white">
+                                <SelectValue placeholder="Pilih item category" />
+                              </SelectTrigger>
+
+                              <SelectContent>
+                                <SelectItem value="all">
+                                  Semua Item Category
+                                </SelectItem>
+
+                                {itemCategories.map((category) => (
+                                  <SelectItem
+                                    key={category.id}
+                                    value={category.id}>
+                                    {category.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        {/* PRODUCT SEARCH */}
                         <Popover>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
+                                type="button"
                                 variant="outline"
                                 role="combobox"
                                 className="w-full justify-between bg-white text-muted-foreground hover:text-stone-700 font-normal">
-                                Cari nama atau SKU produk...
+                                <span className="truncate">
+                                  Cari nama atau SKU produk...
+                                </span>
+
                                 <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
+
                           <PopoverContent
                             className="w-(--radix-popover-trigger-width) p-0"
                             align="start">
-                            <Command>
+                            <Command shouldFilter={false}>
                               <CommandInput
-                                placeholder="Ketik nama produk..."
+                                placeholder="Cari nama atau SKU produk..."
                                 className="h-10"
+                                value={productSearchQuery}
+                                onValueChange={setProductSearchQuery}
                               />
+
                               <CommandList>
-                                <CommandEmpty>
-                                  Produk tidak ditemukan.
-                                </CommandEmpty>
-                                <CommandGroup>
-                                  {products.map((product) => (
-                                    <CommandItem
-                                      key={product.id}
-                                      value={product.name}
-                                      onSelect={() => {
-                                        const isSelected =
-                                          selectedProductIds.includes(
-                                            product.id,
-                                          );
-                                        const nextSelected = isSelected
-                                          ? selectedProductIds.filter(
-                                              (id: string) => id !== product.id,
-                                            )
-                                          : [...selectedProductIds, product.id];
-                                        field.onChange(nextSelected);
-                                      }}>
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          selectedProductIds.includes(
-                                            product.id,
-                                          )
-                                            ? "opacity-100"
-                                            : "opacity-0",
-                                        )}
-                                      />
-                                      {product.name}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
+                                {filteredProducts.length === 0 ? (
+                                  <div className="py-6 text-center text-sm text-muted-foreground">
+                                    Produk tidak ditemukan untuk filter ini.
+                                  </div>
+                                ) : (
+                                  <CommandGroup>
+                                    {filteredProducts.map((product) => {
+                                      const isSelected =
+                                        selectedProductIds.includes(product.id);
+
+                                      return (
+                                        <CommandItem
+                                          key={product.id}
+                                          value={product.id}
+                                          onSelect={() => {
+                                            field.onChange(
+                                              isSelected
+                                                ? selectedProductIds.filter(
+                                                    (id) => id !== product.id,
+                                                  )
+                                                : [
+                                                    ...selectedProductIds,
+                                                    product.id,
+                                                  ],
+                                            );
+                                          }}>
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4 shrink-0",
+                                              isSelected
+                                                ? "opacity-100"
+                                                : "opacity-0",
+                                            )}
+                                          />
+
+                                          <div className="flex flex-col min-w-0">
+                                            <span className="text-sm font-medium truncate">
+                                              {product.name}
+                                            </span>
+
+                                            <span className="text-[10px] text-muted-foreground">
+                                              SKU: {product.sku}
+                                            </span>
+
+                                            <span className="text-[10px] text-muted-foreground">
+                                              {product.category?.name ??
+                                                product.category?.name_id ??
+                                                "Tanpa kategori"}
+                                              {" / "}
+                                              {product.itemCategory?.name ??
+                                                "Tanpa item category"}
+                                            </span>
+                                          </div>
+                                        </CommandItem>
+                                      );
+                                    })}
+                                  </CommandGroup>
+                                )}
                               </CommandList>
                             </Command>
                           </PopoverContent>
                         </Popover>
 
-                        {/* LIST PRODUK YANG SUDAH DIPILIH (MUNCUL DI BAWAH COMBOBOX) */}
+                        {/* SELECTED PRODUCT COUNT */}
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-[11px] text-muted-foreground">
+                            {filteredProducts.length} produk sesuai filter
+                          </span>
+
+                          <span className="text-[11px] font-medium text-blue-600">
+                            {selectedProductIds.length} dipilih
+                          </span>
+                        </div>
+
+                        {/* PRODUK YANG SUDAH DIPILIH */}
                         {selectedProducts.length > 0 && (
                           <div className="flex flex-wrap gap-2 mt-3 p-3 border rounded-lg bg-stone-50/50">
-                            {selectedProducts.map((prod) => (
+                            {selectedProducts.map((product) => (
                               <div
-                                key={prod.id}
-                                className="inline-flex items-center px-2.5 py-1.5 rounded-md border bg-white shadow-sm transition-all hover:border-red-200 group max-w-full">
+                                key={product.id}
+                                className="inline-flex items-center px-2.5 py-1.5 rounded-md border bg-white shadow-sm group max-w-full">
                                 <span className="text-[11px] font-medium truncate pr-2 max-w-50">
-                                  {prod.name}
+                                  {product.name}
                                 </span>
+
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="h-5 w-5 text-stone-400 group-hover:bg-rose-50 group-hover:text-rose-600 shrink-0 rounded-sm"
+                                  className="h-5 w-5 text-stone-400 hover:text-rose-600 shrink-0 rounded-sm"
                                   onClick={() => {
                                     field.onChange(
                                       selectedProductIds.filter(
-                                        (id: string) => id !== prod.id,
+                                        (id) => id !== product.id,
                                       ),
                                     );
                                   }}>
@@ -935,6 +1181,7 @@ export default function FormArticle({
                             ))}
                           </div>
                         )}
+
                         <FormMessage />
                       </FormItem>
                     );
