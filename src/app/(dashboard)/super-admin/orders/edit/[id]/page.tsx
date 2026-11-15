@@ -854,43 +854,50 @@ export default function EditOrderForm() {
 
                   const updateCalculatedPrice = async (
                     idx: number,
-                    prod: any,
-                    selectedAttrs: any,
+                    prod: Product,
+                    selectedAttrs: Record<string, string>,
                     qty: number,
-                  ) => {
+                  ): Promise<void> => {
                     if (!prod) return;
 
-                    // 1. Tentukan Harga Dasar
-                    let baseProductPrice = Number(prod.basePrice || 0);
+                    const priceField = `products.${idx}.price` as const;
 
+                    // Jangan menimpa harga yang sudah diedit manual.
                     if (
-                      baseProductPrice === 0 &&
-                      prod.productVariants &&
-                      prod.productVariants.length > 0
+                      form.getFieldState(priceField, form.formState).isDirty
                     ) {
-                      baseProductPrice = Number(
-                        prod.productVariants[0].price || 0,
-                      );
+                      return;
                     }
 
-                    // 2. Cek apakah ada Varian Fisik yang cocok
-                    const nonCustomAttrsObj = Object.fromEntries(
-                      Object.entries(selectedAttrs).filter(([key]) => {
-                        const foundAttr = prod.availableAttributes?.find(
-                          (a: any) => a.attributeId === key,
+                    // ====================================================
+                    // 1. HARGA DASAR
+                    // ====================================================
+
+                    let baseProductPrice = Number(prod.basePrice || 0);
+
+                    // ====================================================
+                    // 2. CARI VARIAN DARI ATRIBUT FISIK
+                    // ====================================================
+
+                    const physicalAttributes = Object.fromEntries(
+                      Object.entries(selectedAttrs || {}).filter(([key]) => {
+                        const attr = prod.availableAttributes?.find(
+                          (a) => a.attributeId === key,
                         );
-                        return foundAttr?.isCustom !== true;
+
+                        return attr?.isCustom !== true;
                       }),
                     );
 
-                    const nonCustomVals = Object.values(nonCustomAttrsObj);
+                    const physicalValueIds = Object.values(physicalAttributes);
+
                     const matchedVariant = prod.productVariants?.find(
-                      (v: any) =>
-                        v.combinationIds &&
-                        v.combinationIds.length === nonCustomVals.length &&
-                        v.combinationIds.length > 0 &&
-                        v.combinationIds.every((id: string) =>
-                          nonCustomVals.includes(id),
+                      (variant) =>
+                        Array.isArray(variant.combinationIds) &&
+                        variant.combinationIds.length ===
+                          physicalValueIds.length &&
+                        variant.combinationIds.every((id) =>
+                          physicalValueIds.includes(id),
                         ),
                     );
 
@@ -898,50 +905,43 @@ export default function EditOrderForm() {
                       baseProductPrice = Number(matchedVariant.price);
                     }
 
-                    // 3. Hitung Tambahan Harga (Modifiers)
-                    let totalModifiers = 0;
-                    const selectedValIds = Object.values(selectedAttrs);
+                    // ====================================================
+                    // 3. TAMBAHAN HARGA ATRIBUT
+                    // ====================================================
 
-                    if (
-                      prod.availableAttributes &&
-                      Array.isArray(prod.availableAttributes)
-                    ) {
-                      prod.availableAttributes.forEach((attr: any) => {
-                        if (attr.values && Array.isArray(attr.values)) {
-                          attr.values.forEach((val: any) => {
-                            if (selectedValIds.includes(val.valueId)) {
-                              totalModifiers += Number(val.priceModifier || 0);
-                            }
-                          });
+                    let totalModifiers = 0;
+                    const selectedValueIds = Object.values(selectedAttrs || {});
+
+                    for (const attr of prod.availableAttributes || []) {
+                      for (const option of attr.values || []) {
+                        if (selectedValueIds.includes(option.valueId)) {
+                          totalModifiers += Number(option.priceModifier || 0);
                         }
-                      });
+                      }
                     }
 
-                    // 4. Totalkan Harga Dasar dengan Tambahan
                     let baseIdr = baseProductPrice + totalModifiers;
 
-                    // 5. Tier Price (Grosir) -  DENGAN PENGAMAN BARU
-                    if (
-                      prod.priceTiers &&
-                      Array.isArray(prod.priceTiers) &&
-                      prod.priceTiers.length > 0
-                    ) {
-                      const tiers = [...prod.priceTiers].sort(
-                        (a, b) => b.minQuantity - a.minQuantity,
-                      );
-                      const applicableTier = tiers.find(
-                        (tier) => qty >= tier.minQuantity,
-                      );
+                    // ====================================================
+                    // 4. TIER PRICE BERDASARKAN QUANTITY
+                    // ====================================================
 
-                      //  PERBAIKAN: Pastikan tier ditemukan DAN harganya lebih dari 0
+                    if (prod.priceTiers?.length) {
+                      const applicableTier = [...prod.priceTiers]
+                        .sort((a, b) => b.minQuantity - a.minQuantity)
+                        .find((tier) => qty >= tier.minQuantity);
+
                       if (applicableTier && Number(applicableTier.price) > 0) {
                         baseIdr = Number(applicableTier.price) + totalModifiers;
                       }
                     }
 
+                    // ====================================================
+                    // 5. KONVERSI CURRENCY
+                    // ====================================================
+
                     let finalPrice = baseIdr;
 
-                    // 6. Auto Konversi Currency
                     if (
                       selectedCurrencyCode &&
                       selectedCurrencyCode !== "IDR"
@@ -952,22 +952,74 @@ export default function EditOrderForm() {
                           selectedCurrencyCode,
                           baseIdr,
                         );
-                        if (result?.success) {
-                          finalPrice = parseFloat(
-                            result.convertedAmount.toFixed(2),
-                          );
+
+                        if (!result?.success) {
+                          console.warn("Konversi harga gagal.");
+                          return;
                         }
+
+                        finalPrice = Number(result.convertedAmount.toFixed(2));
                       } catch (error) {
                         console.error(
-                          "Gagal convert saat memilih atribut:",
+                          "Gagal konversi harga Edit Order:",
                           error,
                         );
+                        return;
                       }
                     }
 
-                    // 7. Simpan harga akhir
-                    form.setValue(`products.${idx}.price`, finalPrice);
+                    // ====================================================
+                    // 6. VALIDASI SEBELUM MEMPERBARUI HARGA
+                    // ====================================================
+
+                    if (!Number.isFinite(finalPrice) || finalPrice < 0) {
+                      return;
+                    }
+
+                    // Jangan menimpa harga jika admin sudah mengganti produk
+                    // ketika proses konversi currency sedang berlangsung.
+                    if (
+                      form.getValues(`products.${idx}.productId`) !== prod.id
+                    ) {
+                      return;
+                    }
+
+                    // Jangan gunakan hasil perhitungan lama
+                    // ketika quantity sudah berubah lagi.
+                    if (
+                      Number(form.getValues(`products.${idx}.quantity`)) !== qty
+                    ) {
+                      return;
+                    }
+
+                    const latestAttrs =
+                      form.getValues(`products.${idx}.selectedAttributes`) ||
+                      {};
+
+                    if (
+                      JSON.stringify(latestAttrs) !==
+                      JSON.stringify(selectedAttrs || {})
+                    ) {
+                      return;
+                    }
+
+                    // Pemeriksaan ulang setelah proses async.
+                    if (
+                      form.getFieldState(priceField, form.formState).isDirty
+                    ) {
+                      return;
+                    }
+
+                    // ====================================================
+                    // 7. SET HARGA OTOMATIS
+                    // ====================================================
+
+                    form.setValue(priceField, finalPrice, {
+                      shouldDirty: false,
+                      shouldValidate: true,
+                    });
                   };
+
                   return (
                     <div
                       key={field.id}
