@@ -243,55 +243,204 @@ export default function AddOrderForm() {
   const onSubmit = async (data: OrderFormValues) => {
     try {
       setLoading(true);
-      const { phone, clientPoFile, ...payload } = data;
 
-      // 1. Buat FormData baru
-      const formData = new FormData();
+      // ====================================================
+      // 1. VALIDASI DAN NORMALISASI SELURUH PRODUK
+      // ====================================================
+      const validatedProducts = data.products.map((item, index) => {
+        const rowNumber = index + 1;
 
-      // 2. Masukkan semua data teks/angka ke dalam FormData
-      Object.keys(payload).forEach((key) => {
-        const value = (payload as any)[key];
-        // Jangan masukkan field yang kosong atau field kompleks (products) dulu
-        if (
-          value !== undefined &&
-          value !== null &&
-          value !== "" &&
-          key !== "products"
-        ) {
-          formData.append(key, String(value));
+        const selectedProduct = products.find(
+          (product) => product.id === item.productId,
+        );
+
+        if (!selectedProduct) {
+          throw new Error(`Baris ${rowNumber}: Produk tidak ditemukan.`);
         }
+
+        // ==================================================
+        // VALIDASI QUANTITY
+        // ==================================================
+        const quantity = Number(item.quantity);
+
+        if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+          throw new Error(
+            `Baris ${rowNumber} (${selectedProduct.name}): Quantity tidak valid.`,
+          );
+        }
+
+        // ==================================================
+        // VALIDASI HARGA MANUAL
+        // ==================================================
+        const price = Number(item.price);
+
+        if (!Number.isFinite(price) || price < 0) {
+          throw new Error(
+            `Baris ${rowNumber} (${selectedProduct.name}): Unit Price tidak valid.`,
+          );
+        }
+
+        const selectedAttributes = item.selectedAttributes || {};
+
+        const productVariants = selectedProduct.productVariants || [];
+
+        // ==================================================
+        // VALIDASI VARIANT ID YANG SUDAH TERPILIH
+        // ==================================================
+        let variantId =
+          typeof item.variantId === "string" ? item.variantId.trim() : "";
+
+        if (variantId) {
+          const validVariant = productVariants.find(
+            (variant) => variant.id === variantId,
+          );
+
+          if (!validVariant) {
+            throw new Error(
+              `Baris ${rowNumber} (${selectedProduct.name}): Varian tidak terdaftar pada produk tersebut.`,
+            );
+          }
+        }
+
+        // ==================================================
+        // AUTO-RESOLVE VARIAN DARI ATRIBUT FISIK
+        // ==================================================
+        const physicalAttributeIds = new Set(
+          (selectedProduct.availableAttributes || [])
+            .filter((attribute) => attribute.isCustom !== true)
+            .map((attribute) => attribute.attributeId),
+        );
+
+        const selectedPhysicalValues = Object.entries(selectedAttributes)
+          .filter(([attributeId]) => physicalAttributeIds.has(attributeId))
+          .map(([, value]) => value);
+
+        // Hanya mencari varian saat ada atribut fisik
+        // dan belum ada variantId yang valid.
+        if (!variantId && selectedPhysicalValues.length > 0) {
+          const matchingVariants = productVariants.filter((variant) => {
+            const combinationIds = variant.combinationIds || [];
+
+            return (
+              combinationIds.length === selectedPhysicalValues.length &&
+              combinationIds.every((valueId) =>
+                selectedPhysicalValues.includes(valueId),
+              )
+            );
+          });
+
+          // Jangan memilih varian secara acak.
+          // Auto-resolve hanya jika tepat satu yang cocok.
+          if (matchingVariants.length === 1) {
+            variantId = matchingVariants[0].id;
+          }
+        }
+
+        // ==================================================
+        // ATURAN MANUAL ORDER
+        // ==================================================
+        // Backend createOrder menerima harga manual > 0
+        // tanpa mewajibkan variantId.
+        //
+        // Jika harga 0 pada SALES custom, Backend membutuhkan
+        // varian untuk menghitung harga otomatis.
+        //
+        // SAMPLE ORDER tetap dapat menggunakan harga 0.
+        if (
+          data.salesCategory === "SALES" &&
+          selectedProduct.isCustom &&
+          price === 0 &&
+          !variantId
+        ) {
+          throw new Error(
+            `Baris ${rowNumber} (${selectedProduct.name}): Isi Unit Price lebih dari 0 atau pilih varian yang valid.`,
+          );
+        }
+
+        // ==================================================
+        // HASIL FINAL UNTUK BACKEND
+        // ==================================================
+        return {
+          ...item,
+          productId: selectedProduct.id,
+          quantity,
+          price,
+          variantId: variantId || undefined,
+          selectedAttributes,
+        };
       });
 
-      // 3.  MASUKKAN FILE JIKA ADA
+      // ====================================================
+      // 2. PERSIAPKAN FORMDATA
+      // ====================================================
+      const { phone, clientPoFile, ...payload } = data;
+
+      const formData = new FormData();
+
+      Object.entries(payload).forEach(([key, value]) => {
+        if (
+          key === "products" ||
+          value === undefined ||
+          value === null ||
+          value === ""
+        ) {
+          return;
+        }
+
+        formData.append(key, String(value));
+      });
+
+      // ====================================================
+      // 3. LAMPIRAN CLIENT PURCHASE ORDER
+      // ====================================================
       if (clientPoFile instanceof File) {
         formData.append("clientPoFile", clientPoFile);
       }
 
-      // 4. Masukkan array products (Ubah jadi JSON string, backend kita sudah siap menerimanya berkat @Transform)
-      formData.append("products", JSON.stringify(payload.products));
+      // ====================================================
+      // 4. ARRAY PRODUK YANG SUDAH DIVALIDASI
+      // ====================================================
+      formData.append("products", JSON.stringify(validatedProducts));
 
-      // 5. Masukkan array follow-ups (Jika ada)
+      // ====================================================
+      // 5. SAMPLE FOLLOW-UP
+      // ====================================================
       const followUps = sampleSteps
-        .filter((s) => s.enabled && s.date)
-        .map((s) => ({ name: s.name, date: s.date }));
+        .filter((step) => step.enabled && step.date)
+        .map((step) => ({
+          name: step.name,
+          date: step.date,
+        }));
 
       if (followUps.length > 0) {
         formData.append("sampleFollowUps", JSON.stringify(followUps));
       }
 
-      // 6. Kirim ke API menggunakan fetchApi
-      // Perhatikan: Kita tidak men-set "Content-Type", browser akan otomatis men-setnya menjadi "multipart/form-data"
-      const res = await fetchApi("/orders", {
+      // ====================================================
+      // 6. KIRIM CREATE ORDER
+      // ====================================================
+      const response = await fetchApi("/orders", {
         method: "POST",
         body: formData,
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to create order");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+
+        const errorMessage = Array.isArray(errorData.message)
+          ? errorData.message.join(", ")
+          : typeof errorData.message === "string"
+            ? errorData.message
+            : "Gagal membuat order.";
+
+        throw new Error(errorMessage);
       }
 
+      // ====================================================
+      // 7. BERHASIL
+      // ====================================================
       toast.success("Order created successfully");
+
       form.reset();
       setSampleSteps([]);
 
@@ -300,9 +449,12 @@ export default function AddOrderForm() {
       } else {
         router.push("/super-admin/orders?tab=all");
       }
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || "Failed to create order");
+    } catch (error) {
+      console.error("[MANUAL ORDER]", error);
+
+      toast.error(
+        error instanceof Error ? error.message : "Gagal membuat order.",
+      );
     } finally {
       setLoading(false);
     }
@@ -1187,43 +1339,44 @@ export default function AddOrderForm() {
 
                   const updateCalculatedPrice = async (
                     idx: number,
-                    prod: any,
-                    selectedAttrs: any,
+                    prod: Product,
+                    selectedAttrs: Record<string, string>,
                     qty: number,
                   ) => {
                     if (!prod) return;
 
-                    // 1. Tentukan Harga Dasar
-                    let baseProductPrice = Number(prod.basePrice || 0);
+                    const priceField = `products.${idx}.price` as const;
 
+                    // Harga yang sudah diedit admin tidak boleh ditimpa
+                    // oleh perubahan quantity atau atribut.
                     if (
-                      baseProductPrice === 0 &&
-                      prod.productVariants &&
-                      prod.productVariants.length > 0
+                      form.getFieldState(priceField, form.formState).isDirty
                     ) {
-                      baseProductPrice = Number(
-                        prod.productVariants[0].price || 0,
-                      );
+                      return;
                     }
 
-                    // 2. Cek apakah ada Varian Fisik yang cocok
-                    const nonCustomAttrsObj = Object.fromEntries(
-                      Object.entries(selectedAttrs).filter(([key]) => {
-                        const foundAttr = prod.availableAttributes?.find(
-                          (a: any) => a.attributeId === key,
+                    let baseProductPrice = Number(prod.basePrice || 0);
+
+                    // Cocokkan hanya atribut fisik, bukan atribut custom.
+                    const nonCustomAttrs = Object.fromEntries(
+                      Object.entries(selectedAttrs || {}).filter(([key]) => {
+                        const attribute = prod.availableAttributes?.find(
+                          (a) => a.attributeId === key,
                         );
-                        return foundAttr?.isCustom !== true;
+
+                        return attribute?.isCustom !== true;
                       }),
                     );
 
-                    const nonCustomVals = Object.values(nonCustomAttrsObj);
+                    const selectedVariantValues = Object.values(nonCustomAttrs);
+
                     const matchedVariant = prod.productVariants?.find(
-                      (v: any) =>
-                        v.combinationIds &&
-                        v.combinationIds.length === nonCustomVals.length &&
-                        v.combinationIds.length > 0 &&
-                        v.combinationIds.every((id: string) =>
-                          nonCustomVals.includes(id),
+                      (variant) =>
+                        Array.isArray(variant.combinationIds) &&
+                        variant.combinationIds.length ===
+                          selectedVariantValues.length &&
+                        variant.combinationIds.every((id) =>
+                          selectedVariantValues.includes(id),
                         ),
                     );
 
@@ -1231,42 +1384,26 @@ export default function AddOrderForm() {
                       baseProductPrice = Number(matchedVariant.price);
                     }
 
-                    // 3. Hitung Tambahan Harga (Modifiers)
+                    // Hitung biaya tambahan atribut.
                     let totalModifiers = 0;
-                    const selectedValIds = Object.values(selectedAttrs);
+                    const selectedValueIds = Object.values(selectedAttrs || {});
 
-                    if (
-                      prod.availableAttributes &&
-                      Array.isArray(prod.availableAttributes)
-                    ) {
-                      prod.availableAttributes.forEach((attr: any) => {
-                        if (attr.values && Array.isArray(attr.values)) {
-                          attr.values.forEach((val: any) => {
-                            if (selectedValIds.includes(val.valueId)) {
-                              totalModifiers += Number(val.priceModifier || 0);
-                            }
-                          });
+                    for (const attribute of prod.availableAttributes || []) {
+                      for (const option of attribute.values || []) {
+                        if (selectedValueIds.includes(option.valueId)) {
+                          totalModifiers += Number(option.priceModifier || 0);
                         }
-                      });
+                      }
                     }
 
-                    // 4. Totalkan Harga Dasar dengan Tambahan
                     let baseIdr = baseProductPrice + totalModifiers;
 
-                    // 5. Tier Price (Grosir) -  DENGAN PENGAMAN BARU
-                    if (
-                      prod.priceTiers &&
-                      Array.isArray(prod.priceTiers) &&
-                      prod.priceTiers.length > 0
-                    ) {
-                      const tiers = [...prod.priceTiers].sort(
-                        (a, b) => b.minQuantity - a.minQuantity,
-                      );
-                      const applicableTier = tiers.find(
-                        (tier) => qty >= tier.minQuantity,
-                      );
+                    // Pertahankan perhitungan harga tier yang sudah berjalan.
+                    if (prod.priceTiers?.length) {
+                      const applicableTier = [...prod.priceTiers]
+                        .sort((a, b) => b.minQuantity - a.minQuantity)
+                        .find((tier) => qty >= tier.minQuantity);
 
-                      //  PERBAIKAN: Pastikan tier ditemukan DAN harganya lebih dari 0
                       if (applicableTier && Number(applicableTier.price) > 0) {
                         baseIdr = Number(applicableTier.price) + totalModifiers;
                       }
@@ -1274,7 +1411,6 @@ export default function AddOrderForm() {
 
                     let finalPrice = baseIdr;
 
-                    // 6. Auto Konversi Currency
                     if (
                       selectedCurrencyCode &&
                       selectedCurrencyCode !== "IDR"
@@ -1285,22 +1421,52 @@ export default function AddOrderForm() {
                           selectedCurrencyCode,
                           baseIdr,
                         );
-                        if (result?.success) {
-                          finalPrice = parseFloat(
-                            result.convertedAmount.toFixed(2),
-                          );
+
+                        if (!result?.success) {
+                          console.warn("Konversi harga gagal.");
+                          return;
                         }
+
+                        finalPrice = Number(result.convertedAmount.toFixed(2));
                       } catch (error) {
-                        console.error(
-                          "Gagal convert saat memilih atribut:",
-                          error,
-                        );
+                        console.error("Gagal mengonversi harga:", error);
+                        return;
                       }
                     }
 
-                    // 7. Simpan harga akhir
-                    form.setValue(`products.${idx}.price`, finalPrice);
+                    // Hindari hasil konversi lama menimpa produk yang baru dipilih
+                    // ataupun harga manual yang diubah saat proses async berjalan.
+                    if (
+                      form.getValues(`products.${idx}.productId`) !== prod.id
+                    ) {
+                      return;
+                    }
+
+                    if (
+                      JSON.stringify(
+                        form.getValues(`products.${idx}.selectedAttributes`) ||
+                          {},
+                      ) !== JSON.stringify(selectedAttrs || {})
+                    ) {
+                      return;
+                    }
+
+                    if (
+                      form.getFieldState(priceField, form.formState).isDirty
+                    ) {
+                      return;
+                    }
+
+                    if (!Number.isFinite(finalPrice) || finalPrice < 0) {
+                      return;
+                    }
+
+                    form.setValue(priceField, finalPrice, {
+                      shouldDirty: false,
+                      shouldValidate: true,
+                    });
                   };
+
                   return (
                     <div
                       key={field.id}
@@ -1373,7 +1539,19 @@ export default function AddOrderForm() {
                                               key={p.id}
                                               value={`${p.name} ${p.sku || ""}`}
                                               onSelect={() => {
+                                                // Tetapkan produk baru.
                                                 field.onChange(p.id);
+
+                                                // Reset status harga manual untuk produk sebelumnya.
+                                                // Harga otomatis produk baru boleh dihitung kembali.
+                                                form.resetField(
+                                                  `products.${index}.price`,
+                                                  {
+                                                    defaultValue: 0,
+                                                  },
+                                                );
+
+                                                // Hindari variantId dan atribut produk lama terbawa.
                                                 form.setValue(
                                                   `products.${index}.variantId`,
                                                   "",
@@ -1382,11 +1560,15 @@ export default function AddOrderForm() {
                                                   `products.${index}.selectedAttributes`,
                                                   {},
                                                 );
+
+                                                // Tutup pilihan produk.
                                                 setOpenCombobox((prev) => ({
                                                   ...prev,
                                                   [index]: false,
                                                 }));
-                                                updateCalculatedPrice(
+
+                                                // Hitung harga awal produk baru.
+                                                void updateCalculatedPrice(
                                                   index,
                                                   p,
                                                   {},
