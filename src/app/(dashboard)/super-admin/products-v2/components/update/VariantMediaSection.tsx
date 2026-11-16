@@ -342,6 +342,11 @@ export default function FormUpdateProductMedia({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
+  const cleanOptionLabel = (val: string) => {
+    if (!val) return "";
+    return val.split("|")[0].trim();
+  };
+
   // 1. Ekstrak semua grup atribut dan nilai-nilainya
   const attributeGroups = useMemo<CategorizerAttribute[]>(() => {
     const groupsMap = new Map<string, CategorizerAttribute>();
@@ -364,7 +369,7 @@ export default function FormUpdateProductMedia({
         }
         const grp = groupsMap.get(attr.id)!;
         if (!grp.values.some((v) => v.id === val.id)) {
-          grp.values.push({ id: val.id, value: val.value });
+          grp.values.push({ id: val.id, value: cleanOptionLabel(val.value) });
         }
       }
     }
@@ -389,7 +394,7 @@ export default function FormUpdateProductMedia({
             }
             const grp = groupsMap.get(attr.id)!;
             if (!grp.values.some((v) => v.id === val.id)) {
-              grp.values.push({ id: val.id, value: val.value });
+              grp.values.push({ id: val.id, value: cleanOptionLabel(val.value) });
             }
           }
         }
