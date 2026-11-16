@@ -235,9 +235,9 @@ function ExistingMediaDisplay({
             )}
 
             {/* Quick Option Assignment Dropdown */}
-            {type === "image" && categorizerAttr && (
+            {categorizerAttr && (
               <div
-                className="absolute bottom-1.5 left-1.5 right-1.5 z-40"
+                className="absolute bottom-1.5 left-1.5 right-1.5 z-40 max-w-[calc(100%-12px)] overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}>
                 <Select
@@ -249,14 +249,18 @@ function ExistingMediaDisplay({
                     );
                   }}
                   disabled={isSubmitting}>
-                  <SelectTrigger className="h-6 text-[10px] font-semibold bg-white/95 dark:bg-stone-900/95 shadow-xs border-stone-200 dark:border-stone-700 px-1.5 py-0 truncate">
-                    <SelectValue />
+                  <SelectTrigger className="h-6 w-full min-w-0 max-w-full text-[10px] font-semibold bg-white/95 dark:bg-stone-900/95 shadow-xs border-stone-300 dark:border-stone-700 px-1 py-0 overflow-hidden flex items-center justify-between gap-0.5 [&>svg]:size-3 [&>svg]:shrink-0">
+                    <span className="truncate block flex-1 text-left min-w-0">
+                      {m.attributeValueId
+                        ? categorizerAttr.values.find((v) => v.id === m.attributeValueId)?.value || "Kategori"
+                        : type === "video" ? "Video Umum" : "Foto Umum"}
+                    </span>
                   </SelectTrigger>
                   <SelectContent className="text-xs max-h-48 z-50">
                     <SelectItem
                       value="general"
                       className="text-xs font-medium text-stone-600">
-                      Foto Umum (Semua {categorizerAttr.attributeName})
+                      {type === "video" ? "Video Umum" : "Foto Umum"} (Semua {categorizerAttr.attributeName})
                     </SelectItem>
                     {categorizerAttr.values.map((v) => (
                       <SelectItem
@@ -273,7 +277,7 @@ function ExistingMediaDisplay({
 
             <div
               className={`absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-30 ${
-                type === "image" && categorizerAttr ? "pb-7" : ""
+                categorizerAttr ? "pb-7" : ""
               }`}>
               <Button
                 type="button"
@@ -454,6 +458,29 @@ export default function FormUpdateProductMedia({
     attributeValueId: string | null,
   ) => {
     onUpdateMediaMetadata(mediaId, { attributeValueId });
+  };
+
+  const rawVideos = useMemo<ProductMedia[]>(() => {
+    return initialData?.videos || [];
+  }, [initialData?.videos]);
+
+  const displayedVideos = useMemo<ProductMedia[]>(() => {
+    if (!categorizerAttr || activeValueFilter === "ALL") {
+      return rawVideos;
+    }
+    if (activeValueFilter === "GENERAL") {
+      return rawVideos.filter((vid: ProductMedia) => !vid.attributeValueId);
+    }
+    return rawVideos.filter(
+      (vid: ProductMedia) => vid.attributeValueId === activeValueFilter,
+    );
+  }, [rawVideos, categorizerAttr, activeValueFilter]);
+
+  const handleUpdateVideoAttributeValue = (
+    mediaId: string,
+    attributeValueId: string | null,
+  ) => {
+    onUpdateVideoMetadata(mediaId, { attributeValueId });
   };
 
   const handleOpenModal = (item: ProductMedia) => {
@@ -732,13 +759,19 @@ export default function FormUpdateProductMedia({
               </span>
             </div>
             <ExistingMediaDisplay
-              media={initialData?.videos || []}
+              media={displayedVideos}
               type="video"
               onDelete={onDeleteVideo}
               isSubmitting={isSubmitting}
               onEdit={handleOpenVideoModal}
-              onReorder={(newIds) => onReorderMedia?.("video", newIds)}
+              onReorder={
+                activeValueFilter === "ALL"
+                  ? (newIds) => onReorderMedia?.("video", newIds)
+                  : undefined
+              }
               onFilesDrop={processVideoFiles}
+              categorizerAttr={categorizerAttr}
+              onUpdateAttributeValue={handleUpdateVideoAttributeValue}
             />
             <div className="mt-3 flex gap-2 items-center">
               <Input
@@ -811,7 +844,9 @@ export default function FormUpdateProductMedia({
             title: selectedVideo.title || "",
             altText: selectedVideo.altText || "",
             isFeatured: selectedVideo.isFeatured || false,
+            attributeValueId: selectedVideo.attributeValueId || null,
           }}
+          categorizerAttr={categorizerAttr}
           onClose={() => {
             setIsVideoModalOpen(false);
             setSelectedVideo(null);

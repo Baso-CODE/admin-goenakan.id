@@ -7,6 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Check, Star, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export interface VideoMeta {
   url: string;
@@ -15,12 +22,18 @@ export interface VideoMeta {
   altText?: string;
   isFeatured?: boolean;
   isNew?: boolean;
+  attributeValueId?: string | null;
 }
 
 interface VideoDetailModalProps {
   tempId: string | number;
   videoMeta: VideoMeta;
   onClose: () => void;
+  categorizerAttr?: {
+    attributeId: string;
+    attributeName: string;
+    values: { id: string; value: string }[];
+  } | null;
 
   setVideoMetaField: (
     tempId: string | number,
@@ -35,12 +48,16 @@ export const VideoDetailModalCore = ({
   videoMeta,
   tempId,
   onClose,
+  categorizerAttr,
   setVideoMetaField,
 }: VideoDetailModalProps) => {
-  // 1. STATE LOKAL (Termasuk isFeatured)
+  // 1. STATE LOKAL (Termasuk isFeatured & attributeValueId)
   const [title, setTitle] = useState(videoMeta.title || "");
   const [altText, setAltText] = useState(videoMeta.altText || "");
   const [isFeatured, setIsFeatured] = useState(videoMeta.isFeatured || false);
+  const [attributeValueId, setAttributeValueId] = useState<string | null>(
+    videoMeta.attributeValueId || null,
+  );
 
   // 2. HANDLE SAVE (Kirim semua perubahan ke parent)
   const handleSaveAndClose = useCallback(() => {
@@ -48,9 +65,10 @@ export const VideoDetailModalCore = ({
       title,
       altText,
       isFeatured,
+      attributeValueId,
     });
     onClose();
-  }, [title, altText, isFeatured, onClose, setVideoMetaField, tempId]);
+  }, [title, altText, isFeatured, attributeValueId, onClose, setVideoMetaField, tempId]);
 
   // Menangani penutupan modal dengan tombol Esc
   useEffect(() => {
@@ -146,6 +164,37 @@ export const VideoDetailModalCore = ({
                 />
               </label>
             </div>
+
+            {/* Input: Kategori Atribut (jika ada categorizer attribute aktif) */}
+            {categorizerAttr && (
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-700">
+                  Kategori Atribut ({categorizerAttr.attributeName})
+                </Label>
+                <Select
+                  value={attributeValueId || "general"}
+                  onValueChange={(val) =>
+                    setAttributeValueId(val === "general" ? null : val)
+                  }>
+                  <SelectTrigger className="w-full text-xs">
+                    <SelectValue placeholder="Pilih Opsi Atribut..." />
+                  </SelectTrigger>
+                  <SelectContent className="text-xs">
+                    <SelectItem value="general">
+                      Video Umum (Semua {categorizerAttr.attributeName})
+                    </SelectItem>
+                    {categorizerAttr.values.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-400 px-1">
+                  Video yang dikaitkan ke opsi tertentu hanya akan muncul saat customer memilih opsi tersebut.
+                </p>
+              </div>
+            )}
 
             {/* Input 1: Title */}
             <div className="space-y-2">
