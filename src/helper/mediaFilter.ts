@@ -25,8 +25,8 @@ export const isMockupImage = (img: any): boolean => {
     return true;
   }
 
-  // 3. Variant or custom attributes relations
-  if (img.attributeValueId || img.printPositionValueId || img.printSideValueId) {
+  // 3. Print position or print side relations (specific to mockup canvas placement)
+  if (img.printPositionValueId || img.printSideValueId) {
     return true;
   }
 

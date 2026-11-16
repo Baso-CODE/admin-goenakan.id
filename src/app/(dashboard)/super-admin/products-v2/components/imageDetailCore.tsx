@@ -5,18 +5,31 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Check, Star, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export interface ImageMeta {
   url: string;
   altText?: string;
   isFeatured?: boolean;
   isNew?: boolean;
+  attributeValueId?: string | null;
 }
 
 interface ImageDetailModalProps {
   tempId: string | number;
   imageMeta: ImageMeta;
   onClose: () => void;
+  categorizerAttr?: {
+    attributeId: string;
+    attributeName: string;
+    values: { id: string; value: string }[];
+  } | null;
 
   // Kita cukup pakai satu fungsi ini untuk update semua field (altText & isFeatured)
   setImageMetaField: (
@@ -32,20 +45,25 @@ export const ImageDetailModalCore = ({
   imageMeta,
   tempId,
   onClose,
+  categorizerAttr,
   setImageMetaField,
 }: ImageDetailModalProps) => {
-  // 1. BUAT STATE LOKAL UNTUK isFeatured JUGA
+  // 1. BUAT STATE LOKAL UNTUK isFeatured, altText, DAN attributeValueId
   const [altText, setAltText] = useState(imageMeta.altText || "");
   const [isFeatured, setIsFeatured] = useState(imageMeta.isFeatured || false);
+  const [attributeValueId, setAttributeValueId] = useState<string | null>(
+    imageMeta.attributeValueId || null,
+  );
 
-  // 2. UPDATE HANDLE SAVE (Kirim kedua state lokal ke parent)
+  // 2. UPDATE HANDLE SAVE (Kirim semua state lokal ke parent)
   const handleSaveAndClose = useCallback(() => {
     setImageMetaField(tempId, {
       altText,
-      isFeatured, // Kirim status featured yang baru saat tombol save ditekan
+      isFeatured,
+      attributeValueId,
     });
     onClose();
-  }, [altText, isFeatured, onClose, setImageMetaField, tempId]);
+  }, [altText, isFeatured, attributeValueId, onClose, setImageMetaField, tempId]);
 
   // Menangani penutupan modal dengan tombol Esc
   useEffect(() => {
@@ -146,6 +164,37 @@ export const ImageDetailModalCore = ({
                 The featured image is the main photo displayed for this product.
               </p>
             </div>
+
+            {/* Input: Kategori Atribut (jika ada categorizer attribute aktif) */}
+            {categorizerAttr && (
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-700">
+                  Kategori Atribut ({categorizerAttr.attributeName})
+                </Label>
+                <Select
+                  value={attributeValueId || "general"}
+                  onValueChange={(val) =>
+                    setAttributeValueId(val === "general" ? null : val)
+                  }>
+                  <SelectTrigger className="w-full text-xs">
+                    <SelectValue placeholder="Pilih Opsi Atribut..." />
+                  </SelectTrigger>
+                  <SelectContent className="text-xs">
+                    <SelectItem value="general">
+                      Foto Umum (Semua {categorizerAttr.attributeName})
+                    </SelectItem>
+                    {categorizerAttr.values.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-400 px-1">
+                  Foto yang dikaitkan ke opsi tertentu hanya akan muncul saat customer memilih opsi tersebut.
+                </p>
+              </div>
+            )}
 
             {/* Input 2: Alt Text */}
             <div className="space-y-2">

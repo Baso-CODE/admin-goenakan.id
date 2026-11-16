@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Loader2, Pencil, Plus, Star, X, Layers } from "lucide-react";
 import Image from "next/image";
-import { ChangeEvent, useRef, useState, useEffect } from "react";
+import { ChangeEvent, useRef, useState, useEffect, useMemo } from "react";
 import { ImageDetailModalCore } from "../imageDetailCore";
 import { VideoDetailModalCore } from "../videoDetailCore";
 import { MockupAreaSelector } from "../MockupAreaSelector";
@@ -20,11 +20,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+export interface CategorizerAttribute {
+  attributeId: string;
+  attributeName: string;
+  values: {
+    id: string;
+    value: string;
+  }[];
+}
+
 interface ProductMedia {
   id: string;
   url: string;
   altText?: string;
   isFeatured?: boolean;
+  attributeValueId?: string | null;
+  sortOrder?: number;
 }
 
 interface Product {
@@ -35,6 +46,8 @@ interface Product {
   isMultiFace?: boolean;
   mockupFrontImageId?: string | null;
   mockupBackImageId?: string | null;
+  attributeValues?: any[];
+  productVariants?: any[];
 }
 
 interface FormUpdateProductMediaProps {
@@ -72,6 +85,8 @@ function ExistingMediaDisplay({
   onReorder,
   onFilesDrop,
   isSubmitting,
+  categorizerAttr,
+  onUpdateAttributeValue,
 }: {
   media: ProductMedia[];
   type: "image" | "video";
@@ -80,6 +95,8 @@ function ExistingMediaDisplay({
   onReorder?: (orderedIds: string[]) => void;
   onFilesDrop?: (files: File[]) => void;
   isSubmitting: boolean;
+  categorizerAttr?: CategorizerAttribute | null;
+  onUpdateAttributeValue?: (mediaId: string, attributeValueId: string | null) => void;
 }) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -217,7 +234,51 @@ function ExistingMediaDisplay({
               </div>
             )}
 
-            <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-30">
+            {/* Quick Option Assignment Dropdown */}
+            {categorizerAttr && (
+              <div
+                className="absolute bottom-1.5 left-1.5 right-1.5 z-40 max-w-[calc(100%-12px)] overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}>
+                <Select
+                  value={m.attributeValueId || "general"}
+                  onValueChange={(val) => {
+                    onUpdateAttributeValue?.(
+                      m.id,
+                      val === "general" ? null : val,
+                    );
+                  }}
+                  disabled={isSubmitting}>
+                  <SelectTrigger className="h-6 w-full min-w-0 max-w-full text-[10px] font-semibold bg-white/95 dark:bg-stone-900/95 shadow-xs border-stone-300 dark:border-stone-700 px-1 py-0 overflow-hidden flex items-center justify-between gap-0.5 [&>svg]:size-3 [&>svg]:shrink-0">
+                    <span className="truncate block flex-1 text-left min-w-0">
+                      {m.attributeValueId
+                        ? categorizerAttr.values.find((v) => v.id === m.attributeValueId)?.value || "Kategori"
+                        : type === "video" ? "Video Umum" : "Foto Umum"}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent className="text-xs max-h-48 z-50">
+                    <SelectItem
+                      value="general"
+                      className="text-xs font-medium text-stone-600">
+                      {type === "video" ? "Video Umum" : "Foto Umum"} (Semua {categorizerAttr.attributeName})
+                    </SelectItem>
+                    {categorizerAttr.values.map((v) => (
+                      <SelectItem
+                        key={v.id}
+                        value={v.id}
+                        className="text-xs font-medium">
+                        {v.value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div
+              className={`absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-30 ${
+                categorizerAttr ? "pb-7" : ""
+              }`}>
               <Button
                 type="button"
                 size="icon"
@@ -284,6 +345,143 @@ export default function FormUpdateProductMedia({
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+
+  const cleanOptionLabel = (val: string) => {
+    if (!val) return "";
+    return val.split("|")[0].trim();
+  };
+
+  // 1. Ekstrak semua grup atribut dan nilai-nilainya
+  const attributeGroups = useMemo<CategorizerAttribute[]>(() => {
+    const groupsMap = new Map<string, CategorizerAttribute>();
+
+    if (
+      initialData?.attributeValues &&
+      Array.isArray(initialData.attributeValues)
+    ) {
+      for (const item of initialData.attributeValues) {
+        const attr = item.attributeValue?.attribute || item.attribute;
+        const val = item.attributeValue;
+        if (!attr?.id || !val?.id) continue;
+
+        if (!groupsMap.has(attr.id)) {
+          groupsMap.set(attr.id, {
+            attributeId: attr.id,
+            attributeName: attr.name,
+            values: [],
+          });
+        }
+        const grp = groupsMap.get(attr.id)!;
+        if (!grp.values.some((v) => v.id === val.id)) {
+          grp.values.push({ id: val.id, value: cleanOptionLabel(val.value) });
+        }
+      }
+    }
+
+    if (
+      initialData?.productVariants &&
+      Array.isArray(initialData.productVariants)
+    ) {
+      for (const variant of initialData.productVariants) {
+        if (variant.attributeValues && Array.isArray(variant.attributeValues)) {
+          for (const av of variant.attributeValues) {
+            const val = av.attributeValue;
+            const attr = val?.attribute;
+            if (!attr?.id || !val?.id) continue;
+
+            if (!groupsMap.has(attr.id)) {
+              groupsMap.set(attr.id, {
+                attributeId: attr.id,
+                attributeName: attr.name,
+                values: [],
+              });
+            }
+            const grp = groupsMap.get(attr.id)!;
+            if (!grp.values.some((v) => v.id === val.id)) {
+              grp.values.push({ id: val.id, value: cleanOptionLabel(val.value) });
+            }
+          }
+        }
+      }
+    }
+
+    return Array.from(groupsMap.values());
+  }, [initialData]);
+
+  const [selectedAttrId, setSelectedAttrId] = useState<string | null>(null);
+  const [activeValueFilter, setActiveValueFilter] = useState<string>("ALL");
+
+  // Auto-detect categorizer attribute if any image already has attributeValueId
+  useEffect(() => {
+    if (!selectedAttrId && initialData?.images && attributeGroups.length > 0) {
+      for (const img of initialData.images) {
+        if (img.attributeValueId) {
+          const matchGroup = attributeGroups.find((g: CategorizerAttribute) =>
+            g.values.some((v: { id: string; value: string }) => v.id === img.attributeValueId),
+          );
+          if (matchGroup) {
+            setSelectedAttrId(matchGroup.attributeId);
+            break;
+          }
+        }
+      }
+    }
+  }, [initialData?.images, attributeGroups, selectedAttrId]);
+
+  const categorizerAttr = useMemo<CategorizerAttribute | null>(() => {
+    if (!selectedAttrId) return null;
+    return (
+      attributeGroups.find((g: CategorizerAttribute) => g.attributeId === selectedAttrId) || null
+    );
+  }, [selectedAttrId, attributeGroups]);
+
+  const rawImages = useMemo<ProductMedia[]>(() => {
+    return (initialData?.images || []).filter(
+      (img: ProductMedia) => !isMockupImage(img),
+    );
+  }, [initialData?.images]);
+
+  const displayedImages = useMemo<ProductMedia[]>(() => {
+    if (!categorizerAttr || activeValueFilter === "ALL") {
+      return rawImages;
+    }
+    if (activeValueFilter === "GENERAL") {
+      return rawImages.filter((img: ProductMedia) => !img.attributeValueId);
+    }
+    return rawImages.filter(
+      (img: ProductMedia) => img.attributeValueId === activeValueFilter,
+    );
+  }, [rawImages, categorizerAttr, activeValueFilter]);
+
+  const handleUpdateAttributeValue = (
+    mediaId: string,
+    attributeValueId: string | null,
+  ) => {
+    onUpdateMediaMetadata(mediaId, { attributeValueId });
+  };
+
+  const rawVideos = useMemo<ProductMedia[]>(() => {
+    return initialData?.videos || [];
+  }, [initialData?.videos]);
+
+  const displayedVideos = useMemo<ProductMedia[]>(() => {
+    if (!categorizerAttr || activeValueFilter === "ALL") {
+      return rawVideos;
+    }
+    if (activeValueFilter === "GENERAL") {
+      return rawVideos.filter((vid: ProductMedia) => !vid.attributeValueId);
+    }
+    return rawVideos.filter(
+      (vid: ProductMedia) => vid.attributeValueId === activeValueFilter,
+    );
+  }, [rawVideos, categorizerAttr, activeValueFilter]);
+
+  const handleUpdateVideoAttributeValue = (
+    mediaId: string,
+    attributeValueId: string | null,
+  ) => {
+    onUpdateVideoMetadata(mediaId, { attributeValueId });
+  };
 
   const handleOpenModal = (item: ProductMedia) => {
     setSelectedMedia(item);
@@ -398,20 +596,118 @@ export default function FormUpdateProductMedia({
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-lg font-medium">Gambar Produk</h3>
               <span className="text-xs text-stone-500 font-normal">
-                Geser kartu untuk mengubah urutan (Tersimpan otomatis)
+                {activeValueFilter === "ALL"
+                  ? "Geser kartu untuk mengubah urutan (Tersimpan otomatis)"
+                  : "Filter aktif: Urutan tersimpan pada tab 'Semua'"}
               </span>
             </div>
             <p className="text-xs text-stone-500 mb-3">
               Setiap gambar yang berhasil diunggah akan otomatis dikonversi ke format <strong>.webp</strong> untuk mengoptimalkan performa pemuatan halaman.
             </p>
+
+            {/* Categorizer Attribute Selector */}
+            {attributeGroups.length > 0 && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 mb-4 bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-lg">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-indigo-600" />
+                    <Label className="text-xs font-bold text-stone-800 dark:text-stone-200 uppercase tracking-wider">
+                      Kategori Galeri Berdasarkan Atribut
+                    </Label>
+                  </div>
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                    Pilih atribut (misal Model, Warna, Material) untuk mengelompokkan foto ke masing-masing pilihan customer.
+                  </p>
+                </div>
+                <div className="w-full sm:w-72">
+                  <Select
+                    value={selectedAttrId || "none"}
+                    onValueChange={(val) => {
+                      setSelectedAttrId(val === "none" ? null : val);
+                      setActiveValueFilter("ALL");
+                    }}>
+                    <SelectTrigger className="h-8 text-xs bg-white dark:bg-stone-800 border-stone-300">
+                      <SelectValue placeholder="Pilih Atribut..." />
+                    </SelectTrigger>
+                    <SelectContent className="text-xs">
+                      <SelectItem value="none">
+                        -- Tanpa Kategori (Semua Foto Umum) --
+                      </SelectItem>
+                      {attributeGroups.map((group: CategorizerAttribute) => (
+                        <SelectItem
+                          key={group.attributeId}
+                          value={group.attributeId}>
+                          {group.attributeName} ({group.values.length} opsi)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {/* Filter Tabs / Pills */}
+            {categorizerAttr && (
+              <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                <span className="text-xs font-semibold text-stone-500 mr-1">
+                  Filter Tampilan:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveValueFilter("ALL")}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                    activeValueFilter === "ALL"
+                      ? "bg-stone-900 text-white shadow-xs"
+                      : "bg-stone-100 hover:bg-stone-200 text-stone-700"
+                  }`}>
+                  Semua ({rawImages.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveValueFilter("GENERAL")}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                    activeValueFilter === "GENERAL"
+                      ? "bg-stone-900 text-white shadow-xs"
+                      : "bg-stone-100 hover:bg-stone-200 text-stone-700"
+                  }`}>
+                  Foto Umum / Shared (
+                  {rawImages.filter((img: ProductMedia) => !img.attributeValueId).length})
+                </button>
+                {categorizerAttr.values.map((v: { id: string; value: string }) => {
+                  const count = rawImages.filter(
+                    (img: ProductMedia) => img.attributeValueId === v.id,
+                  ).length;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setActiveValueFilter(v.id)}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                        activeValueFilter === v.id
+                          ? "bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-300"
+                          : "bg-stone-100 hover:bg-stone-200 text-stone-700"
+                      }`}>
+                      {v.value} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <ExistingMediaDisplay
-              media={(initialData?.images || []).filter((img: any) => !isMockupImage(img))}
+              media={displayedImages}
               type="image"
               onDelete={onDeleteImage}
               onEdit={handleOpenModal}
-              onReorder={(newIds) => onReorderMedia?.("image", newIds)}
+              onReorder={
+                activeValueFilter === "ALL"
+                  ? (newIds) => onReorderMedia?.("image", newIds)
+                  : undefined
+              }
               onFilesDrop={processImageFiles}
               isSubmitting={isSubmitting}
+              categorizerAttr={categorizerAttr}
+              onUpdateAttributeValue={handleUpdateAttributeValue}
             />
              <div className="mt-3 flex gap-2 items-center">
               <Input
@@ -463,13 +759,19 @@ export default function FormUpdateProductMedia({
               </span>
             </div>
             <ExistingMediaDisplay
-              media={initialData?.videos || []}
+              media={displayedVideos}
               type="video"
               onDelete={onDeleteVideo}
               isSubmitting={isSubmitting}
               onEdit={handleOpenVideoModal}
-              onReorder={(newIds) => onReorderMedia?.("video", newIds)}
+              onReorder={
+                activeValueFilter === "ALL"
+                  ? (newIds) => onReorderMedia?.("video", newIds)
+                  : undefined
+              }
               onFilesDrop={processVideoFiles}
+              categorizerAttr={categorizerAttr}
+              onUpdateAttributeValue={handleUpdateVideoAttributeValue}
             />
             <div className="mt-3 flex gap-2 items-center">
               <Input
@@ -523,7 +825,9 @@ export default function FormUpdateProductMedia({
             isNew: false,
             altText: selectedMedia.altText || "",
             isFeatured: selectedMedia.isFeatured || false,
+            attributeValueId: selectedMedia.attributeValueId || null,
           }}
+          categorizerAttr={categorizerAttr}
           onClose={handleCloseModal}
           setImageMetaField={handleModalUpdateMeta}
           setFeaturedImage={handleModalSetFeatured}
@@ -540,7 +844,9 @@ export default function FormUpdateProductMedia({
             title: selectedVideo.title || "",
             altText: selectedVideo.altText || "",
             isFeatured: selectedVideo.isFeatured || false,
+            attributeValueId: selectedVideo.attributeValueId || null,
           }}
+          categorizerAttr={categorizerAttr}
           onClose={() => {
             setIsVideoModalOpen(false);
             setSelectedVideo(null);

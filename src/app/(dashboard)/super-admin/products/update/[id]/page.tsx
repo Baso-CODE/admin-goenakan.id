@@ -385,7 +385,12 @@ export default function EditProductPage() {
 
   const handleUpdateVideoMetadata = async (
     mediaId: string,
-    updates: { altText?: string; title?: string; isFeatured?: boolean },
+    updates: {
+      altText?: string;
+      title?: string;
+      isFeatured?: boolean;
+      attributeValueId?: string | null;
+    },
   ) => {
     setIsSubmitting(true);
     try {
