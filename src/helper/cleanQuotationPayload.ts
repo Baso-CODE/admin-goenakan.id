@@ -2,13 +2,11 @@ import { QuotationFormValues } from "@/app/(dashboard)/admin-invoice/quotations/
 
 type QuotationPayloadInput = QuotationFormValues & { notes?: any[] };
 
+// MANUAL_QUOTATION_ITEM_SUPPORT_V2
 export const cleanQuotationPayload = (data: QuotationPayloadInput) => {
   const payload: any = { ...data };
-
-  // 1. Buang field UI State
   delete payload.isManualClient;
 
-  // 2. Logic Hybrid Client
   if (!data.isManualClient && data.clientId) {
     delete payload.manualClientName;
     delete payload.manualClientCompany;
@@ -19,45 +17,81 @@ export const cleanQuotationPayload = (data: QuotationPayloadInput) => {
     payload.clientId = null;
   }
 
-  payload.items = data.items.map((item) => {
+  payload.items = data.items.map((item, index) => {
     const { isManualProduct, ...cleanItem }: any = { ...item };
+    const itemNo = index + 1;
+    const name = String(item.productName ?? "").trim();
+    const selectedProductId = String(item.productId ?? "").trim();
 
-    // productId: null jika manual product
-    if (!isManualProduct && item.productId) {
-      // dari DB — biarkan productId
-    } else {
+    if (!name) {
+      throw new Error(`Item ${itemNo}: Nama produk wajib diisi.`);
+    }
+
+    if (isManualProduct) {
+      // Produk manual tidak harus ada di master produk.
       cleanItem.productId = null;
       cleanItem.variantId = null;
-    }
-
-    cleanItem.quantity = Number(item.quantity || 1);
-    cleanItem.unitPrice = Number(item.unitPrice || 0);
-    cleanItem.discount = Number(item.discount || 0);
-
-    // Format tiers sebagai acuan harga grosir
-    if (cleanItem.tiers && cleanItem.tiers.length > 0) {
-      cleanItem.tiers = cleanItem.tiers.map((tier: any) => ({
-        minQuantity: Number(tier.minQuantity) || 1,
-        maxQuantity: tier.maxQuantity ? Number(tier.maxQuantity) : undefined,
-        quantityLabel: tier.quantityLabel || null,
-        unitPrice: Number(tier.unitPrice) || 0,
-      }));
+      cleanItem.selectedAttributes = {};
     } else {
-      cleanItem.tiers = [
-        {
-          minQuantity: 1,
-          maxQuantity: undefined,
-          quantityLabel: "Pcs",
-          unitPrice: 0,
-        },
-      ];
+      if (!selectedProductId) {
+        throw new Error(
+          `Item ${itemNo}: Pilih produk dari database atau aktifkan mode Manual.`,
+        );
+      }
+      cleanItem.productId = selectedProductId;
+      cleanItem.variantId = item.variantId || null;
     }
+
+    const quantity = Number(item.quantity ?? 1);
+    const unitPrice = Number(item.unitPrice ?? 0);
+    const discount = Number(item.discount ?? 0);
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new Error(`Item ${itemNo}: Quantity harus lebih dari 0.`);
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      throw new Error(`Item ${itemNo}: Unit Price tidak valid.`);
+    }
+    if (!Number.isFinite(discount) || discount < 0) {
+      throw new Error(`Item ${itemNo}: Discount tidak valid.`);
+    }
+
+    cleanItem.productName = name;
+    cleanItem.quantity = quantity;
+    cleanItem.unitPrice = unitPrice;
+    cleanItem.discount = discount;
+    cleanItem.tiers = Array.isArray(item.tiers)
+      ? item.tiers.map((tier, tierIndex) => {
+          const minQuantity = Number(tier.minQuantity);
+          const maxQuantity =
+            tier.maxQuantity == null
+              ? undefined
+              : Number(tier.maxQuantity);
+          const tierPrice = Number(tier.unitPrice ?? 0);
+
+          if (!Number.isInteger(minQuantity) || minQuantity < 1) {
+            throw new Error(`Item ${itemNo}, tier ${tierIndex + 1}: Minimum Qty tidak valid.`);
+          }
+          if (
+            maxQuantity !== undefined &&
+            (!Number.isInteger(maxQuantity) || maxQuantity < minQuantity)
+          ) {
+            throw new Error(`Item ${itemNo}, tier ${tierIndex + 1}: Maximum Qty tidak valid.`);
+          }
+          if (!Number.isFinite(tierPrice) || tierPrice < 0) {
+            throw new Error(`Item ${itemNo}, tier ${tierIndex + 1}: Harga tidak valid.`);
+          }
+          return {
+            minQuantity,
+            maxQuantity,
+            quantityLabel: tier.quantityLabel || "Pcs",
+            unitPrice: tierPrice,
+          };
+        })
+      : [];
 
     return cleanItem;
   });
 
-  // 4. Notes dari store
   payload.notes = data.notes || [];
-
   return payload;
 };

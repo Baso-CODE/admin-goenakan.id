@@ -140,6 +140,60 @@ export type NoteCategory = {
 };
 
 // ============================================================
+// MANUAL_QUOTATION_TIER_PRICING_V1
+// Tier pricing berlaku untuk quotation item manual.
+// Produk katalog tetap memakai perhitungan harga katalog yang sudah ada.
+type ManualQuotationTier = {
+  minQuantity: number;
+  maxQuantity?: number | null;
+  unitPrice: number;
+};
+
+type ManualQuotationTierResult = {
+  matched: ManualQuotationTier | null;
+  minimumQuantity: number;
+  minimumTotal: number;
+};
+
+function resolveManualQuotationTier(item: {
+  isManualProduct?: boolean;
+  quantity?: number;
+  tiers?: ManualQuotationTier[];
+}): ManualQuotationTierResult | null {
+  if (!item?.isManualProduct) return null;
+
+  const pricedTiers = (item.tiers || []).filter((tier) => {
+    const min = Number(tier.minQuantity);
+    const max = tier.maxQuantity == null ? null : Number(tier.maxQuantity);
+    const price = Number(tier.unitPrice);
+    return (
+      Number.isInteger(min) &&
+      min >= 1 &&
+      (max === null || (Number.isInteger(max) && max >= min)) &&
+      Number.isFinite(price) &&
+      price > 0
+    );
+  });
+
+  if (pricedTiers.length === 0) return null;
+
+  const sorted = [...pricedTiers].sort(
+    (a, b) => Number(a.minQuantity) - Number(b.minQuantity),
+  );
+  const qty = Number(item.quantity);
+  const matched = sorted.find((tier) =>
+    Number.isInteger(qty) &&
+    qty >= Number(tier.minQuantity) &&
+    (tier.maxQuantity == null || qty <= Number(tier.maxQuantity)),
+  ) ?? null;
+
+  return {
+    matched,
+    minimumQuantity: Number(sorted[0].minQuantity),
+    minimumTotal: Number(sorted[0].minQuantity) * Number(sorted[0].unitPrice),
+  };
+}
+
 // SUB-COMPONENT: ItemRow Edit Quotation
 // ============================================================
 function ItemRow({
@@ -166,6 +220,28 @@ function ItemRow({
   const [openCombobox, setOpenCombobox] = useState(false);
 
   const isManualProduct = form.watch(`items.${index}.isManualProduct`);
+  // Sinkronisasi Unit Price ketika Qty atau harga tier manual berubah.
+  // Tidak mengubah Qty diam-diam; MOQ dipilih lewat tombol di ringkasan.
+  const tierData = resolveManualQuotationTier({
+    isManualProduct,
+    quantity: form.watch(`items.${index}.quantity`),
+    tiers: form.watch(`items.${index}.tiers`),
+  });
+  const matchedTierPrice = tierData?.matched
+    ? Number(tierData.matched.unitPrice)
+    : undefined;
+
+  useEffect(() => {
+    if (matchedTierPrice === undefined) return;
+    const pricePath = `items.${index}.unitPrice` as const;
+    if (Number(form.getValues(pricePath)) !== matchedTierPrice) {
+      form.setValue(pricePath, matchedTierPrice, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }, [matchedTierPrice, form, index]);
+
   const selectedProductId = form.watch(`items.${index}.productId`);
   const selectedProduct = products.find((p: any) => p.id === selectedProductId);
 
@@ -937,16 +1013,40 @@ export default function QuotationForm({
     name: "currencyCode",
   });
 
-  const { subTotal, totalDiscount, grandTotal } = useMemo(() => {
-    let sub = 0,
-      disc = 0;
-    (items || []).forEach((item) => {
+  const { subTotal, totalDiscount, grandTotal, invalidTierItems } = useMemo(() => {
+    let sub = 0;
+    let disc = 0;
+    const invalid: Array<{
+      index: number;
+      qty: number;
+      minimumQuantity: number;
+      minimumTotal: number;
+    }> = [];
+
+    (items || []).forEach((item, index) => {
       const qty = Number(item.quantity) || 0;
-      const price = Number(item.unitPrice) || 0;
+      const tier = resolveManualQuotationTier(item);
+      if (tier && !tier.matched) {
+        invalid.push({
+          index,
+          qty,
+          minimumQuantity: tier.minimumQuantity,
+          minimumTotal: tier.minimumTotal,
+        });
+      }
+      const price = tier?.matched
+        ? Number(tier.matched.unitPrice)
+        : tier ? 0 : Number(item.unitPrice) || 0;
       sub += qty * price;
       disc += Number(item.discount) || 0;
     });
-    return { subTotal: sub, totalDiscount: disc, grandTotal: sub - disc };
+
+    return {
+      subTotal: sub,
+      totalDiscount: disc,
+      grandTotal: Math.max(0, sub - disc),
+      invalidTierItems: invalid,
+    };
   }, [items]);
 
   const handleClientSelect = (clientId: string) => {
@@ -966,8 +1066,26 @@ export default function QuotationForm({
       form.setError("manualClientName", { message: "Client Name is required" });
       return;
     }
+    const invalidIndex = data.items.findIndex((item) => {
+      const tier = resolveManualQuotationTier(item);
+      return !!tier && !tier.matched;
+    });
+    if (invalidIndex !== -1) {
+      const item = data.items[invalidIndex];
+      const tier = resolveManualQuotationTier(item)!;
+      toast.error(
+        `Item ${invalidIndex + 1}: Qty ${item.quantity} di luar rentang harga. Minimum ${tier.minimumQuantity} pcs.`,
+      );
+      return;
+    }
     onSubmit({
       ...data,
+      items: data.items.map((item) => {
+        const tier = resolveManualQuotationTier(item);
+        return tier?.matched
+          ? { ...item, unitPrice: Number(tier.matched.unitPrice) }
+          : item;
+      }),
       notes: getNotesStore(),
     });
   };
@@ -1537,6 +1655,37 @@ export default function QuotationForm({
               <CardTitle className="text-base">Estimasi Biaya</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {invalidTierItems.length > 0 && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-2">
+                  <p className="font-semibold">Qty belum sesuai dengan tier harga.</p>
+                  {invalidTierItems.map((entry) => (
+                    <div key={entry.index} className="flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        Item {entry.index + 1}: Qty {entry.qty} — MOQ {entry.minimumQuantity} pcs.
+                        Harga mulai {new Intl.NumberFormat("id-ID", {
+                          style: "currency",
+                          currency: currencyCode || "IDR",
+                        }).format(entry.minimumTotal)}.
+                      </span>
+                      {entry.qty < entry.minimumQuantity && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            form.setValue(
+                              `items.${entry.index}.quantity`,
+                              entry.minimumQuantity,
+                              { shouldDirty: true, shouldValidate: true },
+                            )
+                          }>
+                          Gunakan MOQ {entry.minimumQuantity}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Estimasi Subtotal</span>
                 <span>
@@ -1560,20 +1709,22 @@ export default function QuotationForm({
               <div className="flex justify-between text-lg font-bold">
                 <span>Estimasi Total</span>
                 <span className="text-blue-600">
-                  {new Intl.NumberFormat("id-ID", {
-                    style: "currency",
-                    currency: currencyCode || "IDR",
-                  }).format(grandTotal)}
+                  {invalidTierItems.length > 0
+                    ? "Belum dapat dihitung"
+                    : new Intl.NumberFormat("id-ID", {
+                        style: "currency",
+                        currency: currencyCode || "IDR",
+                      }).format(grandTotal)}
                 </span>
               </div>
               <p className="text-[10px] text-muted-foreground text-center mt-2 italic">
-                *Total di atas adalah estimasi menggunakan Qty dan Harga dari
-                form utama.
+                *Untuk item manual, harga satuan mengikuti tier berdasarkan Qty.
+                Total hanya tersedia jika Qty sesuai dengan rentang harga.
               </p>
               <Button
                 type="submit"
                 className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={isLoading}>
+                disabled={isLoading || invalidTierItems.length > 0}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
