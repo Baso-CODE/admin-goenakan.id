@@ -337,6 +337,33 @@ export const SIDEBAR_MENU: SidebarSection[] = [
   },
 
   {
+    title: "WhatsApp CRM",
+    groups: [
+      {
+        title: "WhatsApp CRM",
+        icon: "whatsapp",
+        children: [
+          {
+            title: "Inbox & Leads",
+            routeUrl: "/super-admin/whatsapp-crm",
+            href: "/super-admin/whatsapp-crm",
+          },
+          {
+            title: "Sales Pipeline",
+            routeUrl: "/super-admin/whatsapp-crm/pipeline",
+            href: "/super-admin/whatsapp-crm/pipeline",
+          },
+          {
+            title: "Master Kode & Setup",
+            routeUrl: "/super-admin/whatsapp-crm/custom-codes",
+            href: "/super-admin/whatsapp-crm/custom-codes",
+          },
+        ],
+      },
+    ],
+  },
+
+  {
     title: "WA Portal",
     groups: [
       {
