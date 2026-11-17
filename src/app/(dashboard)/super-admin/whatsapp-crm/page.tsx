@@ -212,6 +212,34 @@ export default function WhatsAppCrmInboxPage() {
     }
   };
 
+  const handleAssignLead = async (leadId: string, assignedToUserId: string | null) => {
+    const targetUser = csUsers.find((u) => u.id === assignedToUserId);
+    // Optimistic local update
+    handleUpdateLeadLocal({
+      id: leadId,
+      assignedToUserId,
+      assignedToUser: targetUser || null,
+      assignmentMethod: assignedToUserId ? "MANUAL" : "CLAIM",
+    });
+
+    try {
+      const res = await fetchApi(`/crm/leads/${leadId}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedToUserId }),
+      });
+      if (!res.ok) throw new Error("Gagal mengubah penugasan lead");
+      toast.success(
+        assignedToUserId
+          ? `Lead berhasil ditugaskan ke ${targetUser?.name || "CS"}!`
+          : "Penugasan lead dilepas (kembali ke antrean)!"
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengubah penugasan");
+      fetchLeads(true);
+    }
+  };
+
   const handleSyncWa = async () => {
     try {
       setIsSyncing(true);
@@ -446,11 +474,13 @@ export default function WhatsAppCrmInboxPage() {
               key={lead.id}
               lead={lead}
               statuses={statuses}
+              csUsers={csUsers}
               onEditName={(l) => setEditingLead(l)}
               onLinkCustomer={(l) => setLinkingLead(l)}
               onUnlinkCustomer={handleUnlinkCustomer}
               onOpenChat={(l) => setActiveChatLead(l)}
               onClaimLead={handleClaimLead}
+              onAssignLead={handleAssignLead}
               onUpdateStatus={handleUpdateStatus}
             />
           ))

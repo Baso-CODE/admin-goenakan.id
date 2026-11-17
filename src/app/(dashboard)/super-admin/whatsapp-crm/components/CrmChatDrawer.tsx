@@ -1224,17 +1224,54 @@ export function CrmChatDrawer({
                       </Select>
                     </div>
 
-                    {!isAssigned && (
+                    {!isAssigned ? (
                       <Button
                         type="button"
                         size="sm"
                         onClick={handleClaimLead}
-                        className="h-8 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+                        className="h-8 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 font-medium"
                       >
-                        Klaim
+                        Klaim Saya
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleAssignLead("unassigned")}
+                        className="h-8 px-2 text-xs text-rose-600 border-rose-200 hover:bg-rose-50 shrink-0"
+                        title="Lepas penugasan dan kembalikan ke antrean"
+                      >
+                        Lepas
                       </Button>
                     )}
                   </div>
+                  {isAssigned && (
+                    <div className="flex items-center justify-between text-[10px] text-stone-400 pt-0.5">
+                      <span>
+                        Metode:{" "}
+                        <strong className="text-stone-600">
+                          {lead.assignmentMethod === "CLAIM"
+                            ? "Klaim Mandiri"
+                            : lead.assignmentMethod === "STICKY_CUSTOMER"
+                            ? "Pelanggan Tetap (ERP)"
+                            : lead.assignmentMethod === "ROUND_ROBIN"
+                            ? "Auto-Route"
+                            : "Manual"}
+                        </strong>
+                      </span>
+                      {lead.assignedAt && (
+                        <span>
+                          {new Date(lead.assignedAt).toLocaleDateString("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
