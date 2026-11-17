@@ -2,10 +2,18 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/useApi";
 import {
   DownloadCloud,
+  Filter,
   Inbox,
   Kanban,
   MessageSquare,
@@ -14,11 +22,13 @@ import {
   Search,
   Settings2,
   Sliders,
+  Tag,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { CrmChatDrawer } from "./components/CrmChatDrawer";
 import { EditLeadNameDialog } from "./components/EditLeadNameDialog";
 import { CrmLeadItem, LeadCardItem } from "./components/LeadCardItem";
 import { LinkCustomerDialog } from "./components/LinkCustomerDialog";
@@ -27,14 +37,30 @@ export default function WhatsAppCrmInboxPage() {
   const { fetchApi } = useApi();
 
   const [activeTab, setActiveTab] = useState<"all" | "me" | "unassigned">("all");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const [leads, setLeads] = useState<CrmLeadItem[]>([]);
+  const [csUsers, setCsUsers] = useState<Array<{ id: string; name?: string | null; email?: string | null }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Modal dialog states
+  // Modal & Drawer states
   const [editingLead, setEditingLead] = useState<CrmLeadItem | null>(null);
   const [linkingLead, setLinkingLead] = useState<CrmLeadItem | null>(null);
+  const [activeChatLead, setActiveChatLead] = useState<CrmLeadItem | null>(null);
+
+  // Load CS Users list
+  const fetchCsUsers = useCallback(async () => {
+    try {
+      const res = await fetchApi("/crm/leads/cs-users");
+      if (res.ok) {
+        const json = await res.json();
+        setCsUsers(Array.isArray(json.data) ? json.data : []);
+      }
+    } catch {
+      // ignore
+    }
+  }, [fetchApi]);
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -42,6 +68,9 @@ export default function WhatsAppCrmInboxPage() {
       const params = new URLSearchParams();
       if (activeTab !== "all") {
         params.append("assignedTo", activeTab);
+      }
+      if (statusFilter !== "ALL") {
+        params.append("status", statusFilter);
       }
       if (search.trim()) {
         params.append("search", search.trim());
@@ -52,13 +81,24 @@ export default function WhatsAppCrmInboxPage() {
         throw new Error("Gagal mengambil data leads");
       }
       const json = await res.json();
-      setLeads(Array.isArray(json.items) ? json.items : []);
+      const items = Array.isArray(json.items) ? json.items : [];
+      setLeads(items);
+
+      // If drawer is open, keep activeChatLead in sync
+      if (activeChatLead) {
+        const updatedActive = items.find((i: CrmLeadItem) => i.id === activeChatLead.id);
+        if (updatedActive) setActiveChatLead(updatedActive);
+      }
     } catch (err: any) {
       toast.error(err.message || "Gagal memuat data leads");
     } finally {
       setIsLoading(false);
     }
-  }, [activeTab, search, fetchApi]);
+  }, [activeTab, statusFilter, search, fetchApi, activeChatLead]);
+
+  useEffect(() => {
+    fetchCsUsers();
+  }, [fetchCsUsers]);
 
   useEffect(() => {
     fetchLeads();
@@ -76,6 +116,32 @@ export default function WhatsAppCrmInboxPage() {
       fetchLeads();
     } catch (err: any) {
       toast.error(err.message || "Terjadi kesalahan");
+    }
+  };
+
+  const handleClaimLead = async (leadId: string) => {
+    try {
+      const res = await fetchApi(`/crm/leads/${leadId}/claim`, { method: "POST" });
+      if (!res.ok) throw new Error("Gagal mengklaim lead");
+      toast.success("Lead berhasil diklaim ke akun Anda!");
+      fetchLeads();
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengklaim lead");
+    }
+  };
+
+  const handleUpdateStatus = async (leadId: string, status: string) => {
+    try {
+      const res = await fetchApi(`/crm/leads/${leadId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Gagal mengubah status");
+      toast.success("Status lead berhasil diubah!");
+      fetchLeads();
+    } catch (err: any) {
+      toast.error(err.message || "Gagal memperbarui status");
     }
   };
 
@@ -201,26 +267,59 @@ export default function WhatsAppCrmInboxPage() {
       </div>
 
       {/* ── Filter Controls & Search ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <Tabs
-          value={activeTab}
-          onValueChange={(val: any) => setActiveTab(val)}
-          className="w-full sm:w-auto"
-        >
-          <TabsList className="h-9 bg-stone-100 p-1 border border-stone-200">
-            <TabsTrigger value="all" className="text-xs px-3">
-              Semua Leads
-            </TabsTrigger>
-            <TabsTrigger value="me" className="text-xs px-3">
-              Chat Saya (Assigned to Me)
-            </TabsTrigger>
-            <TabsTrigger value="unassigned" className="text-xs px-3 text-rose-700 font-medium">
-              Antrean Belum Diklaim
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+          {/* Tabs: Filter Penugasan */}
+          <Tabs
+            value={activeTab}
+            onValueChange={(val: any) => setActiveTab(val)}
+            className="w-full sm:w-auto"
+          >
+            <TabsList className="h-9 bg-stone-100 p-1 border border-stone-200">
+              <TabsTrigger value="all" className="text-xs px-3">
+                Semua Leads
+              </TabsTrigger>
+              <TabsTrigger value="me" className="text-xs px-3">
+                Chat Saya
+              </TabsTrigger>
+              <TabsTrigger value="unassigned" className="text-xs px-3 text-rose-700 font-medium">
+                Antrean Belum Diklaim
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-        <div className="relative w-full sm:w-80">
+          {/* Filter Status Prospek */}
+          <div className="w-full sm:w-48">
+            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val)}>
+              <SelectTrigger className="h-9 text-xs bg-white border-stone-200">
+                <SelectValue placeholder="Filter Status..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL" className="text-xs">
+                  Semua Status Prospek
+                </SelectItem>
+                <SelectItem value="NEW" className="text-xs text-rose-600 font-medium">
+                  🔴 Baru (NEW)
+                </SelectItem>
+                <SelectItem value="IN_PROGRESS" className="text-xs text-amber-600 font-medium">
+                  🟡 Sedang Follow Up
+                </SelectItem>
+                <SelectItem value="QUOTATION_SENT" className="text-xs text-blue-600 font-medium">
+                  🔵 Penawaran Terkirim
+                </SelectItem>
+                <SelectItem value="WON" className="text-xs text-emerald-600 font-medium">
+                  🟢 Closing / Deal
+                </SelectItem>
+                <SelectItem value="LOST" className="text-xs text-stone-500 font-medium">
+                  ⚪ Batal (LOST)
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Search Input */}
+        <div className="relative w-full lg:w-80">
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
           <Input
             value={search}
@@ -235,6 +334,7 @@ export default function WhatsAppCrmInboxPage() {
       <div className="space-y-2.5">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center p-12 text-stone-400 bg-white rounded-xl border border-stone-200">
+            <RefreshCw className="w-6 h-6 animate-spin text-emerald-600 mb-2" />
             <p className="text-xs">Memuat antrean WhatsApp CRM...</p>
           </div>
         ) : leads.length === 0 ? (
@@ -244,7 +344,7 @@ export default function WhatsAppCrmInboxPage() {
             <p className="text-[11px] text-stone-400">
               {activeTab === "unassigned"
                 ? "Semua pesan prospek sudah dipegang oleh CS yang bertugas."
-                : "Belum ada kontak prospek yang masuk atau cocok dengan kata kunci pencarian."}
+                : "Belum ada kontak prospek yang masuk atau cocok dengan filter dan kata kunci pencarian."}
             </p>
           </div>
         ) : (
@@ -255,10 +355,22 @@ export default function WhatsAppCrmInboxPage() {
               onEditName={(l) => setEditingLead(l)}
               onLinkCustomer={(l) => setLinkingLead(l)}
               onUnlinkCustomer={handleUnlinkCustomer}
+              onOpenChat={(l) => setActiveChatLead(l)}
+              onClaimLead={handleClaimLead}
+              onUpdateStatus={handleUpdateStatus}
             />
           ))
         )}
       </div>
+
+      {/* In-App Chat Drawer */}
+      <CrmChatDrawer
+        lead={activeChatLead}
+        open={!!activeChatLead}
+        onClose={() => setActiveChatLead(null)}
+        onLeadUpdated={fetchLeads}
+        csUsers={csUsers}
+      />
 
       {/* Dialog: Edit Name */}
       <EditLeadNameDialog
