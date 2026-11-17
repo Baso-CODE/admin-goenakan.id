@@ -30,11 +30,18 @@ import { DatePickerHelper } from "@/helper/datePickerHelper";
 import { ImageCropper } from "@/helper/image-cropper";
 import { useApi } from "@/hooks/useApi";
 import { format } from "date-fns";
-import { ChevronLeft, ClipboardList, ImagePlus, Trash2, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ClipboardList,
+  ImagePlus,
+  Loader2,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import DepartmentForm, {
@@ -150,7 +157,11 @@ export default function ClientAddForm({
   const [activeTab, setActiveTab] = useState("info-dasar");
   const { data: session } = useSession();
   const router = useRouter();
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
+  const [phoneError, setPhoneError] = useState("");
 
+  const savingRef = useRef(false);
   // ==========================================
   // FETCH DEPARTMENTS
   // ==========================================
@@ -196,9 +207,16 @@ export default function ClientAddForm({
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
 
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    if (name === "b2b_phone" || name === "b2c_phone") {
+      setPhoneError("");
+    }
+  };
   const handleTypeChange = (value: ClientType) => {
     setClientType(value);
     setFormData((prev) => ({ ...prev, type: value }));
@@ -206,7 +224,9 @@ export default function ClientAddForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (savingRef.current || hasSaved) return;
 
+    setPhoneError("");
     const validation = clientSchema.safeParse({ type: formData.type });
     if (!validation.success) {
       toast.error("Pilih tipe klien terlebih dahulu!");
@@ -227,6 +247,30 @@ export default function ClientAddForm({
     if (clientType === "B2C") {
       if (!formData.b2c_name) return toast.error("Nama lengkap wajib diisi");
     }
+    const mainPhone =
+      clientType === "B2B"
+        ? formData.b2b_phone?.trim()
+        : formData.b2c_phone?.trim();
+
+    if (!mainPhone) {
+      const message = "Nomor telepon utama Client wajib diisi.";
+
+      setPhoneError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (status !== "authenticated") {
+      toast.error("Sesi berakhir, silakan login kembali.");
+      return;
+    }
+
+    savingRef.current = true;
+    setIsSaving(true);
+
+    toast.loading("Sedang menyimpan Client. Mohon jangan klik tombol lagi.", {
+      id: "create-client-save",
+    });
 
     try {
       if (status !== "authenticated") {
@@ -314,14 +358,37 @@ export default function ClientAddForm({
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        toast.error(
-          `Gagal menyimpan: ${errData.message || "Terjadi kesalahan server"}`,
-        );
+
+        const serverMessage =
+          typeof errData.message === "string"
+            ? errData.message
+            : "Terjadi kesalahan saat menyimpan Client.";
+
+        const isPhoneIssue = /nomor|telepon|phone/i.test(serverMessage);
+
+        const message =
+          res.status === 409 && isPhoneIssue
+            ? `${serverMessage} Gunakan Client yang sudah ada atau masukkan nomor telepon lain.`
+            : serverMessage;
+
+        if (isPhoneIssue) {
+          setPhoneError(message);
+        }
+
+        toast.error(message, {
+          id: "create-client-save",
+          duration: 7000,
+        });
+
         return;
       }
 
       const newClient = await res.json();
-      toast.success("Client berhasil ditambahkan!");
+      setHasSaved(true);
+
+      toast.success("Client berhasil ditambahkan!", {
+        id: "create-client-save",
+      });
       if (isModal && onSuccess) {
         onSuccess(newClient);
       } else {
@@ -329,8 +396,20 @@ export default function ClientAddForm({
         router.refresh();
       }
     } catch (err) {
-      toast.error("Terjadi kesalahan koneksi ke server.");
-      console.error(err);
+      console.error("Create Client failed:", err);
+
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Terjadi kesalahan koneksi ke server.",
+        {
+          id: "create-client-save",
+          duration: 7000,
+        },
+      );
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
     }
   };
 
@@ -474,6 +553,13 @@ export default function ClientAddForm({
                             onChange={handleChange}
                             placeholder="021-xxxxxxx"
                           />
+                          {phoneError && (
+                            <p
+                              role="alert"
+                              className="text-xs font-medium text-red-600 mt-1">
+                              {phoneError}
+                            </p>
+                          )}
                         </div>
                         <div className="space-y-2">
                           <Label>Website *</Label>
@@ -569,6 +655,13 @@ export default function ClientAddForm({
                             onChange={handleChange}
                             placeholder="08xxxxxxxxxx"
                           />
+                          {phoneError && (
+                            <p
+                              role="alert"
+                              className="text-xs font-medium text-red-600 mt-1">
+                              {phoneError}
+                            </p>
+                          )}
                         </div>
 
                         {/* Tanggal Bergabung untuk B2C */}
@@ -891,11 +984,29 @@ export default function ClientAddForm({
         <div className="mt-6 flex justify-end">
           <Button
             type="submit"
-            className="cursor-pointer"
-            disabled={clientType === ""}>
-            <ClipboardList className="h-4 w-4 mr-2" />
-            Simpan Klien Baru
+            disabled={clientType === "" || isSaving || hasSaved}
+            aria-busy={isSaving}
+            className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-60">
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Sedang Menyimpan...
+              </>
+            ) : hasSaved ? (
+              "Berhasil Disimpan"
+            ) : (
+              <>
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Simpan Klien Baru
+              </>
+            )}
           </Button>
+          {isSaving && (
+            <p role="status" className="text-xs text-amber-600 mt-2">
+              Permintaan sedang diproses. Jangan klik tombol Simpan berulang
+              kali.
+            </p>
+          )}
         </div>
       </form>
 

@@ -920,7 +920,10 @@ export default function QuotationAddForm({
       picId: data.picId || undefined,
       currencyCode: data.currencyCode,
       paymentTerms: data.paymentTerms || undefined,
-      items: data.items,
+      items: data.items.map((item, index) => ({
+        ...item,
+        imageUploadExpected: Boolean(itemImages[index]),
+      })),
       notes: getNotesStore(),
     };
     const formData = new FormData();

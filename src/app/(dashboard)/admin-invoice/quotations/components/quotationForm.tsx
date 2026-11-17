@@ -181,11 +181,13 @@ function resolveManualQuotationTier(item: {
     (a, b) => Number(a.minQuantity) - Number(b.minQuantity),
   );
   const qty = Number(item.quantity);
-  const matched = sorted.find((tier) =>
-    Number.isInteger(qty) &&
-    qty >= Number(tier.minQuantity) &&
-    (tier.maxQuantity == null || qty <= Number(tier.maxQuantity)),
-  ) ?? null;
+  const matched =
+    sorted.find(
+      (tier) =>
+        Number.isInteger(qty) &&
+        qty >= Number(tier.minQuantity) &&
+        (tier.maxQuantity == null || qty <= Number(tier.maxQuantity)),
+    ) ?? null;
 
   return {
     matched,
@@ -216,9 +218,9 @@ function ItemRow({
   const [expanded, setExpanded] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const existingImageUrl = form.watch(`items.${index}.imageUrl`) || "";
 
   const [openCombobox, setOpenCombobox] = useState(false);
-
   const isManualProduct = form.watch(`items.${index}.isManualProduct`);
   // Sinkronisasi Unit Price ketika Qty atau harga tier manual berubah.
   // Tidak mengubah Qty diam-diam; MOQ dipilih lewat tombol di ringkasan.
@@ -262,11 +264,12 @@ function ItemRow({
     if (imageFile) {
       const url = URL.createObjectURL(imageFile);
       setPreviewUrl(url);
+
       return () => URL.revokeObjectURL(url);
-    } else {
-      setPreviewUrl(null);
     }
-  }, [imageFile]);
+
+    setPreviewUrl(existingImageUrl || null);
+  }, [imageFile, existingImageUrl]);
 
   //  LOGIKA UTAMA YANG SUDAH DIPERBARUI: (Kalkulasi Tiers Dipertahankan)
   const handleAttributeToggle = (attributeId: string, valueId: string) => {
@@ -754,49 +757,91 @@ function ItemRow({
               {...form.register(`items.${index}.remarks`)}
             />
           </div>
+
           <div>
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
               Referensi Gambar (Opsional)
             </label>
+
             {!previewUrl ? (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full border-2 border-dashed border-slate-200 rounded-lg p-4 flex flex-col items-center gap-2 text-slate-400 hover:border-blue-300 hover:text-blue-400 transition-colors bg-white cursor-pointer">
                 <ImageIcon className="w-6 h-6" />
+
                 <span className="text-xs">
                   Klik untuk upload gambar referensi
                 </span>
-                <span className="text-[10px] text-slate-300">
+
+                <span className="text-[10px] text-slate-400">
                   PNG, JPG, WEBP hingga 5MB
                 </span>
               </button>
             ) : (
-              <div className="relative w-fit group">
-                <img
-                  src={previewUrl}
-                  alt="preview"
-                  className="h-28 w-28 object-cover rounded-lg border border-slate-200 shadow-sm transition-opacity group-hover:opacity-90"
-                />
+              <div className="flex flex-col items-start gap-2">
+                <div className="relative group">
+                  <img
+                    src={previewUrl}
+                    alt="Preview gambar quotation"
+                    className="h-28 w-28 object-cover rounded-lg border border-slate-200 shadow-sm"
+                  />
+
+                  {imageFile && (
+                    <button
+                      type="button"
+                      title="Batalkan gambar baru"
+                      onClick={() => {
+                        onImageChange(index, null);
+
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = "";
+                        }
+                      }}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => {
-                    onImageChange(index, null);
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                  }}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 shadow-md transform hover:scale-110 transition-transform">
-                  <X className="w-3 h-3" />
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline">
+                  Ganti Gambar
                 </button>
+
+                {existingImageUrl && !imageFile && (
+                  <span className="text-[10px] text-green-600">
+                    Gambar tersimpan sebelumnya
+                  </span>
+                )}
+
+                {imageFile && (
+                  <span className="text-[10px] text-blue-600">
+                    Gambar baru siap diupload
+                  </span>
+                )}
               </div>
             )}
+
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) onImageChange(index, file);
+
+                if (!file) return;
+
+                if (file.size > 5 * 1024 * 1024) {
+                  toast.error("Ukuran gambar maksimal 5MB");
+                  e.target.value = "";
+                  return;
+                }
+
+                onImageChange(index, file);
               }}
             />
           </div>
@@ -844,6 +889,8 @@ const quotationSchema = z.object({
         unitPrice: z.coerce.number().min(0).default(0),
         discount: z.coerce.number().min(0).default(0),
         remarks: z.string().optional(),
+        id: z.string().optional(),
+        imageUrl: z.string().optional(),
         tiers: z
           .array(
             z.object({
@@ -863,7 +910,10 @@ export type QuotationFormValues = z.infer<typeof quotationSchema>;
 
 interface QuotationFormProps {
   initialData?: any;
-  onSubmit: (data: QuotationFormValues & { notes: any[] }) => void;
+  onSubmit: (
+    data: QuotationFormValues & { notes: any[] },
+    itemImages: Record<number, File | null>,
+  ) => void;
   isLoading?: boolean;
 }
 
@@ -1003,6 +1053,26 @@ export default function QuotationForm({
     name: "items",
   });
 
+  const handleRemoveItem = (removedIndex: number) => {
+    remove(removedIndex);
+
+    setItemImages((prev) => {
+      const next: Record<number, File | null> = {};
+
+      Object.entries(prev).forEach(([key, file]) => {
+        const oldIndex = Number(key);
+
+        if (oldIndex === removedIndex) return;
+
+        const newIndex = oldIndex > removedIndex ? oldIndex - 1 : oldIndex;
+
+        next[newIndex] = file;
+      });
+
+      return next;
+    });
+  };
+
   const items = useWatch({ control: form.control, name: "items" });
   const isManualClient = useWatch({
     control: form.control,
@@ -1013,41 +1083,44 @@ export default function QuotationForm({
     name: "currencyCode",
   });
 
-  const { subTotal, totalDiscount, grandTotal, invalidTierItems } = useMemo(() => {
-    let sub = 0;
-    let disc = 0;
-    const invalid: Array<{
-      index: number;
-      qty: number;
-      minimumQuantity: number;
-      minimumTotal: number;
-    }> = [];
+  const { subTotal, totalDiscount, grandTotal, invalidTierItems } =
+    useMemo(() => {
+      let sub = 0;
+      let disc = 0;
+      const invalid: Array<{
+        index: number;
+        qty: number;
+        minimumQuantity: number;
+        minimumTotal: number;
+      }> = [];
 
-    (items || []).forEach((item, index) => {
-      const qty = Number(item.quantity) || 0;
-      const tier = resolveManualQuotationTier(item);
-      if (tier && !tier.matched) {
-        invalid.push({
-          index,
-          qty,
-          minimumQuantity: tier.minimumQuantity,
-          minimumTotal: tier.minimumTotal,
-        });
-      }
-      const price = tier?.matched
-        ? Number(tier.matched.unitPrice)
-        : tier ? 0 : Number(item.unitPrice) || 0;
-      sub += qty * price;
-      disc += Number(item.discount) || 0;
-    });
+      (items || []).forEach((item, index) => {
+        const qty = Number(item.quantity) || 0;
+        const tier = resolveManualQuotationTier(item);
+        if (tier && !tier.matched) {
+          invalid.push({
+            index,
+            qty,
+            minimumQuantity: tier.minimumQuantity,
+            minimumTotal: tier.minimumTotal,
+          });
+        }
+        const price = tier?.matched
+          ? Number(tier.matched.unitPrice)
+          : tier
+            ? 0
+            : Number(item.unitPrice) || 0;
+        sub += qty * price;
+        disc += Number(item.discount) || 0;
+      });
 
-    return {
-      subTotal: sub,
-      totalDiscount: disc,
-      grandTotal: Math.max(0, sub - disc),
-      invalidTierItems: invalid,
-    };
-  }, [items]);
+      return {
+        subTotal: sub,
+        totalDiscount: disc,
+        grandTotal: Math.max(0, sub - disc),
+        invalidTierItems: invalid,
+      };
+    }, [items]);
 
   const handleClientSelect = (clientId: string) => {
     const client = clients.find((c) => c.id === clientId);
@@ -1078,16 +1151,23 @@ export default function QuotationForm({
       );
       return;
     }
-    onSubmit({
-      ...data,
-      items: data.items.map((item) => {
-        const tier = resolveManualQuotationTier(item);
-        return tier?.matched
-          ? { ...item, unitPrice: Number(tier.matched.unitPrice) }
-          : item;
-      }),
-      notes: getNotesStore(),
-    });
+    onSubmit(
+      {
+        ...data,
+        items: data.items.map((item) => {
+          const tier = resolveManualQuotationTier(item);
+
+          return tier?.matched
+            ? {
+                ...item,
+                unitPrice: Number(tier.matched.unitPrice),
+              }
+            : item;
+        }),
+        notes: getNotesStore(),
+      },
+      itemImages,
+    );
   };
 
   function escapeNoteHtml(value: string) {
@@ -1633,7 +1713,7 @@ export default function QuotationForm({
                 index={index}
                 products={products}
                 form={form}
-                onRemove={() => remove(index)}
+                onRemove={() => handleRemoveItem(index)}
                 canRemove={fields.length > 1}
                 onImageChange={handleImageChange}
                 imageFile={itemImages[index] ?? null}
@@ -1657,15 +1737,21 @@ export default function QuotationForm({
             <CardContent className="space-y-3">
               {invalidTierItems.length > 0 && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-2">
-                  <p className="font-semibold">Qty belum sesuai dengan tier harga.</p>
+                  <p className="font-semibold">
+                    Qty belum sesuai dengan tier harga.
+                  </p>
                   {invalidTierItems.map((entry) => (
-                    <div key={entry.index} className="flex flex-wrap items-center justify-between gap-2">
+                    <div
+                      key={entry.index}
+                      className="flex flex-wrap items-center justify-between gap-2">
                       <span>
-                        Item {entry.index + 1}: Qty {entry.qty} — MOQ {entry.minimumQuantity} pcs.
-                        Harga mulai {new Intl.NumberFormat("id-ID", {
+                        Item {entry.index + 1}: Qty {entry.qty} — MOQ{" "}
+                        {entry.minimumQuantity} pcs. Harga mulai{" "}
+                        {new Intl.NumberFormat("id-ID", {
                           style: "currency",
                           currency: currencyCode || "IDR",
-                        }).format(entry.minimumTotal)}.
+                        }).format(entry.minimumTotal)}
+                        .
                       </span>
                       {entry.qty < entry.minimumQuantity && (
                         <Button

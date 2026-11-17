@@ -36,8 +36,6 @@ export default function EditQuotationPage() {
 
       const data = await res.json();
 
-      console.log("ini adalah data", data);
-
       const formattedData: any = {
         date: new Date(data.date),
         validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
@@ -57,7 +55,8 @@ export default function EditQuotationPage() {
           isManualProduct: !item.productId,
           productId: item.productId || "",
           variantId: item.variantId || "",
-
+          id: item.id,
+          imageUrl: item.imageUrl || "",
           selectedAttributes: item.selectedAttributes || {},
           productName: item.productName,
           description: item.description || "",
@@ -106,33 +105,56 @@ export default function EditQuotationPage() {
   // ==========================================
   // UPDATE DATA
   // ==========================================
-  const handleUpdate = async (data: QuotationFormValues) => {
+  const handleUpdate = async (
+    data: QuotationFormValues & { notes?: any[] },
+    itemImages: Record<number, File | null>,
+  ) => {
     if (status !== "authenticated") {
       toast.error("Sesi berakhir, silakan login kembali.");
       return;
     }
 
     setIsSaving(true);
+
     try {
       const payload = cleanQuotationPayload(data);
 
+      payload.items = payload.items.map((item: any, index: number) => ({
+        ...item,
+        imageUploadExpected: Boolean(itemImages[index]),
+      }));
+
+      const formData = new FormData();
+
+      formData.append("data", JSON.stringify(payload));
+
+      Object.entries(itemImages).forEach(([idx, file]) => {
+        if (file) {
+          formData.append(`items[${idx}][image]`, file, file.name);
+        }
+      });
+
       const res = await fetchApi(`/quotations/${id}`, {
         method: "PATCH",
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       const result = await res.json();
 
       if (!res.ok) {
-        throw new Error(result.message || "Failed to update");
+        throw new Error(result.message || "Gagal memperbarui quotation");
       }
 
-      toast.success("Quotation updated successfully!");
+      toast.success("Quotation berhasil diperbarui!");
+
       router.push("/admin-invoice/quotations");
       router.refresh();
     } catch (error) {
-      console.error(error);
-      toast.error(error instanceof Error ? error.message : "Failed to update");
+      console.error("Update quotation failed:", error);
+
+      toast.error(
+        error instanceof Error ? error.message : "Gagal memperbarui quotation",
+      );
     } finally {
       setIsSaving(false);
     }
