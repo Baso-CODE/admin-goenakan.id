@@ -73,8 +73,8 @@ export function EditLeadNameDialog({
       <DialogContent className="sm:max-w-[420px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-              <Edit3 className="w-5 h-5 text-emerald-600" />
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-stone-900">
+              <Edit3 className="w-4 h-4 text-emerald-600" />
               <span>Ubah Nama Lead</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-stone-500">

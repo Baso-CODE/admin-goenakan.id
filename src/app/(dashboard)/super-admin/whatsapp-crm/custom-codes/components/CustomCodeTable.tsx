@@ -63,7 +63,7 @@ export function CustomCodeTable({
     return (
       <div className="flex flex-col items-center justify-center p-12 text-stone-400 bg-white rounded-xl border border-stone-200 gap-1">
         <p className="text-xs font-medium text-stone-600">Belum ada kode kustom terdaftar.</p>
-        <p className="text-[11px]">Silakan klik tombol "Tambah Kode Kustom" di atas untuk memulai.</p>
+        <p className="text-[11px]">Silakan klik tombol "Tambah Master Kode" di atas untuk memulai.</p>
       </div>
     );
   }

@@ -121,8 +121,8 @@ export function LinkCustomerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[550px] max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-            <Link2 className="w-5 h-5 text-emerald-600" />
+          <DialogTitle className="flex items-center gap-2 text-base font-bold text-stone-900">
+            <Link2 className="w-4 h-4 text-emerald-600" />
             <span>Hubungkan ke Pelanggan ERP</span>
           </DialogTitle>
           <DialogDescription className="text-xs text-stone-500">

@@ -384,10 +384,10 @@ export function TemplateManagerTab() {
                   loadCategories();
                 }}
                 disabled={isLoading || isLoadingCategories}
-                className="h-8 px-2.5 text-xs text-stone-600 gap-1.5"
+                className="h-8 px-2.5 text-xs text-stone-600 hover:text-stone-900 gap-1.5"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-                <span>Segarkan</span>
+                <span>Refresh</span>
               </Button>
 
               <Button

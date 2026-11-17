@@ -137,9 +137,9 @@ export function CreateCustomCodeDialog({
       <DialogContent className="sm:max-w-[550px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-              <Sparkles className="w-5 h-5 text-emerald-600" />
-              <span>Tambah Master Kode Kustom</span>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-stone-900">
+              <Sparkles className="w-4 h-4 text-emerald-600" />
+              <span>Tambah Master Kode</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-stone-500">
               Pilih tipe kode untuk pelacakan kampanye prospek client (Opsi A) atau kode akses CS (Opsi B).

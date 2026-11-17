@@ -112,16 +112,19 @@ export default function CustomCodesMasterPage() {
           </Link>
 
           <Button
+            type="button"
             variant="outline"
             size="sm"
             onClick={() => fetchCodes()}
-            className="h-8 px-2.5 text-xs gap-1.5"
+            disabled={isLoading}
+            className="h-8 px-2.5 text-xs text-stone-600 hover:text-stone-900 gap-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            <span>Segarkan</span>
+            <span>Refresh</span>
           </Button>
 
           <Button
+            type="button"
             size="sm"
             onClick={() => setDialogOpen(true)}
             className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
@@ -144,10 +147,10 @@ export default function CustomCodesMasterPage() {
               Semua Kode
             </TabsTrigger>
             <TabsTrigger value="LEAD_SOURCE" className="text-xs px-3">
-              🎯 Tracking Client (Opsi A)
+              Tracking Client (Opsi A)
             </TabsTrigger>
             <TabsTrigger value="CS_AGENT_CODE" className="text-xs px-3">
-              🛡️ Kode Akses CS (Opsi B)
+              Kode Akses CS (Opsi B)
             </TabsTrigger>
           </TabsList>
         </Tabs>

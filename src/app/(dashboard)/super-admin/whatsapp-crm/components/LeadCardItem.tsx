@@ -105,42 +105,6 @@ interface LeadCardItemProps {
   onStatusCreated?: (newStatus: CrmStatusConfigItem, targetLeadId?: string | null) => void;
 }
 
-const STATUS_CONFIG: Record<
-  string,
-  { label: string; colorClass: string; dotColor: string }
-> = {
-  NEW: {
-    label: "Baru",
-    colorClass: "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100",
-    dotColor: "bg-rose-500",
-  },
-  IN_PROGRESS: {
-    label: "Follow Up",
-    colorClass: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100",
-    dotColor: "bg-amber-500",
-  },
-  QUOTATION_SENT: {
-    label: "Penawaran",
-    colorClass: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100",
-    dotColor: "bg-blue-500",
-  },
-  WON: {
-    label: "Closing / Deal",
-    colorClass: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100",
-    dotColor: "bg-emerald-500",
-  },
-  LOST: {
-    label: "Batal",
-    colorClass: "bg-stone-100 text-stone-600 border-stone-200 hover:bg-stone-200",
-    dotColor: "bg-stone-400",
-  },
-  CLOSED: {
-    label: "Selesai",
-    colorClass: "bg-stone-100 text-stone-600 border-stone-200 hover:bg-stone-200",
-    dotColor: "bg-stone-400",
-  },
-};
-
 export function LeadCardItem({
   lead,
   statuses,

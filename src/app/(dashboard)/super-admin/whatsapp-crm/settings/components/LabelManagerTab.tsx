@@ -28,6 +28,7 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  Search,
   Sparkles,
   Tag,
   Trash2,
@@ -49,6 +50,7 @@ export function LabelManagerTab() {
   const [labels, setLabels] = useState<CrmLabelConfigItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Dialog State (Add / Edit)
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -175,6 +177,15 @@ export function LabelManagerTab() {
     }
   };
 
+  const filteredLabels = labels.filter((lbl) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      lbl.name.toLowerCase().includes(q) ||
+      (lbl.description && lbl.description.toLowerCase().includes(q))
+    );
+  });
+
   return (
     <div className="space-y-6">
       <Card className="border-stone-200 shadow-sm">
@@ -201,10 +212,10 @@ export function LabelManagerTab() {
                 size="sm"
                 onClick={() => loadLabels()}
                 disabled={isLoading}
-                className="h-8 px-2.5 text-xs text-stone-600 gap-1.5"
+                className="h-8 px-2.5 text-xs text-stone-600 hover:text-stone-900 gap-1.5"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-                <span>Segarkan</span>
+                <span>Refresh</span>
               </Button>
 
               <Button
@@ -220,20 +231,40 @@ export function LabelManagerTab() {
           </div>
         </CardHeader>
 
-        <CardContent className="pt-0">
+        <CardContent className="space-y-4 pt-0">
+          {/* Filters Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+            <p className="text-xs text-stone-500">
+              Total <strong>{labels.length}</strong> label terdaftar
+            </p>
+
+            {/* Search Input */}
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari nama label atau deskripsi..."
+                className="h-8 pl-8 text-xs bg-stone-50/50"
+              />
+            </div>
+          </div>
+
           {isLoading ? (
             <div className="py-16 flex flex-col items-center justify-center gap-3 text-stone-400">
               <Loader2 className="w-7 h-7 animate-spin text-emerald-600" />
               <p className="text-xs">Memuat daftar label...</p>
             </div>
-          ) : labels.length === 0 ? (
+          ) : filteredLabels.length === 0 ? (
             <div className="py-12 text-center space-y-3">
               <div className="w-12 h-12 bg-stone-100 text-stone-400 rounded-full flex items-center justify-center mx-auto">
                 <Tag className="w-6 h-6" />
               </div>
-              <p className="text-sm font-semibold text-stone-700">Belum Ada Label Dikonfigurasi</p>
+              <p className="text-sm font-semibold text-stone-700">Label Tidak Ditemukan</p>
               <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                Tambahkan label pertama untuk mulai mengelompokkan prospek pelanggan berdasarkan kriteria tertentu.
+                {searchQuery
+                  ? "Tidak ada label yang cocok dengan kata kunci pencarian."
+                  : "Tambahkan label pertama untuk mulai mengelompokkan prospek pelanggan berdasarkan kriteria tertentu."}
               </p>
               <Button
                 type="button"
@@ -242,7 +273,7 @@ export function LabelManagerTab() {
                 className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Buat Label Pertama</span>
+                <span>{searchQuery ? "Tambah Label Baru" : "Buat Label Pertama"}</span>
               </Button>
             </div>
           ) : (
@@ -268,7 +299,7 @@ export function LabelManagerTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {labels.map((item, idx) => (
+                  {filteredLabels.map((item, idx) => (
                     <TableRow key={item.id} className="hover:bg-stone-50/50">
                       <TableCell className="text-center font-mono text-xs text-stone-400">
                         {idx + 1}

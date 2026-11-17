@@ -248,56 +248,75 @@ export function StatusManagerTab() {
   return (
     <div className="space-y-6">
       {/* ── Status Management Card ── */}
-      <Card className="border-stone-200 shadow-xs bg-white">
-        <CardHeader className="p-4 sm:p-6 pb-4 border-b border-stone-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <CardTitle className="text-sm sm:text-base font-bold text-stone-900 flex items-center gap-2">
-              <Kanban className="w-4 h-4 text-emerald-600" />
-              <span>Daftar Status & Tahapan Prospek</span>
-            </CardTitle>
-            <CardDescription className="text-xs text-stone-500 mt-1">
-              Atur alur tahapan prospek (*sales pipeline*) secara dinamis. Anda dapat menambah status baru, mengganti warna badge, dan mengurutkan tahapan proses sales.
-            </CardDescription>
-          </div>
+      <Card className="border-stone-200 shadow-sm bg-white">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100">
+                <Kanban className="w-4 h-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold text-stone-900">
+                  Daftar Status & Tahapan Prospek
+                </CardTitle>
+                <CardDescription className="text-xs text-stone-500 mt-0.5">
+                  Atur alur tahapan prospek (*sales pipeline*) secara dinamis. Anda dapat menambah status baru, mengganti warna badge, dan mengurutkan tahapan proses sales.
+                </CardDescription>
+              </div>
+            </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => loadStatuses(false)}
-              disabled={isLoading}
-              className="h-8 px-2.5 text-xs text-stone-600 hover:text-stone-900 gap-1.5"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleOpenCreate}
-              className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-2xs font-medium"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Tambah Status Baru</span>
-            </Button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => loadStatuses(false)}
+                disabled={isLoading}
+                className="h-8 px-2.5 text-xs text-stone-600 hover:text-stone-900 gap-1.5"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                <span>Refresh</span>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleOpenCreate}
+                className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Tambah Status Baru</span>
+              </Button>
+            </div>
           </div>
         </CardHeader>
 
-        <CardContent className="p-0">
+        <CardContent className="pt-0">
           {isLoading ? (
-            <div className="py-16 text-center text-stone-400 space-y-2">
-              <Loader2 className="w-6 h-6 animate-spin mx-auto text-emerald-600" />
+            <div className="py-16 flex flex-col items-center justify-center gap-3 text-stone-400">
+              <Loader2 className="w-7 h-7 animate-spin text-emerald-600" />
               <p className="text-xs">Memuat konfigurasi status...</p>
             </div>
           ) : statuses.length === 0 ? (
-            <div className="py-16 text-center text-stone-400 space-y-2">
-              <Kanban className="w-8 h-8 mx-auto stroke-1" />
-              <p className="text-xs">Belum ada status yang dikonfigurasi.</p>
-              <Button size="sm" onClick={handleOpenCreate} className="h-8 text-xs bg-emerald-600 text-white mt-2">
-                Tambah Status Pertama
+            <div className="py-12 text-center space-y-3">
+              <div className="w-12 h-12 bg-stone-100 text-stone-400 rounded-full flex items-center justify-center mx-auto">
+                <Kanban className="w-6 h-6" />
+              </div>
+              <p className="text-sm font-semibold text-stone-700">Belum Ada Status Dikonfigurasi</p>
+              <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                Atur tahapan prospek pertama untuk mulai memantau alur penjualan di CRM.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleOpenCreate}
+                className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Tambah Status Pertama</span>
               </Button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="border border-stone-200 rounded-lg overflow-hidden">
               <Table>
                 <TableHeader className="bg-stone-50/80">
                   <TableRow className="border-stone-200">
