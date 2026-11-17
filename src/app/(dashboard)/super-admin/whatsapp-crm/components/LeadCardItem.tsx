@@ -66,6 +66,7 @@ interface LeadCardItemProps {
   onEditName: (lead: CrmLeadItem) => void;
   onLinkCustomer: (lead: CrmLeadItem) => void;
   onUnlinkCustomer: (leadId: string) => void;
+  onOpenChat?: (lead: CrmLeadItem) => void;
 }
 
 export function LeadCardItem({
@@ -73,6 +74,7 @@ export function LeadCardItem({
   onEditName,
   onLinkCustomer,
   onUnlinkCustomer,
+  onOpenChat,
 }: LeadCardItemProps) {
   const { name, source, formattedPhone } = lead.resolvedContact;
   const initial = name ? name.charAt(0).toUpperCase() : "?";
@@ -201,16 +203,15 @@ export function LeadCardItem({
           </Button>
         )}
 
-        <Link href="/super-admin/wa-portal/live-chat">
-          <Button
-            type="button"
-            size="sm"
-            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Buka Chat</span>
-          </Button>
-        </Link>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => onOpenChat?.(lead)}
+          className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          <span>Buka Chat</span>
+        </Button>
       </div>
     </div>
   );

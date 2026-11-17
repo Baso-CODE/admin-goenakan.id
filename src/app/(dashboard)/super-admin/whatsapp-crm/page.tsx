@@ -135,9 +135,6 @@ export default function WhatsAppCrmInboxPage() {
               <h1 className="text-xl font-bold tracking-tight text-stone-900">
                 WhatsApp CRM — Inbox & Leads
               </h1>
-              <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
-                Tahap 1 Active
-              </span>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
               Kelola prospek masuk, identifikasi nama kontak cerdas (Combine Contact Name), dan sinkronkan data customer ERP.
@@ -200,16 +197,6 @@ export default function WhatsAppCrmInboxPage() {
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
             <span>Segarkan</span>
           </Button>
-
-          <Link href="/super-admin/wa-portal/live-chat">
-            <Button
-              size="sm"
-              className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>Live Chat Asli (Raw WA)</span>
-            </Button>
-          </Link>
         </div>
       </div>
 
