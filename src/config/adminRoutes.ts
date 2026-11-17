@@ -457,6 +457,13 @@ export const ADMIN_ROUTES: AdminRoute[] = [
     section: "WhatsApp CRM",
     group: "WhatsApp CRM",
   },
+  {
+    title: "WhatsApp CRM - Pengaturan CRM",
+    url: "/super-admin/whatsapp-crm/settings",
+    permission: "manage_whatsapp_crm",
+    section: "WhatsApp CRM",
+    group: "WhatsApp CRM",
+  },
 
   // WA PORTAL
   {

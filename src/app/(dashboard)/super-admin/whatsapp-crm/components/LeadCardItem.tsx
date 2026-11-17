@@ -49,6 +49,9 @@ export interface CrmLeadItem {
     label: string;
   } | null;
   status: "NEW" | "IN_PROGRESS" | "CLOSED";
+  lastMessage?: string | null;
+  lastMessageAt?: string | null;
+  unreadCount?: number;
   createdAt: string;
   updatedAt: string;
   resolvedContact: {
@@ -89,6 +92,12 @@ export function LeadCardItem({
           {/* Main Resolved Name & Source Indicator */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-stone-900 text-sm truncate">{name}</span>
+
+            {lead.unreadCount && lead.unreadCount > 0 ? (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-600 text-white">
+                {lead.unreadCount}
+              </span>
+            ) : null}
 
             {source === "DISPLAY_NAME" && (
               <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
@@ -133,6 +142,24 @@ export function LeadCardItem({
               </span>
             )}
           </div>
+
+          {/* Last Message Snippet */}
+          {lead.lastMessage && (
+            <div className="pt-1 flex items-center gap-2 text-xs text-stone-600">
+              <span className="text-stone-400 shrink-0 text-[11px]">💬</span>
+              <p className="line-clamp-1 italic text-stone-500 text-[11px]">
+                &quot;{lead.lastMessage}&quot;
+              </p>
+              {lead.lastMessageAt && (
+                <span className="text-[10px] text-stone-400 shrink-0 ml-auto sm:ml-0 font-mono">
+                  {new Date(lead.lastMessageAt).toLocaleTimeString("id-ID", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

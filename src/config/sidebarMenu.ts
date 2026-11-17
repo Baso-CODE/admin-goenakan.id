@@ -358,6 +358,11 @@ export const SIDEBAR_MENU: SidebarSection[] = [
             routeUrl: "/super-admin/whatsapp-crm/custom-codes",
             href: "/super-admin/whatsapp-crm/custom-codes",
           },
+          {
+            title: "Pengaturan CRM",
+            routeUrl: "/super-admin/whatsapp-crm/settings",
+            href: "/super-admin/whatsapp-crm/settings",
+          },
         ],
       },
     ],

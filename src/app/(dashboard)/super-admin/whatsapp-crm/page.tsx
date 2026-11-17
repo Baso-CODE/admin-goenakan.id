@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/useApi";
 import {
+  DownloadCloud,
   Inbox,
   Kanban,
   MessageSquare,
@@ -12,6 +13,7 @@ import {
   RefreshCw,
   Search,
   Settings2,
+  Sliders,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -28,6 +30,7 @@ export default function WhatsAppCrmInboxPage() {
   const [search, setSearch] = useState("");
   const [leads, setLeads] = useState<CrmLeadItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Modal dialog states
   const [editingLead, setEditingLead] = useState<CrmLeadItem | null>(null);
@@ -76,6 +79,49 @@ export default function WhatsAppCrmInboxPage() {
     }
   };
 
+  const handleSyncWa = async () => {
+    try {
+      setIsSyncing(true);
+      // Mode 1: Backend direct sync via configured WA receiver session
+      const res = await fetchApi("/crm/leads/sync-from-wa", {
+        method: "POST",
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        toast.success(json.message || "Sinkronisasi leads berhasil!");
+        fetchLeads();
+        return;
+      }
+
+      // Mode 2: Client proxy fallback (if direct backend outbound is not configured yet)
+      const chatsRes = await fetch("/api/wa/chats?limit=100");
+      if (!chatsRes.ok) {
+        throw new Error("Gagal mengambil percakapan dari WhatsApp");
+      }
+      const chatsJson = await chatsRes.json();
+      const chats = Array.isArray(chatsJson) ? chatsJson : chatsJson.data || [];
+
+      const batchRes = await fetchApi("/crm/leads/batch-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chats }),
+      });
+
+      if (batchRes.ok) {
+        const batchJson = await batchRes.json();
+        toast.success(batchJson.message || "Leads berhasil disinkronkan!");
+        fetchLeads();
+      } else {
+        throw new Error("Gagal memproses data leads ke database");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Gagal sinkronisasi data dari WhatsApp");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* ── Top Bar: Title & Primary Actions ── */}
@@ -117,10 +163,33 @@ export default function WhatsAppCrmInboxPage() {
               size="sm"
               className="h-8 px-2.5 text-xs text-stone-600 hover:text-stone-900 gap-1.5"
             >
-              <Settings2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Master Kode & Setup</span>
+              <Settings2 className="w-3.5 h-3.5 text-stone-500" />
+              <span>Master Kode</span>
             </Button>
           </Link>
+
+          <Link href="/super-admin/whatsapp-crm/settings">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-2.5 text-xs text-stone-600 hover:text-stone-900 gap-1.5"
+            >
+              <Sliders className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Pengaturan CRM</span>
+            </Button>
+          </Link>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncWa}
+            disabled={isSyncing}
+            className="h-8 px-2.5 text-xs gap-1.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+            title="Tarik chat terbaru dari sesi WhatsApp aktif"
+          >
+            <DownloadCloud className={`w-3.5 h-3.5 ${isSyncing ? "animate-bounce" : ""}`} />
+            <span>{isSyncing ? "Menyinkronkan..." : "Tarik Pesan WA"}</span>
+          </Button>
 
           <Button
             variant="outline"
