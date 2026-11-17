@@ -250,6 +250,8 @@ export function CrmChatDrawer({
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<{ url: string; filename?: string } | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const dragCounterRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const docInputRef = useRef<HTMLInputElement | null>(null);
@@ -347,6 +349,9 @@ export function CrmChatDrawer({
       }, 6000);
 
       return () => clearInterval(timer);
+    } else {
+      setIsDraggingFile(false);
+      dragCounterRef.current = 0;
     }
   }, [open, lead?.id, fetchMessages, fetchNotes]);
 
@@ -381,13 +386,64 @@ export function CrmChatDrawer({
   };
 
   // Handle File Attachment Selection
-  const handleSelectFile = async (file: File, forceAsDocument = false) => {
-    const processed = await processAttachmentFile(file, forceAsDocument);
-    if (processed) {
-      setPendingAttachment(processed);
-      textareaRef.current?.focus();
+  const handleSelectFile = useCallback(
+    async (file: File, forceAsDocument = false) => {
+      const processed = await processAttachmentFile(file, forceAsDocument);
+      if (processed) {
+        setPendingAttachment(processed);
+        if (activeTab !== "chat") setActiveTab("chat");
+        setTimeout(() => textareaRef.current?.focus(), 80);
+      }
+    },
+    [activeTab]
+  );
+
+  // Drag and drop event handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer?.types?.includes("Files")) {
+      setIsDraggingFile(true);
     }
-  };
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDraggingFile(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounterRef.current = 0;
+      setIsDraggingFile(false);
+
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        const file = files[0];
+        const processed = await processAttachmentFile(file, false);
+        if (processed) {
+          setPendingAttachment(processed);
+          if (activeTab !== "chat") setActiveTab("chat");
+          setTimeout(() => textareaRef.current?.focus(), 80);
+        }
+      }
+    },
+    [activeTab]
+  );
 
   // Handle Paste from Clipboard (allows pasting images)
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -633,8 +689,26 @@ export function CrmChatDrawer({
       <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
         <SheetContent
           side="right"
-          className="w-full sm:max-w-xl md:max-w-2xl p-0 flex flex-col h-full bg-stone-50 border-stone-200"
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className="w-full sm:max-w-xl md:max-w-2xl p-0 flex flex-col h-full bg-stone-50 border-stone-200 relative overflow-hidden"
         >
+          {/* Drag-and-drop Visual Overlay */}
+          {isDraggingFile && (
+            <div className="absolute inset-0 z-50 bg-emerald-600/15 backdrop-blur-[2px] border-2 border-dashed border-emerald-500 rounded-lg flex flex-col items-center justify-center p-6 text-center pointer-events-none transition-all animate-in fade-in duration-150">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 shadow-md animate-bounce">
+                <Paperclip className="w-8 h-8" />
+              </div>
+              <p className="text-sm font-semibold text-emerald-900">
+                Lepaskan file di sini untuk melampirkan ke percakapan
+              </p>
+              <p className="text-xs text-emerald-700 mt-1">
+                Maksimal 10 MB (Gambar atau Dokumen)
+              </p>
+            </div>
+          )}
           {/* ── Top Header ── */}
           <div className="bg-white border-b border-stone-200 p-4 shrink-0 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
