@@ -1415,25 +1415,30 @@ export function CrmChatDrawer({
       {/* Image Preview Lightbox Dialog */}
       {previewImage && (
         <Dialog open={!!previewImage} onOpenChange={(open) => !open && setPreviewImage(null)}>
-          <DialogContent className="max-w-3xl p-2 bg-stone-900/95 border-stone-800 text-white flex flex-col items-center">
-            <DialogTitle className="text-xs text-stone-300 font-normal w-full flex items-center justify-between px-2 pt-1">
-              <span className="truncate max-w-md">{previewImage.filename || "Lampiran Gambar"}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => downloadAttachment(previewImage.url, previewImage.filename)}
-                className="h-7 px-2.5 text-xs text-stone-200 hover:text-white hover:bg-stone-800 gap-1"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Unduh Gambar</span>
-              </Button>
-            </DialogTitle>
-            <div className="w-full flex items-center justify-center p-2 max-h-[80vh] overflow-hidden">
-              <img
-                src={previewImage.url}
-                alt={previewImage.filename || "Preview"}
-                className="max-h-[75vh] w-auto max-w-full object-contain rounded-md"
-              />
+          <DialogContent className="max-w-3xl p-3 bg-stone-950/95 border-stone-800 text-white sm:rounded-xl [&_button[data-slot=dialog-close]]:text-stone-300 [&_button[data-slot=dialog-close]]:hover:text-white">
+            <DialogTitle className="sr-only">Pratinjau Gambar</DialogTitle>
+            <div className="flex flex-col items-center w-full">
+              <div className="w-full flex items-center justify-between pb-2 mb-2 pr-12 border-b border-stone-800 text-xs text-stone-300">
+                <span className="truncate max-w-[200px] sm:max-w-md font-medium">
+                  {previewImage.filename || "Lampiran Gambar"}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => downloadAttachment(previewImage.url, previewImage.filename)}
+                  className="h-7 text-xs bg-stone-800 hover:bg-stone-700 border-stone-700 text-white gap-1.5 cursor-pointer shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Unduh Gambar</span>
+                </Button>
+              </div>
+              <div className="p-1 max-h-[75vh] w-full flex items-center justify-center overflow-auto">
+                <img
+                  src={previewImage.url}
+                  alt={previewImage.filename || "Pratinjau"}
+                  className="max-h-[72vh] max-w-full object-contain rounded-md shadow-lg"
+                />
+              </div>
             </div>
           </DialogContent>
         </Dialog>
