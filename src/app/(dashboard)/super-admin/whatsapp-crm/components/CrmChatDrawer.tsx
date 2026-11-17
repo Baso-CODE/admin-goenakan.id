@@ -71,8 +71,9 @@ interface CrmNoteItem {
 interface CrmChatDrawerProps {
   lead: CrmLeadItem | null;
   open: boolean;
+  sessionId?: string;
   onClose: () => void;
-  onLeadUpdated: () => void;
+  onLeadUpdated?: (updated: Partial<CrmLeadItem> & { id: string }) => void;
   csUsers: Array<{ id: string; name?: string | null; email?: string | null }>;
 }
 
@@ -106,9 +107,18 @@ const QUICK_REPLIES = [
   },
 ];
 
+const getChatId = (phone: string) => {
+  let cleaned = phone.replace(/@c\.us$/i, "").replace(/@g\.us$/i, "").replace(/\D/g, "");
+  if (cleaned.startsWith("08")) {
+    cleaned = "62" + cleaned.slice(1);
+  }
+  return `${cleaned}@c.us`;
+};
+
 export function CrmChatDrawer({
   lead,
   open,
+  sessionId,
   onClose,
   onLeadUpdated,
   csUsers,
@@ -146,27 +156,42 @@ export function CrmChatDrawer({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Fetch WhatsApp Messages
-  const fetchMessages = useCallback(async () => {
-    if (!lead?.phoneNumber) return;
-    try {
-      setIsLoadingMessages(true);
-      const chatId = `${lead.phoneNumber}@c.us`;
-      const res = await fetch(`/api/wa/chats/${encodeURIComponent(chatId)}/messages?limit=50`);
-      if (res.ok) {
-        const json = await res.json();
-        const items = Array.isArray(json) ? json : json?.data || [];
-        setMessages(items);
-        setTimeout(scrollToBottom, 100);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setIsLoadingMessages(false);
-    }
-  }, [lead?.phoneNumber]);
+  // Fetch WhatsApp Messages for this selected chat ONLY
+  const fetchMessages = useCallback(
+    async (silent = false) => {
+      if (!lead?.phoneNumber) return;
+      try {
+        if (!silent) setIsLoadingMessages(true);
+        const chatId = getChatId(lead.phoneNumber);
+        const query = new URLSearchParams();
+        if (sessionId) query.append("sessionId", sessionId);
+        query.append("limit", "100");
 
-  // Fetch Internal Notes
+        const res = await fetch(
+          `/api/wa/chats/${encodeURIComponent(chatId)}/messages?${query.toString()}`
+        );
+        if (res.ok) {
+          const json = await res.json();
+          const items = Array.isArray(json)
+            ? json
+            : Array.isArray(json?.data)
+            ? json.data
+            : [];
+          // Sort ascending by timestamp so latest messages appear at bottom
+          items.sort((a: any, b: any) => (a.timestamp || 0) - (b.timestamp || 0));
+          setMessages(items);
+          if (!silent) setTimeout(scrollToBottom, 100);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!silent) setIsLoadingMessages(false);
+      }
+    },
+    [lead?.phoneNumber, sessionId]
+  );
+
+  // Fetch Internal Notes for this lead
   const fetchNotes = useCallback(async () => {
     if (!lead?.id) return;
     try {
@@ -183,25 +208,57 @@ export function CrmChatDrawer({
     }
   }, [lead?.id, fetchApi]);
 
+  // Load chat and notes when drawer opens or lead changes
   useEffect(() => {
-    if (open && lead) {
-      fetchMessages();
+    if (open && lead?.id) {
+      fetchMessages(false);
       fetchNotes();
+
+      // Background silent auto-refresh every 6 seconds ONLY for this chat while drawer is open
+      const timer = setInterval(() => {
+        fetchMessages(true);
+      }, 6000);
+
+      return () => clearInterval(timer);
     }
-  }, [open, lead, fetchMessages, fetchNotes]);
+  }, [open, lead?.id, fetchMessages, fetchNotes]);
 
   // Send message
   const handleSendMessage = async (textToSend?: string) => {
     const text = textToSend || messageInput.trim();
     if (!text || !lead?.phoneNumber) return;
 
+    const chatId = getChatId(lead.phoneNumber);
+
+    // Optimistic UI update: instantly show bubble in drawer
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
+      body: text,
+      text,
+      fromMe: true,
+      timestamp: Math.floor(Date.now() / 1000),
+      status: "PENDING",
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setMessageInput("");
+    setTimeout(scrollToBottom, 50);
+
+    // Update parent lead card lastMessage locally without re-fetching list
+    onLeadUpdated?.({
+      id: lead.id,
+      lastMessage: text,
+      lastMessageAt: new Date().toISOString(),
+      unreadCount: 0,
+    });
+
     try {
       setIsSending(true);
-      const chatId = `${lead.phoneNumber}@c.us`;
       const res = await fetch(`/api/wa/chats/${encodeURIComponent(chatId)}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          sessionId: sessionId || undefined,
           text,
         }),
       });
@@ -210,32 +267,45 @@ export function CrmChatDrawer({
         throw new Error("Gagal mengirim pesan WhatsApp");
       }
 
-      setMessageInput("");
-      fetchMessages();
-      onLeadUpdated();
+      // Quietly refresh chat after 1.2s to capture server timestamp
+      setTimeout(() => {
+        fetchMessages(true);
+      }, 1200);
     } catch (err: any) {
       toast.error(err.message || "Gagal mengirim pesan");
+      // Rollback optimistic message if failed
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
     } finally {
       setIsSending(false);
     }
   };
 
-  // Claim lead
+  // Claim lead (in-place update)
   const handleClaimLead = async () => {
     if (!lead?.id) return;
     try {
       const res = await fetchApi(`/crm/leads/${lead.id}/claim`, { method: "POST" });
       if (!res.ok) throw new Error("Gagal mengklaim lead");
+      const json = await res.json();
       toast.success("Lead berhasil diklaim ke akun Anda!");
-      onLeadUpdated();
+      if (json.data) {
+        onLeadUpdated?.(json.data);
+      }
     } catch (err: any) {
       toast.error(err.message || "Gagal mengklaim lead");
     }
   };
 
-  // Reassign CS
+  // Reassign CS (in-place update)
   const handleAssignLead = async (userId: string) => {
     if (!lead?.id) return;
+    const targetUser = csUsers.find((u) => u.id === userId);
+    onLeadUpdated?.({
+      id: lead.id,
+      assignedToUserId: userId === "unassigned" ? null : userId,
+      assignedToUser: targetUser || null,
+    });
+
     try {
       const res = await fetchApi(`/crm/leads/${lead.id}/assign`, {
         method: "POST",
@@ -244,15 +314,19 @@ export function CrmChatDrawer({
       });
       if (!res.ok) throw new Error("Gagal mengubah penugasan lead");
       toast.success("Penugasan CS berhasil diperbarui!");
-      onLeadUpdated();
     } catch (err: any) {
       toast.error(err.message || "Gagal menugaskan lead");
     }
   };
 
-  // Update status
+  // Update status (in-place update)
   const handleUpdateStatus = async (status: string) => {
     if (!lead?.id) return;
+    onLeadUpdated?.({
+      id: lead.id,
+      status: status as any,
+    });
+
     try {
       const res = await fetchApi(`/crm/leads/${lead.id}/status`, {
         method: "PATCH",
@@ -261,13 +335,12 @@ export function CrmChatDrawer({
       });
       if (!res.ok) throw new Error("Gagal mengubah status lead");
       toast.success("Status lead berhasil diubah!");
-      onLeadUpdated();
     } catch (err: any) {
       toast.error(err.message || "Gagal mengubah status");
     }
   };
 
-  // Add Label
+  // Toggle label (in-place update)
   const handleToggleLabel = async (labelName: string) => {
     if (!lead?.id) return;
     const exists = currentLabels.includes(labelName);
@@ -276,6 +349,11 @@ export function CrmChatDrawer({
       : [...currentLabels, labelName];
 
     setCurrentLabels(updated);
+    onLeadUpdated?.({
+      id: lead.id,
+      labels: updated,
+    });
+
     try {
       const res = await fetchApi(`/crm/leads/${lead.id}/labels`, {
         method: "PATCH",
@@ -284,7 +362,6 @@ export function CrmChatDrawer({
       });
       if (!res.ok) throw new Error("Gagal memperbarui label");
       toast.success("Label diperbarui");
-      onLeadUpdated();
     } catch (err: any) {
       toast.error(err.message || "Gagal memperbarui label");
       setCurrentLabels(currentLabels); // rollback
@@ -311,10 +388,16 @@ export function CrmChatDrawer({
         body: JSON.stringify({ content: noteInput.trim() }),
       });
       if (!res.ok) throw new Error("Gagal menambahkan catatan");
+      const json = await res.json();
       toast.success("Catatan internal berhasil disimpan!");
       setNoteInput("");
-      fetchNotes();
-      onLeadUpdated();
+      if (json.data) {
+        setNotes((prev) => [json.data, ...prev]);
+        onLeadUpdated?.({
+          id: lead.id,
+          notesCount: (lead.notesCount || 0) + 1,
+        });
+      }
     } catch (err: any) {
       toast.error(err.message || "Gagal menambahkan catatan");
     } finally {
@@ -331,8 +414,11 @@ export function CrmChatDrawer({
       });
       if (!res.ok) throw new Error("Gagal menghapus catatan");
       toast.success("Catatan dihapus");
-      fetchNotes();
-      onLeadUpdated();
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      onLeadUpdated?.({
+        id: lead.id,
+        notesCount: Math.max(0, (lead.notesCount || 1) - 1),
+      });
     } catch (err: any) {
       toast.error(err.message || "Gagal menghapus catatan");
     }
@@ -516,7 +602,7 @@ export function CrmChatDrawer({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={fetchMessages}
+                  onClick={() => fetchMessages(false)}
                   className="h-7 px-2 text-[11px] text-stone-500 gap-1 shrink-0"
                 >
                   <RefreshCw className={`w-3 h-3 ${isLoadingMessages ? "animate-spin" : ""}`} />

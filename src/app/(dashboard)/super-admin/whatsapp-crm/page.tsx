@@ -41,6 +41,7 @@ export default function WhatsAppCrmInboxPage() {
   const [search, setSearch] = useState("");
   const [leads, setLeads] = useState<CrmLeadItem[]>([]);
   const [csUsers, setCsUsers] = useState<Array<{ id: string; name?: string | null; email?: string | null }>>([]);
+  const [receiverSessionId, setReceiverSessionId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -49,7 +50,36 @@ export default function WhatsAppCrmInboxPage() {
   const [linkingLead, setLinkingLead] = useState<CrmLeadItem | null>(null);
   const [activeChatLead, setActiveChatLead] = useState<CrmLeadItem | null>(null);
 
-  // Load CS Users list
+  // Load active receiver session ID once
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const sRes = await fetchApi("/crm/settings");
+        if (sRes.ok) {
+          const sJson = await sRes.json();
+          if (sJson.data?.leadReceiverSessionId) {
+            setReceiverSessionId(sJson.data.leadReceiverSessionId);
+            return;
+          }
+        }
+        // Fallback: fetch from /api/wa/sessions
+        const sessRes = await fetch("/api/wa/sessions");
+        if (sessRes.ok) {
+          const sessJson = await sessRes.json();
+          const items = Array.isArray(sessJson) ? sessJson : sessJson?.data || [];
+          const working = items.find((s: any) => s.status === "WORKING") || items[0];
+          if (working?.id) {
+            setReceiverSessionId(working.id);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadSession();
+  }, [fetchApi]);
+
+  // Load CS Users list once
   const fetchCsUsers = useCallback(async () => {
     try {
       const res = await fetchApi("/crm/leads/cs-users");
@@ -62,39 +92,37 @@ export default function WhatsAppCrmInboxPage() {
     }
   }, [fetchApi]);
 
-  const fetchLeads = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const params = new URLSearchParams();
-      if (activeTab !== "all") {
-        params.append("assignedTo", activeTab);
-      }
-      if (statusFilter !== "ALL") {
-        params.append("status", statusFilter);
-      }
-      if (search.trim()) {
-        params.append("search", search.trim());
-      }
+  // Fetch leads list (without activeChatLead in dependencies!)
+  const fetchLeads = useCallback(
+    async (silent = false) => {
+      try {
+        if (!silent) setIsLoading(true);
+        const params = new URLSearchParams();
+        if (activeTab !== "all") {
+          params.append("assignedTo", activeTab);
+        }
+        if (statusFilter !== "ALL") {
+          params.append("status", statusFilter);
+        }
+        if (search.trim()) {
+          params.append("search", search.trim());
+        }
 
-      const res = await fetchApi(`/crm/leads?${params.toString()}`);
-      if (!res.ok) {
-        throw new Error("Gagal mengambil data leads");
+        const res = await fetchApi(`/crm/leads?${params.toString()}`);
+        if (!res.ok) {
+          throw new Error("Gagal mengambil data leads");
+        }
+        const json = await res.json();
+        const items = Array.isArray(json.items) ? json.items : [];
+        setLeads(items);
+      } catch (err: any) {
+        toast.error(err.message || "Gagal memuat data leads");
+      } finally {
+        if (!silent) setIsLoading(false);
       }
-      const json = await res.json();
-      const items = Array.isArray(json.items) ? json.items : [];
-      setLeads(items);
-
-      // If drawer is open, keep activeChatLead in sync
-      if (activeChatLead) {
-        const updatedActive = items.find((i: CrmLeadItem) => i.id === activeChatLead.id);
-        if (updatedActive) setActiveChatLead(updatedActive);
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Gagal memuat data leads");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [activeTab, statusFilter, search, fetchApi, activeChatLead]);
+    },
+    [activeTab, statusFilter, search, fetchApi]
+  );
 
   useEffect(() => {
     fetchCsUsers();
@@ -103,6 +131,19 @@ export default function WhatsAppCrmInboxPage() {
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
+
+  // In-place local state updater: updates a specific lead without full page refresh
+  const handleUpdateLeadLocal = useCallback(
+    (updated: Partial<CrmLeadItem> & { id: string }) => {
+      setLeads((prev) =>
+        prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item))
+      );
+      setActiveChatLead((prev) =>
+        prev && prev.id === updated.id ? { ...prev, ...updated } : prev
+      );
+    },
+    []
+  );
 
   const handleUnlinkCustomer = async (leadId: string) => {
     if (!confirm("Lepaskan tautan pelanggan dari lead ini?")) return;
@@ -113,7 +154,7 @@ export default function WhatsAppCrmInboxPage() {
       });
       if (!res.ok) throw new Error("Gagal melepas tautan");
       toast.success("Tautan customer berhasil dilepas");
-      fetchLeads();
+      handleUpdateLeadLocal({ id: leadId, customerProfileId: null, customerProfile: null });
     } catch (err: any) {
       toast.error(err.message || "Terjadi kesalahan");
     }
@@ -123,14 +164,21 @@ export default function WhatsAppCrmInboxPage() {
     try {
       const res = await fetchApi(`/crm/leads/${leadId}/claim`, { method: "POST" });
       if (!res.ok) throw new Error("Gagal mengklaim lead");
+      const json = await res.json();
       toast.success("Lead berhasil diklaim ke akun Anda!");
-      fetchLeads();
+      if (json.data) {
+        handleUpdateLeadLocal(json.data);
+      } else {
+        fetchLeads(true);
+      }
     } catch (err: any) {
       toast.error(err.message || "Gagal mengklaim lead");
     }
   };
 
   const handleUpdateStatus = async (leadId: string, status: string) => {
+    // Optimistic update for 0ms visual feedback
+    handleUpdateLeadLocal({ id: leadId, status: status as any });
     try {
       const res = await fetchApi(`/crm/leads/${leadId}/status`, {
         method: "PATCH",
@@ -139,9 +187,9 @@ export default function WhatsAppCrmInboxPage() {
       });
       if (!res.ok) throw new Error("Gagal mengubah status");
       toast.success("Status lead berhasil diubah!");
-      fetchLeads();
     } catch (err: any) {
       toast.error(err.message || "Gagal memperbarui status");
+      fetchLeads(true);
     }
   };
 
@@ -156,12 +204,16 @@ export default function WhatsAppCrmInboxPage() {
       if (res.ok) {
         const json = await res.json();
         toast.success(json.message || "Sinkronisasi leads berhasil!");
-        fetchLeads();
+        fetchLeads(true);
         return;
       }
 
       // Mode 2: Client proxy fallback (if direct backend outbound is not configured yet)
-      const chatsRes = await fetch("/api/wa/chats?limit=100");
+      const chatsUrl = receiverSessionId
+        ? `/api/wa/chats?sessionId=${encodeURIComponent(receiverSessionId)}&limit=100`
+        : `/api/wa/chats?limit=100`;
+
+      const chatsRes = await fetch(chatsUrl);
       if (!chatsRes.ok) {
         throw new Error("Gagal mengambil percakapan dari WhatsApp");
       }
@@ -177,7 +229,7 @@ export default function WhatsAppCrmInboxPage() {
       if (batchRes.ok) {
         const batchJson = await batchRes.json();
         toast.success(batchJson.message || "Leads berhasil disinkronkan!");
-        fetchLeads();
+        fetchLeads(true);
       } else {
         throw new Error("Gagal memproses data leads ke database");
       }
@@ -367,8 +419,9 @@ export default function WhatsAppCrmInboxPage() {
       <CrmChatDrawer
         lead={activeChatLead}
         open={!!activeChatLead}
+        sessionId={receiverSessionId}
         onClose={() => setActiveChatLead(null)}
-        onLeadUpdated={fetchLeads}
+        onLeadUpdated={handleUpdateLeadLocal}
         csUsers={csUsers}
       />
 
@@ -378,7 +431,7 @@ export default function WhatsAppCrmInboxPage() {
         onOpenChange={(open) => !open && setEditingLead(null)}
         leadId={editingLead?.id || null}
         currentName={editingLead?.displayName || ""}
-        onSuccess={fetchLeads}
+        onSuccess={() => fetchLeads(true)}
       />
 
       {/* Dialog: Link to Customer ERP */}
@@ -387,7 +440,7 @@ export default function WhatsAppCrmInboxPage() {
         onOpenChange={(open) => !open && setLinkingLead(null)}
         leadId={linkingLead?.id || null}
         leadPhone={linkingLead?.phoneNumber || ""}
-        onSuccess={fetchLeads}
+        onSuccess={() => fetchLeads(true)}
       />
     </div>
   );
