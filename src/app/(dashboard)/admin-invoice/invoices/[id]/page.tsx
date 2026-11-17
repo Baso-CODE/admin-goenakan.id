@@ -124,6 +124,10 @@ type InvoiceDetail = {
     remarks?: string | null;
     selectedAttributes?: unknown;
     customization?: unknown;
+    displayAttributes?: {
+      name: string;
+      value: string;
+    }[];
     product: {
       name: string;
       sku: string;
@@ -141,23 +145,23 @@ type InvoiceDetail = {
 };
 
 const renderCustomization = (
-  selectedAttributes: unknown,
+  displayAttributes?: {
+    name: string;
+    value: string;
+  }[],
   customization?: unknown,
 ) => {
-  const parseValue = (value: unknown): unknown => {
-    if (typeof value !== "string") return value;
+  const isUUID = (value: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      value,
+    );
 
-    try {
-      return JSON.parse(value);
-    } catch {
-      return value;
+  const formatSafeValue = (value: unknown): string => {
+    if (typeof value === "string") {
+      return isUUID(value) ? "" : value.trim();
     }
-  };
 
-  const formatValue = (value: unknown): string => {
-    if (value === null || value === undefined) return "";
-
-    if (typeof value === "string" || typeof value === "number") {
+    if (typeof value === "number") {
       return String(value);
     }
 
@@ -166,82 +170,62 @@ const renderCustomization = (
     }
 
     if (Array.isArray(value)) {
-      return value.map(formatValue).filter(Boolean).join(", ");
+      return value.map(formatSafeValue).filter(Boolean).join(", ");
     }
 
-    if (typeof value === "object") {
-      const record = value as Record<string, unknown>;
-
-      if (record.value !== undefined) {
-        return formatValue(record.value);
-      }
-
-      if (record.name !== undefined) {
-        return formatValue(record.name);
-      }
-
-      return Object.values(record).map(formatValue).filter(Boolean).join(", ");
+    if (value && typeof value === "object") {
+      const object = value as Record<string, unknown>;
+      return formatSafeValue(object.label ?? object.name ?? object.value);
     }
 
     return "";
   };
 
-  const renderEntries = (value: unknown) => {
-    const parsed = parseValue(value);
+  let parsedCustomization = customization;
 
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return null;
+  if (typeof customization === "string") {
+    try {
+      parsedCustomization = JSON.parse(customization);
+    } catch {
+      parsedCustomization = null;
     }
+  }
 
-    return Object.entries(parsed as Record<string, unknown>)
-      .filter(([key, val]) => {
-        return (
-          !["freightMode", "resolvedAttributes"].includes(key) &&
-          val !== null &&
-          val !== undefined &&
-          val !== ""
-        );
-      })
-      .map(([key, val]) => {
-        const text = formatValue(val);
+  const customEntries =
+    parsedCustomization &&
+    typeof parsedCustomization === "object" &&
+    !Array.isArray(parsedCustomization)
+      ? Object.entries(parsedCustomization as Record<string, unknown>)
+          .filter(
+            ([key]) =>
+              !isUUID(key) &&
+              !["freightMode", "resolvedAttributes"].includes(key),
+          )
+          .map(([key, value]) => ({
+            name: key,
+            value: formatSafeValue(value),
+          }))
+          .filter((entry) => entry.value)
+      : [];
 
-        if (!text) return null;
-
-        return (
-          <div key={key} className="text-[10px] text-slate-600">
-            <span className="font-medium">{key}: </span>
-            <span>{text}</span>
-          </div>
-        );
-      });
-  };
-
-  const attributes = renderEntries(selectedAttributes);
-  const customizations = renderEntries(customization);
-
-  if (!attributes?.some(Boolean) && !customizations?.some(Boolean)) {
+  if (!displayAttributes?.length && customEntries.length === 0) {
     return null;
   }
 
   return (
-    <div className="mt-2 space-y-1">
-      {attributes?.some(Boolean) && (
-        <div>
-          <div className="text-[10px] font-semibold text-slate-700">
-            Selected Attributes
-          </div>
-          {attributes}
+    <div className="mt-2 space-y-1 text-[10px] leading-relaxed text-slate-600">
+      {displayAttributes?.map((attribute, index) => (
+        <div key={`${attribute.name}-${index}`}>
+          <span className="font-semibold">{attribute.name}:</span>{" "}
+          {attribute.value}
         </div>
-      )}
+      ))}
 
-      {customizations?.some(Boolean) && (
-        <div>
-          <div className="text-[10px] font-semibold text-slate-700">
-            Customization
-          </div>
-          {customizations}
+      {customEntries.map((entry, index) => (
+        <div key={`${entry.name}-${index}`}>
+          <span className="font-semibold">{entry.name}:</span> {entry.value}
         </div>
-      )}
+      ))}
     </div>
   );
 };
@@ -270,7 +254,61 @@ export default function InvoiceDetailPage() {
 
   const handlePrint = useReactToPrint({
     contentRef: invoiceRef,
+
     documentTitle: `Invoice-${invoice?.invoiceNumber || invoice?.id}`,
+
+    pageStyle: `
+    @page {
+      size: A4 portrait;
+      margin: 12mm;
+    }
+
+    @media print {
+      html,
+      body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      #invoice-content {
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+        transform: none !important;
+        box-shadow: none !important;
+      }
+
+      #invoice-content > .flex-1 {
+        flex: none !important;
+      }
+
+      #invoice-content table {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
+      #invoice-content thead {
+        display: table-header-group !important;
+      }
+
+      #invoice-content .invoice-item-row {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+
+      #invoice-content img {
+        max-width: 100% !important;
+      }
+    }
+  `,
+
     onAfterPrint: () => toast.success("Dialog cetak telah ditutup"),
   });
 
@@ -563,10 +601,7 @@ export default function InvoiceDetailPage() {
         <div
           id="invoice-content"
           ref={invoiceRef}
-          className="w-[210mm] min-h-[297mm] h-auto bg-[#ffffff] text-[#1e293b] p-10 flex flex-col font-sans text-[13px] leading-relaxed relative box-border transform scale-90 md:scale-100 origin-top shadow-lg print:shadow-none print:scale-100"
-          style={{
-            padding: "40px",
-          }}>
+          className="w-[210mm] min-h-[297mm] h-auto bg-[#ffffff] text-[#1e293b] p-10 flex flex-col font-sans text-[13px] leading-relaxed relative box-border transform scale-90 md:scale-100 origin-top shadow-lg print:shadow-none print:scale-100">
           <div className="flex-1">
             {/* 1. HEADER */}
             <div className="w-full mb-10">
@@ -806,121 +841,111 @@ export default function InvoiceDetailPage() {
               </table>
             </div>
 
-            {/* 4. PRODUCT TABLE - Document-specific dynamic structure */}
+            {/* 4. PRODUCT TABLE */}
             <div className="mb-6">
-              <table className="w-full border-collapse border border-[#94a3b8] text-[11px] table-fixed">
-                <thead className="print:table-header-group">
-                  <tr className="bg-[#f3f4f6] text-center font-bold">
-                    <th className="border border-[#94a3b8] p-1 w-[6%]">No.</th>
-                    <th className="border border-[#94a3b8] p-1">
+              <h3 className="mb-3 border-b border-slate-200 pb-2 text-[13px] font-bold uppercase tracking-wide">
+                Product Details
+              </h3>
+
+              <table className="w-full table-fixed border-collapse text-[11px]">
+                <colgroup>
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "42%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "19%" }} />
+                  <col style={{ width: "23%" }} />
+                </colgroup>
+
+                <thead className="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th className="border border-slate-300 px-2 py-3 text-center">
+                      No.
+                    </th>
+                    <th className="border border-slate-300 px-3 py-3 text-left">
                       Product Description
                     </th>
-                    <th className="border border-[#94a3b8] p-1 w-[11%]">
-                      Quantity
+                    <th className="border border-slate-300 px-2 py-3 text-center">
+                      Qty
                     </th>
-                    <th className="border border-[#94a3b8] p-1 w-[18%]">
+                    <th className="border border-slate-300 px-2 py-3 text-right">
                       Unit Price
                     </th>
-                    {showAmountColumn && (
-                      <th className="border border-[#94a3b8] p-1 w-[17%]">
-                        Amount
-                      </th>
-                    )}
-                    <th className="border border-[#94a3b8] p-1 w-[19%]">
-                      Total Amount
+                    <th className="border border-slate-300 px-2 py-3 text-right">
+                      Amount
                     </th>
-                    {showDueColumn && (
-                      <th className="border border-[#94a3b8] p-1 w-[19%]">
-                        Amount Due
-                      </th>
-                    )}
                   </tr>
                 </thead>
+
                 <tbody>
                   {invoice.items.map((item, index) => {
-                    const lineAmount = Number(item.price) * item.quantity;
+                    const lineTotal =
+                      Number(item.price) * Number(item.quantity);
+
                     return (
-                      <tr
-                        key={item.id}
-                        className="align-top break-inside-avoid">
-                        <td className="border border-[#94a3b8] p-2 text-center">
+                      <tr key={item.id} className="invoice-item-row align-top">
+                        <td className="border border-slate-300 px-2 py-3 text-center">
                           {index + 1}
                         </td>
-                        <td className="border border-[#94a3b8] p-2 text-left wrap-break-words">
-                          <div className="font-semibold">
+
+                        <td className="border border-slate-300 px-3 py-3">
+                          <div
+                            className="font-semibold leading-relaxed text-slate-900"
+                            style={{ overflowWrap: "anywhere" }}>
                             {item.product.name}
                           </div>
-                          {item.product.sku && (
-                            <div className="text-[10px] text-slate-500">
-                              SKU: {item.product.sku}
-                            </div>
-                          )}
-                          {item.variant && (
-                            <div className="text-[10px] text-slate-500">
+
+                          {item.variant?.variantName && (
+                            <div className="mt-1 text-[10px] text-slate-500">
                               Variant: {item.variant.variantName}
                             </div>
                           )}
+
                           {renderCustomization(
-                            item.selectedAttributes,
+                            item.displayAttributes,
                             item.customization,
                           )}
+
                           {item.remarks && (
-                            <div className="text-[10px] italic">
+                            <p className="mt-2 whitespace-pre-wrap text-[10px] italic text-slate-500">
                               {item.remarks}
-                            </div>
+                            </p>
                           )}
                         </td>
-                        <td className="border border-[#94a3b8] p-2 text-center">
-                          {item.quantity}
+
+                        <td className="border border-slate-300 px-2 py-3 text-center">
+                          {Number(item.quantity).toLocaleString("id-ID")}
                         </td>
-                        <td className="border border-[#94a3b8] p-2 text-right wrap-break-words">
+
+                        <td className="border border-slate-300 px-2 py-3 text-right">
                           {formatCurrency(Number(item.price), currency)}
                         </td>
-                        {showAmountColumn && (
-                          <td className="border border-[#94a3b8] p-2 text-right wrap-break-words">
-                            {formatCurrency(lineAmount, currency)}
-                          </td>
-                        )}
-                        {!isMultiple ? (
-                          <td className="border border-[#94a3b8] p-2 text-right font-semibold wrap-break-words">
-                            {formatCurrency(
-                              isPartial ? lineAmount : orderTotal,
-                              currency,
-                            )}
-                          </td>
-                        ) : index === 0 ? (
-                          <td
-                            rowSpan={itemCount}
-                            className="border border-[#94a3b8] p-2 text-right align-middle font-bold wrap-break-words">
-                            {formatCurrency(
-                              isPartial ? calculatedOrderTotal : orderTotal,
-                              currency,
-                            )}
-                          </td>
-                        ) : null}
-                        {showDueColumn &&
-                          (index === 0 ? (
-                            <td
-                              rowSpan={itemCount}
-                              className="border border-[#94a3b8] p-2 text-right align-middle font-bold wrap-break-words">
-                              {formatCurrency(amountDue, currency)}
-                            </td>
-                          ) : null)}
+
+                        <td className="border border-slate-300 px-2 py-3 text-right font-semibold">
+                          {formatCurrency(lineTotal, currency)}
+                        </td>
                       </tr>
                     );
                   })}
-                  <tr className="bg-[#f8fafc] font-bold break-inside-avoid">
-                    <td
-                      colSpan={columnCount - 1}
-                      className="border border-[#94a3b8] p-2 text-right">
-                      Total Amount Due
-                    </td>
-                    <td className="border border-[#94a3b8] p-2 text-right wrap-break-words">
-                      {formatCurrency(amountDue, currency)}
-                    </td>
-                  </tr>
                 </tbody>
               </table>
+
+              <div className="mt-4 flex justify-end">
+                <div className="w-full max-w-[320px] space-y-2 text-[12px]">
+                  <div className="flex justify-between gap-4 text-slate-600">
+                    <span>Total Order</span>
+                    <span className="font-semibold">
+                      {formatCurrency(orderTotal, currency)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between gap-4 border-t border-slate-300 pt-3 font-bold">
+                    <span>Amount Due</span>
+                    <span className="text-[14px] text-blue-700">
+                      {formatCurrency(amountDue, currency)}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* 5. PAYMENT SUMMARY - Full / DP / BP / Installment / Partial */}

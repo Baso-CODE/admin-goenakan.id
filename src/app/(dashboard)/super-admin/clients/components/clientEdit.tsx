@@ -36,7 +36,7 @@ import {
 import { ImageCropper } from "@/helper/image-cropper";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import AddressField from "./addressField";
 
@@ -54,6 +54,10 @@ export default function ClientEditForm() {
   );
   const [activeTab, setActiveTab] = useState("info-dasar");
   const [isLoading, setIsLoading] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
+  const [phoneError, setPhoneError] = useState("");
+
+  const savingRef = useRef(false);
 
   // Master Data
   const [purchaseChannels, setPurchaseChannels] = useState<any[]>([]);
@@ -178,14 +182,48 @@ export default function ClientEditForm() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
-    setFormData((prev: any) => ({ ...prev, [name]: value }));
+
+    setFormData((prev: any) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    if (name === "b2b_phone" || name === "b2c_phone") {
+      setPhoneError("");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    //  Nyalakan loading saat tombol ditekan
+    if (savingRef.current || hasSaved) return;
+
+    setPhoneError("");
+
+    if (!formData || status !== "authenticated") {
+      toast.error("Data Client atau sesi login tidak tersedia.");
+      return;
+    }
+
+    const mainPhone =
+      clientType === "B2B"
+        ? formData.b2b_phone?.trim()
+        : formData.b2c_phone?.trim();
+
+    if (!mainPhone) {
+      const message = "Nomor telepon utama Client wajib diisi.";
+
+      setPhoneError(message);
+      toast.error(message);
+      return;
+    }
+
+    savingRef.current = true;
     setIsLoading(true);
+
+    toast.loading("Sedang memperbarui Client. Mohon jangan klik tombol lagi.", {
+      id: "update-client-save",
+    });
 
     try {
       const formDataPayload = new FormData();
@@ -265,17 +303,48 @@ export default function ClientEditForm() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => null);
-        console.error("❌ VALIDATION ERROR DARI BACKEND:", errorData);
-        throw new Error(errorData?.message || "Gagal memperbarui client");
+
+        const serverMessage =
+          typeof errorData?.message === "string"
+            ? errorData.message
+            : "Gagal memperbarui Client.";
+
+        const isPhoneIssue = /nomor|telepon|phone/i.test(serverMessage);
+
+        const message =
+          res.status === 409 && isPhoneIssue
+            ? `${serverMessage} Masukkan nomor lain atau gunakan Client yang sudah terdaftar.`
+            : serverMessage;
+
+        if (isPhoneIssue) {
+          setPhoneError(message);
+        }
+
+        throw new Error(message);
       }
 
-      toast.success("Klien berhasil diperbarui!");
+      setHasSaved(true);
+
+      toast.success("Klien berhasil diperbarui!", {
+        id: "update-client-save",
+      });
+
       router.push("/super-admin/clients");
       router.refresh();
-    } catch (error: any) {
-      toast.error(error.message || "Terjadi kesalahan saat update data.");
+    } catch (error) {
+      console.error("Update Client failed:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Terjadi kesalahan saat memperbarui Client.",
+        {
+          id: "update-client-save",
+          duration: 7000,
+        },
+      );
     } finally {
-      //  MATIKAN LOADING DI SINI (Berhasil maupun Gagal, loading pasti berhenti)
+      savingRef.current = false;
       setIsLoading(false);
     }
   };
@@ -833,13 +902,16 @@ export default function ClientEditForm() {
         <div className="mt-6 flex justify-end">
           <Button
             type="submit"
-            disabled={isLoading}
-            className="cursor-pointer bg-green-600 hover:bg-green-700 text-white">
+            disabled={isLoading || hasSaved}
+            aria-busy={isLoading}
+            className="cursor-pointer bg-green-600 hover:bg-green-700 text-white disabled:cursor-not-allowed disabled:opacity-60">
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Memperbarui...
               </>
+            ) : hasSaved ? (
+              "Berhasil Diperbarui"
             ) : (
               <>
                 <ClipboardList className="h-4 w-4 mr-2" />
@@ -847,6 +919,12 @@ export default function ClientEditForm() {
               </>
             )}
           </Button>
+          {isLoading && (
+            <p role="status" className="text-xs text-amber-600 mt-2">
+              Perubahan sedang disimpan. Jangan klik tombol Update berulang
+              kali.
+            </p>
+          )}
         </div>
       </form>
     </div>
