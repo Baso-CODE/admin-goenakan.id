@@ -252,8 +252,10 @@ export default function ClientAddForm({
         ? formData.b2b_phone?.trim()
         : formData.b2c_phone?.trim();
 
-    if (!mainPhone) {
-      const message = "Nomor telepon utama Client wajib diisi.";
+    // Nomor telepon wajib hanya untuk B2C.
+    // B2B boleh tanpa nomor telepon kantor.
+    if (clientType === "B2C" && !mainPhone) {
+      const message = "Nomor HP Client B2C wajib diisi.";
 
       setPhoneError(message);
       toast.error(message);
@@ -546,7 +548,7 @@ export default function ClientAddForm({
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Telepon Kantor</Label>
+                          <Label>Telepon Kantor (Opsional)</Label>
                           <Input
                             name="b2b_phone"
                             value={formData.b2b_phone}

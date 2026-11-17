@@ -210,8 +210,9 @@ export default function ClientEditForm() {
         ? formData.b2b_phone?.trim()
         : formData.b2c_phone?.trim();
 
-    if (!mainPhone) {
-      const message = "Nomor telepon utama Client wajib diisi.";
+    // B2B boleh mengosongkan nomor kantor saat Update.
+    if (clientType === "B2C" && !mainPhone) {
+      const message = "Nomor HP Client B2C wajib diisi.";
 
       setPhoneError(message);
       toast.error(message);
@@ -488,7 +489,7 @@ export default function ClientEditForm() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Telepon Kantor</Label>
+                          <Label>Telepon Kantor (Opsional)</Label>
                           <Input
                             name="b2b_phone"
                             value={formData.b2b_phone}
