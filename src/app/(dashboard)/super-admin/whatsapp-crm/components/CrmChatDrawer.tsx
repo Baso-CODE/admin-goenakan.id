@@ -693,7 +693,7 @@ export function CrmChatDrawer({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className="w-full sm:max-w-xl md:max-w-2xl p-0 flex flex-col h-full bg-stone-50 border-stone-200 relative overflow-hidden"
+          className="w-full sm:max-w-xl md:max-w-2xl p-0 flex flex-col h-full bg-stone-50 border-stone-200 overflow-hidden"
         >
           {/* Drag-and-drop Visual Overlay */}
           {isDraggingFile && (
