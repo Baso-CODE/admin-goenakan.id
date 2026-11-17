@@ -18,8 +18,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/useApi";
-import { Copy, Link2, Loader2, Sparkles, UserCheck } from "lucide-react";
+import {
+  CheckCheck,
+  Copy,
+  Link2,
+  Loader2,
+  MessageSquare,
+  Sparkles,
+  UserCheck,
+} from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { MEDIA_CHANNELS } from "../types/customCode.type";
@@ -49,7 +58,9 @@ export function CreateCustomCodeDialog({
   const [channel, setChannel] = useState<string>("Website / Katalog");
   const [assignedUserId, setAssignedUserId] = useState<string>("");
   const [waPhoneNumber, setWaPhoneNumber] = useState("6282387902238"); // Nomor official WA bisnis
-  const [customText, setCustomText] = useState("Halo Goenakan, saya ingin konsultasi pesanan custom");
+  const [customText, setCustomText] = useState(
+    "Halo Goenakan, saya ingin konsultasi pesanan custom.\nBisa tolong kirimkan katalog dan pricelist terbarunya?"
+  );
 
   const [users, setUsers] = useState<UserOption[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
@@ -138,7 +149,7 @@ export function CreateCustomCodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px]">
+      <DialogContent className="sm:max-w-[580px] max-h-[92vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-bold text-stone-900">
@@ -217,38 +228,78 @@ export function CreateCustomCodeDialog({
               </div>
             )}
 
-            {/* OPSI A Fields: Click to Chat Generator */}
+            {/* Fields: Click to Chat Generator & Multiline Message Template */}
             {codeType === "LEAD_SOURCE" && (
-              <div className="p-3 bg-stone-50 border border-stone-200 rounded-lg space-y-3">
-                <div className="flex items-center gap-1.5 text-stone-700 font-semibold text-xs">
+              <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-lg space-y-3.5">
+                <div className="flex items-center gap-1.5 text-stone-800 font-semibold text-xs border-b border-stone-200/80 pb-2">
                   <Link2 className="w-4 h-4 text-emerald-600" />
-                  <span>Generator Tautan WhatsApp Otomatis (Click-to-Chat)</span>
+                  <span>Generator Tautan WhatsApp & Template Pesan</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-stone-500">Nomor WA Tujuan</Label>
-                    <Input
-                      value={waPhoneNumber}
-                      onChange={(e) => setWaPhoneNumber(e.target.value)}
-                      placeholder="6281234567890"
-                      className="h-8 text-xs font-mono"
-                    />
+                {/* Nomor WA Bisnis Tujuan */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-stone-700">Nomor WhatsApp Bisnis Tujuan</Label>
+                  <Input
+                    value={waPhoneNumber}
+                    onChange={(e) => setWaPhoneNumber(e.target.value)}
+                    placeholder="6282387902238"
+                    className="h-8 text-xs font-mono bg-white"
+                  />
+                  <p className="text-[10px] text-stone-400">
+                    Nomor WhatsApp resmi yang akan menerima pesan dari tautan ini.
+                  </p>
+                </div>
+
+                {/* Template Pesan Pelanggan (Wider Textarea) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold text-stone-700">
+                      Draft Pesan Pelanggan (Dapat Multi-Baris)
+                    </Label>
+                    <span className="text-[10px] text-stone-400">Mendukung Enter / Baris Baru</span>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-stone-500">Draft Pesan Pelanggan</Label>
-                    <Input
-                      value={customText}
-                      onChange={(e) => setCustomText(e.target.value)}
-                      placeholder="Halo Goenakan..."
-                      className="h-8 text-xs"
-                    />
+                  <Textarea
+                    rows={3}
+                    value={customText}
+                    onChange={(e) => setCustomText(e.target.value)}
+                    placeholder="Tulis draf pesan pembuka pelanggan..."
+                    className="text-xs bg-white resize-y min-h-[75px] leading-relaxed"
+                  />
+                  <p className="text-[10px] text-stone-400">
+                    Pesan ini otomatis terisi di chat WhatsApp pelanggan saat tombol diklik.
+                  </p>
+                </div>
+
+                {/* Live WhatsApp Bubble Preview */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-stone-600">
+                    <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Pratinjau Pesan di Aplikasi WhatsApp:</span>
+                  </div>
+                  <div className="bg-[#EFEAE2] p-3 rounded-lg border border-stone-200/90 shadow-2xs">
+                    <div className="bg-white rounded-lg p-2.5 max-w-[85%] ml-auto text-xs text-stone-800 shadow-2xs border border-stone-200/60 space-y-1.5">
+                      <p className="whitespace-pre-wrap leading-relaxed text-[11px] text-stone-800">
+                        {customText.trim() || "Halo Goenakan..."}
+                      </p>
+                      <div className="pt-0.5 border-t border-stone-100 flex items-center justify-between gap-2 text-[10px]">
+                        <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          [REF:{normalizedCode || "KODE"}]
+                        </span>
+                        <span className="inline-flex items-center gap-0.5 text-stone-400 text-[9px]">
+                          <span>12:00</span>
+                          <CheckCheck className="w-3 h-3 text-sky-500" />
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
+                {/* Resulting URL */}
                 {generatedWaUrl && (
-                  <div className="space-y-1 pt-1">
-                    <Label className="text-[11px] text-stone-500">Hasil Tautan (Pasang di Tombol Website Client):</Label>
+                  <div className="space-y-1.5 pt-1">
+                    <Label className="text-xs font-semibold text-stone-700">
+                      Hasil Tautan Click-to-Chat (Pasang di Website / Iklan):
+                    </Label>
                     <div className="flex items-center gap-1.5">
                       <Input
                         readOnly
@@ -260,9 +311,10 @@ export function CreateCustomCodeDialog({
                         variant="outline"
                         size="sm"
                         onClick={() => copyToClipboard(generatedWaUrl)}
-                        className="h-8 px-2.5 shrink-0 text-xs"
+                        className="h-8 px-2.5 shrink-0 text-xs gap-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
                       >
                         <Copy className="w-3.5 h-3.5" />
+                        <span>Salin Link</span>
                       </Button>
                     </div>
                   </div>
@@ -270,10 +322,10 @@ export function CreateCustomCodeDialog({
               </div>
             )}
 
-            {/* OPSI B Fields: CS User Mapping */}
+            {/* CS User Mapping */}
             {codeType === "CS_AGENT_CODE" && (
-              <div className="p-3 bg-stone-50 border border-stone-200 rounded-lg space-y-2">
-                <div className="flex items-center gap-1.5 text-stone-700 font-semibold text-xs">
+              <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-lg space-y-2">
+                <div className="flex items-center gap-1.5 text-stone-800 font-semibold text-xs border-b border-stone-200/80 pb-2">
                   <UserCheck className="w-4 h-4 text-emerald-600" />
                   <span>Kaitkan ke Akun User CS</span>
                 </div>
