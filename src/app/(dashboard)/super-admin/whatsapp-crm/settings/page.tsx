@@ -17,7 +17,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/useApi";
 import {
-  ArrowLeft,
   Bot,
   CheckCircle2,
   Clock,
@@ -247,12 +246,6 @@ function SettingsContent() {
       {/* ── Top Header ── */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-stone-200 pb-5">
         <div className="flex items-center gap-3">
-          <Link href="/super-admin/whatsapp-crm">
-            <Button variant="ghost" size="icon" className="h-9 w-9 text-stone-500 hover:text-stone-900">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
-
           <div className="p-2.5 bg-emerald-500/10 text-emerald-600 rounded-xl border border-emerald-500/20">
             <Sliders className="w-6 h-6" />
           </div>
