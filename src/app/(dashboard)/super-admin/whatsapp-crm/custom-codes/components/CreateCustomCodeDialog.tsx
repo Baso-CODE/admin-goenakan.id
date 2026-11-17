@@ -142,7 +142,7 @@ export function CreateCustomCodeDialog({
               <span>Tambah Master Kode</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-stone-500">
-              Pilih tipe kode untuk pelacakan kampanye prospek client (Opsi A) atau kode akses CS (Opsi B).
+              Pilih tipe kode untuk pelacakan kampanye prospek client atau kode identitas penugasan CS.
             </DialogDescription>
           </DialogHeader>
 
@@ -159,10 +159,10 @@ export function CreateCustomCodeDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="LEAD_SOURCE" className="text-xs">
-                    🎯 Opsi A: Tracking Prospek Client (Web / Iklan / Katalog)
+                    Tracking Prospek Client (Web / Iklan / Kampanye)
                   </SelectItem>
                   <SelectItem value="CS_AGENT_CODE" className="text-xs">
-                    🛡️ Opsi B: Kode Identitas CS (Akses & Proteksi Kunci Chat)
+                    Kode Identitas CS (Akses & Proteksi Kunci Chat)
                   </SelectItem>
                 </SelectContent>
               </Select>

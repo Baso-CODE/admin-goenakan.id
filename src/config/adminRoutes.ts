@@ -451,7 +451,7 @@ export const ADMIN_ROUTES: AdminRoute[] = [
     group: "WhatsApp CRM",
   },
   {
-    title: "WhatsApp CRM - Master Kode & Setup",
+    title: "WhatsApp CRM - Master Kode",
     url: "/super-admin/whatsapp-crm/custom-codes",
     permission: "manage_whatsapp_crm",
     section: "WhatsApp CRM",

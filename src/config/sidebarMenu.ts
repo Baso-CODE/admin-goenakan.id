@@ -354,7 +354,7 @@ export const SIDEBAR_MENU: SidebarSection[] = [
             href: "/super-admin/whatsapp-crm/pipeline",
           },
           {
-            title: "Master Kode & Setup",
+            title: "Master Kode",
             routeUrl: "/super-admin/whatsapp-crm/custom-codes",
             href: "/super-admin/whatsapp-crm/custom-codes",
           },

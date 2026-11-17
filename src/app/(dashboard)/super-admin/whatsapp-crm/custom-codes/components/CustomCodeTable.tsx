@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Copy, ExternalLink, Link2, Trash2, UserCheck } from "lucide-react";
+import { Copy, ExternalLink, Link2, Loader2, Sparkles, Trash2, UserCheck } from "lucide-react";
 import React from "react";
 import { toast } from "sonner";
 
@@ -53,7 +53,8 @@ export function CustomCodeTable({
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-stone-400 bg-white rounded-xl border border-stone-200">
+      <div className="py-16 flex flex-col items-center justify-center gap-3 text-stone-400 bg-white rounded-lg border border-stone-200">
+        <Loader2 className="w-7 h-7 animate-spin text-emerald-600" />
         <p className="text-xs">Memuat daftar master kode...</p>
       </div>
     );
@@ -61,17 +62,22 @@ export function CustomCodeTable({
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-stone-400 bg-white rounded-xl border border-stone-200 gap-1">
-        <p className="text-xs font-medium text-stone-600">Belum ada kode kustom terdaftar.</p>
-        <p className="text-[11px]">Silakan klik tombol "Tambah Master Kode" di atas untuk memulai.</p>
+      <div className="py-12 text-center space-y-3 bg-white rounded-lg border border-stone-200">
+        <div className="w-12 h-12 bg-stone-100 text-stone-400 rounded-full flex items-center justify-center mx-auto">
+          <Sparkles className="w-6 h-6" />
+        </div>
+        <p className="text-sm font-semibold text-stone-700">Belum Ada Master Kode</p>
+        <p className="text-xs text-stone-500 max-w-sm mx-auto">
+          Tambahkan kode pelacakan kampanye atau kode identitas CS pertama Anda untuk memulai tracking prospek.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
+    <div className="bg-white rounded-lg border border-stone-200 overflow-hidden shadow-xs">
       <Table>
-        <TableHeader className="bg-stone-50">
+        <TableHeader className="bg-stone-50/80">
           <TableRow>
             <TableHead className="w-[180px] text-xs font-semibold text-stone-700">Kode Unik</TableHead>
             <TableHead className="text-xs font-semibold text-stone-700">Label Deskripsi</TableHead>

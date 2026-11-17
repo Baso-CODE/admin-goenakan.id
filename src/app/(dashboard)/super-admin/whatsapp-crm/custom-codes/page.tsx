@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/useApi";
-import { ArrowLeft, Plus, RefreshCw, Search, Settings2, Sparkles } from "lucide-react";
+import { Inbox, Plus, RefreshCw, Search, Settings2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -87,14 +87,11 @@ export default function CustomCodesMasterPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold tracking-tight text-stone-900">
-                Master Kode Prospek & Akses CS
+                Master Kode Pelacakan & Akses CS
               </h1>
-              <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
-                Dynamic Master
-              </span>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
-              Kelola kode pelacakan prospek client (Opsi A) untuk tracking hulu-ke-hilir dan kode identitas CS (Opsi B) untuk otentikasi penanganan lead.
+              Kelola kode pelacakan prospek client untuk tracking kampanye hulu-ke-hilir dan kode identitas penugasan CS.
             </p>
           </div>
         </div>
@@ -106,7 +103,7 @@ export default function CustomCodesMasterPage() {
               size="sm"
               className="h-8 px-2.5 text-xs text-stone-600 hover:text-stone-900 gap-1.5"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
+              <Inbox className="w-3.5 h-3.5 text-stone-500" />
               <span>Kembali ke Inbox & Leads</span>
             </Button>
           </Link>
@@ -147,10 +144,10 @@ export default function CustomCodesMasterPage() {
               Semua Kode
             </TabsTrigger>
             <TabsTrigger value="LEAD_SOURCE" className="text-xs px-3">
-              Tracking Client (Opsi A)
+              Tracking Client
             </TabsTrigger>
             <TabsTrigger value="CS_AGENT_CODE" className="text-xs px-3">
-              Kode Akses CS (Opsi B)
+              Kode Akses CS
             </TabsTrigger>
           </TabsList>
         </Tabs>
