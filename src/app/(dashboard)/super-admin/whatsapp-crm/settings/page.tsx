@@ -243,7 +243,7 @@ function SettingsContent() {
   const selectedSessionObj = sessions.find((s) => s.id === settings.leadReceiverSessionId);
 
   return (
-    <div className="space-y-6 pb-16 max-w-5xl mx-auto">
+    <div className="space-y-6 pb-12">
       {/* ── Top Header ── */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-stone-200 pb-5">
         <div className="flex items-center gap-3">
@@ -262,9 +262,6 @@ function SettingsContent() {
               <h1 className="text-xl font-bold tracking-tight text-stone-900">
                 Pengaturan WhatsApp CRM
               </h1>
-              <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
-                Konfigurasi Inti
-              </span>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
               Tentukan nomor WhatsApp penerima leads, filter percakapan masuk, dan aturan penugasan CS.
