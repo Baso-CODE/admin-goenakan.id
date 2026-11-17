@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/useApi";
-import { ArrowLeft, Plus, RefreshCw, Search, Sparkles } from "lucide-react";
+import { ArrowLeft, Plus, RefreshCw, Search, Settings2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -77,10 +77,29 @@ export default function CustomCodesMasterPage() {
   };
 
   return (
-    <div className="space-y-4 pb-8">
-      {/* Top Breadcrumb & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-2">
+    <div className="space-y-6 pb-12">
+      {/* ── Top Bar: Title & Primary Actions ── */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-stone-200 pb-5">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-emerald-500/10 text-emerald-600 rounded-xl border border-emerald-500/20">
+            <Settings2 className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold tracking-tight text-stone-900">
+                Master Kode Prospek & Akses CS
+              </h1>
+              <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                Dynamic Master
+              </span>
+            </div>
+            <p className="text-xs text-stone-500 mt-0.5">
+              Kelola kode pelacakan prospek client (Opsi A) untuk tracking hulu-ke-hilir dan kode identitas CS (Opsi B) untuk otentikasi penanganan lead.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Link href="/super-admin/whatsapp-crm">
             <Button
               variant="outline"
@@ -91,9 +110,7 @@ export default function CustomCodesMasterPage() {
               <span>Kembali ke Inbox & Leads</span>
             </Button>
           </Link>
-        </div>
 
-        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -115,26 +132,14 @@ export default function CustomCodesMasterPage() {
         </div>
       </div>
 
-      {/* Hero Header */}
-      <div className="bg-gradient-to-r from-emerald-900 via-stone-900 to-stone-900 text-white rounded-2xl p-6 shadow-sm border border-stone-800">
-        <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-1">
-          <Sparkles className="w-4 h-4" />
-          <span>Dynamic Custom Code Master Menu</span>
-        </div>
-        <h1 className="text-xl font-bold tracking-tight">Master Kode Prospek & Akses CS</h1>
-        <p className="text-xs text-stone-300 max-w-2xl mt-1 leading-relaxed">
-          Kelola kode pelacakan prospek client (Opsi A) yang disematkan di tombol WhatsApp website/iklan untuk tracking hulu-ke-hilir, serta kode identitas CS (Opsi B) untuk otentikasi penanganan lead.
-        </p>
-      </div>
-
-      {/* Filter Tabs & Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+      {/* ── Filter Controls & Search ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <Tabs
           value={activeTab}
           onValueChange={(val: any) => setActiveTab(val)}
           className="w-full sm:w-auto"
         >
-          <TabsList className="h-9 bg-stone-100 p-1">
+          <TabsList className="h-9 bg-stone-100 p-1 border border-stone-200">
             <TabsTrigger value="ALL" className="text-xs px-3">
               Semua Kode
             </TabsTrigger>
@@ -158,7 +163,7 @@ export default function CustomCodesMasterPage() {
         </div>
       </div>
 
-      {/* Data Table */}
+      {/* ── Data Table ── */}
       <CustomCodeTable
         items={items}
         isLoading={isLoading}
@@ -166,7 +171,7 @@ export default function CustomCodesMasterPage() {
         onDelete={handleDelete}
       />
 
-      {/* Dialog Form */}
+      {/* ── Dialog Form ── */}
       <CreateCustomCodeDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}

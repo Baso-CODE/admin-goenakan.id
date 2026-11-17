@@ -12,7 +12,6 @@ import {
   RefreshCw,
   Search,
   Settings2,
-  Sparkles,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -78,18 +77,37 @@ export default function WhatsAppCrmInboxPage() {
   };
 
   return (
-    <div className="space-y-4 pb-12">
-      {/* Top Header Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-2">
+    <div className="space-y-6 pb-12">
+      {/* ── Top Bar: Title & Primary Actions ── */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-stone-200 pb-5">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-emerald-500/10 text-emerald-600 rounded-xl border border-emerald-500/20">
+            <Inbox className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold tracking-tight text-stone-900">
+                WhatsApp CRM — Inbox & Leads
+              </h1>
+              <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                Tahap 1 Active
+              </span>
+            </div>
+            <p className="text-xs text-stone-500 mt-0.5">
+              Kelola prospek masuk, identifikasi nama kontak cerdas (Combine Contact Name), dan sinkronkan data customer ERP.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Link href="/super-admin/whatsapp-crm/pipeline">
             <Button
               variant="outline"
               size="sm"
               className="h-8 px-2.5 text-xs text-stone-600 hover:text-stone-900 gap-1.5"
             >
-              <Kanban className="w-3.5 h-3.5" />
-              <span>Sales Pipeline Kanban</span>
+              <Kanban className="w-3.5 h-3.5 text-stone-500" />
+              <span>Sales Pipeline</span>
             </Button>
           </Link>
 
@@ -103,9 +121,7 @@ export default function WhatsAppCrmInboxPage() {
               <span>Master Kode & Setup</span>
             </Button>
           </Link>
-        </div>
 
-        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -128,33 +144,21 @@ export default function WhatsAppCrmInboxPage() {
         </div>
       </div>
 
-      {/* Main Banner */}
-      <div className="bg-gradient-to-r from-emerald-900 via-stone-900 to-stone-900 text-white rounded-2xl p-6 shadow-sm border border-stone-800">
-        <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-1">
-          <Inbox className="w-4 h-4" />
-          <span>WhatsApp CRM Workspace</span>
-        </div>
-        <h1 className="text-xl font-bold tracking-tight">Kotak Masuk Prospek & Manajemen Leads</h1>
-        <p className="text-xs text-stone-300 max-w-2xl mt-1 leading-relaxed">
-          Pusat pengelolaan pesan masuk prospek pelanggan terintegrasi. Identifikasi nama kontak cerdas (Combine Contact Name) serta sinkronkan riwayat pesanan dengan menautkan lead ke master pelanggan ERP Goenakan.
-        </p>
-      </div>
-
-      {/* Filter Tabs & Search Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+      {/* ── Filter Controls & Search ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <Tabs
           value={activeTab}
           onValueChange={(val: any) => setActiveTab(val)}
           className="w-full sm:w-auto"
         >
-          <TabsList className="h-9 bg-stone-100 p-1">
+          <TabsList className="h-9 bg-stone-100 p-1 border border-stone-200">
             <TabsTrigger value="all" className="text-xs px-3">
               Semua Leads
             </TabsTrigger>
             <TabsTrigger value="me" className="text-xs px-3">
               Chat Saya (Assigned to Me)
             </TabsTrigger>
-            <TabsTrigger value="unassigned" className="text-xs px-3 text-rose-700">
+            <TabsTrigger value="unassigned" className="text-xs px-3 text-rose-700 font-medium">
               Antrean Belum Diklaim
             </TabsTrigger>
           </TabsList>
@@ -171,7 +175,7 @@ export default function WhatsAppCrmInboxPage() {
         </div>
       </div>
 
-      {/* Leads List Feed */}
+      {/* ── Leads List Feed ── */}
       <div className="space-y-2.5">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center p-12 text-stone-400 bg-white rounded-xl border border-stone-200">
@@ -183,8 +187,8 @@ export default function WhatsAppCrmInboxPage() {
             <p className="text-xs font-semibold text-stone-700">Tidak ada lead di filter ini</p>
             <p className="text-[11px] text-stone-400">
               {activeTab === "unassigned"
-                ? "Bagus! Semua pesan prospek sudah dipegang oleh CS yang bertugas."
-                : "Belum ada kontak prospek yang masuk atau cocok dengan pencarian."}
+                ? "Semua pesan prospek sudah dipegang oleh CS yang bertugas."
+                : "Belum ada kontak prospek yang masuk atau cocok dengan kata kunci pencarian."}
             </p>
           </div>
         ) : (
