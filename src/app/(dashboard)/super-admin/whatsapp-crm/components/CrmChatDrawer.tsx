@@ -65,6 +65,7 @@ import { toast } from "sonner";
 import { CrmLeadItem } from "./LeadCardItem";
 import { CrmStatusConfigItem, DEFAULT_STATUS_FALLBACKS } from "../types/crmStatus.type";
 import { CrmLabelConfigItem } from "../types/crmLabel.type";
+import { CrmMessageTemplateItem } from "../types/crmTemplate.type";
 import { QuickAddStatusDialog } from "./QuickAddStatusDialog";
 
 // Lazy-load Emoji Picker to prevent SSR lag
@@ -280,6 +281,11 @@ export function CrmChatDrawer({
   const [csSearchQuery, setCsSearchQuery] = useState("");
   const [csPopoverOpen, setCsPopoverOpen] = useState(false);
 
+  // Message templates (Quick Reply) state
+  const [templates, setTemplates] = useState<CrmMessageTemplateItem[]>([]);
+  const [templateSearchQuery, setTemplateSearchQuery] = useState("");
+  const [templatePopoverOpen, setTemplatePopoverOpen] = useState(false);
+
   const filteredCsUsers = csUsers.filter(
     (u) =>
       !csSearchQuery.trim() ||
@@ -302,11 +308,27 @@ export function CrmChatDrawer({
     }
   }, [fetchApi]);
 
+  // Load message templates from backend
+  const loadTemplates = useCallback(async () => {
+    try {
+      const res = await fetchApi("/crm/templates");
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json.data)) {
+          setTemplates(json.data);
+        }
+      }
+    } catch {
+      // Ignore background template fetch failure
+    }
+  }, [fetchApi]);
+
   useEffect(() => {
     if (open) {
       loadAvailableLabels();
+      loadTemplates();
     }
-  }, [open, loadAvailableLabels]);
+  }, [open, loadAvailableLabels, loadTemplates]);
 
   // Sync internal state when lead changes
   useEffect(() => {
@@ -947,33 +969,93 @@ export function CrmChatDrawer({
             <div className="bg-white border-t border-stone-200 p-3 space-y-2 shrink-0">
               {/* Quick Action Tools */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                <Popover>
+                <Popover open={templatePopoverOpen} onOpenChange={setTemplatePopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-7 px-2 text-[11px] text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100 gap-1 shrink-0"
+                      className="h-7 px-2 text-[11px] text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100 gap-1 shrink-0 cursor-pointer"
                     >
                       <Zap className="w-3 h-3 text-amber-600" />
                       <span>Template Balasan</span>
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent align="start" className="w-80 p-2 space-y-1 text-xs">
-                    <p className="font-bold text-stone-700 px-2 py-1 text-[11px]">
-                      Pilih Pesan Cepat (Quick Reply)
-                    </p>
-                    {QUICK_REPLIES.map((qr, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setMessageInput(qr.text)}
-                        className="w-full text-left p-2 rounded hover:bg-stone-100 transition-colors text-stone-800 space-y-0.5"
+                  <PopoverContent align="start" className="w-84 p-2.5 space-y-2 text-xs">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-stone-100">
+                      <p className="font-bold text-stone-700 text-[11px]">
+                        Pilih Pesan Cepat (Quick Reply)
+                      </p>
+                      <Link
+                        href="/super-admin/whatsapp-crm/settings?tab=templates"
+                        className="text-[10px] text-emerald-600 hover:text-emerald-800 font-semibold"
+                        title="Buka Pengaturan Template CRM"
                       >
-                        <div className="font-semibold text-xs text-emerald-700">{qr.title}</div>
-                        <p className="text-[10px] text-stone-500 line-clamp-2">{qr.text}</p>
-                      </button>
-                    ))}
+                        Kelola →
+                      </Link>
+                    </div>
+
+                    {/* Search Input for Templates */}
+                    <div className="relative">
+                      <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-stone-400" />
+                      <input
+                        type="text"
+                        value={templateSearchQuery}
+                        onChange={(e) => setTemplateSearchQuery(e.target.value)}
+                        placeholder="Cari judul, shortcut (/), atau isi..."
+                        className="w-full pl-6 pr-2 py-1 text-xs bg-stone-50 border border-stone-200 rounded focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
+                      />
+                    </div>
+
+                    {/* Scrollable Templates List */}
+                    <div className="max-h-64 overflow-y-auto space-y-1 pt-0.5">
+                      {(templates.length > 0
+                        ? templates
+                        : QUICK_REPLIES.map((qr, idx) => ({
+                            id: String(idx),
+                            title: qr.title,
+                            content: qr.text,
+                            category: "Umum",
+                            shortcut: null,
+                            orderIndex: idx,
+                            createdAt: "",
+                          }))
+                      )
+                        .filter((tpl) => {
+                          if (!templateSearchQuery.trim()) return true;
+                          const q = templateSearchQuery.toLowerCase();
+                          return (
+                            tpl.title.toLowerCase().includes(q) ||
+                            tpl.content.toLowerCase().includes(q) ||
+                            (tpl.shortcut && tpl.shortcut.toLowerCase().includes(q))
+                          );
+                        })
+                        .map((tpl) => (
+                          <button
+                            key={tpl.id}
+                            type="button"
+                            onClick={() => {
+                              setMessageInput(tpl.content);
+                              setTemplatePopoverOpen(false);
+                            }}
+                            className="w-full text-left p-2 rounded hover:bg-stone-50 transition-colors text-stone-800 space-y-0.5 border border-transparent hover:border-stone-200 cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="font-semibold text-xs text-emerald-700 truncate">
+                                {tpl.title}
+                              </span>
+                              {tpl.shortcut && (
+                                <span className="font-mono text-[9px] font-bold bg-stone-100 text-stone-500 px-1 py-0.2 rounded border border-stone-200 shrink-0">
+                                  {tpl.shortcut}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-stone-500 line-clamp-2 leading-relaxed">
+                              {tpl.content}
+                            </p>
+                          </button>
+                        ))}
+                    </div>
                   </PopoverContent>
                 </Popover>
 

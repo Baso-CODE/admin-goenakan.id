@@ -26,6 +26,7 @@ import {
   Inbox,
   Kanban,
   Loader2,
+  MessageSquareText,
   Save,
   ShieldAlert,
   Smartphone,
@@ -40,6 +41,7 @@ import React, { Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { StatusManagerTab } from "./components/StatusManagerTab";
 import { LabelManagerTab } from "./components/LabelManagerTab";
+import { TemplateManagerTab } from "./components/TemplateManagerTab";
 
 interface WaSessionItem {
   id: string;
@@ -69,12 +71,17 @@ function SettingsContent() {
 
   const [activeTab, setActiveTab] = useState<string>(() => {
     const tab = searchParams.get("tab");
-    return tab === "statuses" || tab === "labels" ? tab : "ingestion";
+    return tab === "statuses" || tab === "labels" || tab === "templates" ? tab : "ingestion";
   });
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "statuses" || tabParam === "labels" || tabParam === "ingestion") {
+    if (
+      tabParam === "statuses" ||
+      tabParam === "labels" ||
+      tabParam === "templates" ||
+      tabParam === "ingestion"
+    ) {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
@@ -277,7 +284,7 @@ function SettingsContent() {
 
       {/* ── Settings Tabs ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-stone-100 p-1 h-9 w-full sm:w-auto inline-flex">
+        <TabsList className="bg-stone-100 p-1 h-9 w-full sm:w-auto inline-flex overflow-x-auto">
           <TabsTrigger value="ingestion" className="text-xs px-4 gap-2 flex-1 sm:flex-none">
             <Sliders className="w-3.5 h-3.5" />
             <span>Aturan Ingest & Akun WA</span>
@@ -289,6 +296,10 @@ function SettingsContent() {
           <TabsTrigger value="labels" className="text-xs px-4 gap-2 flex-1 sm:flex-none">
             <Tag className="w-3.5 h-3.5" />
             <span>Label & Kategori Prospek</span>
+          </TabsTrigger>
+          <TabsTrigger value="templates" className="text-xs px-4 gap-2 flex-1 sm:flex-none">
+            <MessageSquareText className="w-3.5 h-3.5" />
+            <span>Template Pesan (Quick Reply)</span>
           </TabsTrigger>
         </TabsList>
 
@@ -601,6 +612,10 @@ function SettingsContent() {
 
         <TabsContent value="labels" className="space-y-6 m-0">
           <LabelManagerTab />
+        </TabsContent>
+
+        <TabsContent value="templates" className="space-y-6 m-0">
+          <TemplateManagerTab />
         </TabsContent>
       </Tabs>
     </div>
