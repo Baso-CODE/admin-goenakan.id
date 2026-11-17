@@ -48,6 +48,11 @@ export default function WhatsAppCrmInboxPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [quickAddStatusOpen, setQuickAddStatusOpen] = useState(false);
+  const [tabCounts, setTabCounts] = useState<{ all: number; me: number; unassigned: number }>({
+    all: 0,
+    me: 0,
+    unassigned: 0,
+  });
 
   // Modal & Drawer states
   const [editingLead, setEditingLead] = useState<CrmLeadItem | null>(null);
@@ -136,6 +141,13 @@ export default function WhatsAppCrmInboxPage() {
         const json = await res.json();
         const items = Array.isArray(json.items) ? json.items : [];
         setLeads(items);
+        if (json.counts) {
+          setTabCounts({
+            all: json.counts.all ?? 0,
+            me: json.counts.me ?? 0,
+            unassigned: json.counts.unassigned ?? 0,
+          });
+        }
       } catch (err: any) {
         toast.error(err.message || "Gagal memuat data leads");
       } finally {
@@ -387,14 +399,23 @@ export default function WhatsAppCrmInboxPage() {
             className="w-full sm:w-auto"
           >
             <TabsList className="h-9 bg-stone-100 p-1 border border-stone-200">
-              <TabsTrigger value="all" className="text-xs px-3">
-                Semua Leads
+              <TabsTrigger value="all" className="text-xs px-2.5 gap-1.5 font-medium">
+                <span>Semua Leads</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-stone-200 text-stone-700">
+                  {tabCounts.all}
+                </span>
               </TabsTrigger>
-              <TabsTrigger value="me" className="text-xs px-3">
-                Chat Saya
+              <TabsTrigger value="me" className="text-xs px-2.5 gap-1.5 font-medium">
+                <span>Chat Saya</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  {tabCounts.me}
+                </span>
               </TabsTrigger>
-              <TabsTrigger value="unassigned" className="text-xs px-3 text-rose-700 font-medium">
-                Antrean Belum Diklaim
+              <TabsTrigger value="unassigned" className="text-xs px-2.5 text-rose-700 font-medium gap-1.5">
+                <span>Antrean Belum Diklaim</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                  {tabCounts.unassigned}
+                </span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -433,6 +454,18 @@ export default function WhatsAppCrmInboxPage() {
                           </div>
                         </SelectItem>
                       ))}
+
+                  {/* Tambah Status Baru di dalam Dropdown */}
+                  <div className="pt-1 border-t border-stone-100 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setQuickAddStatusOpen(true)}
+                      className="w-full flex items-center gap-1.5 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50 rounded font-semibold cursor-pointer transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>+ Tambah Status Baru</span>
+                    </button>
+                  </div>
                 </SelectContent>
               </Select>
             </div>
@@ -448,18 +481,6 @@ export default function WhatsAppCrmInboxPage() {
                 <span className="hidden md:inline">Kelola Status</span>
               </Button>
             </Link>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setQuickAddStatusOpen(true)}
-              className="h-9 px-2.5 text-xs text-emerald-700 hover:text-emerald-800 border-emerald-200 hover:bg-emerald-50 gap-1.5 shrink-0"
-              title="Tambah tahapan status prospek langsung"
-            >
-              <Plus className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden sm:inline">+ Status Baru</span>
-            </Button>
           </div>
         </div>
 

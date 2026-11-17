@@ -22,6 +22,7 @@ import {
   Link2,
   MessageSquare,
   Plus,
+  Search,
   Sparkles,
   Tag,
   Unlink,
@@ -154,11 +155,19 @@ export function LeadCardItem({
   onStatusCreated,
 }: LeadCardItemProps) {
   const [quickAddStatusOpen, setQuickAddStatusOpen] = useState(false);
+  const [csSearchQuery, setCsSearchQuery] = useState("");
   const { name, source, formattedPhone } = lead.resolvedContact;
   const initial = name ? name.charAt(0).toUpperCase() : "?";
 
   const isAssigned = !!lead.assignedToUserId;
   const isLinked = !!lead.customerProfileId;
+
+  const filteredCsUsers = csUsers?.filter(
+    (u) =>
+      !csSearchQuery.trim() ||
+      (u.name || "").toLowerCase().includes(csSearchQuery.trim().toLowerCase()) ||
+      (u.email || "").toLowerCase().includes(csSearchQuery.trim().toLowerCase())
+  ) || [];
 
   const statusMeta =
     lead.statusConfig ||
@@ -358,48 +367,70 @@ export function LeadCardItem({
                   <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 text-xs p-1">
-                <div className="px-2 py-1 text-[10px] font-bold text-stone-400 uppercase tracking-wider">
-                  Penugasan CS
+              <DropdownMenuContent align="end" className="w-60 text-xs p-1">
+                {/* Search input for CS */}
+                <div className="p-1 pb-1.5 border-b border-stone-100">
+                  <div className="relative">
+                    <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-stone-400" />
+                    <input
+                      type="text"
+                      value={csSearchQuery}
+                      onChange={(e) => setCsSearchQuery(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      placeholder="Cari nama CS..."
+                      className="w-full pl-6 pr-2 py-1 text-xs bg-stone-50 border border-stone-200 rounded focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
+                    />
+                  </div>
                 </div>
+
                 {onClaimLead && (
                   <DropdownMenuItem
                     onClick={() => onClaimLead(lead.id)}
-                    className="flex items-center gap-2 text-emerald-700 font-semibold cursor-pointer py-1.5"
+                    className="flex items-center gap-2 text-xs text-emerald-700 font-medium cursor-pointer py-1.5"
                   >
-                    <Zap className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600" />
-                    <span>⚡ Klaim Leads (Ambil Alih)</span>
+                    <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Klaim Leads</span>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator />
-                <div className="px-2 py-1 text-[10px] font-semibold text-stone-500">
+
+                <div className="px-2 py-1 text-[10px] font-bold text-stone-400 uppercase tracking-wider">
                   Pilih CS Pengganti:
                 </div>
-                {csUsers && csUsers.length > 0 ? (
-                  csUsers.map((user) => (
-                    <DropdownMenuItem
-                      key={user.id}
-                      onClick={() => onAssignLead?.(lead.id, user.id)}
-                      className={`flex items-center justify-between text-xs cursor-pointer py-1.5 ${
-                        lead.assignedToUserId === user.id ? "bg-stone-100 font-bold text-stone-900" : ""
-                      }`}
-                    >
-                      <span className="truncate">{user.name || user.email}</span>
-                      {lead.assignedToUserId === user.id && (
-                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      )}
-                    </DropdownMenuItem>
-                  ))
-                ) : (
-                  <div className="px-2 py-1 text-[11px] text-stone-400 italic">Tidak ada staf CS aktif</div>
-                )}
+
+                <div className="max-h-44 overflow-y-auto space-y-0.5">
+                  {filteredCsUsers.length > 0 ? (
+                    filteredCsUsers.map((user) => (
+                      <DropdownMenuItem
+                        key={user.id}
+                        onClick={() => onAssignLead?.(lead.id, user.id)}
+                        className={`flex items-center justify-between text-xs cursor-pointer py-1.5 ${
+                          lead.assignedToUserId === user.id ? "bg-stone-100 font-bold text-stone-900" : ""
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                          <span className="truncate">{user.name || user.email}</span>
+                        </div>
+                        {lead.assignedToUserId === user.id && (
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        )}
+                      </DropdownMenuItem>
+                    ))
+                  ) : (
+                    <div className="px-2 py-2 text-[11px] text-stone-400 italic text-center">
+                      CS tidak ditemukan
+                    </div>
+                  )}
+                </div>
+
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => onAssignLead?.(lead.id, null)}
-                  className="flex items-center gap-2 text-rose-600 cursor-pointer py-1.5"
+                  className="flex items-center gap-2 text-xs text-rose-600 font-medium cursor-pointer py-1.5"
                 >
-                  <UserX className="w-3.5 h-3.5" />
-                  <span>Lepas Penugasan (Kembalikan ke Antrean)</span>
+                  <UserX className="w-3.5 h-3.5 shrink-0" />
+                  <span>Lepas Leads</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -436,24 +467,45 @@ export function LeadCardItem({
                       <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 text-xs p-1">
+                  <DropdownMenuContent align="end" className="w-60 text-xs p-1">
+                    {/* Search input for CS */}
+                    <div className="p-1 pb-1.5 border-b border-stone-100">
+                      <div className="relative">
+                        <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-stone-400" />
+                        <input
+                          type="text"
+                          value={csSearchQuery}
+                          onChange={(e) => setCsSearchQuery(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          placeholder="Cari nama CS..."
+                          className="w-full pl-6 pr-2 py-1 text-xs bg-stone-50 border border-stone-200 rounded focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
+                        />
+                      </div>
+                    </div>
+
                     <div className="px-2 py-1 text-[10px] font-bold text-stone-400 uppercase tracking-wider">
                       Tugaskan Prospek ke CS
                     </div>
-                    {csUsers && csUsers.length > 0 ? (
-                      csUsers.map((user) => (
-                        <DropdownMenuItem
-                          key={user.id}
-                          onClick={() => onAssignLead(lead.id, user.id)}
-                          className="flex items-center gap-2 text-xs cursor-pointer py-1.5"
-                        >
-                          <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                          <span className="truncate">{user.name || user.email}</span>
-                        </DropdownMenuItem>
-                      ))
-                    ) : (
-                      <div className="px-2 py-1 text-[11px] text-stone-400 italic">Tidak ada staf CS aktif</div>
-                    )}
+
+                    <div className="max-h-44 overflow-y-auto space-y-0.5">
+                      {filteredCsUsers.length > 0 ? (
+                        filteredCsUsers.map((user) => (
+                          <DropdownMenuItem
+                            key={user.id}
+                            onClick={() => onAssignLead(lead.id, user.id)}
+                            className="flex items-center gap-2 text-xs cursor-pointer py-1.5"
+                          >
+                            <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                            <span className="truncate">{user.name || user.email}</span>
+                          </DropdownMenuItem>
+                        ))
+                      ) : (
+                        <div className="px-2 py-2 text-[11px] text-stone-400 italic text-center">
+                          CS tidak ditemukan
+                        </div>
+                      )}
+                    </div>
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}

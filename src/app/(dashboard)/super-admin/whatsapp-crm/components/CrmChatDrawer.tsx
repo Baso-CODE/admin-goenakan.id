@@ -34,6 +34,7 @@ import {
   Building2,
   Check,
   CheckCheck,
+  ChevronDown,
   Clock,
   Download,
   Eye,
@@ -45,6 +46,7 @@ import {
   Paperclip,
   Plus,
   RefreshCw,
+  Search,
   Send,
   Smile,
   Sparkles,
@@ -275,6 +277,15 @@ export function CrmChatDrawer({
   const [customTagInput, setCustomTagInput] = useState("");
   const [availableLabels, setAvailableLabels] = useState<CrmLabelConfigItem[]>([]);
   const [quickAddStatusOpen, setQuickAddStatusOpen] = useState(false);
+  const [csSearchQuery, setCsSearchQuery] = useState("");
+  const [csPopoverOpen, setCsPopoverOpen] = useState(false);
+
+  const filteredCsUsers = csUsers.filter(
+    (u) =>
+      !csSearchQuery.trim() ||
+      (u.name || "").toLowerCase().includes(csSearchQuery.trim().toLowerCase()) ||
+      (u.email || "").toLowerCase().includes(csSearchQuery.trim().toLowerCase())
+  );
 
   // Load configured labels from backend
   const loadAvailableLabels = useCallback(async () => {
@@ -1203,18 +1214,7 @@ export function CrmChatDrawer({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Lead Status */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[11px] font-semibold text-stone-600">Status Prospek</Label>
-                    <button
-                      type="button"
-                      onClick={() => setQuickAddStatusOpen(true)}
-                      className="text-[10px] text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-0.5 cursor-pointer"
-                      title="Tambah status baru langsung"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>+ Status Baru</span>
-                    </button>
-                  </div>
+                  <Label className="text-[11px] font-semibold text-stone-600">Status Prospek</Label>
                   <Select
                     value={lead.status}
                     onValueChange={(val) => handleUpdateStatus(val)}
@@ -1267,24 +1267,78 @@ export function CrmChatDrawer({
                   <Label className="text-[11px] font-semibold text-stone-600">CS Penanggung Jawab</Label>
                   <div className="flex items-center gap-1.5">
                     <div className="flex-1">
-                      <Select
-                        value={lead.assignedToUserId || "unassigned"}
-                        onValueChange={(val) => handleAssignLead(val)}
-                      >
-                        <SelectTrigger className="h-8 text-xs bg-white">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unassigned" className="text-xs text-stone-400">
-                            -- Belum Ditugaskan --
-                          </SelectItem>
-                          {csUsers.map((user) => (
-                            <SelectItem key={user.id} value={user.id} className="text-xs">
-                              {user.name || user.email}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={csPopoverOpen} onOpenChange={setCsPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 w-full justify-between text-xs bg-white font-normal px-2.5 border-stone-200"
+                          >
+                            <span className="truncate">
+                              {lead.assignedToUser?.name ||
+                                csUsers.find((u) => u.id === lead.assignedToUserId)?.name ||
+                                "-- Belum Ditugaskan --"}
+                            </span>
+                            <ChevronDown className="w-3.5 h-3.5 opacity-50 shrink-0 ml-1" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="w-56 p-1 text-xs">
+                          <div className="p-1 pb-1.5 border-b border-stone-100">
+                            <div className="relative">
+                              <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-stone-400" />
+                              <input
+                                type="text"
+                                value={csSearchQuery}
+                                onChange={(e) => setCsSearchQuery(e.target.value)}
+                                placeholder="Cari nama CS..."
+                                className="w-full pl-6 pr-2 py-1 text-xs bg-stone-50 border border-stone-200 rounded focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
+                              />
+                            </div>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto space-y-0.5 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleAssignLead("unassigned");
+                                setCsPopoverOpen(false);
+                              }}
+                              className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors flex items-center justify-between cursor-pointer ${
+                                !lead.assignedToUserId
+                                  ? "bg-stone-100 font-bold text-stone-900"
+                                  : "text-stone-500 hover:bg-stone-50"
+                              }`}
+                            >
+                              <span>-- Belum Ditugaskan --</span>
+                              {!lead.assignedToUserId && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                            </button>
+                            {filteredCsUsers.map((user) => (
+                              <button
+                                key={user.id}
+                                type="button"
+                                onClick={() => {
+                                  handleAssignLead(user.id);
+                                  setCsPopoverOpen(false);
+                                }}
+                                className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors flex items-center justify-between cursor-pointer ${
+                                  lead.assignedToUserId === user.id
+                                    ? "bg-stone-100 font-bold text-stone-900"
+                                    : "text-stone-700 hover:bg-stone-50"
+                                }`}
+                              >
+                                <span className="truncate">{user.name || user.email}</span>
+                                {lead.assignedToUserId === user.id && (
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                )}
+                              </button>
+                            ))}
+                            {filteredCsUsers.length === 0 && (
+                              <div className="px-2 py-2 text-[11px] text-stone-400 italic text-center">
+                                CS tidak ditemukan
+                              </div>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
 
                     {!isAssigned ? (
@@ -1292,7 +1346,7 @@ export function CrmChatDrawer({
                         type="button"
                         size="sm"
                         onClick={handleClaimLead}
-                        className="h-8 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 font-medium"
+                        className="h-8 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 font-medium cursor-pointer"
                       >
                         Klaim Leads
                       </Button>
@@ -1302,10 +1356,10 @@ export function CrmChatDrawer({
                         variant="outline"
                         size="sm"
                         onClick={() => handleAssignLead("unassigned")}
-                        className="h-8 px-2 text-xs text-rose-600 border-rose-200 hover:bg-rose-50 shrink-0"
+                        className="h-8 px-2 text-xs text-rose-600 border-rose-200 hover:bg-rose-50 shrink-0 cursor-pointer"
                         title="Lepas penugasan dan kembalikan ke antrean"
                       >
-                        Lepas
+                        Lepas Leads
                       </Button>
                     )}
                   </div>
@@ -1512,30 +1566,32 @@ export function CrmChatDrawer({
                   notes.map((note) => (
                     <div
                       key={note.id}
-                      className="p-2.5 rounded-lg bg-stone-50 border border-stone-200 text-xs space-y-1 relative group"
+                      className="p-2.5 rounded-lg bg-stone-50 border border-stone-200 text-xs space-y-1.5 group"
                     >
-                      <div className="flex items-center justify-between text-[10px] text-stone-400">
-                        <span className="font-semibold text-stone-700">
+                      <div className="flex items-center justify-between text-[10px] text-stone-400 gap-2">
+                        <span className="font-semibold text-stone-700 truncate">
                           {note.user?.name || "Staf CS"}
                         </span>
-                        <span>
-                          {new Date(note.createdAt).toLocaleDateString("id-ID", {
-                            day: "numeric",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-mono text-[10px]">
+                            {new Date(note.createdAt).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteNote(note.id)}
+                            className="text-stone-400 hover:text-rose-600 transition-colors p-0.5 rounded hover:bg-rose-50 cursor-pointer"
+                            title="Hapus catatan"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                       <p className="text-stone-800 text-[11px] whitespace-pre-wrap">{note.content}</p>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteNote(note.id)}
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-stone-400 hover:text-rose-600 transition-opacity"
-                        title="Hapus catatan"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
                     </div>
                   ))
                 )}
