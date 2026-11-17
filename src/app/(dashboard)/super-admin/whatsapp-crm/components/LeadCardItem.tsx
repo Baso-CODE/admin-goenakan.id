@@ -164,8 +164,8 @@ export function LeadCardItem({
     };
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-4 shadow-sm hover:border-stone-300 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-      {/* Contact Profile & Info */}
+    <div className="bg-white border border-stone-200 rounded-xl p-4 shadow-sm hover:border-stone-300 transition-all flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+      {/* ── Contact Profile & Info (Left Side: Profile, Name, Source, Number, REF, Labels, Last Message) ── */}
       <div className="flex items-start gap-3 min-w-0 flex-1">
         <Avatar className="w-11 h-11 border border-stone-200 shrink-0 bg-emerald-50 text-emerald-800 font-bold text-sm">
           <AvatarFallback>{initial}</AvatarFallback>
@@ -181,76 +181,6 @@ export function LeadCardItem({
                 {lead.unreadCount} baru
               </span>
             ) : null}
-
-            {/* Quick Status Dropdown */}
-            {onUpdateStatus ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-semibold transition-colors cursor-pointer shadow-2xs hover:opacity-90"
-                    style={{
-                      backgroundColor: `${statusMeta.color}15`,
-                      color: statusMeta.color,
-                      borderColor: `${statusMeta.color}40`,
-                    }}
-                  >
-                    <span
-                      className="w-1.5 h-1.5 rounded-full shrink-0"
-                      style={{ backgroundColor: statusMeta.color }}
-                    />
-                    <span>{statusMeta.label}</span>
-                    <ChevronDown className="w-2.5 h-2.5 opacity-60" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="text-xs min-w-[180px]">
-                  {statuses && statuses.length > 0 ? (
-                    statuses.map((st) => (
-                      <DropdownMenuItem
-                        key={st.id}
-                        onClick={() => onUpdateStatus(lead.id, st.key)}
-                        className="flex items-center gap-2 cursor-pointer font-medium py-1.5"
-                      >
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0 shadow-2xs"
-                          style={{ backgroundColor: st.color }}
-                        />
-                        <span>{st.label}</span>
-                      </DropdownMenuItem>
-                    ))
-                  ) : (
-                    Object.entries(DEFAULT_STATUS_FALLBACKS).map(([k, v]) => (
-                      <DropdownMenuItem
-                        key={k}
-                        onClick={() => onUpdateStatus(lead.id, k)}
-                        className="flex items-center gap-2 cursor-pointer font-medium py-1.5"
-                      >
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ backgroundColor: v.color }}
-                        />
-                        <span>{v.label}</span>
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <span
-                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-semibold shadow-2xs"
-                style={{
-                  backgroundColor: `${statusMeta.color}15`,
-                  color: statusMeta.color,
-                  borderColor: `${statusMeta.color}40`,
-                }}
-              >
-                <span
-                  className="w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{ backgroundColor: statusMeta.color }}
-                />
-                <span>{statusMeta.label}</span>
-              </span>
-            )}
 
             {source === "DISPLAY_NAME" && (
               <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
@@ -281,122 +211,6 @@ export function LeadCardItem({
                 <Sparkles className="w-2.5 h-2.5" />
                 <span>REF: {lead.sourceCode.code}</span>
               </span>
-            )}
-
-            {/* Status Penugasan (Interactive Dropdown Reassign & Quick Claim) */}
-            {isAssigned ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200/90 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer shadow-2xs"
-                    title="Klik untuk mengubah penugasan CS"
-                  >
-                    <UserCheck className="w-2.5 h-2.5 text-blue-600" />
-                    <span>Ditangani: <strong>{lead.assignedToUser?.name || "CS"}</strong></span>
-                    <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56 text-xs p-1">
-                  <div className="px-2 py-1 text-[10px] font-bold text-stone-400 uppercase tracking-wider">
-                    Penugasan CS
-                  </div>
-                  {onClaimLead && (
-                    <DropdownMenuItem
-                      onClick={() => onClaimLead(lead.id)}
-                      className="flex items-center gap-2 text-emerald-700 font-semibold cursor-pointer py-1.5"
-                    >
-                      <Zap className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600" />
-                      <span>⚡ Alihkan ke Saya (Klaim)</span>
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <div className="px-2 py-1 text-[10px] font-semibold text-stone-500">
-                    Pilih CS Pengganti:
-                  </div>
-                  {csUsers && csUsers.length > 0 ? (
-                    csUsers.map((user) => (
-                      <DropdownMenuItem
-                        key={user.id}
-                        onClick={() => onAssignLead?.(lead.id, user.id)}
-                        className={`flex items-center justify-between text-xs cursor-pointer py-1.5 ${
-                          lead.assignedToUserId === user.id ? "bg-stone-100 font-bold text-stone-900" : ""
-                        }`}
-                      >
-                        <span className="truncate">{user.name || user.email}</span>
-                        {lead.assignedToUserId === user.id && (
-                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        )}
-                      </DropdownMenuItem>
-                    ))
-                  ) : (
-                    <div className="px-2 py-1 text-[11px] text-stone-400 italic">Tidak ada staf CS aktif</div>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => onAssignLead?.(lead.id, null)}
-                    className="flex items-center gap-2 text-rose-600 cursor-pointer py-1.5"
-                  >
-                    <UserX className="w-3.5 h-3.5" />
-                    <span>Lepas Penugasan (Kembalikan ke Antrean)</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <div className="inline-flex items-center gap-1.5">
-                {/* 1-Click Klaim Saya */}
-                {onClaimLead ? (
-                  <button
-                    type="button"
-                    onClick={() => onClaimLead(lead.id)}
-                    className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer shadow-2xs"
-                    title="1-Klik klaim prospek ini ke akun Anda"
-                  >
-                    <Zap className="w-2.5 h-2.5 text-emerald-600 fill-emerald-600" />
-                    <span>Klaim Saya</span>
-                  </button>
-                ) : (
-                  <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded text-[10px] font-medium">
-                    Belum Diklaim
-                  </span>
-                )}
-
-                {/* Direct Assign to other CS */}
-                {onAssignLead && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer"
-                        title="Tugaskan ke CS spesifik"
-                      >
-                        <UserPlus className="w-2.5 h-2.5 text-rose-600" />
-                        <span>Tugaskan CS</span>
-                        <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-56 text-xs p-1">
-                      <div className="px-2 py-1 text-[10px] font-bold text-stone-400 uppercase tracking-wider">
-                        Tugaskan Prospek ke CS
-                      </div>
-                      {csUsers && csUsers.length > 0 ? (
-                        csUsers.map((user) => (
-                          <DropdownMenuItem
-                            key={user.id}
-                            onClick={() => onAssignLead(lead.id, user.id)}
-                            className="flex items-center gap-2 text-xs cursor-pointer py-1.5"
-                          >
-                            <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                            <span className="truncate">{user.name || user.email}</span>
-                          </DropdownMenuItem>
-                        ))
-                      ) : (
-                        <div className="px-2 py-1 text-[11px] text-stone-400 italic">Tidak ada staf CS aktif</div>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
             )}
 
             {/* Note count indicator */}
@@ -443,53 +257,245 @@ export function LeadCardItem({
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-2 sm:pt-0">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => onEditName(lead)}
-          className="h-8 px-2.5 text-xs text-stone-600 hover:text-stone-900 gap-1"
-        >
-          <Edit3 className="w-3.5 h-3.5" />
-          <span>Edit Nama</span>
-        </Button>
+      {/* ── Status, CS Assignment, & Action Buttons (Right Side) ── */}
+      <div className="flex flex-col sm:items-end gap-2.5 shrink-0 w-full lg:w-auto border-t lg:border-t-0 pt-3 lg:pt-0">
+        {/* Row 1: Status & CS Assignment / Klaim Leads */}
+        <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+          {/* Quick Status Dropdown */}
+          {onUpdateStatus ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-semibold transition-colors cursor-pointer shadow-2xs hover:opacity-90"
+                  style={{
+                    backgroundColor: `${statusMeta.color}15`,
+                    color: statusMeta.color,
+                    borderColor: `${statusMeta.color}40`,
+                  }}
+                >
+                  <span
+                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{ backgroundColor: statusMeta.color }}
+                  />
+                  <span>{statusMeta.label}</span>
+                  <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="text-xs min-w-[180px]">
+                {statuses && statuses.length > 0 ? (
+                  statuses.map((st) => (
+                    <DropdownMenuItem
+                      key={st.id}
+                      onClick={() => onUpdateStatus(lead.id, st.key)}
+                      className="flex items-center gap-2 cursor-pointer font-medium py-1.5"
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0 shadow-2xs"
+                        style={{ backgroundColor: st.color }}
+                      />
+                      <span>{st.label}</span>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  Object.entries(DEFAULT_STATUS_FALLBACKS).map(([k, v]) => (
+                    <DropdownMenuItem
+                      key={k}
+                      onClick={() => onUpdateStatus(lead.id, k)}
+                      className="flex items-center gap-2 cursor-pointer font-medium py-1.5"
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: v.color }}
+                      />
+                      <span>{v.label}</span>
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-semibold shadow-2xs"
+              style={{
+                backgroundColor: `${statusMeta.color}15`,
+                color: statusMeta.color,
+                borderColor: `${statusMeta.color}40`,
+              }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ backgroundColor: statusMeta.color }}
+              />
+              <span>{statusMeta.label}</span>
+            </span>
+          )}
 
-        {isLinked ? (
+          {/* Status Penugasan (Interactive Dropdown Reassign & Klaim Leads) */}
+          {isAssigned ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200/90 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer shadow-2xs"
+                  title="Klik untuk mengubah penugasan CS"
+                >
+                  <UserCheck className="w-2.5 h-2.5 text-blue-600" />
+                  <span>Ditangani: <strong>{lead.assignedToUser?.name || "CS"}</strong></span>
+                  <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 text-xs p-1">
+                <div className="px-2 py-1 text-[10px] font-bold text-stone-400 uppercase tracking-wider">
+                  Penugasan CS
+                </div>
+                {onClaimLead && (
+                  <DropdownMenuItem
+                    onClick={() => onClaimLead(lead.id)}
+                    className="flex items-center gap-2 text-emerald-700 font-semibold cursor-pointer py-1.5"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600" />
+                    <span>⚡ Klaim Leads (Ambil Alih)</span>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <div className="px-2 py-1 text-[10px] font-semibold text-stone-500">
+                  Pilih CS Pengganti:
+                </div>
+                {csUsers && csUsers.length > 0 ? (
+                  csUsers.map((user) => (
+                    <DropdownMenuItem
+                      key={user.id}
+                      onClick={() => onAssignLead?.(lead.id, user.id)}
+                      className={`flex items-center justify-between text-xs cursor-pointer py-1.5 ${
+                        lead.assignedToUserId === user.id ? "bg-stone-100 font-bold text-stone-900" : ""
+                      }`}
+                    >
+                      <span className="truncate">{user.name || user.email}</span>
+                      {lead.assignedToUserId === user.id && (
+                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      )}
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <div className="px-2 py-1 text-[11px] text-stone-400 italic">Tidak ada staf CS aktif</div>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onAssignLead?.(lead.id, null)}
+                  className="flex items-center gap-2 text-rose-600 cursor-pointer py-1.5"
+                >
+                  <UserX className="w-3.5 h-3.5" />
+                  <span>Lepas Penugasan (Kembalikan ke Antrean)</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="inline-flex items-center gap-1.5">
+              {/* 1-Click Klaim Leads */}
+              {onClaimLead ? (
+                <button
+                  type="button"
+                  onClick={() => onClaimLead(lead.id)}
+                  className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer shadow-2xs"
+                  title="1-Klik klaim prospek ini ke akun Anda"
+                >
+                  <Zap className="w-2.5 h-2.5 text-emerald-600 fill-emerald-600" />
+                  <span>Klaim Leads</span>
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded text-[10px] font-medium">
+                  Belum Diklaim
+                </span>
+              )}
+
+              {/* Direct Assign to other CS */}
+              {onAssignLead && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer"
+                      title="Tugaskan ke CS spesifik"
+                    >
+                      <UserPlus className="w-2.5 h-2.5 text-rose-600" />
+                      <span>Tugaskan CS</span>
+                      <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 text-xs p-1">
+                    <div className="px-2 py-1 text-[10px] font-bold text-stone-400 uppercase tracking-wider">
+                      Tugaskan Prospek ke CS
+                    </div>
+                    {csUsers && csUsers.length > 0 ? (
+                      csUsers.map((user) => (
+                        <DropdownMenuItem
+                          key={user.id}
+                          onClick={() => onAssignLead(lead.id, user.id)}
+                          className="flex items-center gap-2 text-xs cursor-pointer py-1.5"
+                        >
+                          <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                          <span className="truncate">{user.name || user.email}</span>
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <div className="px-2 py-1 text-[11px] text-stone-400 italic">Tidak ada staf CS aktif</div>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Row 2: Action Buttons */}
+        <div className="flex items-center gap-1.5 flex-wrap sm:justify-end">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => onUnlinkCustomer(lead.id)}
-            title="Putuskan tautan profil customer"
-            className="h-8 px-2.5 text-xs text-purple-700 border-purple-200 hover:bg-purple-50 gap-1"
+            onClick={() => onEditName(lead)}
+            className="h-8 px-2.5 text-xs text-stone-600 hover:text-stone-900 gap-1"
           >
-            <Unlink className="w-3.5 h-3.5" />
-            <span>Lepas Tautan</span>
+            <Edit3 className="w-3.5 h-3.5" />
+            <span>Edit Nama</span>
           </Button>
-        ) : (
+
+          {isLinked ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onUnlinkCustomer(lead.id)}
+              title="Putuskan tautan profil customer"
+              className="h-8 px-2.5 text-xs text-purple-700 border-purple-200 hover:bg-purple-50 gap-1"
+            >
+              <Unlink className="w-3.5 h-3.5" />
+              <span>Lepas Tautan</span>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onLinkCustomer(lead)}
+              className="h-8 px-2.5 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50 gap-1"
+            >
+              <Link2 className="w-3.5 h-3.5" />
+              <span>Hubungkan ERP</span>
+            </Button>
+          )}
+
           <Button
             type="button"
-            variant="outline"
             size="sm"
-            onClick={() => onLinkCustomer(lead)}
-            className="h-8 px-2.5 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50 gap-1"
+            onClick={() => onOpenChat(lead)}
+            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
           >
-            <Link2 className="w-3.5 h-3.5" />
-            <span>Hubungkan ERP</span>
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Buka Chat</span>
           </Button>
-        )}
-
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => onOpenChat(lead)}
-          className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-        >
-          <MessageSquare className="w-3.5 h-3.5" />
-          <span>Buka Chat</span>
-        </Button>
+        </div>
       </div>
     </div>
   );

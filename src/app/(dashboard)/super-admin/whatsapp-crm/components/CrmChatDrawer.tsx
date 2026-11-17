@@ -1231,7 +1231,7 @@ export function CrmChatDrawer({
                         onClick={handleClaimLead}
                         className="h-8 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 font-medium"
                       >
-                        Klaim Saya
+                        Klaim Leads
                       </Button>
                     ) : (
                       <Button
