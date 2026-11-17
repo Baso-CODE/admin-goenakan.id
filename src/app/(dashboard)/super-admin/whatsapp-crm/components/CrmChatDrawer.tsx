@@ -56,11 +56,14 @@ import {
   Zap,
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { EmojiStyle, Theme, type EmojiClickData } from "emoji-picker-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CrmLeadItem } from "./LeadCardItem";
 import { CrmStatusConfigItem, DEFAULT_STATUS_FALLBACKS } from "../types/crmStatus.type";
+import { CrmLabelConfigItem } from "../types/crmLabel.type";
+import { QuickAddStatusDialog } from "./QuickAddStatusDialog";
 
 // Lazy-load Emoji Picker to prevent SSR lag
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), {
@@ -104,6 +107,7 @@ interface CrmChatDrawerProps {
   onLeadUpdated?: (updated: Partial<CrmLeadItem> & { id: string }) => void;
   csUsers: Array<{ id: string; name?: string | null; email?: string | null }>;
   statuses?: CrmStatusConfigItem[];
+  onStatusCreated?: (newStatus: CrmStatusConfigItem, targetLeadId?: string | null) => void;
 }
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -236,6 +240,7 @@ export function CrmChatDrawer({
   onLeadUpdated,
   csUsers,
   statuses,
+  onStatusCreated,
 }: CrmChatDrawerProps) {
   const { fetchApi } = useApi();
 
@@ -268,6 +273,29 @@ export function CrmChatDrawer({
   // Labels state
   const [currentLabels, setCurrentLabels] = useState<string[]>([]);
   const [customTagInput, setCustomTagInput] = useState("");
+  const [availableLabels, setAvailableLabels] = useState<CrmLabelConfigItem[]>([]);
+  const [quickAddStatusOpen, setQuickAddStatusOpen] = useState(false);
+
+  // Load configured labels from backend
+  const loadAvailableLabels = useCallback(async () => {
+    try {
+      const res = await fetchApi("/crm/labels");
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json.data)) {
+          setAvailableLabels(json.data);
+        }
+      }
+    } catch {
+      // Ignore background label fetch failure
+    }
+  }, [fetchApi]);
+
+  useEffect(() => {
+    if (open) {
+      loadAvailableLabels();
+    }
+  }, [open, loadAvailableLabels]);
 
   // Sync internal state when lead changes
   useEffect(() => {
@@ -628,8 +656,22 @@ export function CrmChatDrawer({
   // Add custom label
   const handleAddCustomLabel = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customTagInput.trim()) return;
-    handleToggleLabel(customTagInput.trim());
+    const trimmed = customTagInput.trim();
+    if (!trimmed) return;
+    handleToggleLabel(trimmed);
+    setAvailableLabels((prev) => {
+      if (prev.some((p) => p.name.toLowerCase() === trimmed.toLowerCase())) return prev;
+      return [
+        ...prev,
+        {
+          id: trimmed,
+          name: trimmed,
+          color: "#059669",
+          orderIndex: (prev.length || 0) + 1,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+    });
     setCustomTagInput("");
   };
 
@@ -1161,7 +1203,18 @@ export function CrmChatDrawer({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Lead Status */}
                 <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-stone-600">Status Prospek</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px] font-semibold text-stone-600">Status Prospek</Label>
+                    <button
+                      type="button"
+                      onClick={() => setQuickAddStatusOpen(true)}
+                      className="text-[10px] text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-0.5 cursor-pointer"
+                      title="Tambah status baru langsung"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>+ Status Baru</span>
+                    </button>
+                  </div>
                   <Select
                     value={lead.status}
                     onValueChange={(val) => handleUpdateStatus(val)}
@@ -1195,6 +1248,16 @@ export function CrmChatDrawer({
                           </SelectItem>
                         ))
                       )}
+                      <div className="pt-1 border-t border-stone-100 p-1">
+                        <button
+                          type="button"
+                          onClick={() => setQuickAddStatusOpen(true)}
+                          className="w-full flex items-center gap-1.5 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50 rounded font-semibold cursor-pointer transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Tambah Status Baru</span>
+                        </button>
+                      </div>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1315,23 +1378,43 @@ export function CrmChatDrawer({
                       <span>Tambah Label</span>
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent align="start" className="w-64 p-2 text-xs space-y-2">
-                    <p className="font-bold text-stone-700 text-[11px]">Pilih Label Tersedia:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {PRESET_LABELS.map((p) => {
-                        const active = currentLabels.includes(p);
+                  <PopoverContent align="start" className="w-68 p-2.5 text-xs space-y-2">
+                    <div className="flex items-center justify-between pb-1 border-b border-stone-100">
+                      <p className="font-bold text-stone-700 text-[11px]">Pilih Label Tersedia:</p>
+                      <Link
+                        href="/super-admin/whatsapp-crm/settings?tab=labels"
+                        className="text-[10px] text-emerald-600 hover:text-emerald-800 font-semibold"
+                        title="Buka Pengaturan Label CRM"
+                      >
+                        Kelola →
+                      </Link>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1 max-h-44 overflow-y-auto pt-0.5">
+                      {(availableLabels.length > 0
+                        ? availableLabels
+                        : PRESET_LABELS.map((p) => ({ id: p, name: p, color: "#059669" }))
+                      ).map((lbl: any) => {
+                        const name = typeof lbl === "string" ? lbl : lbl.name;
+                        const color = typeof lbl === "object" ? lbl.color || "#059669" : "#059669";
+                        const active = currentLabels.includes(name);
                         return (
                           <button
-                            key={p}
+                            key={name}
                             type="button"
-                            onClick={() => handleToggleLabel(p)}
-                            className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                            onClick={() => handleToggleLabel(name)}
+                            className={`text-[10px] px-2 py-0.5 rounded border transition-colors flex items-center gap-1 cursor-pointer ${
                               active
-                                ? "bg-emerald-600 text-white border-emerald-600"
+                                ? "bg-emerald-600 text-white border-emerald-600 font-semibold"
                                 : "bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100"
                             }`}
                           >
-                            {p} {active ? "✓" : "+"}
+                            <span
+                              className="w-1.5 h-1.5 rounded-full shrink-0 shadow-2xs"
+                              style={{ backgroundColor: active ? "#ffffff" : color }}
+                            />
+                            <span>{name}</span>
+                            <span className="text-[9px] opacity-75">{active ? "✓" : "+"}</span>
                           </button>
                         );
                       })}
@@ -1341,10 +1424,10 @@ export function CrmChatDrawer({
                       <Input
                         value={customTagInput}
                         onChange={(e) => setCustomTagInput(e.target.value)}
-                        placeholder="Label kustom..."
+                        placeholder="Ketik label baru..."
                         className="h-7 text-xs"
                       />
-                      <Button type="submit" size="sm" className="h-7 px-2 text-xs">
+                      <Button type="submit" size="sm" className="h-7 px-2 text-xs bg-emerald-600 text-white">
                         +
                       </Button>
                     </form>
@@ -1493,6 +1576,20 @@ export function CrmChatDrawer({
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Quick Add Status Dialog */}
+      <QuickAddStatusDialog
+        open={quickAddStatusOpen}
+        onOpenChange={setQuickAddStatusOpen}
+        targetLeadId={lead?.id}
+        targetLeadName={lead?.displayName || lead?.waPushName || lead?.phoneNumber}
+        onStatusCreated={(newStatus, targetLeadId) => {
+          onStatusCreated?.(newStatus, targetLeadId);
+          if (lead && targetLeadId === lead.id) {
+            handleUpdateStatus(newStatus.key);
+          }
+        }}
+      />
     </>
   );
 }

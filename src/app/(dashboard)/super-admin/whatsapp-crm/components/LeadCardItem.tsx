@@ -21,6 +21,7 @@ import {
   HandMetal,
   Link2,
   MessageSquare,
+  Plus,
   Sparkles,
   Tag,
   Unlink,
@@ -31,8 +32,9 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
-import React from "react";
+import React, { useState } from "react";
 import { CrmStatusConfigItem, DEFAULT_STATUS_FALLBACKS } from "../types/crmStatus.type";
+import { QuickAddStatusDialog } from "./QuickAddStatusDialog";
 
 export interface CrmLeadItem {
   id: string;
@@ -99,6 +101,7 @@ interface LeadCardItemProps {
   onClaimLead?: (leadId: string) => void;
   onAssignLead?: (leadId: string, assignedToUserId: string | null) => void;
   onUpdateStatus?: (leadId: string, status: string) => void;
+  onStatusCreated?: (newStatus: CrmStatusConfigItem, targetLeadId?: string | null) => void;
 }
 
 const STATUS_CONFIG: Record<
@@ -148,7 +151,9 @@ export function LeadCardItem({
   onClaimLead,
   onAssignLead,
   onUpdateStatus,
+  onStatusCreated,
 }: LeadCardItemProps) {
+  const [quickAddStatusOpen, setQuickAddStatusOpen] = useState(false);
   const { name, source, formattedPhone } = lead.resolvedContact;
   const initial = name ? name.charAt(0).toUpperCase() : "?";
 
@@ -312,6 +317,14 @@ export function LeadCardItem({
                     </DropdownMenuItem>
                   ))
                 )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setQuickAddStatusOpen(true)}
+                  className="flex items-center gap-2 cursor-pointer font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 py-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>+ Tambah Status Baru</span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
@@ -497,6 +510,20 @@ export function LeadCardItem({
           </Button>
         </div>
       </div>
+
+      {/* Quick Add Status Dialog directly from card */}
+      <QuickAddStatusDialog
+        open={quickAddStatusOpen}
+        onOpenChange={setQuickAddStatusOpen}
+        targetLeadId={lead.id}
+        targetLeadName={name}
+        onStatusCreated={(newStatus, targetLeadId) => {
+          onStatusCreated?.(newStatus, targetLeadId);
+          if (targetLeadId) {
+            onUpdateStatus?.(targetLeadId, newStatus.key);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -32,6 +32,7 @@ import { CrmChatDrawer } from "./components/CrmChatDrawer";
 import { EditLeadNameDialog } from "./components/EditLeadNameDialog";
 import { CrmLeadItem, LeadCardItem } from "./components/LeadCardItem";
 import { LinkCustomerDialog } from "./components/LinkCustomerDialog";
+import { QuickAddStatusDialog } from "./components/QuickAddStatusDialog";
 import { CrmStatusConfigItem, DEFAULT_STATUS_FALLBACKS } from "./types/crmStatus.type";
 
 export default function WhatsAppCrmInboxPage() {
@@ -46,6 +47,7 @@ export default function WhatsAppCrmInboxPage() {
   const [receiverSessionId, setReceiverSessionId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [quickAddStatusOpen, setQuickAddStatusOpen] = useState(false);
 
   // Modal & Drawer states
   const [editingLead, setEditingLead] = useState<CrmLeadItem | null>(null);
@@ -209,6 +211,16 @@ export default function WhatsAppCrmInboxPage() {
     } catch (err: any) {
       toast.error(err.message || "Gagal memperbarui status");
       fetchLeads(true);
+    }
+  };
+
+  const handleStatusCreated = (newStatus: CrmStatusConfigItem, targetLeadId?: string | null) => {
+    setStatuses((prev) => {
+      if (prev.some((s) => s.id === newStatus.id || s.key === newStatus.key)) return prev;
+      return [...prev, newStatus];
+    });
+    if (targetLeadId) {
+      handleUpdateStatus(targetLeadId, newStatus.key);
     }
   };
 
@@ -436,6 +448,18 @@ export default function WhatsAppCrmInboxPage() {
                 <span className="hidden md:inline">Kelola Status</span>
               </Button>
             </Link>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setQuickAddStatusOpen(true)}
+              className="h-9 px-2.5 text-xs text-emerald-700 hover:text-emerald-800 border-emerald-200 hover:bg-emerald-50 gap-1.5 shrink-0"
+              title="Tambah tahapan status prospek langsung"
+            >
+              <Plus className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden sm:inline">+ Status Baru</span>
+            </Button>
           </div>
         </div>
 
@@ -482,6 +506,7 @@ export default function WhatsAppCrmInboxPage() {
               onClaimLead={handleClaimLead}
               onAssignLead={handleAssignLead}
               onUpdateStatus={handleUpdateStatus}
+              onStatusCreated={handleStatusCreated}
             />
           ))
         )}
@@ -496,6 +521,14 @@ export default function WhatsAppCrmInboxPage() {
         onLeadUpdated={handleUpdateLeadLocal}
         csUsers={csUsers}
         statuses={statuses}
+        onStatusCreated={handleStatusCreated}
+      />
+
+      {/* Quick Add Status Dialog from Filter Bar */}
+      <QuickAddStatusDialog
+        open={quickAddStatusOpen}
+        onOpenChange={setQuickAddStatusOpen}
+        onStatusCreated={handleStatusCreated}
       />
 
       {/* Dialog: Edit Name */}

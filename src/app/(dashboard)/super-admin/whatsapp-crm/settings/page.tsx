@@ -31,6 +31,7 @@ import {
   Smartphone,
   Sliders,
   Sparkles,
+  Tag,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -38,6 +39,7 @@ import { useSearchParams } from "next/navigation";
 import React, { Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { StatusManagerTab } from "./components/StatusManagerTab";
+import { LabelManagerTab } from "./components/LabelManagerTab";
 
 interface WaSessionItem {
   id: string;
@@ -66,12 +68,13 @@ function SettingsContent() {
   const searchParams = useSearchParams();
 
   const [activeTab, setActiveTab] = useState<string>(() => {
-    return searchParams.get("tab") === "statuses" ? "statuses" : "ingestion";
+    const tab = searchParams.get("tab");
+    return tab === "statuses" || tab === "labels" ? tab : "ingestion";
   });
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "statuses" || tabParam === "ingestion") {
+    if (tabParam === "statuses" || tabParam === "labels" || tabParam === "ingestion") {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
@@ -282,6 +285,10 @@ function SettingsContent() {
           <TabsTrigger value="statuses" className="text-xs px-4 gap-2 flex-1 sm:flex-none">
             <Kanban className="w-3.5 h-3.5" />
             <span>Status & Tahapan Prospek</span>
+          </TabsTrigger>
+          <TabsTrigger value="labels" className="text-xs px-4 gap-2 flex-1 sm:flex-none">
+            <Tag className="w-3.5 h-3.5" />
+            <span>Label & Kategori Prospek</span>
           </TabsTrigger>
         </TabsList>
 
@@ -590,6 +597,10 @@ function SettingsContent() {
 
         <TabsContent value="statuses" className="space-y-6 m-0">
           <StatusManagerTab />
+        </TabsContent>
+
+        <TabsContent value="labels" className="space-y-6 m-0">
+          <LabelManagerTab />
         </TabsContent>
       </Tabs>
     </div>
