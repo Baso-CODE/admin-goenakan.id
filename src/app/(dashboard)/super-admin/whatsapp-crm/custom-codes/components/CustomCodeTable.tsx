@@ -10,34 +10,32 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Copy, ExternalLink, Link2, Loader2, Sparkles, Trash2, UserCheck } from "lucide-react";
+import {
+  Copy,
+  Edit3,
+  ExternalLink,
+  Globe,
+  Link2,
+  Loader2,
+  Sparkles,
+  Tag,
+  Trash2,
+  UserCheck,
+  Users,
+} from "lucide-react";
+import Link from "next/link";
 import React from "react";
 import { toast } from "sonner";
+import { CustomCodeItem } from "../types/customCode.type";
 
-export interface CustomCodeItem {
-  id: string;
-  code: string;
-  label: string;
-  type: "LEAD_SOURCE" | "CS_AGENT_CODE";
-  leadUrlRef?: string | null;
-  assignedUserId?: string | null;
-  assignedUser?: {
-    id: string;
-    name: string;
-    email: string;
-  } | null;
-  isActive: boolean;
-  createdAt: string;
-  _count?: {
-    leads: number;
-  };
-}
+export type { CustomCodeItem };
 
 interface CustomCodeTableProps {
   items: CustomCodeItem[];
   isLoading: boolean;
   onToggleActive: (id: string, currentActive: boolean) => void;
   onDelete: (id: string) => void;
+  onEdit?: (item: CustomCodeItem) => void;
 }
 
 export function CustomCodeTable({
@@ -45,6 +43,7 @@ export function CustomCodeTable({
   isLoading,
   onToggleActive,
   onDelete,
+  onEdit,
 }: CustomCodeTableProps) {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -80,7 +79,7 @@ export function CustomCodeTable({
         <TableHeader className="bg-stone-50/80">
           <TableRow>
             <TableHead className="w-[180px] text-xs font-semibold text-stone-700">Kode Unik</TableHead>
-            <TableHead className="text-xs font-semibold text-stone-700">Label Deskripsi</TableHead>
+            <TableHead className="text-xs font-semibold text-stone-700">Label & Saluran Media</TableHead>
             <TableHead className="text-xs font-semibold text-stone-700">Tipe & Konteks</TableHead>
             <TableHead className="text-xs font-semibold text-stone-700 text-center">Leads Terjaring</TableHead>
             <TableHead className="text-xs font-semibold text-stone-700 text-center">Status</TableHead>
@@ -90,6 +89,7 @@ export function CustomCodeTable({
         <TableBody>
           {items.map((item) => {
             const isSource = item.type === "LEAD_SOURCE";
+            const leadCount = item._count?.leads ?? 0;
 
             return (
               <TableRow key={item.id} className="hover:bg-stone-50/70 transition-colors">
@@ -100,9 +100,17 @@ export function CustomCodeTable({
                   </span>
                 </TableCell>
 
-                {/* Label */}
+                {/* Label & Saluran Media */}
                 <TableCell className="text-xs text-stone-800">
-                  <p className="font-medium">{item.label}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-medium text-stone-900">{item.label}</span>
+                    {item.channel && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-stone-100 text-stone-600 border border-stone-200/80 px-1.5 py-0.2 rounded">
+                        <Tag className="w-2.5 h-2.5 text-stone-500" />
+                        <span>{item.channel}</span>
+                      </span>
+                    )}
+                  </div>
                   {item.leadUrlRef && (
                     <div className="flex items-center gap-1.5 mt-1 text-[11px] text-stone-400">
                       <span className="truncate max-w-[280px] font-mono text-[10px]">
@@ -142,12 +150,23 @@ export function CustomCodeTable({
                   )}
                 </TableCell>
 
-                {/* Leads Terjaring */}
+                {/* Leads Terjaring (Klik untuk langsung filter di Inbox) */}
                 <TableCell className="text-xs text-center font-semibold text-stone-800">
                   {isSource ? (
-                    <span className="inline-flex items-center justify-center min-w-[24px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-                      {item._count?.leads ?? 0}
-                    </span>
+                    leadCount > 0 ? (
+                      <Link
+                        href={`/super-admin/whatsapp-crm?sourceCode=${encodeURIComponent(item.code)}`}
+                        className="inline-flex items-center justify-center gap-1 min-w-[28px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-colors shadow-2xs group"
+                        title="Buka daftar leads untuk kode ini di Inbox CRM"
+                      >
+                        <span>{leadCount}</span>
+                        <ExternalLink className="w-2.5 h-2.5 opacity-60 group-hover:opacity-100" />
+                      </Link>
+                    ) : (
+                      <span className="inline-flex items-center justify-center min-w-[24px] px-1.5 py-0.5 rounded-full bg-stone-50 text-stone-400 text-xs font-normal border border-stone-200">
+                        0
+                      </span>
+                    )
                   ) : (
                     <span className="text-stone-300">-</span>
                   )}
@@ -171,6 +190,36 @@ export function CustomCodeTable({
                 {/* Aksi */}
                 <TableCell className="text-xs text-right">
                   <div className="flex items-center justify-end gap-1">
+                    {/* Shortcut View Leads di Inbox */}
+                    {isSource && leadCount > 0 && (
+                      <Link
+                        href={`/super-admin/whatsapp-crm?sourceCode=${encodeURIComponent(item.code)}`}
+                        title="Lihat leads terkait di Inbox CRM"
+                      >
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-stone-500 hover:text-emerald-600"
+                        >
+                          <Users className="w-3.5 h-3.5" />
+                        </Button>
+                      </Link>
+                    )}
+
+                    {/* Edit Master Kode */}
+                    {onEdit && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onEdit(item)}
+                        title="Edit Master Kode"
+                        className="h-7 w-7 p-0 text-stone-500 hover:text-blue-600"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+
+                    {/* Salin Tautan WhatsApp */}
                     {item.leadUrlRef && (
                       <Button
                         variant="ghost"
@@ -182,6 +231,8 @@ export function CustomCodeTable({
                         <Copy className="w-3.5 h-3.5" />
                       </Button>
                     )}
+
+                    {/* Nonaktifkan / Hapus */}
                     <Button
                       variant="ghost"
                       size="sm"

@@ -22,6 +22,7 @@ import { useApi } from "@/hooks/useApi";
 import { Copy, Link2, Loader2, Sparkles, UserCheck } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { MEDIA_CHANNELS } from "../types/customCode.type";
 
 interface UserOption {
   id: string;
@@ -45,8 +46,9 @@ export function CreateCustomCodeDialog({
   const [codeType, setCodeType] = useState<"LEAD_SOURCE" | "CS_AGENT_CODE">("LEAD_SOURCE");
   const [code, setCode] = useState("");
   const [label, setLabel] = useState("");
+  const [channel, setChannel] = useState<string>("Website / Katalog");
   const [assignedUserId, setAssignedUserId] = useState<string>("");
-  const [waPhoneNumber, setWaPhoneNumber] = useState("6281234567890"); // Nomor official WA bisnis
+  const [waPhoneNumber, setWaPhoneNumber] = useState("6282387902238"); // Nomor official WA bisnis
   const [customText, setCustomText] = useState("Halo Goenakan, saya ingin konsultasi pesanan custom");
 
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -104,6 +106,7 @@ export function CreateCustomCodeDialog({
           code: normalizedCode,
           label: label.trim(),
           type: codeType,
+          channel: codeType === "LEAD_SOURCE" ? channel : null,
           leadUrlRef: codeType === "LEAD_SOURCE" ? generatedWaUrl : null,
           assignedUserId: codeType === "CS_AGENT_CODE" ? assignedUserId : null,
         }),
@@ -117,6 +120,7 @@ export function CreateCustomCodeDialog({
       toast.success(data.message || "Kode kustom berhasil didaftarkan");
       setCode("");
       setLabel("");
+      setChannel("Website / Katalog");
       setAssignedUserId("");
       onOpenChange(false);
       onSuccess();
@@ -193,6 +197,25 @@ export function CreateCustomCodeDialog({
                 required
               />
             </div>
+
+            {/* Saluran Media / Channel (LEAD_SOURCE) */}
+            {codeType === "LEAD_SOURCE" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Saluran Media / Channel</Label>
+                <Select value={channel} onValueChange={setChannel}>
+                  <SelectTrigger className="h-9 text-xs bg-white">
+                    <SelectValue placeholder="Pilih saluran penempatan kode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MEDIA_CHANNELS.map((ch) => (
+                      <SelectItem key={ch.value} value={ch.value} className="text-xs">
+                        {ch.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* OPSI A Fields: Click to Chat Generator */}
             {codeType === "LEAD_SOURCE" && (

@@ -22,10 +22,13 @@ import {
   Search,
   Settings2,
   Sliders,
+  Sparkles,
   Tag,
   Users,
+  X,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CrmChatDrawer } from "./components/CrmChatDrawer";
@@ -37,6 +40,9 @@ import { CrmStatusConfigItem, DEFAULT_STATUS_FALLBACKS } from "./types/crmStatus
 
 export default function WhatsAppCrmInboxPage() {
   const { fetchApi } = useApi();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const sourceCodeParam = searchParams.get("sourceCode") || "";
 
   const [activeTab, setActiveTab] = useState<"all" | "me" | "unassigned">("all");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -133,6 +139,9 @@ export default function WhatsAppCrmInboxPage() {
         if (search.trim()) {
           params.append("search", search.trim());
         }
+        if (sourceCodeParam.trim()) {
+          params.append("sourceCode", sourceCodeParam.trim());
+        }
 
         const res = await fetchApi(`/crm/leads?${params.toString()}`);
         if (!res.ok) {
@@ -154,7 +163,7 @@ export default function WhatsAppCrmInboxPage() {
         if (!silent) setIsLoading(false);
       }
     },
-    [activeTab, statusFilter, search, fetchApi]
+    [activeTab, statusFilter, search, sourceCodeParam, fetchApi]
   );
 
   useEffect(() => {
@@ -498,6 +507,39 @@ export default function WhatsAppCrmInboxPage() {
         </div>
       </div>
 
+      {/* ── Active Master Code Filter Chip (Point 3) ── */}
+      {sourceCodeParam && (
+        <div className="flex items-center justify-between gap-2 p-2.5 px-3.5 bg-amber-50 border border-amber-200/90 rounded-lg text-xs text-amber-900 shadow-2xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1 font-semibold text-amber-800">
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <span>Memfilter Leads Kampanye:</span>
+            </span>
+            <span className="font-mono font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded border border-amber-300">
+              {sourceCodeParam}
+            </span>
+            <span className="text-amber-700 text-[11px]">
+              (Menampilkan hanya prospek yang datang melalui kode ini)
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams.toString());
+              next.delete("sourceCode");
+              const qs = next.toString();
+              router.push(qs ? `/super-admin/whatsapp-crm?${qs}` : "/super-admin/whatsapp-crm");
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-100/80 hover:bg-amber-200 text-amber-900 font-semibold text-[11px] transition-colors shrink-0"
+            title="Hapus filter master kode"
+          >
+            <X className="w-3 h-3" />
+            <span>Hapus Filter</span>
+          </button>
+        </div>
+      )}
+
       {/* ── Leads List Feed ── */}
       <div className="space-y-2.5">
         {isLoading ? (
@@ -510,7 +552,9 @@ export default function WhatsAppCrmInboxPage() {
             <Users className="w-8 h-8 text-stone-300" />
             <p className="text-xs font-semibold text-stone-700">Tidak ada lead di filter ini</p>
             <p className="text-[11px] text-stone-400">
-              {activeTab === "unassigned"
+              {sourceCodeParam
+                ? `Belum ada prospek yang masuk menggunakan kode pelacakan ${sourceCodeParam}.`
+                : activeTab === "unassigned"
                 ? "Semua pesan prospek sudah dipegang oleh CS yang bertugas."
                 : "Belum ada kontak prospek yang masuk atau cocok dengan filter dan kata kunci pencarian."}
             </p>
