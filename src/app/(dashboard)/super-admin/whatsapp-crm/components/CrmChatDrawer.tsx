@@ -60,6 +60,7 @@ import { EmojiStyle, Theme, type EmojiClickData } from "emoji-picker-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CrmLeadItem } from "./LeadCardItem";
+import { CrmStatusConfigItem, DEFAULT_STATUS_FALLBACKS } from "../types/crmStatus.type";
 
 // Lazy-load Emoji Picker to prevent SSR lag
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), {
@@ -102,6 +103,7 @@ interface CrmChatDrawerProps {
   onClose: () => void;
   onLeadUpdated?: (updated: Partial<CrmLeadItem> & { id: string }) => void;
   csUsers: Array<{ id: string; name?: string | null; email?: string | null }>;
+  statuses?: CrmStatusConfigItem[];
 }
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -233,6 +235,7 @@ export function CrmChatDrawer({
   onClose,
   onLeadUpdated,
   csUsers,
+  statuses,
 }: CrmChatDrawerProps) {
   const { fetchApi } = useApi();
 
@@ -1167,21 +1170,31 @@ export function CrmChatDrawer({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="NEW" className="text-xs text-rose-600 font-semibold">
-                        🔴 Prospek Baru (NEW)
-                      </SelectItem>
-                      <SelectItem value="IN_PROGRESS" className="text-xs text-amber-600 font-semibold">
-                        🟡 Sedang Follow Up (IN_PROGRESS)
-                      </SelectItem>
-                      <SelectItem value="QUOTATION_SENT" className="text-xs text-blue-600 font-semibold">
-                        🔵 Penawaran Terkirim (QUOTATION)
-                      </SelectItem>
-                      <SelectItem value="WON" className="text-xs text-emerald-600 font-semibold">
-                        🟢 Closing / Deal (WON)
-                      </SelectItem>
-                      <SelectItem value="LOST" className="text-xs text-stone-500 font-semibold">
-                        ⚪ Batal / Tidak Tertarik (LOST)
-                      </SelectItem>
+                      {statuses && statuses.length > 0 ? (
+                        statuses.map((st) => (
+                          <SelectItem key={st.id} value={st.key} className="text-xs font-semibold py-1.5">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="w-2 h-2 rounded-full shrink-0 shadow-2xs"
+                                style={{ backgroundColor: st.color }}
+                              />
+                              <span>{st.label}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        Object.entries(DEFAULT_STATUS_FALLBACKS).map(([k, v]) => (
+                          <SelectItem key={k} value={k} className="text-xs font-semibold py-1.5">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="w-2 h-2 rounded-full shrink-0 shadow-2xs"
+                                style={{ backgroundColor: v.color }}
+                              />
+                              <span>{v.label}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import React from "react";
+import { CrmStatusConfigItem, DEFAULT_STATUS_FALLBACKS } from "../types/crmStatus.type";
 
 export interface CrmLeadItem {
   id: string;
@@ -58,7 +59,15 @@ export interface CrmLeadItem {
     code: string;
     label: string;
   } | null;
-  status: "NEW" | "IN_PROGRESS" | "QUOTATION_SENT" | "WON" | "LOST" | "CLOSED";
+  status: string;
+  statusConfig?: {
+    id?: string;
+    key: string;
+    label: string;
+    color: string;
+    isWon?: boolean;
+    isLost?: boolean;
+  } | null;
   lastMessage?: string | null;
   lastMessageAt?: string | null;
   unreadCount?: number;
@@ -75,6 +84,7 @@ export interface CrmLeadItem {
 
 interface LeadCardItemProps {
   lead: CrmLeadItem;
+  statuses?: CrmStatusConfigItem[];
   onEditName: (lead: CrmLeadItem) => void;
   onLinkCustomer: (lead: CrmLeadItem) => void;
   onUnlinkCustomer: (leadId: string) => void;
@@ -121,6 +131,7 @@ const STATUS_CONFIG: Record<
 
 export function LeadCardItem({
   lead,
+  statuses,
   onEditName,
   onLinkCustomer,
   onUnlinkCustomer,
@@ -134,7 +145,13 @@ export function LeadCardItem({
   const isAssigned = !!lead.assignedToUserId;
   const isLinked = !!lead.customerProfileId;
 
-  const statusMeta = STATUS_CONFIG[lead.status] || STATUS_CONFIG.NEW;
+  const statusMeta =
+    lead.statusConfig ||
+    statuses?.find((s) => s.key === lead.status) ||
+    DEFAULT_STATUS_FALLBACKS[lead.status] || {
+      label: lead.status,
+      color: "#4b5563",
+    };
 
   return (
     <div className="bg-white border border-stone-200 rounded-xl p-4 shadow-sm hover:border-stone-300 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -161,36 +178,66 @@ export function LeadCardItem({
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-semibold transition-colors cursor-pointer ${statusMeta.colorClass}`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-semibold transition-colors cursor-pointer shadow-2xs hover:opacity-90"
+                    style={{
+                      backgroundColor: `${statusMeta.color}15`,
+                      color: statusMeta.color,
+                      borderColor: `${statusMeta.color}40`,
+                    }}
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dotColor}`} />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{ backgroundColor: statusMeta.color }}
+                    />
                     <span>{statusMeta.label}</span>
                     <ChevronDown className="w-2.5 h-2.5 opacity-60" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="text-xs">
-                  <DropdownMenuItem onClick={() => onUpdateStatus(lead.id, "NEW")}>
-                    🔴 Prospek Baru (NEW)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onUpdateStatus(lead.id, "IN_PROGRESS")}>
-                    🟡 Sedang Follow Up (IN_PROGRESS)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onUpdateStatus(lead.id, "QUOTATION_SENT")}>
-                    🔵 Penawaran Terkirim (QUOTATION)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onUpdateStatus(lead.id, "WON")}>
-                    🟢 Closing / Deal (WON)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onUpdateStatus(lead.id, "LOST")}>
-                    ⚪ Batal / Tidak Tertarik (LOST)
-                  </DropdownMenuItem>
+                <DropdownMenuContent align="start" className="text-xs min-w-[180px]">
+                  {statuses && statuses.length > 0 ? (
+                    statuses.map((st) => (
+                      <DropdownMenuItem
+                        key={st.id}
+                        onClick={() => onUpdateStatus(lead.id, st.key)}
+                        className="flex items-center gap-2 cursor-pointer font-medium py-1.5"
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0 shadow-2xs"
+                          style={{ backgroundColor: st.color }}
+                        />
+                        <span>{st.label}</span>
+                      </DropdownMenuItem>
+                    ))
+                  ) : (
+                    Object.entries(DEFAULT_STATUS_FALLBACKS).map(([k, v]) => (
+                      <DropdownMenuItem
+                        key={k}
+                        onClick={() => onUpdateStatus(lead.id, k)}
+                        className="flex items-center gap-2 cursor-pointer font-medium py-1.5"
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: v.color }}
+                        />
+                        <span>{v.label}</span>
+                      </DropdownMenuItem>
+                    ))
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
               <span
-                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-semibold ${statusMeta.colorClass}`}
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-semibold shadow-2xs"
+                style={{
+                  backgroundColor: `${statusMeta.color}15`,
+                  color: statusMeta.color,
+                  borderColor: `${statusMeta.color}40`,
+                }}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dotColor}`} />
+                <span
+                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                  style={{ backgroundColor: statusMeta.color }}
+                />
                 <span>{statusMeta.label}</span>
               </span>
             )}

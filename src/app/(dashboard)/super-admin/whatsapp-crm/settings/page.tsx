@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/useApi";
 import {
@@ -23,6 +24,7 @@ import {
   DownloadCloud,
   Filter,
   Inbox,
+  Kanban,
   Loader2,
   Save,
   ShieldAlert,
@@ -32,8 +34,10 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import React, { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import React, { Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { StatusManagerTab } from "./components/StatusManagerTab";
 
 interface WaSessionItem {
   id: string;
@@ -57,8 +61,20 @@ interface CrmSettingsData {
   blacklistedNumbers?: string | null;
 }
 
-export default function WhatsAppCrmSettingsPage() {
+function SettingsContent() {
   const { fetchApi } = useApi();
+  const searchParams = useSearchParams();
+
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return searchParams.get("tab") === "statuses" ? "statuses" : "ingestion";
+  });
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "statuses" || tabParam === "ingestion") {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -250,18 +266,32 @@ export default function WhatsAppCrmSettingsPage() {
           <Link href="/super-admin/whatsapp-crm">
             <Button variant="outline" size="sm" className="h-8 px-3 text-xs gap-1.5">
               <Inbox className="w-3.5 h-3.5 text-stone-500" />
-              <span>Kembali ke Inbox</span>
+              <span>Kembali ke Inbox & Leads</span>
             </Button>
           </Link>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-3 text-stone-400">
-          <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
-          <p className="text-xs">Memuat data konfigurasi...</p>
-        </div>
-      ) : (
+      {/* ── Settings Tabs ── */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="bg-stone-100 p-1 h-9 w-full sm:w-auto inline-flex">
+          <TabsTrigger value="ingestion" className="text-xs px-4 gap-2 flex-1 sm:flex-none">
+            <Sliders className="w-3.5 h-3.5" />
+            <span>Aturan Ingest & Akun WA</span>
+          </TabsTrigger>
+          <TabsTrigger value="statuses" className="text-xs px-4 gap-2 flex-1 sm:flex-none">
+            <Kanban className="w-3.5 h-3.5" />
+            <span>Status & Tahapan Prospek</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ingestion" className="space-y-6 m-0">
+          {isLoading ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-3 text-stone-400">
+              <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+              <p className="text-xs">Memuat data konfigurasi...</p>
+            </div>
+          ) : (
         <form onSubmit={handleSaveSettings} className="space-y-6">
           {/* ── Card 1: Akun WhatsApp Penerima Leads ── */}
           <Card className="border-stone-200 shadow-sm">
@@ -556,6 +586,27 @@ export default function WhatsAppCrmSettingsPage() {
           </div>
         </form>
       )}
+        </TabsContent>
+
+        <TabsContent value="statuses" className="space-y-6 m-0">
+          <StatusManagerTab />
+        </TabsContent>
+      </Tabs>
     </div>
+  );
+}
+
+export default function WhatsAppCrmSettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-20 flex flex-col items-center justify-center gap-3 text-stone-400">
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+          <p className="text-xs">Memuat Pengaturan CRM...</p>
+        </div>
+      }
+    >
+      <SettingsContent />
+    </Suspense>
   );
 }

@@ -32,6 +32,7 @@ import { CrmChatDrawer } from "./components/CrmChatDrawer";
 import { EditLeadNameDialog } from "./components/EditLeadNameDialog";
 import { CrmLeadItem, LeadCardItem } from "./components/LeadCardItem";
 import { LinkCustomerDialog } from "./components/LinkCustomerDialog";
+import { CrmStatusConfigItem, DEFAULT_STATUS_FALLBACKS } from "./types/crmStatus.type";
 
 export default function WhatsAppCrmInboxPage() {
   const { fetchApi } = useApi();
@@ -40,6 +41,7 @@ export default function WhatsAppCrmInboxPage() {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const [leads, setLeads] = useState<CrmLeadItem[]>([]);
+  const [statuses, setStatuses] = useState<CrmStatusConfigItem[]>([]);
   const [csUsers, setCsUsers] = useState<Array<{ id: string; name?: string | null; email?: string | null }>>([]);
   const [receiverSessionId, setReceiverSessionId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +51,23 @@ export default function WhatsAppCrmInboxPage() {
   const [editingLead, setEditingLead] = useState<CrmLeadItem | null>(null);
   const [linkingLead, setLinkingLead] = useState<CrmLeadItem | null>(null);
   const [activeChatLead, setActiveChatLead] = useState<CrmLeadItem | null>(null);
+
+  // Load dynamic lead statuses
+  const fetchStatuses = useCallback(async () => {
+    try {
+      const res = await fetchApi("/crm/statuses");
+      if (res.ok) {
+        const json = await res.json();
+        setStatuses(Array.isArray(json.data) ? json.data : []);
+      }
+    } catch {
+      // ignore
+    }
+  }, [fetchApi]);
+
+  useEffect(() => {
+    fetchStatuses();
+  }, [fetchStatuses]);
 
   // Load active receiver session ID once
   useEffect(() => {
@@ -340,33 +359,55 @@ export default function WhatsAppCrmInboxPage() {
             </TabsList>
           </Tabs>
 
-          {/* Filter Status Prospek */}
-          <div className="w-full sm:w-48">
-            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val)}>
-              <SelectTrigger className="h-9 text-xs bg-white border-stone-200">
-                <SelectValue placeholder="Filter Status..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL" className="text-xs">
-                  Semua Status Prospek
-                </SelectItem>
-                <SelectItem value="NEW" className="text-xs text-rose-600 font-medium">
-                  🔴 Baru (NEW)
-                </SelectItem>
-                <SelectItem value="IN_PROGRESS" className="text-xs text-amber-600 font-medium">
-                  🟡 Sedang Follow Up
-                </SelectItem>
-                <SelectItem value="QUOTATION_SENT" className="text-xs text-blue-600 font-medium">
-                  🔵 Penawaran Terkirim
-                </SelectItem>
-                <SelectItem value="WON" className="text-xs text-emerald-600 font-medium">
-                  🟢 Closing / Deal
-                </SelectItem>
-                <SelectItem value="LOST" className="text-xs text-stone-500 font-medium">
-                  ⚪ Batal (LOST)
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Filter Status Prospek & Kelola Shortcut */}
+          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+            <div className="w-full sm:w-48">
+              <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val)}>
+                <SelectTrigger className="h-9 text-xs bg-white border-stone-200">
+                  <SelectValue placeholder="Filter Status..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL" className="text-xs font-medium">
+                    Semua Status Prospek
+                  </SelectItem>
+                  {statuses.length > 0
+                    ? statuses.map((st) => (
+                        <SelectItem key={st.id} value={st.key} className="text-xs font-medium py-1.5">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0 shadow-2xs"
+                              style={{ backgroundColor: st.color }}
+                            />
+                            <span>{st.label}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    : Object.entries(DEFAULT_STATUS_FALLBACKS).map(([k, v]) => (
+                        <SelectItem key={k} value={k} className="text-xs font-medium py-1.5">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: v.color }}
+                            />
+                            <span>{v.label}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Link href="/super-admin/whatsapp-crm/settings?tab=statuses">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 px-2.5 text-xs text-stone-600 hover:text-stone-900 border-stone-200 hover:bg-stone-50 gap-1.5 shrink-0"
+                title="Kelola & Atur Tahapan Status Prospek"
+              >
+                <Kanban className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="hidden md:inline">Kelola Status</span>
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -404,6 +445,7 @@ export default function WhatsAppCrmInboxPage() {
             <LeadCardItem
               key={lead.id}
               lead={lead}
+              statuses={statuses}
               onEditName={(l) => setEditingLead(l)}
               onLinkCustomer={(l) => setLinkingLead(l)}
               onUnlinkCustomer={handleUnlinkCustomer}
@@ -423,6 +465,7 @@ export default function WhatsAppCrmInboxPage() {
         onClose={() => setActiveChatLead(null)}
         onLeadUpdated={handleUpdateLeadLocal}
         csUsers={csUsers}
+        statuses={statuses}
       />
 
       {/* Dialog: Edit Name */}
