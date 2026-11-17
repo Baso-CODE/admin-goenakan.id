@@ -286,6 +286,112 @@ export function CrmChatDrawer({
   const [templateSearchQuery, setTemplateSearchQuery] = useState("");
   const [templatePopoverOpen, setTemplatePopoverOpen] = useState(false);
 
+  // Slash (/) autocomplete state
+  const [slashActive, setSlashActive] = useState(false);
+  const [slashQuery, setSlashQuery] = useState("");
+  const [slashStartIndex, setSlashStartIndex] = useState<number>(-1);
+  const [slashHighlightIndex, setSlashHighlightIndex] = useState(0);
+  const slashMenuRef = useRef<HTMLDivElement>(null);
+  const slashItemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Combined templates list (from API or fallback)
+  const availableTemplates: CrmMessageTemplateItem[] =
+    templates.length > 0
+      ? templates
+      : QUICK_REPLIES.map((qr, idx) => ({
+          id: String(idx),
+          title: qr.title,
+          content: qr.text,
+          category: "Umum",
+          shortcut: null,
+          orderIndex: idx,
+          createdAt: "",
+        }));
+
+  const filteredSlashTemplates = availableTemplates.filter((tpl) => {
+    if (!slashQuery) return true;
+    const q = slashQuery.toLowerCase();
+    const shortcutClean = (tpl.shortcut || "").replace(/^\//, "").toLowerCase();
+    return (
+      shortcutClean.includes(q) ||
+      tpl.title.toLowerCase().includes(q) ||
+      (tpl.category && tpl.category.toLowerCase().includes(q)) ||
+      tpl.content.toLowerCase().includes(q)
+    );
+  });
+
+  // Handle message input change with slash autocomplete detection
+  const handleMessageInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setMessageInput(val);
+
+    const cursorPos = e.target.selectionStart ?? val.length;
+    const textBefore = val.slice(0, cursorPos);
+
+    // Match slash shortcut at start of line or after whitespace: e.g. "/salam" or "halo /kat" or just "/"
+    const match = textBefore.match(/(?:^|\s)\/([^\s/]*)$/);
+    if (match) {
+      const query = match[1];
+      const matchIndex = match.index ?? 0;
+      const slashIdx = matchIndex + (match[0].startsWith(" ") ? 1 : 0);
+      setSlashActive(true);
+      setSlashQuery(query);
+      setSlashStartIndex(slashIdx);
+      setSlashHighlightIndex(0);
+    } else {
+      setSlashActive(false);
+      setSlashQuery("");
+      setSlashStartIndex(-1);
+    }
+  };
+
+  // Insert selected slash template into textarea
+  const handleSelectSlashTemplate = (tpl: CrmMessageTemplateItem) => {
+    const cursorPos = textareaRef.current?.selectionStart ?? messageInput.length;
+    const startIdx = slashStartIndex >= 0 ? slashStartIndex : 0;
+    const beforeSlash = messageInput.slice(0, startIdx);
+    const afterCursor = messageInput.slice(cursorPos);
+    const newText = beforeSlash + tpl.content + afterCursor;
+
+    setMessageInput(newText);
+    setSlashActive(false);
+    setSlashQuery("");
+    setSlashStartIndex(-1);
+
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const newCursor = beforeSlash.length + tpl.content.length;
+        textareaRef.current.setSelectionRange(newCursor, newCursor);
+      }
+    }, 15);
+  };
+
+  // Scroll highlighted slash item into view
+  useEffect(() => {
+    if (slashActive && slashItemRefs.current[slashHighlightIndex]) {
+      slashItemRefs.current[slashHighlightIndex]?.scrollIntoView({
+        block: "nearest",
+      });
+    }
+  }, [slashHighlightIndex, slashActive]);
+
+  // Click outside to dismiss slash autocomplete
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        slashMenuRef.current &&
+        !slashMenuRef.current.contains(e.target as Node) &&
+        textareaRef.current &&
+        !textareaRef.current.contains(e.target as Node)
+      ) {
+        setSlashActive(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const filteredCsUsers = csUsers.filter(
     (u) =>
       !csSearchQuery.trim() ||
@@ -555,6 +661,9 @@ export function CrmChatDrawer({
 
     setMessages((prev) => [...prev, optimisticMsg]);
     setMessageInput("");
+    setSlashActive(false);
+    setSlashQuery("");
+    setSlashStartIndex(-1);
     setPendingAttachment(null);
     setIsEmojiPickerOpen(false);
     setTimeout(() => scrollToBottom("smooth"), 50);
@@ -1157,8 +1266,97 @@ export function CrmChatDrawer({
                   e.preventDefault();
                   handleSendMessage();
                 }}
-                className="flex items-end gap-1.5"
+                className="relative flex items-end gap-1.5"
               >
+                {/* Slash (/) Quick Reply Autocomplete Popup */}
+                {slashActive && (
+                  <div
+                    ref={slashMenuRef}
+                    className="absolute bottom-full mb-2 left-0 right-0 z-50 bg-white border border-stone-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150"
+                  >
+                    <div className="flex items-center justify-between px-3 py-1.5 bg-stone-50 border-b border-stone-200 text-[11px]">
+                      <div className="flex items-center gap-1.5 font-semibold text-stone-700">
+                        <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                        <span>Template Pesan Cepat</span>
+                        {slashQuery && (
+                          <span className="font-mono bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded text-[10px] font-bold">
+                            /{slashQuery}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] text-stone-400">
+                        <span className="hidden sm:inline">Tekan</span>
+                        <kbd className="px-1 py-0.5 bg-white border border-stone-200 rounded text-[9px] text-stone-600 font-mono">↑</kbd>
+                        <kbd className="px-1 py-0.5 bg-white border border-stone-200 rounded text-[9px] text-stone-600 font-mono">↓</kbd>
+                        <span className="hidden sm:inline">navigasi,</span>
+                        <kbd className="px-1 py-0.5 bg-white border border-stone-200 rounded text-[9px] text-stone-600 font-mono">Enter</kbd>
+                        <span className="hidden sm:inline">pilih,</span>
+                        <kbd className="px-1 py-0.5 bg-white border border-stone-200 rounded text-[9px] text-stone-600 font-mono">Esc</kbd>
+                        <span className="hidden sm:inline">batal</span>
+                      </div>
+                    </div>
+
+                    <div className="max-h-60 overflow-y-auto p-1 divide-y divide-stone-100">
+                      {filteredSlashTemplates.length === 0 ? (
+                        <div className="py-5 px-3 text-center text-xs text-stone-400 space-y-1">
+                          <p className="font-medium text-stone-600">Tidak ada template yang cocok dengan "/{slashQuery}"</p>
+                          <p className="text-[10px] text-stone-400">
+                            Ketik kata kunci lain atau buka{" "}
+                            <Link
+                              href="/super-admin/whatsapp-crm/settings?tab=templates"
+                              className="text-emerald-600 hover:underline font-semibold"
+                            >
+                              Pengaturan Template
+                            </Link>
+                          </p>
+                        </div>
+                      ) : (
+                        filteredSlashTemplates.map((tpl, index) => {
+                          const isSelected = index === slashHighlightIndex;
+                          return (
+                            <button
+                              key={tpl.id}
+                              ref={(el) => {
+                                slashItemRefs.current[index] = el;
+                              }}
+                              type="button"
+                              onMouseEnter={() => setSlashHighlightIndex(index)}
+                              onClick={() => handleSelectSlashTemplate(tpl)}
+                              className={`w-full text-left p-2 rounded-lg transition-colors cursor-pointer space-y-1 ${
+                                isSelected
+                                  ? "bg-emerald-50 text-emerald-950 border border-emerald-200 shadow-xs"
+                                  : "hover:bg-stone-50 text-stone-800 border border-transparent"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="font-bold text-xs text-stone-800 truncate">
+                                    {tpl.title}
+                                  </span>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[9px] px-1 py-0 bg-stone-100 text-stone-600 border-stone-200 font-normal shrink-0"
+                                  >
+                                    {tpl.category || "Umum"}
+                                  </Badge>
+                                </div>
+                                {tpl.shortcut && (
+                                  <span className="font-mono text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded shrink-0">
+                                    {tpl.shortcut.startsWith("/") ? tpl.shortcut : `/${tpl.shortcut}`}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-stone-500 line-clamp-2 leading-relaxed">
+                                {tpl.content}
+                              </p>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Hidden Native File Inputs */}
                 <input
                   type="file"
@@ -1257,15 +1455,41 @@ export function CrmChatDrawer({
                 <Textarea
                   ref={textareaRef}
                   value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
+                  onChange={handleMessageInputChange}
                   onPaste={handlePaste}
                   onKeyDown={(e) => {
+                    if (slashActive && filteredSlashTemplates.length > 0) {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setSlashHighlightIndex((prev) => (prev + 1) % filteredSlashTemplates.length);
+                        return;
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setSlashHighlightIndex((prev) => (prev - 1 + filteredSlashTemplates.length) % filteredSlashTemplates.length);
+                        return;
+                      }
+                      if (e.key === "Enter" || e.key === "Tab") {
+                        e.preventDefault();
+                        const chosen = filteredSlashTemplates[slashHighlightIndex] || filteredSlashTemplates[0];
+                        if (chosen) {
+                          handleSelectSlashTemplate(chosen);
+                        }
+                        return;
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setSlashActive(false);
+                        return;
+                      }
+                    }
+
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       handleSendMessage();
                     }
                   }}
-                  placeholder="Ketik pesan WhatsApp... (Enter untuk kirim)"
+                  placeholder="Ketik pesan WhatsApp... (Ketik / untuk template cepat)"
                   rows={2}
                   className="text-xs resize-none bg-stone-50/50 flex-1"
                 />

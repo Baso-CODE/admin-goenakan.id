@@ -9,6 +9,15 @@ export interface CrmMessageTemplateItem {
   updatedAt?: string;
 }
 
+export interface CrmTemplateCategoryItem {
+  id: string;
+  name: string;
+  orderIndex?: number;
+  templateCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const PRESET_TEMPLATE_CATEGORIES = [
   "Salam",
   "Pemesanan",
