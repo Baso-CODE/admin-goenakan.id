@@ -24,7 +24,6 @@ import {
   ClipboardList,
   ImagePlus,
   Loader2,
-  Lock,
   Mail,
   Save,
   ShieldCheck,
@@ -116,23 +115,15 @@ export default function UserForm({
   const form = useForm<UserFormValues>({
     resolver: zodResolver(
       userSchema.superRefine((values, ctx) => {
-        if (!isEdit && values.password.length < 6) {
-          ctx.addIssue({
-            code: "custom",
-            path: ["password"],
-            message: "Password must be at least 6 characters",
-          });
-        }
-
         if (
           isEdit &&
           values.password.length > 0 &&
-          values.password.length < 6
+          values.password.length < 8
         ) {
           ctx.addIssue({
             code: "custom",
             path: ["password"],
-            message: "Password must be at least 6 characters",
+            message: "Password minimal 8 karakter",
           });
         }
       }),
@@ -466,45 +457,31 @@ export default function UserForm({
                   PASSWORD
               ================================== */}
 
-              <div className="col-span-1">
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        <Lock className="h-4 w-4 text-muted-foreground" />
+              {isEdit && (
+                <div className="col-span-1">
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>New Password (Optional)</FormLabel>
 
-                        {isEdit
-                          ? "New Password (Optional)"
-                          : "Temporary Password *"}
-                      </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="password"
+                            autoComplete="new-password"
+                            placeholder="Kosongkan jika tidak diubah"
+                            {...field}
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
 
-                      <FormControl>
-                        <Input
-                          type="password"
-                          autoComplete="new-password"
-                          placeholder={
-                            isEdit
-                              ? "Leave blank to keep current password"
-                              : "Min. 6 characters"
-                          }
-                          {...field}
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-
-                      {isEdit && (
-                        <p className="text-xs text-muted-foreground">
-                          Kosongkan jika tidak ingin mengganti password.
-                        </p>
-                      )}
-
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
 
               {/* ==================================
                   ROLE

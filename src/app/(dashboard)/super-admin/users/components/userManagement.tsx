@@ -1,7 +1,13 @@
 "use client";
 
-import { Pencil, Search, Trash2, UserPlus } from "lucide-react";
-import { useSession } from "next-auth/react";
+import {
+  Loader2,
+  MailPlus,
+  Pencil,
+  Search,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -20,241 +26,450 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useDebounce } from "@/helper/debounce";
 import { useApi } from "@/hooks/useApi";
 
-// --- Definisi Tipe (Sesuai dengan balikan dari UserService backend) ---
 interface User {
   id: string;
-  name: string;
+  name: string | null;
   email: string;
   image: string | null;
   createdAt: string;
+  invitationPending: boolean;
   role: {
     name: string;
   };
 }
 
-// Helper function untuk memformat Role
-const formatRole = (role: string): string => {
-  if (!role) return "NO ROLE";
-  return role.replace(/_/g, " ");
-};
+const formatRole = (role: string): string =>
+  role ? role.replace(/_/g, " ") : "NO ROLE";
 
 export default function UserManagementPage() {
   const { fetchApi, status } = useApi();
-  const { data: session } = useSession();
 
-  // === STATE ===
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [search, setSearch] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
-  // Jika backend belum pakai pagination, kita pakai pencarian di sisi client (Client-side filtering)
+  const [search, setSearch] = useState("");
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
   const debouncedSearch = useDebounce(search, 800);
 
-  // === FETCH DATA DARI BACKEND ===
+  // ===================================================
+  // FETCH USERS
+  // ===================================================
   const fetchUsers = async () => {
     if (status !== "authenticated") return;
 
     setLoading(true);
-    try {
-      // Pastikan endpoint ini sesuai dengan yang Anda set di UserRouter (misal: /users)
-      const res = await fetchApi("/users");
 
-      if (!res.ok) {
-        throw new Error("Gagal mengambil data user");
+    try {
+      const response = await fetchApi("/users");
+
+      if (!response.ok) {
+        throw new Error("Gagal mengambil data User.");
       }
 
-      const data = await res.json();
+      const data: User[] = await response.json();
+
       setUsers(data);
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || "Terjadi kesalahan server");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Gagal memuat User.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchUsers();
+    if (status === "authenticated") {
+      void fetchUsers();
+    } else if (status === "unauthenticated") {
+      setLoading(false);
+    }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  // === CLIENT-SIDE FILTERING ===
+  // ===================================================
+  // RESEND INVITATION
+  // ===================================================
+
+  const handleResendInvitation = async () => {
+    if (
+      status !== "authenticated" ||
+      !selectedUser ||
+      !selectedUser.invitationPending ||
+      resendingId !== null
+    ) {
+      return;
+    }
+
+    const user = selectedUser;
+
+    setResendingId(user.id);
+
+    try {
+      const response = await fetchApi(`/users/${user.id}/resend-invitation`, {
+        method: "POST",
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          result.message || "Gagal mengirim ulang email aktivasi.",
+        );
+      }
+
+      toast.success(`Email aktivasi berhasil dikirim ulang ke ${user.email}`, {
+        duration: 5000,
+      });
+
+      // Tutup modal setelah email berhasil dikirim.
+      setSelectedUser(null);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Terjadi kesalahan saat mengirim email.",
+      );
+
+      // Jika gagal, modal tetap terbuka agar bisa dicoba lagi.
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  // ===================================================
+  // SEARCH
+  // ===================================================
   const filteredUsers = users.filter((user) => {
-    const searchLower = debouncedSearch.toLowerCase();
+    const keyword = debouncedSearch.trim().toLowerCase();
+
     return (
-      (user.name && user.name.toLowerCase().includes(searchLower)) ||
-      (user.email && user.email.toLowerCase().includes(searchLower)) ||
-      (user.role?.name &&
-        formatRole(user.role.name).toLowerCase().includes(searchLower))
+      (user.name || "").toLowerCase().includes(keyword) ||
+      user.email.toLowerCase().includes(keyword) ||
+      formatRole(user.role?.name).toLowerCase().includes(keyword)
     );
   });
 
   return (
-    <div className="space-y-12 w-full mx-auto pb-10">
-      {/* ========================================== */}
-      {/* BAGIAN 1: TABEL USER MANAGEMENT            */}
-      {/* ========================================== */}
-      <div className="space-y-5">
-        {/* === HEADER CARD & SEARCH === */}
-        <Card className="border-l-4 border-l-blue-600 shadow-sm">
-          <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <CardTitle className="text-2xl font-bold">
-                User Management
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Kelola data pengguna sistem dan hak akses mereka.
-              </p>
-            </div>
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search name, email, or role..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10 h-10 rounded-lg"
-              />
-            </div>
-          </CardHeader>
-        </Card>
+    <div className="mx-auto w-full space-y-5 pb-10">
+      {/* HEADER */}
+      <Card className="border-l-4 border-l-primary shadow-sm">
+        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <CardTitle className="text-2xl font-bold">
+              User Management
+            </CardTitle>
 
-        {/* === ADD USER BUTTON === */}
-        <div className="flex justify-end">
+            <p className="mt-1 text-sm text-muted-foreground">
+              Kelola pengguna, hak akses, dan undangan aktivasi akun Goenakan.
+            </p>
+          </div>
+
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+
+            <Input
+              type="text"
+              placeholder="Cari nama, email, atau role..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-10 rounded-lg pl-10"
+            />
+          </div>
+        </CardHeader>
+      </Card>
+
+      {/* CREATE BUTTON */}
+      <div className="flex justify-end">
+        <Button asChild className="gap-2">
           <Link href="/super-admin/users/add">
-            <Button className="gap-2 bg-blue-600 hover:bg-blue-700 transition duration-200">
-              <UserPlus className="h-4 w-4" />
-              Add New User
-            </Button>
+            <UserPlus className="h-4 w-4" />
+            Add New User
           </Link>
-        </div>
+        </Button>
+      </div>
 
-        {/* === TABLE CARD === */}
-        <Card className="w-full overflow-hidden shadow-sm border-t-0">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto border rounded-md">
-              <Table className="whitespace-nowrap">
-                <TableHeader className="bg-muted/30">
-                  <TableRow>
-                    <TableHead className="min-w-45">User</TableHead>
-                    <TableHead className="min-w-60">Email</TableHead>
-                    <TableHead className="min-w-40">Role</TableHead>
-                    <TableHead className="min-w-30">Join Date</TableHead>
-                    <TableHead className="text-right min-w-30 sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)]">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    Array.from({ length: 4 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          <Skeleton className="h-5 w-32" />
+      {/* TABLE */}
+      <Card className="w-full overflow-hidden shadow-sm">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table className="whitespace-nowrap">
+              <TableHeader className="bg-muted/40">
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status Aktivasi</TableHead>
+                  <TableHead>Join Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, index) => (
+                    <TableRow key={index}>
+                      {Array.from({ length: 6 }).map((_, column) => (
+                        <TableCell key={column}>
+                          <Skeleton className="h-6 w-28" />
                         </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-5 w-48" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-6 w-24 rounded-full" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-5 w-24" />
-                        </TableCell>
-                        <TableCell className="sticky right-0 bg-white">
-                          <Skeleton className="h-8 w-16 ml-auto" />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : filteredUsers.length > 0 ? (
-                    filteredUsers.map((user) => (
-                      <TableRow
-                        key={user.id}
-                        className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50">
-                        <TableCell className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-3">
-                          {/* Tampilkan Image jika ada, jika tidak pakai inisial (Opsional) */}
-                          <div className="h-8 w-8 rounded-full bg-slate-200 overflow-hidden shrink-0 flex items-center justify-center border">
+                      ))}
+                    </TableRow>
+                  ))
+                ) : filteredUsers.length > 0 ? (
+                  filteredUsers.map((user) => (
+                    <TableRow key={user.id} className="hover:bg-muted/30">
+                      {/* USER */}
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-primary/10">
                             {user.image ? (
                               <img
                                 src={user.image}
-                                alt={user.name}
+                                alt={user.name || "User"}
                                 className="h-full w-full object-cover"
                               />
                             ) : (
-                              <span className="text-xs font-bold text-slate-500">
-                                {user.name?.substring(0, 2).toUpperCase() ||
-                                  "US"}
+                              <span className="text-xs font-bold text-primary">
+                                {(user.name || "US").slice(0, 2).toUpperCase()}
                               </span>
                             )}
                           </div>
-                          {user.name}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {user.email}
-                        </TableCell>
-                        <TableCell>
+
+                          <span className="font-medium">
+                            {user.name || "Unnamed User"}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      {/* EMAIL */}
+                      <TableCell className="text-muted-foreground">
+                        {user.email}
+                      </TableCell>
+
+                      {/* ROLE */}
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className="border-primary/20 bg-primary/5 text-primary">
+                          {formatRole(user.role?.name)}
+                        </Badge>
+                      </TableCell>
+
+                      {/* ACTIVATION */}
+                      <TableCell>
+                        {user.invitationPending ? (
                           <Badge
                             variant="outline"
-                            className={
-                              user.role?.name === "SUPER_ADMIN"
-                                ? "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900 dark:text-purple-300"
-                                : "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300"
-                            }>
-                            {formatRole(user.role?.name)}
+                            className="border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                            Menunggu Aktivasi
                           </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-gray-500">
-                          {new Date(user.createdAt).toLocaleDateString(
-                            "id-ID",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            },
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right sticky right-0 bg-white shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)]">
-                          <div className="flex justify-end gap-2">
-                            <Link href={`/super-admin/users/edit/${user.id}`}>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50">
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                            {/* Jika Anda sudah punya fungsi Delete di backend, tambahkan handler di sini */}
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Tidak ada undangan tertunda
+                          </span>
+                        )}
+                      </TableCell>
+
+                      {/* DATE */}
+                      <TableCell className="text-muted-foreground">
+                        {new Date(user.createdAt).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </TableCell>
+
+                      {/* ACTIONS */}
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-2">
+                          {user.invitationPending && (
                             <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                              onClick={() =>
-                                toast.info("Fitur hapus belum disambungkan")
-                              }>
-                              <Trash2 className="h-4 w-4" />
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={resendingId !== null}
+                              onClick={() => setSelectedUser(user)}
+                              className="gap-2 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary">
+                              {resendingId === user.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <MailPlus className="h-4 w-4" />
+                              )}
+
+                              {resendingId === user.id
+                                ? "Mengirim..."
+                                : "Kirim Ulang"}
                             </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell
-                        colSpan={5}
-                        className="text-center py-10 text-muted-foreground">
-                        Tidak ada pengguna yang sesuai dengan pencarian Anda.
+                          )}
+
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="icon"
+                            className="text-primary hover:bg-primary/10 hover:text-primary">
+                            <Link
+                              href={`/super-admin/users/edit/${user.id}`}
+                              aria-label={`Edit ${user.name || user.email}`}>
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Delete user"
+                            className="text-destructive hover:bg-destructive/10"
+                            onClick={() =>
+                              toast.info("Fitur hapus belum disambungkan.")
+                            }>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="py-12 text-center text-muted-foreground">
+                      Tidak ada pengguna yang sesuai dengan pencarian.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ==========================================
+    CONFIRM RESEND INVITATION DIALOG
+========================================== */}
+      <AlertDialog
+        open={selectedUser !== null}
+        onOpenChange={(open) => {
+          if (!open && resendingId === null) {
+            setSelectedUser(null);
+          }
+        }}>
+        <AlertDialogContent className="max-w-md rounded-2xl border-border bg-card p-6 shadow-xl sm:p-7">
+          <AlertDialogHeader className="space-y-4 text-left">
+            {/* ICON */}
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10">
+              <MailPlus className="h-7 w-7 text-primary" />
             </div>
-          </CardContent>
-        </Card>
-      </div>
+
+            {/* TITLE */}
+            <div className="space-y-2">
+              <AlertDialogTitle className="text-xl font-bold tracking-tight text-foreground">
+                Kirim Ulang Undangan?
+              </AlertDialogTitle>
+
+              <AlertDialogDescription className="text-sm leading-6 text-muted-foreground">
+                Anda akan mengirim ulang email aktivasi akun Goenakan Indonesia
+                kepada pengguna berikut.
+              </AlertDialogDescription>
+            </div>
+          </AlertDialogHeader>
+
+          {/* USER INFORMATION */}
+          <div className="space-y-3 rounded-xl border border-border bg-muted/40 p-4">
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Nama Pengguna
+              </p>
+
+              <p className="text-sm font-semibold text-foreground">
+                {selectedUser?.name || "Unnamed User"}
+              </p>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Alamat Email
+              </p>
+
+              <p className="break-all text-sm font-medium text-primary">
+                {selectedUser?.email || "-"}
+              </p>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Role
+              </p>
+
+              <p className="text-sm font-medium text-foreground">
+                {selectedUser?.role?.name?.replace(/_/g, " ") || "-"}
+              </p>
+            </div>
+          </div>
+
+          {/* INFORMATION */}
+          <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
+            <MailPlus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+
+            <p className="text-xs leading-6 text-muted-foreground">
+              Sistem akan mengirimkan link aktivasi baru yang berlaku selama{" "}
+              <strong>24 jam</strong>. Link aktivasi sebelumnya otomatis tidak
+              berlaku. Akun pengguna tidak akan dibuat ulang.
+            </p>
+          </div>
+
+          {/* ACTIONS */}
+          <AlertDialogFooter className="mt-2 gap-2 sm:gap-3">
+            <AlertDialogCancel
+              disabled={resendingId !== null}
+              className="h-10 rounded-lg border-border px-5">
+              Batal
+            </AlertDialogCancel>
+
+            <AlertDialogAction
+              disabled={!selectedUser || resendingId !== null}
+              onClick={(event) => {
+                // Jangan tutup modal sebelum API selesai.
+                event.preventDefault();
+
+                void handleResendInvitation();
+              }}
+              className="h-10 gap-2 rounded-lg bg-primary px-5 font-semibold text-primary-foreground hover:bg-primary/90">
+              {resendingId !== null ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Mengirim...
+                </>
+              ) : (
+                <>
+                  <MailPlus className="h-4 w-4" />
+                  Ya, Kirim Ulang
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
