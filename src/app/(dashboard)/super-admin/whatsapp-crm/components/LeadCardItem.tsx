@@ -18,6 +18,7 @@ import {
   Edit3,
   ExternalLink,
   FileText,
+  Globe,
   HandMetal,
   Link2,
   MessageSquare,
@@ -34,6 +35,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
+import {
+  parseWhatsappClickAttribution,
+  WhatsappClickAttribution,
+} from "../types/crmAttribution.type";
 import { CrmStatusConfigItem, DEFAULT_STATUS_FALLBACKS } from "../types/crmStatus.type";
 import { QuickAddStatusDialog } from "./QuickAddStatusDialog";
 
@@ -68,6 +73,8 @@ export interface CrmLeadItem {
     code: string;
     label: string;
   } | null;
+  whatsappClickId?: string | null;
+  whatsappClick?: WhatsappClickAttribution | null;
   status: string;
   statusConfig?: {
     id?: string;
@@ -190,6 +197,20 @@ export function LeadCardItem({
                 <span>REF: {lead.sourceCode.code}</span>
               </span>
             )}
+
+            {lead.whatsappClick && (() => {
+              const attr = parseWhatsappClickAttribution(lead.whatsappClick);
+              if (!attr) return null;
+              return (
+                <span
+                  className={`inline-flex items-center gap-1 border px-2 py-0.5 rounded text-[10px] font-semibold ${attr.badgeClass}`}
+                  title={`Halaman: ${attr.pagePath} | CTA: ${attr.ctaName}${attr.campaign ? ` | Kampanye: ${attr.campaign}` : ""}`}
+                >
+                  <Globe className="w-2.5 h-2.5" />
+                  <span>{attr.platform} ({attr.code})</span>
+                </span>
+              );
+            })()}
 
             {/* Note count indicator */}
             {lead.notesCount && lead.notesCount > 0 ? (

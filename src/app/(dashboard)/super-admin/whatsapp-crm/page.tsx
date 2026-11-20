@@ -14,6 +14,7 @@ import { useApi } from "@/hooks/useApi";
 import {
   DownloadCloud,
   Filter,
+  Globe,
   Inbox,
   Kanban,
   MessageSquare,
@@ -46,6 +47,7 @@ export default function WhatsAppCrmInboxPage() {
 
   const [activeTab, setActiveTab] = useState<"all" | "me" | "unassigned">("all");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [trafficSource, setTrafficSource] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const [leads, setLeads] = useState<CrmLeadItem[]>([]);
   const [statuses, setStatuses] = useState<CrmStatusConfigItem[]>([]);
@@ -136,6 +138,9 @@ export default function WhatsAppCrmInboxPage() {
         if (statusFilter !== "ALL") {
           params.append("status", statusFilter);
         }
+        if (trafficSource !== "ALL") {
+          params.append("trafficSource", trafficSource);
+        }
         if (search.trim()) {
           params.append("search", search.trim());
         }
@@ -163,7 +168,7 @@ export default function WhatsAppCrmInboxPage() {
         if (!silent) setIsLoading(false);
       }
     },
-    [activeTab, statusFilter, search, sourceCodeParam, fetchApi]
+    [activeTab, statusFilter, trafficSource, search, sourceCodeParam, fetchApi]
   );
 
   useEffect(() => {
@@ -492,6 +497,38 @@ export default function WhatsAppCrmInboxPage() {
                 <span className="hidden md:inline">Kelola Status</span>
               </Button>
             </Link>
+
+            {/* Filter Sumber Trafik / Atribusi Web */}
+            <div className="w-full sm:w-44">
+              <Select value={trafficSource} onValueChange={(val) => setTrafficSource(val)}>
+                <SelectTrigger className="h-9 text-xs bg-white border-stone-200">
+                  <SelectValue placeholder="Sumber Trafik..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL" className="text-xs font-medium">
+                    Semua Saluran Trafik
+                  </SelectItem>
+                  <SelectItem value="website" className="text-xs font-medium py-1.5">
+                    <div className="flex items-center gap-1.5 text-sky-700">
+                      <Globe className="w-3.5 h-3.5" />
+                      <span>Klik Iklan/Web (GK)</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="master_code" className="text-xs font-medium py-1.5">
+                    <div className="flex items-center gap-1.5 text-amber-700">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Master Kode CRM (REF)</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="direct" className="text-xs font-medium py-1.5">
+                    <div className="flex items-center gap-1.5 text-stone-700">
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Chat Langsung (Direct)</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -536,6 +573,34 @@ export default function WhatsAppCrmInboxPage() {
           >
             <X className="w-3 h-3" />
             <span>Hapus Filter</span>
+          </button>
+        </div>
+      )}
+
+      {/* ── Active Traffic Source Filter Chip ── */}
+      {trafficSource !== "ALL" && (
+        <div className="flex items-center justify-between gap-2 p-2 px-3 bg-sky-50 border border-sky-200/90 rounded-lg text-xs text-sky-900 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <Globe className="w-3.5 h-3.5 text-sky-600" />
+            <span>
+              Memfilter Saluran Trafik:{" "}
+              <strong>
+                {trafficSource === "website"
+                  ? "Klik Iklan & Web (GK-XXXXX)"
+                  : trafficSource === "master_code"
+                  ? "Master Kode CRM (REF:XXX)"
+                  : "Chat Masuk Langsung (Direct)"}
+              </strong>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setTrafficSource("ALL")}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-100 hover:bg-sky-200 text-sky-900 font-semibold text-[11px] transition-colors cursor-pointer"
+            title="Reset filter saluran trafik"
+          >
+            <X className="w-3 h-3" />
+            <span>Reset Saluran</span>
           </button>
         </div>
       )}

@@ -39,6 +39,7 @@ import {
   Download,
   Eye,
   FileText,
+  Globe,
   Image as ImageIcon,
   Info,
   Loader2,
@@ -63,6 +64,7 @@ import { EmojiStyle, Theme, type EmojiClickData } from "emoji-picker-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CrmLeadItem } from "./LeadCardItem";
+import { parseWhatsappClickAttribution } from "../types/crmAttribution.type";
 import { CrmStatusConfigItem, DEFAULT_STATUS_FALLBACKS } from "../types/crmStatus.type";
 import { CrmLabelConfigItem } from "../types/crmLabel.type";
 import { CrmMessageTemplateItem } from "../types/crmTemplate.type";
@@ -1704,6 +1706,64 @@ export function CrmChatDrawer({
                   <span>Sumber Iklan / Kampanye: <strong>{lead.sourceCode.label} ({lead.sourceCode.code})</strong></span>
                 </div>
               )}
+
+              {/* Digital Footprint / Dynamic Website Click Attribution */}
+              {lead.whatsappClick && (() => {
+                const attr = parseWhatsappClickAttribution(lead.whatsappClick);
+                if (!attr) return null;
+
+                return (
+                  <div className="p-3 bg-stone-50 border border-stone-200/90 rounded-lg space-y-2 mt-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-stone-900 border-b border-stone-200/70 pb-1.5">
+                      <div className="flex items-center gap-1.5 text-sky-700">
+                        <Globe className="w-3.5 h-3.5" />
+                        <span>Atribusi Iklan & Jejak Web ({attr.code})</span>
+                      </div>
+                      <Badge variant="outline" className={`text-[10px] font-semibold ${attr.badgeClass}`}>
+                        {attr.platform}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <span className="text-stone-400 block text-[10px]">Halaman Produk:</span>
+                        <span className="font-mono font-medium text-stone-800 break-all">{attr.pagePath || "/"}</span>
+                      </div>
+                      <div>
+                        <span className="text-stone-400 block text-[10px]">Tombol Diklik (CTA):</span>
+                        <span className="font-medium text-stone-800">{attr.ctaName || "-"}</span>
+                      </div>
+
+                      {attr.campaign && (
+                        <div>
+                          <span className="text-stone-400 block text-[10px]">Kampanye (UTM):</span>
+                          <span className="font-semibold text-emerald-700">{attr.campaign}</span>
+                        </div>
+                      )}
+
+                      {attr.medium && (
+                        <div>
+                          <span className="text-stone-400 block text-[10px]">Media Iklan (Medium):</span>
+                          <span className="text-stone-700">{attr.medium}</span>
+                        </div>
+                      )}
+
+                      {attr.referrer && (
+                        <div className="col-span-2">
+                          <span className="text-stone-400 block text-[10px]">Link Asal (Referrer):</span>
+                          <span className="text-stone-600 truncate block text-[10px]">{attr.referrer}</span>
+                        </div>
+                      )}
+
+                      {attr.gaClientId && (
+                        <div className="col-span-2 text-[10px] text-stone-400 font-mono">
+                          GA Client ID: {attr.gaClientId}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Labels / Tags Section */}
