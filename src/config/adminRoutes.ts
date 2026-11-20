@@ -10,6 +10,7 @@ export type AdminRoute = {
     | "Database"
     | "User Management"
     | "Marketing & Content"
+    | "WhatsApp CRM"
     | "WA Portal"
     | "Other";
   group: string;
@@ -432,6 +433,40 @@ export const ADMIN_ROUTES: AdminRoute[] = [
     defaultPriority: 330,
     section: "Marketing & Content",
     group: "Marketing Campaigns",
+  },
+
+  // WHATSAPP CRM
+  {
+    title: "WhatsApp CRM - Inbox & Leads",
+    url: "/super-admin/whatsapp-crm",
+    permission: "view_crm_inbox",
+    defaultPriority: 340,
+    section: "WhatsApp CRM",
+    group: "WhatsApp CRM",
+  },
+  {
+    title: "WhatsApp CRM - Sales Pipeline",
+    url: "/super-admin/whatsapp-crm/pipeline",
+    permission: "view_crm_pipeline",
+    defaultPriority: 341,
+    section: "WhatsApp CRM",
+    group: "WhatsApp CRM",
+  },
+  {
+    title: "WhatsApp CRM - Master Kode",
+    url: "/super-admin/whatsapp-crm/custom-codes",
+    permission: "manage_whatsapp_crm",
+    defaultPriority: 342,
+    section: "WhatsApp CRM",
+    group: "WhatsApp CRM",
+  },
+  {
+    title: "WhatsApp CRM - Pengaturan CRM",
+    url: "/super-admin/whatsapp-crm/settings",
+    permission: "manage_whatsapp_crm",
+    defaultPriority: 343,
+    section: "WhatsApp CRM",
+    group: "WhatsApp CRM",
   },
 
   // WA PORTAL

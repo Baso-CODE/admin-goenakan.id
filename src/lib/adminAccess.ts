@@ -30,11 +30,13 @@ export function getDefaultAdminRoute(
 
   const allowedRoutes = ADMIN_ROUTES.filter((route) =>
     canAccessAdminRoute(route, role, permissions),
-  )
+  );
+
+  const prioritized = allowedRoutes
     .filter((route) => route.defaultPriority !== undefined)
     .sort((a, b) => (a.defaultPriority ?? 9999) - (b.defaultPriority ?? 9999));
 
-  return allowedRoutes[0]?.url ?? "/unauthorized";
+  return prioritized[0]?.url ?? allowedRoutes[0]?.url ?? "/unauthorized";
 }
 
 export function getAccessibleAdminRoutes(

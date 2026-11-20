@@ -53,16 +53,18 @@ export async function fetchWaApi<T = any>(
   }
 
   let response: Response;
+  const isChatSync = targetUrl.includes("/chats");
+  const timeoutMs = isChatSync ? 60000 : 15000;
   try {
     response = await fetch(targetUrl, {
       ...options,
       headers,
-      signal: options.signal || AbortSignal.timeout(12000),
+      signal: options.signal || AbortSignal.timeout(timeoutMs),
       cache: "no-store",
     });
   } catch (err: any) {
-    if (err.name === "TimeoutError") {
-      throw new WaApiError("WhatsApp API request timed out (12s)", 504);
+    if (err.name === "TimeoutError" || err?.message?.toLowerCase().includes("timeout")) {
+      throw new WaApiError(`WhatsApp API request timed out (${timeoutMs / 1000}s)`, 504);
     }
     throw new WaApiError(err.message || "Failed to connect to WhatsApp API", 502);
   }
@@ -107,7 +109,9 @@ export async function fetchWaApiRaw(
   }
 
   const isStreaming = cleanPath.includes("/events");
-  const signal = options.signal !== undefined ? options.signal : isStreaming ? undefined : AbortSignal.timeout(12000);
+  const isChatSync = cleanPath.includes("/chats");
+  const timeoutMs = isChatSync ? 60000 : 15000;
+  const signal = options.signal !== undefined ? options.signal : isStreaming ? undefined : AbortSignal.timeout(timeoutMs);
 
   try {
     return await fetch(targetUrl, {
@@ -117,8 +121,8 @@ export async function fetchWaApiRaw(
       cache: "no-store",
     });
   } catch (err: any) {
-    if (err.name === "TimeoutError") {
-      throw new WaApiError("WhatsApp API request timed out (12s)", 504);
+    if (err.name === "TimeoutError" || err?.message?.toLowerCase().includes("timeout")) {
+      throw new WaApiError(`WhatsApp API request timed out (${timeoutMs / 1000}s)`, 504);
     }
     if (err.name === "AbortError") {
       throw new WaApiError("Client disconnected", 499);
