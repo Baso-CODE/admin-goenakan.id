@@ -21,6 +21,7 @@ import {
   Globe,
   HandMetal,
   Link2,
+  Lock,
   MessageSquare,
   Plus,
   Search,
@@ -34,6 +35,7 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import React, { useState } from "react";
 import {
   parseWhatsappClickAttribution,
@@ -112,6 +114,69 @@ interface LeadCardItemProps {
   onStatusCreated?: (newStatus: CrmStatusConfigItem, targetLeadId?: string | null) => void;
 }
 
+function formatRelativeMessageTime(dateStr?: string | null) {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  const timeHHmm = date.toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  if (diffSec < 60) {
+    return {
+      text: "Baru saja",
+      time: timeHHmm,
+      isVeryRecent: true,
+    };
+  }
+  if (diffSec < 3600) {
+    const min = Math.floor(diffSec / 60);
+    return {
+      text: `${min} mnt lalu`,
+      time: timeHHmm,
+      isVeryRecent: min <= 5,
+    };
+  }
+
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  if (isToday) {
+    const hr = Math.floor(diffSec / 3600);
+    return {
+      text: `${hr} jam lalu`,
+      time: timeHHmm,
+      isVeryRecent: false,
+    };
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+
+  if (isYesterday) {
+    return {
+      text: "Kemarin",
+      time: timeHHmm,
+      isVeryRecent: false,
+    };
+  }
+
+  return {
+    text: date.toLocaleDateString("id-ID", { day: "numeric", month: "short" }),
+    time: timeHHmm,
+    isVeryRecent: false,
+  };
+}
+
 export function LeadCardItem({
   lead,
   statuses,
@@ -130,8 +195,18 @@ export function LeadCardItem({
   const { name, source, formattedPhone } = lead.resolvedContact;
   const initial = name ? name.charAt(0).toUpperCase() : "?";
 
+  const { data: session } = useSession();
+  const currentUserId = (session?.user as any)?.id;
+  const currentUserRole = String((session?.user as any)?.role || "").toUpperCase();
+  const userPermissions: string[] = (session?.user as any)?.permissions || [];
+
+  const isSupervisorOrAdmin = ["SUPER_ADMIN", "ADMIN", "SUPERVISOR", "MANAGER"].includes(currentUserRole);
+  const canAssignLead = isSupervisorOrAdmin || userPermissions.includes("assign_crm_leads");
+
   const isAssigned = !!lead.assignedToUserId;
   const isLinked = !!lead.customerProfileId;
+  const isAssignedToMe = Boolean(isAssigned && currentUserId && lead.assignedToUserId === currentUserId);
+  const isAssignedToOther = Boolean(isAssigned && currentUserId && lead.assignedToUserId !== currentUserId);
 
   const filteredCsUsers = csUsers?.filter(
     (u) =>
@@ -148,8 +223,16 @@ export function LeadCardItem({
       color: "#4b5563",
     };
 
+  const hasUnread = Boolean(lead.unreadCount && lead.unreadCount > 0);
+
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-4 shadow-sm hover:border-stone-300 transition-all flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+    <div
+      className={`bg-white border rounded-xl p-4 shadow-sm hover:border-stone-300 transition-all flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 ${
+        hasUnread
+          ? "border-emerald-300 border-l-4 border-l-emerald-500 bg-emerald-50/15"
+          : "border-stone-200"
+      }`}
+    >
       {/* ── Contact Profile & Info (Left Side: Profile, Name, Source, Number, REF, Labels, Last Message) ── */}
       <div className="flex items-start gap-3 min-w-0 flex-1">
         <Avatar className="w-11 h-11 border border-stone-200 shrink-0 bg-emerald-50 text-emerald-800 font-bold text-sm">
@@ -161,8 +244,8 @@ export function LeadCardItem({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-stone-900 text-sm truncate">{name}</span>
 
-            {lead.unreadCount && lead.unreadCount > 0 ? (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-600 text-white">
+            {hasUnread ? (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white animate-pulse shadow-xs">
                 {lead.unreadCount} baru
               </span>
             ) : null}
@@ -243,14 +326,25 @@ export function LeadCardItem({
               <p className="line-clamp-1 italic text-stone-500 text-[11px]">
                 &quot;{lead.lastMessage}&quot;
               </p>
-              {lead.lastMessageAt && (
-                <span className="text-[10px] text-stone-400 shrink-0 ml-auto sm:ml-0 font-mono">
-                  {new Date(lead.lastMessageAt).toLocaleTimeString("id-ID", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              )}
+              {lead.lastMessageAt && (() => {
+                const rel = formatRelativeMessageTime(lead.lastMessageAt);
+                if (!rel) return null;
+                return (
+                  <span
+                    className={`text-[10px] shrink-0 ml-auto sm:ml-0 font-mono flex items-center gap-1 ${
+                      rel.isVeryRecent ? "text-emerald-700 font-semibold" : "text-stone-400"
+                    }`}
+                    title={new Date(lead.lastMessageAt).toLocaleString("id-ID")}
+                  >
+                    {rel.isVeryRecent && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    )}
+                    <span>{rel.text}</span>
+                    <span>•</span>
+                    <span>{rel.time}</span>
+                  </span>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -340,85 +434,135 @@ export function LeadCardItem({
 
           {/* Status Penugasan (Interactive Dropdown Reassign & Klaim Leads) */}
           {isAssigned ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200/90 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer shadow-2xs"
-                  title="Klik untuk mengubah penugasan CS"
-                >
-                  <UserCheck className="w-2.5 h-2.5 text-blue-600" />
-                  <span>Ditangani: <strong>{lead.assignedToUser?.name || "CS"}</strong></span>
-                  <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-60 text-xs p-1">
-                {/* Search input for CS */}
-                <div className="p-1 pb-1.5 border-b border-stone-100">
-                  <div className="relative">
-                    <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-stone-400" />
-                    <input
-                      type="text"
-                      value={csSearchQuery}
-                      onChange={(e) => setCsSearchQuery(e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
-                      placeholder="Cari nama CS..."
-                      className="w-full pl-6 pr-2 py-1 text-xs bg-stone-50 border border-stone-200 rounded focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
-                    />
-                  </div>
-                </div>
-
-                {onClaimLead && (
-                  <DropdownMenuItem
-                    onClick={() => onClaimLead(lead.id)}
-                    className="flex items-center gap-2 text-xs text-emerald-700 font-medium cursor-pointer py-1.5"
+            canAssignLead ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer shadow-2xs border ${
+                      isAssignedToMe
+                        ? "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border-emerald-300"
+                        : isAssignedToOther
+                        ? "bg-amber-50 text-amber-900 hover:bg-amber-100 border-amber-300"
+                        : "bg-blue-50 text-blue-800 hover:bg-blue-100 border-blue-200/90"
+                    }`}
+                    title={
+                      isAssignedToMe
+                        ? "Ditangani oleh Anda (Klik untuk ubah penugasan)"
+                        : `Dikunci oleh ${lead.assignedToUser?.name || "CS Lain"} (Klik untuk opsi penugasan)`
+                    }
                   >
-                    <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>Klaim Leads</span>
-                  </DropdownMenuItem>
-                )}
-
-                <div className="px-2 py-1 text-[10px] font-bold text-stone-400 uppercase tracking-wider">
-                  Pilih CS Pengganti:
-                </div>
-
-                <div className="max-h-44 overflow-y-auto space-y-0.5">
-                  {filteredCsUsers.length > 0 ? (
-                    filteredCsUsers.map((user) => (
-                      <DropdownMenuItem
-                        key={user.id}
-                        onClick={() => onAssignLead?.(lead.id, user.id)}
-                        className={`flex items-center justify-between text-xs cursor-pointer py-1.5 ${
-                          lead.assignedToUserId === user.id ? "bg-stone-100 font-bold text-stone-900" : ""
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                          <span className="truncate">{user.name || user.email}</span>
-                        </div>
-                        {lead.assignedToUserId === user.id && (
-                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        )}
-                      </DropdownMenuItem>
-                    ))
-                  ) : (
-                    <div className="px-2 py-2 text-[11px] text-stone-400 italic text-center">
-                      CS tidak ditemukan
+                    {isAssignedToOther ? (
+                      <Lock className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                    ) : (
+                      <UserCheck className={`w-2.5 h-2.5 shrink-0 ${isAssignedToMe ? "text-emerald-600" : "text-blue-600"}`} />
+                    )}
+                    <span>
+                      {isAssignedToMe ? (
+                        <>Ditangani: <strong>Anda</strong></>
+                      ) : (
+                        <>Ditangani: <strong>{lead.assignedToUser?.name || "CS"}</strong></>
+                      )}
+                    </span>
+                    <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60 text-xs p-1">
+                  {/* Search input for CS */}
+                  <div className="p-1 pb-1.5 border-b border-stone-100">
+                    <div className="relative">
+                      <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-stone-400" />
+                      <input
+                        type="text"
+                        value={csSearchQuery}
+                        onChange={(e) => setCsSearchQuery(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        placeholder="Cari nama CS..."
+                        className="w-full pl-6 pr-2 py-1 text-xs bg-stone-50 border border-stone-200 rounded focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
+                      />
                     </div>
-                  )}
-                </div>
+                  </div>
 
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => onAssignLead?.(lead.id, null)}
-                  className="flex items-center gap-2 text-xs text-rose-600 font-medium cursor-pointer py-1.5"
-                >
-                  <UserX className="w-3.5 h-3.5 shrink-0" />
-                  <span>Lepas Leads</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {onClaimLead && (
+                    <DropdownMenuItem
+                      onClick={() => onClaimLead(lead.id)}
+                      className="flex items-center gap-2 text-xs text-emerald-700 font-medium cursor-pointer py-1.5"
+                    >
+                      <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Klaim Leads</span>
+                    </DropdownMenuItem>
+                  )}
+
+                  <div className="px-2 py-1 text-[10px] font-bold text-stone-400 uppercase tracking-wider">
+                    Pilih CS Pengganti:
+                  </div>
+
+                  <div className="max-h-44 overflow-y-auto space-y-0.5">
+                    {filteredCsUsers.length > 0 ? (
+                      filteredCsUsers.map((user) => (
+                        <DropdownMenuItem
+                          key={user.id}
+                          onClick={() => onAssignLead?.(lead.id, user.id)}
+                          className={`flex items-center justify-between text-xs cursor-pointer py-1.5 ${
+                            lead.assignedToUserId === user.id ? "bg-stone-100 font-bold text-stone-900" : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                            <span className="truncate">{user.name || user.email}</span>
+                          </div>
+                          {lead.assignedToUserId === user.id && (
+                            <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          )}
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <div className="px-2 py-2 text-[11px] text-stone-400 italic text-center">
+                        CS tidak ditemukan
+                      </div>
+                    )}
+                  </div>
+
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => onAssignLead?.(lead.id, null)}
+                    className="flex items-center gap-2 text-xs text-rose-600 font-medium cursor-pointer py-1.5"
+                  >
+                    <UserX className="w-3.5 h-3.5 shrink-0" />
+                    <span>Lepas Leads</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <span
+                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                  isAssignedToMe
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs"
+                    : isAssignedToOther
+                    ? "bg-amber-50 text-amber-900 border-amber-300 shadow-2xs"
+                    : "bg-blue-50 text-blue-800 border-blue-200/90 shadow-2xs"
+                }`}
+                title={
+                  isAssignedToMe
+                    ? "Ditangani oleh Anda"
+                    : `Dikunci oleh ${lead.assignedToUser?.name || "CS Lain"}`
+                }
+              >
+                {isAssignedToOther ? (
+                  <Lock className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                ) : (
+                  <UserCheck className={`w-2.5 h-2.5 shrink-0 ${isAssignedToMe ? "text-emerald-600" : "text-blue-600"}`} />
+                )}
+                <span>
+                  {isAssignedToMe ? (
+                    <>Ditangani: <strong>Anda</strong></>
+                  ) : (
+                    <>Ditangani: <strong>{lead.assignedToUser?.name || "CS"}</strong></>
+                  )}
+                </span>
+              </span>
+            )
           ) : (
             <div className="inline-flex items-center gap-1.5">
               {/* 1-Click Klaim Leads */}
@@ -438,8 +582,8 @@ export function LeadCardItem({
                 </span>
               )}
 
-              {/* Direct Assign to other CS */}
-              {onAssignLead && (
+              {/* Direct Assign to other CS: HANYA untuk Supervisor / Admin */}
+              {canAssignLead && onAssignLead && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -536,15 +680,40 @@ export function LeadCardItem({
             </Button>
           )}
 
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => onOpenChat(lead)}
-            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Buka Chat</span>
-          </Button>
+          {isAssignedToOther ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenChat(lead)}
+              className="h-8 px-3 text-xs border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 gap-1.5 shadow-2xs font-semibold cursor-pointer"
+              title={`Chat sedang dikunci oleh ${lead.assignedToUser?.name || "CS Lain"}`}
+            >
+              <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span>Buka (Terkunci)</span>
+            </Button>
+          ) : isAssignedToMe ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => onOpenChat(lead)}
+              className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-2xs font-semibold cursor-pointer"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Buka Chat</span>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenChat(lead)}
+              className="h-8 px-3 text-xs border-stone-300 bg-white hover:bg-stone-50 text-stone-700 gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-stone-500" />
+              <span>Buka Chat</span>
+            </Button>
+          )}
         </div>
       </div>
 

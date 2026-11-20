@@ -62,6 +62,13 @@ export default function WhatsAppCrmInboxPage() {
     unassigned: 0,
   });
 
+  // Live Stream & Last Fetch Time states
+  const [isAutoStreamActive, setIsAutoStreamActive] = useState<boolean>(true);
+  const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
+  const [lastFetchText, setLastFetchText] = useState<string>("Memuat...");
+  const [isAutoClassifying, setIsAutoClassifying] = useState<boolean>(false);
+  const [isScanningHistory, setIsScanningHistory] = useState<boolean>(false);
+
   // Modal & Drawer states
   const [editingLead, setEditingLead] = useState<CrmLeadItem | null>(null);
   const [linkingLead, setLinkingLead] = useState<CrmLeadItem | null>(null);
@@ -155,6 +162,7 @@ export default function WhatsAppCrmInboxPage() {
         const json = await res.json();
         const items = Array.isArray(json.items) ? json.items : [];
         setLeads(items);
+        setLastFetchTime(new Date());
         if (json.counts) {
           setTabCounts({
             all: json.counts.all ?? 0,
@@ -178,6 +186,90 @@ export default function WhatsAppCrmInboxPage() {
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
+
+  // ── Auto Live-Stream: polling setiap 10 detik jika tab aktif ──
+  useEffect(() => {
+    if (!isAutoStreamActive) return;
+
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchLeads(true);
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [isAutoStreamActive, fetchLeads]);
+
+  // ── Ticker untuk menghitung selisih waktu tarikan terakhir secara dinamis ──
+  useEffect(() => {
+    const updateRelativeFetchTime = () => {
+      if (!lastFetchTime) {
+        setLastFetchText("Menghubungkan...");
+        return;
+      }
+      const now = new Date();
+      const diffSec = Math.floor((now.getTime() - lastFetchTime.getTime()) / 1000);
+      const timeStr = lastFetchTime.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      if (diffSec < 5) {
+        setLastFetchText(`${timeStr} (Baru saja)`);
+      } else if (diffSec < 60) {
+        setLastFetchText(`${timeStr} (${diffSec} dtk lalu)`);
+      } else {
+        const diffMin = Math.floor(diffSec / 60);
+        setLastFetchText(`${timeStr} (${diffMin} mnt lalu)`);
+      }
+    };
+
+    updateRelativeFetchTime();
+    const ticker = setInterval(updateRelativeFetchTime, 1000);
+    return () => clearInterval(ticker);
+  }, [lastFetchTime]);
+
+  const handleAutoClassify = async () => {
+    try {
+      setIsAutoClassifying(true);
+      const res = await fetchApi("/crm/leads/auto-classify", {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Gagal mengklasifikasikan pesan leads");
+      const json = await res.json();
+      toast.success(json.message || "Auto-klasifikasi selesai!");
+      setLastFetchTime(new Date());
+      fetchLeads(true);
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat klasifikasi");
+    } finally {
+      setIsAutoClassifying(false);
+    }
+  };
+
+  const handleScanHistory = async () => {
+    try {
+      setIsScanningHistory(true);
+      const res = await fetchApi("/crm/leads/scan-history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: receiverSessionId, limit: 50 }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.message || "Gagal memindai riwayat chat");
+      }
+      const json = await res.json();
+      toast.success(json.message || "Pemindaian riwayat chat selesai!");
+      setLastFetchTime(new Date());
+      fetchLeads(true);
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat memindai riwayat chat");
+    } finally {
+      setIsScanningHistory(false);
+    }
+  };
 
   // In-place local state updater: updates a specific lead without full page refresh
   const handleUpdateLeadLocal = useCallback(
@@ -284,23 +376,29 @@ export default function WhatsAppCrmInboxPage() {
       // Mode 1: Backend direct sync via configured WA receiver session
       const res = await fetchApi("/crm/leads/sync-from-wa", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limit: 50 }),
       });
 
       if (res.ok) {
         const json = await res.json();
         toast.success(json.message || "Sinkronisasi leads berhasil!");
+        setLastFetchTime(new Date());
         fetchLeads(true);
         return;
       }
 
+      const errorJson = await res.json().catch(() => null);
+
       // Mode 2: Client proxy fallback (if direct backend outbound is not configured yet)
       const chatsUrl = receiverSessionId
-        ? `/api/wa/chats?sessionId=${encodeURIComponent(receiverSessionId)}&limit=100`
-        : `/api/wa/chats?limit=100`;
+        ? `/api/wa/chats?sessionId=${encodeURIComponent(receiverSessionId)}&limit=50`
+        : `/api/wa/chats?limit=50`;
 
       const chatsRes = await fetch(chatsUrl);
       if (!chatsRes.ok) {
-        throw new Error("Gagal mengambil percakapan dari WhatsApp");
+        const chatsErr = await chatsRes.json().catch(() => null);
+        throw new Error(chatsErr?.message || errorJson?.message || "Gagal mengambil percakapan dari WhatsApp");
       }
       const chatsJson = await chatsRes.json();
       const chats = Array.isArray(chatsJson) ? chatsJson : chatsJson.data || [];
@@ -314,9 +412,11 @@ export default function WhatsAppCrmInboxPage() {
       if (batchRes.ok) {
         const batchJson = await batchRes.json();
         toast.success(batchJson.message || "Leads berhasil disinkronkan!");
+        setLastFetchTime(new Date());
         fetchLeads(true);
       } else {
-        throw new Error("Gagal memproses data leads ke database");
+        const batchErr = await batchRes.json().catch(() => null);
+        throw new Error(batchErr?.message || "Gagal memproses data leads ke database");
       }
     } catch (err: any) {
       toast.error(err.message || "Gagal sinkronisasi data dari WhatsApp");
@@ -342,6 +442,43 @@ export default function WhatsAppCrmInboxPage() {
             <p className="text-xs text-stone-500 mt-0.5">
               Kelola prospek masuk, identifikasi nama kontak cerdas (Combine Contact Name), dan sinkronkan data customer ERP.
             </p>
+
+            {/* Live Stream & Last Fetch Time Status Indicator */}
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  const nextState = !isAutoStreamActive;
+                  setIsAutoStreamActive(nextState);
+                  toast.info(nextState ? "Live Stream otomatis diaktifkan" : "Live Stream dijeda");
+                }}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border transition-colors cursor-pointer ${
+                  isAutoStreamActive
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
+                    : "bg-stone-100 border-stone-200 text-stone-500 hover:bg-stone-200"
+                }`}
+                title={isAutoStreamActive ? "Klik untuk jeda auto-stream" : "Klik untuk aktifkan auto-stream"}
+              >
+                <span className="relative flex h-2 w-2">
+                  {isAutoStreamActive && (
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  )}
+                  <span
+                    className={`relative inline-flex rounded-full h-2 w-2 ${
+                      isAutoStreamActive ? "bg-emerald-500" : "bg-stone-400"
+                    }`}
+                  />
+                </span>
+                <span>{isAutoStreamActive ? "Live Stream Aktif" : "Live Stream Dijeda"}</span>
+              </button>
+
+              <div className="inline-flex items-center gap-1.5 text-[11px] text-stone-500 font-mono">
+                <span className="text-stone-400">Tarikan Terakhir:</span>
+                <span className="font-semibold text-stone-700 bg-stone-100 px-1.5 py-0.5 rounded border border-stone-200">
+                  {lastFetchText}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -378,6 +515,30 @@ export default function WhatsAppCrmInboxPage() {
               <span>Pengaturan CRM</span>
             </Button>
           </Link>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleScanHistory}
+            disabled={isScanningHistory || isLoading}
+            className="h-8 px-2.5 text-xs text-blue-700 border-blue-200 hover:bg-blue-50 gap-1.5"
+            title="Pindai riwayat chat terdahulu untuk menemukan kode GK- / jejak web yang belum tertaut"
+          >
+            <Globe className={`w-3.5 h-3.5 ${isScanningHistory ? "animate-spin text-blue-600" : "text-blue-500"}`} />
+            <span>{isScanningHistory ? "Memindai..." : "Pindai Jejak Web"}</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAutoClassify}
+            disabled={isAutoClassifying || isLoading}
+            className="h-8 px-2.5 text-xs text-purple-700 border-purple-200 hover:bg-purple-50 gap-1.5"
+            title="Klasifikasikan otomatis seluruh pesan leads berdasarkan produk & kebutuhan"
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${isAutoClassifying ? "animate-spin text-purple-600" : "text-purple-500"}`} />
+            <span>{isAutoClassifying ? "Mengklasifikasi..." : "Auto-Klasifikasi"}</span>
+          </Button>
 
           <Button
             variant="outline"

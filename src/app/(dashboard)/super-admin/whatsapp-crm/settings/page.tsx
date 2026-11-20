@@ -33,6 +33,7 @@ import {
   Sparkles,
   Tag,
   Users,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -88,6 +89,7 @@ function SettingsContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSubscribingWebhook, setIsSubscribingWebhook] = useState(false);
 
   const [sessions, setSessions] = useState<WaSessionItem[]>([]);
   const [settings, setSettings] = useState<CrmSettingsData>({
@@ -199,7 +201,7 @@ function SettingsContent() {
       const res = await fetchApi("/crm/leads/sync-from-wa", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: settings.leadReceiverSessionId }),
+        body: JSON.stringify({ sessionId: settings.leadReceiverSessionId, limit: 50 }),
       });
 
       if (res.ok) {
@@ -208,14 +210,17 @@ function SettingsContent() {
         return;
       }
 
+      const errorJson = await res.json().catch(() => null);
+
       // Attempt 2: client proxy fallback
       const chatsUrl = settings.leadReceiverSessionId
-        ? `/api/wa/chats?sessionId=${encodeURIComponent(settings.leadReceiverSessionId)}&limit=100`
-        : `/api/wa/chats?limit=100`;
+        ? `/api/wa/chats?sessionId=${encodeURIComponent(settings.leadReceiverSessionId)}&limit=50`
+        : `/api/wa/chats?limit=50`;
 
       const chatsRes = await fetch(chatsUrl);
       if (!chatsRes.ok) {
-        throw new Error("Gagal mengambil percakapan dari server WhatsApp");
+        const chatsErr = await chatsRes.json().catch(() => null);
+        throw new Error(chatsErr?.message || errorJson?.message || "Gagal mengambil percakapan dari server WhatsApp");
       }
       const chatsJson = await chatsRes.json();
       const chats = Array.isArray(chatsJson) ? chatsJson : chatsJson.data || [];
@@ -236,6 +241,25 @@ function SettingsContent() {
       toast.error(err.message || "Gagal sinkronisasi data dari WhatsApp");
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleSubscribeWebhook = async () => {
+    try {
+      setIsSubscribingWebhook(true);
+      const res = await fetchApi("/crm/settings/subscribe-webhook", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Webhook real-time berhasil dihubungkan ke WhatsApp Gateway!");
+      } else {
+        toast.error(data.message || "Gagal menghubungkan webhook ke WhatsApp Gateway");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat menghubungkan webhook");
+    } finally {
+      setIsSubscribingWebhook(false);
     }
   };
 
@@ -386,18 +410,64 @@ function SettingsContent() {
               </div>
 
               {selectedSessionObj && (
-                <div className="p-3 bg-stone-50 rounded-lg border border-stone-200/80 text-xs text-stone-600 flex flex-wrap gap-4 items-center">
-                  <div>
-                    <span className="text-stone-400 block text-[10px] uppercase font-bold">ID Sesi:</span>
-                    <span className="font-mono font-medium">{selectedSessionObj.id}</span>
+                <div className="space-y-3">
+                  <div className="p-3 bg-stone-50 rounded-lg border border-stone-200/80 text-xs text-stone-600 flex flex-wrap gap-4 items-center">
+                    <div>
+                      <span className="text-stone-400 block text-[10px] uppercase font-bold">ID Sesi:</span>
+                      <span className="font-mono font-medium">{selectedSessionObj.id}</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 block text-[10px] uppercase font-bold">Nomor HP:</span>
+                      <span className="font-mono font-medium">{selectedSessionObj.phoneNumber || "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 block text-[10px] uppercase font-bold">Nama Profil WA:</span>
+                      <span className="font-medium">{selectedSessionObj.me?.pushName || selectedSessionObj.name || "-"}</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-stone-400 block text-[10px] uppercase font-bold">Nomor HP:</span>
-                    <span className="font-mono font-medium">{selectedSessionObj.phoneNumber || "-"}</span>
-                  </div>
-                  <div>
-                    <span className="text-stone-400 block text-[10px] uppercase font-bold">Nama Profil WA:</span>
-                    <span className="font-medium">{selectedSessionObj.me?.pushName || selectedSessionObj.name || "-"}</span>
+
+                  <div className="p-3 bg-emerald-50/60 rounded-lg border border-emerald-200/80 text-xs text-emerald-900 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-semibold">
+                        <Zap className="w-4 h-4 text-emerald-600 animate-pulse" />
+                        <span>Real-Time Webhook Auto-Capture Aktif</span>
+                      </div>
+                      <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px]">
+                        24/7 Otomatis
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-emerald-700 leading-relaxed">
+                      Setiap pesan baru dari pelanggan yang masuk ke nomor ini langsung tercatat otomatis ke daftar Leads CRM dalam hitungan milidetik tanpa perlu tombol tarik manual.
+                    </p>
+                    <div className="pt-2 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-[10px] text-emerald-700 font-mono">
+                        <span>Endpoint:</span>
+                        <code className="bg-white px-2 py-0.5 rounded border border-emerald-200 text-emerald-800 select-all font-semibold">
+                          /crm/leads/webhook
+                        </code>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isSubscribingWebhook}
+                        onClick={handleSubscribeWebhook}
+                        className="h-7 px-2.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100 hover:text-emerald-900 border border-emerald-300 bg-white shadow-xs gap-1"
+                        title="Daftarkan/sinkronkan endpoint webhook ini ke Catha WhatsApp Gateway"
+                      >
+                        {isSubscribingWebhook ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>Menghubungkan...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-3 h-3 text-emerald-600" />
+                            <span>Sinkronkan ke Gateway WA</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}

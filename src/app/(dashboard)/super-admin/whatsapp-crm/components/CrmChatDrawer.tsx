@@ -3,7 +3,14 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +38,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/useApi";
 import {
+  AlertCircle,
   Building2,
   Check,
   CheckCheck,
@@ -42,17 +50,21 @@ import {
   Globe,
   Image as ImageIcon,
   Info,
+  KeyRound,
   Loader2,
+  Lock,
   MessageSquare,
   Paperclip,
   Plus,
   RefreshCw,
   Search,
   Send,
+  ShieldAlert,
   Smile,
   Sparkles,
   Tag,
   Trash2,
+  Unlock,
   User,
   UserCheck,
   X,
@@ -60,6 +72,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { EmojiStyle, Theme, type EmojiClickData } from "emoji-picker-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -248,6 +261,33 @@ export function CrmChatDrawer({
   onStatusCreated,
 }: CrmChatDrawerProps) {
   const { fetchApi } = useApi();
+  const { data: session } = useSession();
+
+  const currentUserId = session?.user?.id;
+  const currentUserRole = String(session?.user?.role || "").toUpperCase();
+  const isSupervisorOrAdmin = ["SUPER_ADMIN", "ADMIN", "SUPERVISOR", "MANAGER"].includes(currentUserRole);
+  const canAssignLead = isSupervisorOrAdmin || ((session?.user as any)?.permissions || []).includes("assign_crm_leads");
+
+  // Chat Lock Protection state
+  const [isSupervisorOverride, setIsSupervisorOverride] = useState(false);
+  const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
+  const [supervisorPinInput, setSupervisorPinInput] = useState("");
+  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+  const [isTakingOver, setIsTakingOver] = useState(false);
+
+  // Reset override whenever opened lead changes
+  useEffect(() => {
+    setIsSupervisorOverride(false);
+    setIsPinDialogOpen(false);
+    setSupervisorPinInput("");
+  }, [lead?.id]);
+
+  const assignedUserId = lead?.assignedToUserId;
+  const assignedUser = lead?.assignedToUser || csUsers.find((u) => u.id === assignedUserId);
+  const assignedCsName = assignedUser?.name || "CS Lain";
+  const isAssignedToMe = Boolean(assignedUserId && currentUserId && assignedUserId === currentUserId);
+  const isAssignedToOther = Boolean(assignedUserId && currentUserId && assignedUserId !== currentUserId);
+  const isChatLocked = Boolean(isAssignedToOther && !isSupervisorOverride);
 
   const [activeTab, setActiveTab] = useState<"chat" | "info">("chat");
 
@@ -282,6 +322,8 @@ export function CrmChatDrawer({
   const [quickAddStatusOpen, setQuickAddStatusOpen] = useState(false);
   const [csSearchQuery, setCsSearchQuery] = useState("");
   const [csPopoverOpen, setCsPopoverOpen] = useState(false);
+  const [manualCodeInput, setManualCodeInput] = useState("");
+  const [isAttachingCode, setIsAttachingCode] = useState(false);
 
   // Message templates (Quick Reply) state
   const [templates, setTemplates] = useState<CrmMessageTemplateItem[]>([]);
@@ -482,6 +524,34 @@ export function CrmChatDrawer({
           if (!silent) {
             setTimeout(() => scrollToBottom("instant"), 80);
           }
+
+          // Otomatis deteksi & tautkan kode jika ada di riwayat 100 chat terakhir tapi lead belum tertaut
+          if (lead?.id && !lead.whatsappClick && !lead.sourceCode) {
+            for (const m of items) {
+              const body = m.body || m.text || "";
+              const dyn =
+                body.match(/(?:Kode\s*(?:WA)?|Code|Ref)?\s*:?\s*(GK-[A-Za-z0-9_-]{3,12})/i) ||
+                body.match(/\b(GK-[A-Za-z0-9_-]{3,12})\b/i);
+              const stat = body.match(/(?:\[\s*)?(?:REF|CODE)\s*:\s*([A-Za-z0-9_-]+)(?:\s*\])?/i);
+              const detected = dyn ? dyn[1].toUpperCase() : stat ? stat[1].toUpperCase() : null;
+              if (detected) {
+                fetchApi(`/crm/leads/${lead.id}/attach-code`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ code: detected }),
+                })
+                  .then((r) => r.json())
+                  .then((json) => {
+                    if (json.success && json.data) {
+                      onLeadUpdated?.(json.data);
+                      toast.success(`Jejak web (${detected}) otomatis terdeteksi & tertaut!`);
+                    }
+                  })
+                  .catch(() => {});
+                break;
+              }
+            }
+          }
         }
       } catch {
         // ignore
@@ -634,10 +704,98 @@ export function CrmChatDrawer({
     }
   };
 
+  // Klaim chat ke akun saya (Lock to current CS)
+  const handleClaimChat = async () => {
+    if (!lead?.id) return;
+    try {
+      const res = await fetchApi(`/crm/leads/${lead.id}/claim`, { method: "POST" });
+      if (!res.ok) throw new Error("Gagal mengklaim chat");
+      const json = await res.json();
+      toast.success("Chat berhasil diklaim & dikunci ke akun Anda!");
+      if (json.data) {
+        onLeadUpdated?.(json.data);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengklaim chat");
+    }
+  };
+
+  // Ambil alih chat (Takeover with optional supervisor PIN)
+  const handleTakeoverChat = async (pin?: string) => {
+    if (!lead?.id) return;
+    try {
+      setIsTakingOver(true);
+      const res = await fetchApi(`/crm/leads/${lead.id}/takeover`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || "Gagal mengambil alih chat");
+      }
+      toast.success(json.message || "Chat berhasil diambil alih!");
+      setIsPinDialogOpen(false);
+      setSupervisorPinInput("");
+      setIsSupervisorOverride(false);
+      if (json.data) {
+        onLeadUpdated?.(json.data);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengambil alih chat");
+    } finally {
+      setIsTakingOver(false);
+    }
+  };
+
+  // Verifikasi PIN dan buka kunci sementara (Bypass)
+  const handleVerifyPinAndUnlock = async () => {
+    const pin = supervisorPinInput.trim();
+    if (!pin) {
+      toast.error("Masukkan kode supervisor");
+      return;
+    }
+    try {
+      setIsVerifyingPin(true);
+      const res = await fetchApi("/crm/leads/verify-supervisor-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || "Kode supervisor salah");
+      }
+      toast.success("Otorisasi Supervisor Berhasil! Penguncian chat dibuka untuk sesi ini.");
+      setIsSupervisorOverride(true);
+      setIsPinDialogOpen(false);
+      setSupervisorPinInput("");
+    } catch (err: any) {
+      toast.error(err.message || "Gagal memverifikasi kode");
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
+
   // Send message with optional attachment
   const handleSendMessage = async (textToSend?: string) => {
     const text = textToSend !== undefined ? textToSend : messageInput.trim();
     if ((!text && !pendingAttachment) || !lead?.phoneNumber) return;
+
+    if (isChatLocked) {
+      toast.error(`Chat sedang dikunci oleh ${assignedCsName}. Buka dengan Kode Supervisor untuk membalas.`);
+      return;
+    }
+
+    // Jika chat belum diklaim siapapun, otomatis klaim ke akun saat pesan dikirim
+    if (!lead.assignedToUserId && currentUserId) {
+      fetchApi(`/crm/leads/${lead.id}/claim`, { method: "POST" })
+        .then((r) => r.json())
+        .then((json) => {
+          if (json.data) onLeadUpdated?.(json.data);
+        })
+        .catch(() => {});
+    }
 
     const chatId = getChatId(lead.phoneNumber);
     const toSendAttachment = pendingAttachment;
@@ -745,6 +903,29 @@ export function CrmChatDrawer({
       toast.success("Penugasan CS berhasil diperbarui!");
     } catch (err: any) {
       toast.error(err.message || "Gagal menugaskan lead");
+    }
+  };
+
+  // Tautkan kode atribusi (GK-XXXXX / REF:XXX) ke lead
+  const handleManualAttachCode = async (codeToAttach: string) => {
+    if (!lead?.id || !codeToAttach.trim()) return;
+    try {
+      const res = await fetchApi(`/crm/leads/${lead.id}/attach-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: codeToAttach.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Kode pelacakan berhasil ditautkan!");
+        if (data.data) {
+          onLeadUpdated?.(data.data);
+        }
+      } else {
+        toast.error(data.message || "Kode tidak ditemukan di database");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menautkan kode");
     }
   };
 
@@ -921,6 +1102,43 @@ export function CrmChatDrawer({
                 </SheetDescription>
               </div>
             </div>
+
+            {/* Chat Lock / CS Ownership Status Badge */}
+            <div className="flex items-center gap-2 shrink-0">
+              {isAssignedToMe && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Ditangani Anda</span>
+                </span>
+              )}
+              {isAssignedToOther && (
+                isSupervisorOverride ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                    <Unlock className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Otorisasi Supervisor Aktif</span>
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-300 shadow-2xs"
+                    title={`Percakapan dikunci oleh ${assignedCsName}`}
+                  >
+                    <Lock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Terkunci ({assignedCsName})</span>
+                  </span>
+                )
+              )}
+              {!assignedUserId && (
+                <button
+                  type="button"
+                  onClick={handleClaimChat}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-colors cursor-pointer"
+                  title="Klik untuk mengklaim dan mengunci percakapan ini ke akun Anda"
+                >
+                  <Zap className="w-3.5 h-3.5 fill-white text-white" />
+                  <span>Klaim Chat</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* ── Tabs: Chat vs CRM Context ── */}
@@ -950,6 +1168,62 @@ export function CrmChatDrawer({
               activeTab === "chat" ? "flex" : "hidden"
             }`}
           >
+            {/* Top Sticky Attribution Info Banner in Chat Tab */}
+            {lead.whatsappClick && (() => {
+              const attr = parseWhatsappClickAttribution(lead.whatsappClick);
+              if (!attr) return null;
+              return (
+                <div className="px-4 py-2 bg-sky-50/95 border-b border-sky-200/90 flex items-center justify-between text-xs text-sky-950 shrink-0 shadow-2xs backdrop-blur-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Globe className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                    <span className="truncate">
+                      Jejak Web: <strong className="text-sky-900">{attr.platform}</strong> ({attr.code}) • Halaman: <code className="bg-white px-1 py-0.5 rounded border border-sky-200 text-sky-800 font-mono text-[11px]">{attr.pagePath || "/"}</code>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("info")}
+                    className="text-[11px] text-sky-700 hover:text-sky-900 font-semibold underline shrink-0 cursor-pointer ml-2"
+                  >
+                    Detail Jejak →
+                  </button>
+                </div>
+              );
+            })()}
+
+            {lead.sourceCode && !lead.whatsappClick && (
+              <div className="px-4 py-2 bg-amber-50/95 border-b border-amber-200/90 flex items-center justify-between text-xs text-amber-950 shrink-0 shadow-2xs backdrop-blur-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span className="truncate">
+                    Kampanye Iklan: <strong className="text-amber-900">{lead.sourceCode.label} ({lead.sourceCode.code})</strong>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("info")}
+                  className="text-[11px] text-amber-700 hover:text-amber-900 font-semibold underline shrink-0 cursor-pointer ml-2"
+                >
+                  Detail →
+                </button>
+              </div>
+            )}
+
+            {/* Top Banner when chat is locked to another CS */}
+            {isAssignedToOther && (
+              <div className="px-4 py-2 bg-amber-100 border-b border-amber-300 flex items-center justify-between text-xs text-amber-950 shrink-0 shadow-2xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                  <span className="truncate">
+                    <strong>Chat Terkunci:</strong> Percakapan ini sedang ditangani oleh <strong className="text-amber-900">{assignedCsName}</strong>
+                  </span>
+                </div>
+                <Badge variant="outline" className="text-[10px] bg-amber-200/90 border-amber-300 text-amber-900 font-bold shrink-0">
+                  Anti-Tabrakan Aktif
+                </Badge>
+              </div>
+            )}
+
             {/* Messages Scroll Area */}
             <div
               ref={messagesContainerRef}
@@ -1060,6 +1334,44 @@ export function CrmChatDrawer({
                           </p>
                         )}
 
+                        {/* Code Detection Chip inside Message Bubble */}
+                        {(() => {
+                          const body = msg.body || msg.text || "";
+                          const dyn =
+                            body.match(/(?:Kode\s*(?:WA)?|Code)\s*:\s*(GK-[A-HJ-KM-NP-Z0-9]{4,6})/i) ||
+                            body.match(/\b(GK-[A-HJ-KM-NP-Z0-9]{5})\b/i);
+                          const stat = body.match(/(?:\[\s*)?(?:REF|CODE)\s*:\s*([A-Za-z0-9_-]+)(?:\s*\])?/i);
+                          const codeFound = dyn ? dyn[1].toUpperCase() : stat ? stat[1].toUpperCase() : null;
+                          if (!codeFound) return null;
+
+                          return (
+                            <div
+                              className={`mt-1.5 flex items-center justify-between gap-2 px-2 py-1 rounded-md text-[10px] font-medium border ${
+                                isMe
+                                  ? "bg-emerald-700/80 border-emerald-500 text-white"
+                                  : "bg-sky-50 border-sky-200 text-sky-900"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <Globe className="w-3 h-3 text-sky-600 shrink-0" />
+                                <span>
+                                  Kode Terdeteksi: <strong>{codeFound}</strong>
+                                </span>
+                              </div>
+                              {!lead.whatsappClick && !lead.sourceCode && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleManualAttachCode(codeFound)}
+                                  className="underline hover:text-sky-950 font-bold cursor-pointer shrink-0 ml-1"
+                                  title="Tautkan kode ini ke data lead"
+                                >
+                                  Tautkan Jejak
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
+
                         <div
                           className={`text-[9px] flex items-center justify-end gap-1 ${
                             isMe ? "text-emerald-100" : "text-stone-400"
@@ -1078,436 +1390,550 @@ export function CrmChatDrawer({
 
             {/* Quick Reply Bar, Attachment Preview & Input */}
             <div className="bg-white border-t border-stone-200 p-3 space-y-2 shrink-0">
-              {/* Quick Action Tools */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                <Popover open={templatePopoverOpen} onOpenChange={setTemplatePopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-[11px] text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100 gap-1 shrink-0 cursor-pointer"
-                    >
-                      <Zap className="w-3 h-3 text-amber-600" />
-                      <span>Template Balasan</span>
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-84 p-2.5 space-y-2 text-xs">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-stone-100">
-                      <p className="font-bold text-stone-700 text-[11px]">
-                        Pilih Pesan Cepat (Quick Reply)
-                      </p>
-                      <Link
-                        href="/super-admin/whatsapp-crm/settings?tab=templates"
-                        className="text-[10px] text-emerald-600 hover:text-emerald-800 font-semibold"
-                        title="Buka Pengaturan Template CRM"
-                      >
-                        Kelola →
-                      </Link>
+              {isChatLocked ? (
+                /* ── Lock Protection Card (Anti-Tabrakan Aktif) ── */
+                <div className="p-4 bg-amber-50/90 border border-amber-200 rounded-xl space-y-3 shadow-xs animate-in fade-in duration-150">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200 shadow-2xs">
+                      <Lock className="w-5 h-5" />
                     </div>
-
-                    {/* Search Input for Templates */}
-                    <div className="relative">
-                      <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-stone-400" />
-                      <input
-                        type="text"
-                        value={templateSearchQuery}
-                        onChange={(e) => setTemplateSearchQuery(e.target.value)}
-                        placeholder="Cari judul, shortcut (/), atau isi..."
-                        className="w-full pl-6 pr-2 py-1 text-xs bg-stone-50 border border-stone-200 rounded focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
-                      />
-                    </div>
-
-                    {/* Scrollable Templates List */}
-                    <div className="max-h-64 overflow-y-auto space-y-1 pt-0.5">
-                      {(templates.length > 0
-                        ? templates
-                        : QUICK_REPLIES.map((qr, idx) => ({
-                            id: String(idx),
-                            title: qr.title,
-                            content: qr.text,
-                            category: "Umum",
-                            shortcut: null,
-                            orderIndex: idx,
-                            createdAt: "",
-                          }))
-                      )
-                        .filter((tpl) => {
-                          if (!templateSearchQuery.trim()) return true;
-                          const q = templateSearchQuery.toLowerCase();
-                          return (
-                            tpl.title.toLowerCase().includes(q) ||
-                            tpl.content.toLowerCase().includes(q) ||
-                            (tpl.shortcut && tpl.shortcut.toLowerCase().includes(q))
-                          );
-                        })
-                        .map((tpl) => (
-                          <button
-                            key={tpl.id}
-                            type="button"
-                            onClick={() => {
-                              setMessageInput(tpl.content);
-                              setTemplatePopoverOpen(false);
-                            }}
-                            className="w-full text-left p-2 rounded hover:bg-stone-50 transition-colors text-stone-800 space-y-0.5 border border-transparent hover:border-stone-200 cursor-pointer"
-                          >
-                            <div className="flex items-center justify-between gap-1.5">
-                              <span className="font-semibold text-xs text-emerald-700 truncate">
-                                {tpl.title}
-                              </span>
-                              {tpl.shortcut && (
-                                <span className="font-mono text-[9px] font-bold bg-stone-100 text-stone-500 px-1 py-0.2 rounded border border-stone-200 shrink-0">
-                                  {tpl.shortcut}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[10px] text-stone-500 line-clamp-2 leading-relaxed">
-                              {tpl.content}
-                            </p>
-                          </button>
-                        ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => fetchMessages(false)}
-                  className="h-7 px-2 text-[11px] text-stone-500 gap-1 shrink-0"
-                >
-                  <RefreshCw className={`w-3 h-3 ${isLoadingMessages ? "animate-spin" : ""}`} />
-                  <span>Refresh Chat</span>
-                </Button>
-              </div>
-
-              {/* Pending Attachment Preview Box */}
-              {pendingAttachment && (
-                <div className="flex items-center justify-between gap-3 p-2 bg-stone-100 border border-stone-200 rounded-lg animate-in fade-in duration-150">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {pendingAttachment.isImage && !pendingAttachment.sendAsDocument ? (
-                      <div className="relative w-10 h-10 rounded-md overflow-hidden bg-stone-200 shrink-0 border border-stone-300">
-                        <img
-                          src={pendingAttachment.dataUrl}
-                          alt={pendingAttachment.name}
-                          className="w-full h-full object-cover"
-                        />
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-xs font-bold text-amber-950">
+                          Percakapan Dikunci oleh CS Penanggung Jawab
+                        </h4>
+                        <span className="text-[10px] font-semibold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full border border-amber-300">
+                          Anti-Tabrakan Aktif
+                        </span>
                       </div>
-                    ) : (
-                      <div className="w-10 h-10 rounded-md bg-stone-200 flex items-center justify-center shrink-0 border border-stone-300 text-stone-600">
-                        <FileText className="w-5 h-5" />
-                      </div>
-                    )}
-                    <div className="min-w-0 text-left">
-                      <p className="text-xs font-medium text-stone-800 truncate max-w-[180px] sm:max-w-xs">
-                        {pendingAttachment.name}
-                      </p>
-                      <p className="text-[10px] text-stone-500">
-                        {pendingAttachment.sizeFormatted}
-                        {pendingAttachment.isImage && (
-                          <span className="ml-1 text-[9px] text-emerald-600 font-medium">
-                            ({pendingAttachment.sendAsDocument ? "Kirim sbg Dokumen" : "Kirim sbg Gambar"})
-                          </span>
-                        )}
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        Percakapan ini sedang ditangani oleh <strong className="text-amber-950 font-bold">{assignedCsName}</strong>. Penguncian aktif agar pelanggan tidak menerima balasan tumpang tindih dari beberapa CS sekaligus.
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {pendingAttachment.isImage && (
-                      <div className="flex items-center bg-stone-200/90 p-0.5 rounded-md text-[10px]">
-                        <button
+                  <div className="flex items-center gap-2 pt-2 border-t border-amber-200/70 flex-wrap">
+                    {isSupervisorOrAdmin ? (
+                      <>
+                        <Button
                           type="button"
-                          onClick={() =>
-                            setPendingAttachment((prev) =>
-                              prev ? { ...prev, sendAsDocument: false } : null
-                            )
-                          }
-                          className={`px-2 py-0.5 rounded transition-all font-medium ${
-                            !pendingAttachment.sendAsDocument
-                              ? "bg-white text-emerald-700 shadow-xs font-semibold"
-                              : "text-stone-600 hover:text-stone-900"
-                          }`}
+                          size="sm"
+                          onClick={() => setIsSupervisorOverride(true)}
+                          className="h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shadow-2xs font-semibold cursor-pointer"
                         >
-                          Gambar
-                        </button>
-                        <button
+                          <Unlock className="w-3.5 h-3.5" />
+                          <span>Akses Supervisor (Bypass Kunci)</span>
+                        </Button>
+                        <Button
                           type="button"
-                          onClick={() =>
-                            setPendingAttachment((prev) =>
-                              prev ? { ...prev, sendAsDocument: true } : null
-                            )
-                          }
-                          className={`px-2 py-0.5 rounded transition-all font-medium ${
-                            pendingAttachment.sendAsDocument
-                              ? "bg-white text-emerald-700 shadow-xs font-semibold"
-                              : "text-stone-600 hover:text-stone-900"
-                          }`}
+                          size="sm"
+                          variant="outline"
+                          disabled={isTakingOver}
+                          onClick={() => handleTakeoverChat()}
+                          className="h-8 text-xs border-amber-300 text-amber-900 hover:bg-amber-100 gap-1.5 font-semibold cursor-pointer"
                         >
-                          Dokumen
-                        </button>
-                      </div>
+                          {isTakingOver ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <UserCheck className="w-3.5 h-3.5 text-amber-700" />
+                          )}
+                          <span>Alihkan Penugasan ke Saya</span>
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => setIsPinDialogOpen(true)}
+                          className="h-8 text-xs bg-amber-700 hover:bg-amber-800 text-white gap-1.5 shadow-2xs font-semibold cursor-pointer"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" />
+                          <span>Buka Kunci dengan Kode Supervisor</span>
+                        </Button>
+                        <span className="text-[11px] text-amber-700 italic">
+                          Minta kode 6-digit ke Supervisor jika perlu merespon darurat.
+                        </span>
+                      </>
                     )}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setPendingAttachment(null)}
-                      className="h-7 w-7 p-0 text-stone-400 hover:text-stone-700 rounded-full shrink-0"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
                   </div>
                 </div>
-              )}
-
-              {/* Chat Input Form */}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSendMessage();
-                }}
-                className="relative flex items-end gap-1.5"
-              >
-                {/* Slash (/) Quick Reply Autocomplete Popup */}
-                {slashActive && (
-                  <div
-                    ref={slashMenuRef}
-                    className="absolute bottom-full mb-2 left-0 right-0 z-50 bg-white border border-stone-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150"
-                  >
-                    <div className="flex items-center justify-between px-3 py-1.5 bg-stone-50 border-b border-stone-200 text-[11px]">
-                      <div className="flex items-center gap-1.5 font-semibold text-stone-700">
-                        <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                        <span>Template Pesan Cepat</span>
-                        {slashQuery && (
-                          <span className="font-mono bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded text-[10px] font-bold">
-                            /{slashQuery}
-                          </span>
-                        )}
+              ) : (
+                <>
+                  {/* Supervisor Override Notification Banner */}
+                  {isSupervisorOverride && (
+                    <div className="px-3 py-1.5 bg-amber-100/90 border border-amber-300 rounded-lg flex items-center justify-between text-xs text-amber-900 animate-in fade-in duration-100">
+                      <div className="flex items-center gap-2">
+                        <Unlock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                        <span>
+                          <strong>Mode Supervisor Aktif:</strong> Anda dapat membalas chat milik {assignedCsName}.
+                        </span>
                       </div>
-                      <div className="flex items-center gap-1 text-[10px] text-stone-400">
-                        <span className="hidden sm:inline">Tekan</span>
-                        <kbd className="px-1 py-0.5 bg-white border border-stone-200 rounded text-[9px] text-stone-600 font-mono">↑</kbd>
-                        <kbd className="px-1 py-0.5 bg-white border border-stone-200 rounded text-[9px] text-stone-600 font-mono">↓</kbd>
-                        <span className="hidden sm:inline">navigasi,</span>
-                        <kbd className="px-1 py-0.5 bg-white border border-stone-200 rounded text-[9px] text-stone-600 font-mono">Enter</kbd>
-                        <span className="hidden sm:inline">pilih,</span>
-                        <kbd className="px-1 py-0.5 bg-white border border-stone-200 rounded text-[9px] text-stone-600 font-mono">Esc</kbd>
-                        <span className="hidden sm:inline">batal</span>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsSupervisorOverride(false)}
+                        className="text-[11px] font-semibold text-amber-800 hover:underline cursor-pointer ml-2 shrink-0"
+                      >
+                        Kunci Kembali
+                      </button>
                     </div>
+                  )}
 
-                    <div className="max-h-60 overflow-y-auto p-1 divide-y divide-stone-100">
-                      {filteredSlashTemplates.length === 0 ? (
-                        <div className="py-5 px-3 text-center text-xs text-stone-400 space-y-1">
-                          <p className="font-medium text-stone-600">Tidak ada template yang cocok dengan "/{slashQuery}"</p>
-                          <p className="text-[10px] text-stone-400">
-                            Ketik kata kunci lain atau buka{" "}
-                            <Link
-                              href="/super-admin/whatsapp-crm/settings?tab=templates"
-                              className="text-emerald-600 hover:underline font-semibold"
-                            >
-                              Pengaturan Template
-                            </Link>
+                  {/* If unassigned, require claiming before chatting so multiple CS don't respond simultaneously */}
+                  {!assignedUserId ? (
+                    <div className="p-4 bg-stone-50 border border-stone-200 rounded-xl space-y-3 text-center animate-in fade-in duration-150 shadow-2xs">
+                      <div className="flex items-center justify-center gap-2 text-stone-800 font-bold text-xs">
+                        <Zap className="w-4 h-4 text-emerald-600 fill-emerald-600" />
+                        <span>Percakapan Ini Belum Diklaim (Antrean Bebas)</span>
+                      </div>
+                      <p className="text-xs text-stone-500 max-w-sm mx-auto leading-relaxed">
+                        Klaim chat ini ke akun Anda untuk menjadi CS penanggung jawab resmi dan mengunci akses balasan agar tidak terjadi tabrakan respon dengan CS lain.
+                      </p>
+                      <Button
+                        type="button"
+                        onClick={handleClaimChat}
+                        className="h-9 px-4 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-2xs font-bold cursor-pointer"
+                      >
+                        <Zap className="w-3.5 h-3.5 fill-white text-white" />
+                        <span>Klaim & Kunci Chat ke Akun Saya</span>
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Quick Action Tools */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                    <Popover open={templatePopoverOpen} onOpenChange={setTemplatePopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-[11px] text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100 gap-1 shrink-0 cursor-pointer"
+                        >
+                          <Zap className="w-3 h-3 text-amber-600" />
+                          <span>Template Balasan</span>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-84 p-2.5 space-y-2 text-xs">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-stone-100">
+                          <p className="font-bold text-stone-700 text-[11px]">
+                            Pilih Pesan Cepat (Quick Reply)
                           </p>
+                          <Link
+                            href="/super-admin/whatsapp-crm/settings?tab=templates"
+                            className="text-[10px] text-emerald-600 hover:text-emerald-800 font-semibold"
+                            title="Buka Pengaturan Template CRM"
+                          >
+                            Kelola →
+                          </Link>
                         </div>
-                      ) : (
-                        filteredSlashTemplates.map((tpl, index) => {
-                          const isSelected = index === slashHighlightIndex;
-                          return (
-                            <button
-                              key={tpl.id}
-                              ref={(el) => {
-                                slashItemRefs.current[index] = el;
-                              }}
-                              type="button"
-                              onMouseEnter={() => setSlashHighlightIndex(index)}
-                              onClick={() => handleSelectSlashTemplate(tpl)}
-                              className={`w-full text-left p-2 rounded-lg transition-colors cursor-pointer space-y-1 ${
-                                isSelected
-                                  ? "bg-emerald-50 text-emerald-950 border border-emerald-200 shadow-xs"
-                                  : "hover:bg-stone-50 text-stone-800 border border-transparent"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="font-bold text-xs text-stone-800 truncate">
+
+                        {/* Search Input for Templates */}
+                        <div className="relative">
+                          <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-stone-400" />
+                          <input
+                            type="text"
+                            value={templateSearchQuery}
+                            onChange={(e) => setTemplateSearchQuery(e.target.value)}
+                            placeholder="Cari judul, shortcut (/), atau isi..."
+                            className="w-full pl-6 pr-2 py-1 text-xs bg-stone-50 border border-stone-200 rounded focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
+                          />
+                        </div>
+
+                        {/* Scrollable Templates List */}
+                        <div className="max-h-64 overflow-y-auto space-y-1 pt-0.5">
+                          {(templates.length > 0
+                            ? templates
+                            : QUICK_REPLIES.map((qr, idx) => ({
+                                id: String(idx),
+                                title: qr.title,
+                                content: qr.text,
+                                category: "Umum",
+                                shortcut: null,
+                                orderIndex: idx,
+                                createdAt: "",
+                              }))
+                          )
+                            .filter((tpl) => {
+                              if (!templateSearchQuery.trim()) return true;
+                              const q = templateSearchQuery.toLowerCase();
+                              return (
+                                tpl.title.toLowerCase().includes(q) ||
+                                tpl.content.toLowerCase().includes(q) ||
+                                (tpl.shortcut && tpl.shortcut.toLowerCase().includes(q))
+                              );
+                            })
+                            .map((tpl) => (
+                              <button
+                                key={tpl.id}
+                                type="button"
+                                onClick={() => {
+                                  setMessageInput(tpl.content);
+                                  setTemplatePopoverOpen(false);
+                                }}
+                                className="w-full text-left p-2 rounded hover:bg-stone-50 transition-colors text-stone-800 space-y-0.5 border border-transparent hover:border-stone-200 cursor-pointer"
+                              >
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <span className="font-semibold text-xs text-emerald-700 truncate">
                                     {tpl.title}
                                   </span>
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[9px] px-1 py-0 bg-stone-100 text-stone-600 border-stone-200 font-normal shrink-0"
-                                  >
-                                    {tpl.category || "Umum"}
-                                  </Badge>
+                                  {tpl.shortcut && (
+                                    <span className="font-mono text-[9px] font-bold bg-stone-100 text-stone-500 px-1 py-0.2 rounded border border-stone-200 shrink-0">
+                                      {tpl.shortcut}
+                                    </span>
+                                  )}
                                 </div>
-                                {tpl.shortcut && (
-                                  <span className="font-mono text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded shrink-0">
-                                    {tpl.shortcut.startsWith("/") ? tpl.shortcut : `/${tpl.shortcut}`}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-stone-500 line-clamp-2 leading-relaxed">
-                                {tpl.content}
-                              </p>
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
+                                <p className="text-[10px] text-stone-500 line-clamp-2 leading-relaxed">
+                                  {tpl.content}
+                                </p>
+                              </button>
+                            ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => fetchMessages(false)}
+                      className="h-7 px-2 text-[11px] text-stone-500 gap-1 shrink-0"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isLoadingMessages ? "animate-spin" : ""}`} />
+                      <span>Refresh Chat</span>
+                    </Button>
                   </div>
-                )}
 
-                {/* Hidden Native File Inputs */}
-                <input
-                  type="file"
-                  ref={imageInputRef}
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      handleSelectFile(e.target.files[0], false);
-                    }
-                    e.target.value = "";
-                  }}
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  className="hidden"
-                />
-                <input
-                  type="file"
-                  ref={docInputRef}
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      handleSelectFile(e.target.files[0], true);
-                    }
-                    e.target.value = "";
-                  }}
-                  accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
-                  className="hidden"
-                />
+                  {/* Pending Attachment Preview Box */}
+                  {pendingAttachment && (
+                    <div className="flex items-center justify-between gap-3 p-2 bg-stone-100 border border-stone-200 rounded-lg animate-in fade-in duration-150">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {pendingAttachment.isImage && !pendingAttachment.sendAsDocument ? (
+                          <div className="relative w-10 h-10 rounded-md overflow-hidden bg-stone-200 shrink-0 border border-stone-300">
+                            <img
+                              src={pendingAttachment.dataUrl}
+                              alt={pendingAttachment.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-md bg-stone-200 flex items-center justify-center shrink-0 border border-stone-300 text-stone-600">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                        )}
+                        <div className="min-w-0 text-left">
+                          <p className="text-xs font-medium text-stone-800 truncate max-w-[180px] sm:max-w-xs">
+                            {pendingAttachment.name}
+                          </p>
+                          <p className="text-[10px] text-stone-500">
+                            {pendingAttachment.sizeFormatted}
+                            {pendingAttachment.isImage && (
+                              <span className="ml-1 text-[9px] text-emerald-600 font-medium">
+                                ({pendingAttachment.sendAsDocument ? "Kirim sbg Dokumen" : "Kirim sbg Gambar"})
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
 
-                {/* Emoji Picker Popover */}
-                <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className={`h-10 w-10 p-0 rounded-lg shrink-0 transition-colors ${
-                        isEmojiPickerOpen
-                          ? "text-emerald-600 bg-emerald-50"
-                          : "text-stone-500 hover:text-stone-700 hover:bg-stone-100"
-                      }`}
-                      title="Pilih Emoji"
-                    >
-                      <Smile className="w-5 h-5" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    align="start"
-                    side="top"
-                    sideOffset={8}
-                    className="p-0 border border-stone-200 shadow-2xl rounded-2xl overflow-hidden w-auto z-50 bg-white"
-                  >
-                    <EmojiPicker
-                      onEmojiClick={handleEmojiClick}
-                      autoFocusSearch={false}
-                      theme={Theme.LIGHT}
-                      emojiStyle={EmojiStyle.APPLE}
-                      searchPlaceHolder="Cari emoji..."
-                      width={320}
-                      height={360}
-                      lazyLoadEmojis={true}
-                      previewConfig={{ showPreview: false }}
-                    />
-                  </PopoverContent>
-                </Popover>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {pendingAttachment.isImage && (
+                          <div className="flex items-center bg-stone-200/90 p-0.5 rounded-md text-[10px]">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPendingAttachment((prev) =>
+                                  prev ? { ...prev, sendAsDocument: false } : null
+                                )
+                              }
+                              className={`px-2 py-0.5 rounded transition-all font-medium ${
+                                !pendingAttachment.sendAsDocument
+                                  ? "bg-white text-emerald-700 shadow-xs font-semibold"
+                                  : "text-stone-600 hover:text-stone-900"
+                              }`}
+                            >
+                              Gambar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPendingAttachment((prev) =>
+                                  prev ? { ...prev, sendAsDocument: true } : null
+                                )
+                              }
+                              className={`px-2 py-0.5 rounded transition-all font-medium ${
+                                pendingAttachment.sendAsDocument
+                                  ? "bg-white text-emerald-700 shadow-xs font-semibold"
+                                  : "text-stone-600 hover:text-stone-900"
+                              }`}
+                            >
+                              Dokumen
+                            </button>
+                          </div>
+                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPendingAttachment(null)}
+                          className="h-7 w-7 p-0 text-stone-400 hover:text-stone-700 rounded-full shrink-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
-                {/* Attachment Menu (Paperclip) */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-10 w-10 p-0 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg shrink-0"
-                      title="Lampirkan File / Gambar"
-                    >
-                      <Paperclip className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" side="top" className="w-44 p-1 shadow-lg border-stone-200">
-                    <DropdownMenuItem
-                      onClick={() => imageInputRef.current?.click()}
-                      className="flex items-center gap-2.5 text-xs py-2 cursor-pointer text-stone-700 hover:text-stone-900"
-                    >
-                      <ImageIcon className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>Foto & Gambar</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => docInputRef.current?.click()}
-                      className="flex items-center gap-2.5 text-xs py-2 cursor-pointer text-stone-700 hover:text-stone-900"
-                    >
-                      <FileText className="w-4 h-4 text-sky-600 shrink-0" />
-                      <span>Dokumen</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* Input Textarea */}
-                <Textarea
-                  ref={textareaRef}
-                  value={messageInput}
-                  onChange={handleMessageInputChange}
-                  onPaste={handlePaste}
-                  onKeyDown={(e) => {
-                    if (slashActive && filteredSlashTemplates.length > 0) {
-                      if (e.key === "ArrowDown") {
-                        e.preventDefault();
-                        setSlashHighlightIndex((prev) => (prev + 1) % filteredSlashTemplates.length);
-                        return;
-                      }
-                      if (e.key === "ArrowUp") {
-                        e.preventDefault();
-                        setSlashHighlightIndex((prev) => (prev - 1 + filteredSlashTemplates.length) % filteredSlashTemplates.length);
-                        return;
-                      }
-                      if (e.key === "Enter" || e.key === "Tab") {
-                        e.preventDefault();
-                        const chosen = filteredSlashTemplates[slashHighlightIndex] || filteredSlashTemplates[0];
-                        if (chosen) {
-                          handleSelectSlashTemplate(chosen);
-                        }
-                        return;
-                      }
-                      if (e.key === "Escape") {
-                        e.preventDefault();
-                        setSlashActive(false);
-                        return;
-                      }
-                    }
-
-                    if (e.key === "Enter" && !e.shiftKey) {
+                  {/* Chat Input Form */}
+                  <form
+                    onSubmit={(e) => {
                       e.preventDefault();
                       handleSendMessage();
-                    }
-                  }}
-                  placeholder="Ketik pesan WhatsApp... (Ketik / untuk template cepat)"
-                  rows={2}
-                  className="text-xs resize-none bg-stone-50/50 flex-1"
-                />
+                    }}
+                    className="relative flex items-end gap-1.5"
+                  >
+                    {/* Slash (/) Quick Reply Autocomplete Popup */}
+                    {slashActive && (
+                      <div
+                        ref={slashMenuRef}
+                        className="absolute bottom-full mb-2 left-0 right-0 z-50 bg-white border border-stone-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150"
+                      >
+                        <div className="flex items-center justify-between px-3 py-1.5 bg-stone-50 border-b border-stone-200 text-[11px]">
+                          <div className="flex items-center gap-1.5 font-semibold text-stone-700">
+                            <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                            <span>Template Pesan Cepat</span>
+                            {slashQuery && (
+                              <span className="font-mono bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded text-[10px] font-bold">
+                                /{slashQuery}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] text-stone-400">
+                            <span className="hidden sm:inline">Tekan</span>
+                            <kbd className="px-1 py-0.5 bg-white border border-stone-200 rounded text-[9px] text-stone-600 font-mono">↑</kbd>
+                            <kbd className="px-1 py-0.5 bg-white border border-stone-200 rounded text-[9px] text-stone-600 font-mono">↓</kbd>
+                            <span className="hidden sm:inline">navigasi,</span>
+                            <kbd className="px-1 py-0.5 bg-white border border-stone-200 rounded text-[9px] text-stone-600 font-mono">Enter</kbd>
+                            <span className="hidden sm:inline">pilih,</span>
+                            <kbd className="px-1 py-0.5 bg-white border border-stone-200 rounded text-[9px] text-stone-600 font-mono">Esc</kbd>
+                            <span className="hidden sm:inline">batal</span>
+                          </div>
+                        </div>
 
-                <Button
-                  type="submit"
-                  disabled={isSending || (!messageInput.trim() && !pendingAttachment)}
-                  className="h-14 px-4 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
-                >
-                  {isSending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
+                        <div className="max-h-60 overflow-y-auto p-1 divide-y divide-stone-100">
+                          {filteredSlashTemplates.length === 0 ? (
+                            <div className="py-5 px-3 text-center text-xs text-stone-400 space-y-1">
+                              <p className="font-medium text-stone-600">Tidak ada template yang cocok dengan &quot;/{slashQuery}&quot;</p>
+                              <p className="text-[10px] text-stone-400">
+                                Ketik kata kunci lain atau buka{" "}
+                                <Link
+                                  href="/super-admin/whatsapp-crm/settings?tab=templates"
+                                  className="text-emerald-600 hover:underline font-semibold"
+                                >
+                                  Pengaturan Template
+                                </Link>
+                              </p>
+                            </div>
+                          ) : (
+                            filteredSlashTemplates.map((tpl, index) => {
+                              const isSelected = index === slashHighlightIndex;
+                              return (
+                                <button
+                                  key={tpl.id}
+                                  ref={(el) => {
+                                    slashItemRefs.current[index] = el;
+                                  }}
+                                  type="button"
+                                  onMouseEnter={() => setSlashHighlightIndex(index)}
+                                  onClick={() => handleSelectSlashTemplate(tpl)}
+                                  className={`w-full text-left p-2 rounded-lg transition-colors cursor-pointer space-y-1 ${
+                                    isSelected
+                                      ? "bg-emerald-50 text-emerald-950 border border-emerald-200 shadow-xs"
+                                      : "hover:bg-stone-50 text-stone-800 border border-transparent"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="font-bold text-xs text-stone-800 truncate">
+                                        {tpl.title}
+                                      </span>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[9px] px-1 py-0 bg-stone-100 text-stone-600 border-stone-200 font-normal shrink-0"
+                                      >
+                                        {tpl.category || "Umum"}
+                                      </Badge>
+                                    </div>
+                                    {tpl.shortcut && (
+                                      <span className="font-mono text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded shrink-0">
+                                        {tpl.shortcut.startsWith("/") ? tpl.shortcut : `/${tpl.shortcut}`}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-stone-500 line-clamp-2 leading-relaxed">
+                                    {tpl.content}
+                                  </p>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Hidden Native File Inputs */}
+                    <input
+                      type="file"
+                      ref={imageInputRef}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleSelectFile(e.target.files[0], false);
+                        }
+                        e.target.value = "";
+                      }}
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                    />
+                    <input
+                      type="file"
+                      ref={docInputRef}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleSelectFile(e.target.files[0], true);
+                        }
+                        e.target.value = "";
+                      }}
+                      accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
+                      className="hidden"
+                    />
+
+                    {/* Emoji Picker Popover */}
+                    <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className={`h-10 w-10 p-0 rounded-lg shrink-0 transition-colors ${
+                            isEmojiPickerOpen
+                              ? "text-emerald-600 bg-emerald-50"
+                              : "text-stone-500 hover:text-stone-700 hover:bg-stone-100"
+                          }`}
+                          title="Pilih Emoji"
+                        >
+                          <Smile className="w-5 h-5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="start"
+                        side="top"
+                        sideOffset={8}
+                        className="p-0 border border-stone-200 shadow-2xl rounded-2xl overflow-hidden w-auto z-50 bg-white"
+                      >
+                        <EmojiPicker
+                          onEmojiClick={handleEmojiClick}
+                          autoFocusSearch={false}
+                          theme={Theme.LIGHT}
+                          emojiStyle={EmojiStyle.APPLE}
+                          searchPlaceHolder="Cari emoji..."
+                          width={320}
+                          height={360}
+                          lazyLoadEmojis={true}
+                          previewConfig={{ showPreview: false }}
+                        />
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* Attachment Menu (Paperclip) */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-10 w-10 p-0 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg shrink-0"
+                          title="Lampirkan File / Gambar"
+                        >
+                          <Paperclip className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" side="top" className="w-44 p-1 shadow-lg border-stone-200">
+                        <DropdownMenuItem
+                          onClick={() => imageInputRef.current?.click()}
+                          className="flex items-center gap-2.5 text-xs py-2 cursor-pointer text-stone-700 hover:text-stone-900"
+                        >
+                          <ImageIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Foto & Gambar</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => docInputRef.current?.click()}
+                          className="flex items-center gap-2.5 text-xs py-2 cursor-pointer text-stone-700 hover:text-stone-900"
+                        >
+                          <FileText className="w-4 h-4 text-sky-600 shrink-0" />
+                          <span>Dokumen</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {/* Input Textarea */}
+                    <Textarea
+                      ref={textareaRef}
+                      value={messageInput}
+                      onChange={handleMessageInputChange}
+                      onPaste={handlePaste}
+                      onKeyDown={(e) => {
+                        if (slashActive && filteredSlashTemplates.length > 0) {
+                          if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            setSlashHighlightIndex((prev) => (prev + 1) % filteredSlashTemplates.length);
+                            return;
+                          }
+                          if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            setSlashHighlightIndex((prev) => (prev - 1 + filteredSlashTemplates.length) % filteredSlashTemplates.length);
+                            return;
+                          }
+                          if (e.key === "Enter" || e.key === "Tab") {
+                            e.preventDefault();
+                            const chosen = filteredSlashTemplates[slashHighlightIndex] || filteredSlashTemplates[0];
+                            if (chosen) {
+                              handleSelectSlashTemplate(chosen);
+                            }
+                            return;
+                          }
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            setSlashActive(false);
+                            return;
+                          }
+                        }
+
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                      placeholder="Ketik pesan WhatsApp... (Ketik / untuk template cepat)"
+                      rows={2}
+                      className="text-xs resize-none bg-stone-50/50 flex-1"
+                    />
+
+                    <Button
+                      type="submit"
+                      disabled={isSending || (!messageInput.trim() && !pendingAttachment)}
+                      className="h-14 px-4 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+                    >
+                      {isSending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </form>
+                    </>
                   )}
-                </Button>
-              </form>
+                </>
+              )}
             </div>
           </div>
 
@@ -1575,78 +2001,88 @@ export function CrmChatDrawer({
                   <Label className="text-[11px] font-semibold text-stone-600">CS Penanggung Jawab</Label>
                   <div className="flex items-center gap-1.5">
                     <div className="flex-1">
-                      <Popover open={csPopoverOpen} onOpenChange={setCsPopoverOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-8 w-full justify-between text-xs bg-white font-normal px-2.5 border-stone-200"
-                          >
-                            <span className="truncate">
-                              {lead.assignedToUser?.name ||
-                                csUsers.find((u) => u.id === lead.assignedToUserId)?.name ||
-                                "-- Belum Ditugaskan --"}
-                            </span>
-                            <ChevronDown className="w-3.5 h-3.5 opacity-50 shrink-0 ml-1" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" className="w-56 p-1 text-xs">
-                          <div className="p-1 pb-1.5 border-b border-stone-100">
-                            <div className="relative">
-                              <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-stone-400" />
-                              <input
-                                type="text"
-                                value={csSearchQuery}
-                                onChange={(e) => setCsSearchQuery(e.target.value)}
-                                placeholder="Cari nama CS..."
-                                className="w-full pl-6 pr-2 py-1 text-xs bg-stone-50 border border-stone-200 rounded focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
-                              />
-                            </div>
-                          </div>
-                          <div className="max-h-48 overflow-y-auto space-y-0.5 pt-1">
-                            <button
+                      {canAssignLead ? (
+                        <Popover open={csPopoverOpen} onOpenChange={setCsPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
                               type="button"
-                              onClick={() => {
-                                handleAssignLead("unassigned");
-                                setCsPopoverOpen(false);
-                              }}
-                              className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors flex items-center justify-between cursor-pointer ${
-                                !lead.assignedToUserId
-                                  ? "bg-stone-100 font-bold text-stone-900"
-                                  : "text-stone-500 hover:bg-stone-50"
-                              }`}
+                              variant="outline"
+                              className="h-8 w-full justify-between text-xs bg-white font-normal px-2.5 border-stone-200"
                             >
-                              <span>-- Belum Ditugaskan --</span>
-                              {!lead.assignedToUserId && <Check className="w-3.5 h-3.5 text-emerald-600" />}
-                            </button>
-                            {filteredCsUsers.map((user) => (
+                              <span className="truncate">
+                                {lead.assignedToUser?.name ||
+                                  csUsers.find((u) => u.id === lead.assignedToUserId)?.name ||
+                                  "-- Belum Ditugaskan --"}
+                              </span>
+                              <ChevronDown className="w-3.5 h-3.5 opacity-50 shrink-0 ml-1" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="w-56 p-1 text-xs">
+                            <div className="p-1 pb-1.5 border-b border-stone-100">
+                              <div className="relative">
+                                <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-stone-400" />
+                                <input
+                                  type="text"
+                                  value={csSearchQuery}
+                                  onChange={(e) => setCsSearchQuery(e.target.value)}
+                                  placeholder="Cari nama CS..."
+                                  className="w-full pl-6 pr-2 py-1 text-xs bg-stone-50 border border-stone-200 rounded focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
+                                />
+                              </div>
+                            </div>
+                            <div className="max-h-48 overflow-y-auto space-y-0.5 pt-1">
                               <button
-                                key={user.id}
                                 type="button"
                                 onClick={() => {
-                                  handleAssignLead(user.id);
+                                  handleAssignLead("unassigned");
                                   setCsPopoverOpen(false);
                                 }}
                                 className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors flex items-center justify-between cursor-pointer ${
-                                  lead.assignedToUserId === user.id
+                                  !lead.assignedToUserId
                                     ? "bg-stone-100 font-bold text-stone-900"
-                                    : "text-stone-700 hover:bg-stone-50"
+                                    : "text-stone-500 hover:bg-stone-50"
                                 }`}
                               >
-                                <span className="truncate">{user.name || user.email}</span>
-                                {lead.assignedToUserId === user.id && (
-                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                )}
+                                <span>-- Belum Ditugaskan --</span>
+                                {!lead.assignedToUserId && <Check className="w-3.5 h-3.5 text-emerald-600" />}
                               </button>
-                            ))}
-                            {filteredCsUsers.length === 0 && (
-                              <div className="px-2 py-2 text-[11px] text-stone-400 italic text-center">
-                                CS tidak ditemukan
-                              </div>
-                            )}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
+                              {filteredCsUsers.map((user) => (
+                                <button
+                                  key={user.id}
+                                  type="button"
+                                  onClick={() => {
+                                    handleAssignLead(user.id);
+                                    setCsPopoverOpen(false);
+                                  }}
+                                  className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors flex items-center justify-between cursor-pointer ${
+                                    lead.assignedToUserId === user.id
+                                      ? "bg-stone-100 font-bold text-stone-900"
+                                      : "text-stone-700 hover:bg-stone-50"
+                                  }`}
+                                >
+                                  <span className="truncate">{user.name || user.email}</span>
+                                  {lead.assignedToUserId === user.id && (
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  )}
+                                </button>
+                              ))}
+                              {filteredCsUsers.length === 0 && (
+                                <div className="px-2 py-2 text-[11px] text-stone-400 italic text-center">
+                                  CS tidak ditemukan
+                                </div>
+                              )}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <div className="h-8 w-full flex items-center px-2.5 rounded border border-stone-200 bg-stone-50 text-xs text-stone-700 font-medium">
+                          <span className="truncate">
+                            {lead.assignedToUser?.name ||
+                              csUsers.find((u) => u.id === lead.assignedToUserId)?.name ||
+                              "-- Belum Ditugaskan --"}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {!isAssigned ? (
@@ -1658,7 +2094,7 @@ export function CrmChatDrawer({
                       >
                         Klaim Leads
                       </Button>
-                    ) : (
+                    ) : canAssignLead ? (
                       <Button
                         type="button"
                         variant="outline"
@@ -1669,7 +2105,7 @@ export function CrmChatDrawer({
                       >
                         Lepas Leads
                       </Button>
-                    )}
+                    ) : null}
                   </div>
                   {isAssigned && (
                     <div className="flex items-center justify-between text-[10px] text-stone-400 pt-0.5">
@@ -1764,6 +2200,43 @@ export function CrmChatDrawer({
                   </div>
                 );
               })()}
+
+              {/* Form Tautkan Kode Manual jika belum terdeteksi */}
+              {!lead.whatsappClick && !lead.sourceCode && (
+                <div className="p-3 bg-stone-50 border border-dashed border-stone-300 rounded-lg space-y-2 mt-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-stone-700">
+                    <div className="flex items-center gap-1.5 text-stone-600">
+                      <Globe className="w-3.5 h-3.5 text-stone-500" />
+                      <span>Tautkan Kode Atribusi Manual</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Masukkan kode (contoh: GK-A1B2C atau REF:XXX)..."
+                      value={manualCodeInput}
+                      onChange={(e) => setManualCodeInput(e.target.value)}
+                      className="h-7 text-xs bg-white uppercase font-mono"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && manualCodeInput.trim()) {
+                          handleManualAttachCode(manualCodeInput.trim());
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={isAttachingCode || !manualCodeInput.trim()}
+                      onClick={() => handleManualAttachCode(manualCodeInput.trim())}
+                      className="h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 font-medium"
+                    >
+                      {isAttachingCode ? <Loader2 className="w-3 h-3 animate-spin" /> : "Tautkan"}
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-stone-400">
+                    Jika pelanggan mengirim kode lewat chat tetapi belum tertaut otomatis, Anda dapat menautkannya langsung di sini.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Labels / Tags Section */}
@@ -1998,6 +2471,81 @@ export function CrmChatDrawer({
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Supervisor PIN Unlock Dialog */}
+      <Dialog open={isPinDialogOpen} onOpenChange={setIsPinDialogOpen}>
+        <DialogContent className="max-w-md p-6 bg-white sm:rounded-xl">
+          <DialogHeader>
+            <div className="flex items-center gap-2.5 text-amber-700 mb-1">
+              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <KeyRound className="w-4 h-4 text-amber-700" />
+              </div>
+              <DialogTitle className="text-base font-bold text-stone-900">
+                Otorisasi Kode Supervisor
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-stone-600 leading-relaxed">
+              Percakapan ini sedang dikunci oleh <strong>{assignedCsName}</strong>. Masukkan PIN Supervisor 6-digit untuk membuka akses balasan sesi ini atau mengalihkan penugasan.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleVerifyPinAndUnlock();
+            }}
+            className="space-y-4 py-2"
+          >
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-stone-700">Kode PIN Supervisor</Label>
+              <Input
+                type="password"
+                maxLength={10}
+                placeholder="Contoh: 123456"
+                value={supervisorPinInput}
+                onChange={(e) => setSupervisorPinInput(e.target.value)}
+                autoFocus
+                className="font-mono text-center tracking-widest text-lg font-bold h-11"
+              />
+              <p className="text-[11px] text-stone-400">
+                Default PIN pengujian: <code className="bg-stone-100 px-1 py-0.5 rounded font-mono font-bold text-stone-700">123456</code>
+              </p>
+            </div>
+
+            <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsPinDialogOpen(false)}
+                className="text-xs cursor-pointer"
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={isTakingOver || !supervisorPinInput.trim()}
+                onClick={() => handleTakeoverChat(supervisorPinInput.trim())}
+                className="text-xs gap-1.5 text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 cursor-pointer"
+              >
+                {isTakingOver ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
+                <span>Ambil Alih (Takeover)</span>
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isVerifyingPin || !supervisorPinInput.trim()}
+                className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 cursor-pointer shadow-2xs"
+              >
+                {isVerifyingPin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlock className="w-3.5 h-3.5" />}
+                <span>Buka Balasan Sesi Ini</span>
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Quick Add Status Dialog */}
       <QuickAddStatusDialog
