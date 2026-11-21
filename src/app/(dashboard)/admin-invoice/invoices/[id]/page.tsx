@@ -158,7 +158,11 @@ const renderCustomization = (
 
   const formatSafeValue = (value: unknown): string => {
     if (typeof value === "string") {
-      return isUUID(value) ? "" : value.trim();
+      // Ambil label sebelum karakter "|" pertama.
+      // Contoh: Oval|https://cloudinary... menjadi Oval
+      const label = value.split("|", 1)[0].trim();
+
+      return !label || isUUID(label) ? "" : label;
     }
 
     if (typeof value === "number") {
@@ -175,6 +179,7 @@ const renderCustomization = (
 
     if (value && typeof value === "object") {
       const object = value as Record<string, unknown>;
+
       return formatSafeValue(object.label ?? object.name ?? object.value);
     }
 
@@ -214,12 +219,18 @@ const renderCustomization = (
 
   return (
     <div className="mt-2 space-y-1 text-[10px] leading-relaxed text-slate-600">
-      {displayAttributes?.map((attribute, index) => (
-        <div key={`${attribute.name}-${index}`}>
-          <span className="font-semibold">{attribute.name}:</span>{" "}
-          {attribute.value}
-        </div>
-      ))}
+      {displayAttributes?.map((attribute, index) => {
+        const displayValue = formatSafeValue(attribute.value);
+
+        if (!displayValue) return null;
+
+        return (
+          <div key={`${attribute.name}-${index}`}>
+            <span className="font-semibold">{attribute.name}:</span>{" "}
+            {displayValue}
+          </div>
+        );
+      })}
 
       {customEntries.map((entry, index) => (
         <div key={`${entry.name}-${index}`}>
