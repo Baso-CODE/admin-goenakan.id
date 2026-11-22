@@ -7,10 +7,10 @@ import {
   ReactNodeViewRenderer,
   useCurrentEditor,
   useEditor,
+  useEditorState,
 } from "@tiptap/react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-
 // --- Tiptap Core Extensions ---
 import { Highlight } from "@tiptap/extension-highlight";
 import { Image as BaseImage } from "@tiptap/extension-image";
@@ -450,9 +450,15 @@ const ImageControls = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [altInput, setAltInput] = useState("");
 
-  if (!editor) return null;
+  // Ikuti perubahan seleksi Tiptap secara reaktif.
+  const isImageActive = useEditorState({
+    editor,
+    selector: ({ editor: currentEditor }) => {
+      return currentEditor?.isActive("image") ?? false;
+    },
+  });
 
-  const isImageActive = editor.isActive("image");
+  if (!editor) return null;
 
   const handleOpenDialog = () => {
     const currentAttrs = editor.getAttributes("image");
@@ -472,13 +478,16 @@ const ImageControls = () => {
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
+              type="button"
               variant="ghost"
               size="default"
               className="h-8 w-8"
               disabled={!isImageActive}
               onClick={handleOpenDialog}>
               <Captions
-                className={`h-4 w-4 ${isImageActive ? "text-green-600" : "text-gray-400"}`}
+                className={`h-4 w-4 ${
+                  isImageActive ? "text-green-600" : "text-gray-400"
+                }`}
               />
             </Button>
           </TooltipTrigger>
