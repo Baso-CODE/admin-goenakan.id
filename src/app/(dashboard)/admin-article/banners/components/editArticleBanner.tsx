@@ -34,10 +34,12 @@ export default function EditArticleBanner() {
       const data = response.data || response;
 
       // Memasukkan data dari database ke dalam state Form
+
       setBannerData({
         articleId: data.articleId,
         backgroundColor: data.backgroundColor || "#C4A48E",
-        buttonText: data.buttonText || "Baca Selengkapnya",
+        buttonTextId:
+          data.buttonTextId || data.buttonText || "Baca Selengkapnya",
         ctaLink: data.ctaLink || "",
         isActive: data.isActive ?? false,
       });
