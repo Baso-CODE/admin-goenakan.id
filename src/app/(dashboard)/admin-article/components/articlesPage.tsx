@@ -60,6 +60,60 @@ type Meta = {
   total: number;
 };
 
+type PageItem = number | "ellipsis-left" | "ellipsis-right";
+
+function getPageNumbers(currentPage: number, totalPages: number): PageItem[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const visible = new Set<number>([
+    1,
+    2,
+    totalPages - 1,
+    totalPages,
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+  ]);
+
+  // Tampilkan lebih banyak nomor ketika dekat awal.
+  if (currentPage <= 3) {
+    visible.add(3);
+    visible.add(4);
+  }
+
+  // Tampilkan lebih banyak nomor ketika dekat akhir.
+  if (currentPage >= totalPages - 2) {
+    visible.add(totalPages - 2);
+    visible.add(totalPages - 3);
+  }
+
+  const sorted = [...visible]
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((a, b) => a - b);
+
+  const result: PageItem[] = [];
+
+  sorted.forEach((page, index) => {
+    const previous = sorted[index - 1];
+
+    if (previous !== undefined) {
+      const gap = page - previous;
+
+      if (gap === 2) {
+        result.push(previous + 1);
+      } else if (gap > 2) {
+        result.push(index <= 2 ? "ellipsis-left" : "ellipsis-right");
+      }
+    }
+
+    result.push(page);
+  });
+
+  return result;
+}
+
 export default function ArticlesSection() {
   const { fetchApi, status } = useApi();
   const queryClient = useQueryClient();
@@ -186,6 +240,27 @@ export default function ArticlesSection() {
 
   const meta: Meta | null = articleResponse?.meta ?? null;
 
+  const totalPages = meta
+    ? Math.max(1, Math.ceil(meta.total / Math.max(1, meta.perPage || 10)))
+    : 1;
+
+  const pageNumbers = getPageNumbers(Math.min(page, totalPages), totalPages);
+
+  const isPaginationDisabled = loading || isFetching;
+
+  const goToPage = (targetPage: number) => {
+    if (
+      isPaginationDisabled ||
+      targetPage < 1 ||
+      targetPage > totalPages ||
+      targetPage === page
+    ) {
+      return;
+    }
+
+    setPage(targetPage);
+  };
+
   const error = queryError
     ? queryError instanceof Error
       ? queryError.message
@@ -296,13 +371,26 @@ export default function ArticlesSection() {
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Semua Kategori" />
                   </SelectTrigger>
+
                   <SelectContent>
                     <SelectItem value="all">Semua Kategori</SelectItem>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name_id}
-                      </SelectItem>
-                    ))}
+
+                    <SelectItem value="__uncategorized__">
+                      Uncategorized
+                    </SelectItem>
+
+                    {categories
+                      .filter(
+                        (cat) =>
+                          !["uncategorized", "tanpa kategori"].includes(
+                            cat.name_id.trim().toLowerCase(),
+                          ),
+                      )
+                      .map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name_id}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -487,34 +575,83 @@ export default function ArticlesSection() {
       </Card>
 
       {/* ==========================================
-          PAGINATION - TANSTACK QUERY
-          ========================================== */}
+    PAGINATION - NUMBERED
+========================================== */}
       {meta && (
-        <div className="flex justify-between items-center p-4 border-t text-sm text-muted-foreground">
-          <p>
-            Page <strong>{meta.page}</strong> of{" "}
-            <strong>
-              {Math.max(1, Math.ceil(meta.total / (meta.perPage || 10)))}
-            </strong>
-          </p>
+        <div className="flex flex-col gap-4 border-t p-4 md:flex-row md:items-center md:justify-between">
+          {/* PAGINATION INFORMATION */}
+          <div className="text-sm text-muted-foreground">
+            Showing{" "}
+            <span className="font-semibold text-foreground">
+              {meta.total === 0 ? 0 : (page - 1) * (meta.perPage || 10) + 1}
+            </span>
+            {" - "}
+            <span className="font-semibold text-foreground">
+              {Math.min(page * (meta.perPage || 10), meta.total)}
+            </span>
+            {" of "}
+            <span className="font-semibold text-foreground">{meta.total}</span>
+            {" articles"}
+          </div>
 
-          <div className="space-x-2">
+          {/* NUMBERED PAGE BUTTONS */}
+          <nav
+            aria-label="Article pagination"
+            className="flex flex-wrap items-center justify-center gap-1.5">
             <Button
+              type="button"
               size="sm"
               variant="outline"
-              disabled={!meta.hasPrevious || loading || isFetching}
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
+              disabled={page <= 1 || isPaginationDisabled}
+              onClick={() => goToPage(page - 1)}
+              className="h-9 min-w-20 rounded-lg">
               Previous
             </Button>
 
+            {pageNumbers.map((item, index) => {
+              if (typeof item !== "number") {
+                return (
+                  <span
+                    key={`${item}-${index}`}
+                    aria-hidden="true"
+                    className="flex h-9 w-8 items-center justify-center text-sm text-muted-foreground">
+                    ...
+                  </span>
+                );
+              }
+
+              const isActive = item === page;
+
+              return (
+                <Button
+                  key={item}
+                  type="button"
+                  size="sm"
+                  variant={isActive ? "default" : "outline"}
+                  aria-label={`Page ${item}`}
+                  aria-current={isActive ? "page" : undefined}
+                  disabled={isPaginationDisabled}
+                  onClick={() => goToPage(item)}
+                  className={`h-9 min-w-9 rounded-lg px-2.5 ${
+                    isActive
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "hover:border-primary/40 hover:text-primary"
+                  }`}>
+                  {item}
+                </Button>
+              );
+            })}
+
             <Button
+              type="button"
               size="sm"
               variant="outline"
-              disabled={!meta.hasNext || loading || isFetching}
-              onClick={() => setPage((prev) => prev + 1)}>
+              disabled={page >= totalPages || isPaginationDisabled}
+              onClick={() => goToPage(page + 1)}
+              className="h-9 min-w-16 rounded-lg">
               Next
             </Button>
-          </div>
+          </nav>
         </div>
       )}
 
