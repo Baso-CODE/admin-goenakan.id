@@ -49,7 +49,10 @@ const articleBannerSchema = z.object({
   backgroundColor: z
     .string()
     .min(1, { message: "Warna background wajib diisi." }),
-  buttonText: z.string().min(1, { message: "Teks tombol wajib diisi." }),
+  buttonTextId: z
+    .string()
+    .trim()
+    .min(1, { message: "Teks tombol wajib diisi." }),
   ctaLink: z.string().url({ message: "Link CTA harus berupa URL yang valid." }),
   isActive: z.boolean().default(false),
 });
@@ -82,7 +85,7 @@ export default function FormArticleBanner({
     defaultValues: initialData || {
       articleId: "",
       backgroundColor: "#C4A48E",
-      buttonText: "Baca Selengkapnya",
+      buttonTextId: "Baca Selengkapnya",
       ctaLink: "",
       isActive: false,
     },
@@ -253,7 +256,7 @@ export default function FormArticleBanner({
               {/* === Button Text === */}
               <FormField
                 control={form.control}
-                name="buttonText"
+                name="buttonTextId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
