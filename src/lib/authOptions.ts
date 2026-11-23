@@ -9,6 +9,7 @@ export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: "Credentials",
+
       credentials: {
         email: {
           label: "Email",
@@ -28,7 +29,7 @@ export const authOptions: NextAuthOptions = {
 
         const user = await prisma.user.findUnique({
           where: {
-            email: credentials.email,
+            email: credentials.email.trim(),
           },
           include: {
             role: {
@@ -82,45 +83,36 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
+    // ==========================================
+    // JWT CALLBACK
+    // ==========================================
     async jwt({ token, user }) {
-      /*
-       * LOGIN PERTAMA
-       */
+      // LOGIN PERTAMA
       if (user) {
         token.id = user.id;
+        token.name = user.name;
+        token.email = user.email;
         token.role = user.role;
         token.roleId = user.roleId;
         token.permissions = user.permissions;
         token.permissionVersion = user.permissionVersion;
 
-        token.accessToken = createAccessToken({
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          roleId: user.roleId,
-          permissions: user.permissions,
-          permissionVersion: user.permissionVersion,
-        });
+        // Jangan simpan JWT API di cookie NextAuth.
+        // JWT API dibuat melalui session callback.
+        token.accessToken = "";
 
         return token;
       }
 
-      /*
-       * Tidak ada user ID di token.
-       */
+      // TOKEN TIDAK VALID
       if (!token.id) {
+        token.accessToken = "";
         return token;
       }
 
-      /*
-       * Ambil kondisi user + role terbaru dari database.
-       *
-       * Ini menangani:
-       * - permission role berubah
-       * - permissionVersion berubah
-       * - user pindah role
-       * - nama role berubah
-       */
+      // ==========================================
+      // REFRESH USER & ROLE DARI DATABASE
+      // ==========================================
       const currentUser = await prisma.user.findUnique({
         where: {
           id: token.id,
@@ -150,53 +142,85 @@ export const authOptions: NextAuthOptions = {
         (permission) => permission.name,
       );
 
-      const permissionVersion = currentUser.role.permissionVersion;
-
-      /*
-       * SELALU sinkronkan token NextAuth
-       * dengan kondisi database terbaru.
-       */
+      // ==========================================
+      // SINKRONISASI DATA JWT NEXTAUTH
+      // ==========================================
+      token.id = currentUser.id;
+      token.name = currentUser.name;
+      token.email = currentUser.email;
       token.role = roleName;
       token.roleId = currentUser.roleId;
       token.permissions = permissions;
-      token.permissionVersion = permissionVersion;
+      token.permissionVersion = currentUser.role.permissionVersion;
 
-      /*
-       * SELALU buat access token API baru.
-       *
-       * Ini penting supaya accessToken tidak tertinggal
-       * permissionVersion lama.
-       */
-      token.accessToken = createAccessToken({
-        id: currentUser.id,
-        email: currentUser.email,
-        role: roleName,
-        roleId: currentUser.roleId,
-        permissions,
-        permissionVersion,
-      });
+      // PENTING:
+      // Tidak membuat JWT API di sini.
+      // Menghindari JWT bersarang dalam cookie.
+      token.accessToken = "";
 
       return token;
     },
 
+    // ==========================================
+    // SESSION CALLBACK
+    // ==========================================
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id;
-        session.user.role = token.role;
-        session.user.roleId = token.roleId;
-        session.user.permissions = token.permissions || [];
-
-        session.user.permissionVersion = token.permissionVersion;
-
-        session.user.accessToken = token.accessToken;
+      if (!session.user) {
+        return session;
       }
+
+      session.user.id = token.id;
+      session.user.name = token.name;
+      session.user.email = token.email;
+
+      session.user.role = token.role;
+      session.user.roleId = token.roleId;
+
+      session.user.permissions = Array.isArray(token.permissions)
+        ? token.permissions
+        : [];
+
+      session.user.permissionVersion = token.permissionVersion;
+
+      // ==========================================
+      // VALIDASI SESSION ADMIN
+      // ==========================================
+      const isValidAdmin =
+        Boolean(token.id) &&
+        Boolean(token.roleId) &&
+        Boolean(token.role) &&
+        token.role !== "CUSTOMER" &&
+        typeof token.permissionVersion === "number";
+
+      if (!isValidAdmin) {
+        session.user.accessToken = "";
+        return session;
+      }
+
+      // ==========================================
+      // GENERATE API ACCESS TOKEN
+      // ==========================================
+      // Token API hanya dimasukkan ke response
+      // session, bukan cookie NextAuth.
+      session.user.accessToken = createAccessToken({
+        id: token.id,
+        email: token.email,
+        role: token.role,
+        roleId: token.roleId,
+        permissions: session.user.permissions,
+        permissionVersion: token.permissionVersion,
+      });
 
       return session;
     },
   },
 
+  // ==========================================
+  // SESSION CONFIGURATION
+  // ==========================================
   session: {
     strategy: "jwt",
+    maxAge: 7 * 24 * 60 * 60,
   },
 
   pages: {
@@ -206,6 +230,9 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
+// ==========================================
+// CREATE BACKEND API ACCESS TOKEN
+// ==========================================
 function createAccessToken({
   id,
   email,
@@ -221,6 +248,12 @@ function createAccessToken({
   permissions: string[];
   permissionVersion: number;
 }) {
+  const secret = process.env.NEXTAUTH_SECRET;
+
+  if (!secret) {
+    throw new Error("NEXTAUTH_SECRET belum dikonfigurasi.");
+  }
+
   return sign(
     {
       id,
@@ -230,7 +263,7 @@ function createAccessToken({
       permissions,
       permissionVersion,
     },
-    process.env.NEXTAUTH_SECRET!,
+    secret,
     {
       expiresIn: "7d",
     },

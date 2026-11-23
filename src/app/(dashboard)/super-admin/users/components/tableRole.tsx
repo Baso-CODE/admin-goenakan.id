@@ -150,11 +150,11 @@ export default function TableRole() {
               />
             </div>
             {/* Tombol Tambah Role */}
-            <Link href="/super-admin/roles/add">
-              <Button className="w-full md:w-auto bg-blue-600 hover:bg-blue-700">
-                + Add Role
-              </Button>
-            </Link>
+            <Button
+              asChild
+              className="w-full md:w-auto bg-blue-600 hover:bg-blue-700">
+              <Link href="/super-admin/users/roles/add">+ Add Role</Link>
+            </Button>
           </div>
         </CardHeader>
       </Card>

@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
 import { toast } from "sonner";
 
+import ChangeInvoiceSignerDialog from "@/app/(dashboard)/components/changeInvoiceSignerDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,7 +51,15 @@ type InvoiceDetail = {
   paidAt: string | null;
   totalAmount: number;
   method?: string;
-
+  signerUserId?: string | null;
+  signerName?: string | null;
+  signerInfo?: {
+    id: string | null;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    signatureUrl: string | null;
+  } | null;
   previousInvoice?: {
     id: number;
     invoiceNumber: string | null;
@@ -431,10 +440,16 @@ export default function InvoiceDetailPage() {
   };
 
   const salesData = {
-    name: invoice.order?.createdBy?.name || "Admin / Sales",
-    phone: invoice.order?.createdBy?.phone || "-",
-    signatureUrl: invoice.order?.createdBy?.image || null,
+    name:
+      invoice.signerInfo?.name ||
+      invoice.order?.createdBy?.name ||
+      "Goenakan Admin",
+
+    phone: invoice.signerInfo?.phone || invoice.order?.createdBy?.phone || "-",
+
+    signatureUrl: invoice.signerInfo?.signatureUrl ?? null,
   };
+
   const calculatedOrderTotal = invoice.items.reduce(
     (acc, item) => acc + Number(item.price) * item.quantity,
     0,
@@ -590,6 +605,15 @@ export default function InvoiceDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <ChangeInvoiceSignerDialog
+              invoiceId={invoice.id}
+              currentSignerUserId={invoice.signerUserId ?? null}
+              currentSignerName={
+                invoice.signerInfo?.name ?? invoice.signerName ?? null
+              }
+              invoiceStatus={invoice.status}
+              onSaved={loadData}
+            />
             <Button variant="outline" onClick={handlePrint}>
               <Download className="mr-2 h-4 w-4" />
               Print / Save PDF

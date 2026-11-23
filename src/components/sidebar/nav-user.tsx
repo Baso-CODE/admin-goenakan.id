@@ -1,10 +1,10 @@
 "use client";
 
 import {
-  BadgeCheck,
   Bell,
   ChevronsUpDown,
   CreditCard,
+  FileSignature,
   LogOut,
   Sparkles,
 } from "lucide-react";
@@ -26,6 +26,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import Link from "next/link";
 
 export function NavUser({
   user,
@@ -96,10 +97,15 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <BadgeCheck />
-                Account
+              <DropdownMenuItem asChild>
+                <Link
+                  href="/account/signature"
+                  className="flex cursor-pointer items-center gap-2">
+                  <FileSignature className="h-4 w-4" />
+                  Tanda Tangan Saya
+                </Link>
               </DropdownMenuItem>
+
               <DropdownMenuItem>
                 <CreditCard />
                 Billing

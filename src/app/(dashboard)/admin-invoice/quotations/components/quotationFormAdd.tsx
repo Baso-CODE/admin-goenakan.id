@@ -1,5 +1,4 @@
 "use client";
-
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import {
@@ -76,6 +75,7 @@ import {
   QuotationNotesSection,
 } from "./helper/quotationNotesSection";
 import { ClientData, NoteCategory, ProductData } from "./quotationForm";
+import QuotationSignerSelect from "./quotationSignerSelect";
 
 export type Currency = { code: string; name: string; symbol: string };
 
@@ -97,6 +97,7 @@ const quotationSchema = z.object({
   picId: z.string().optional(),
   currencyCode: z.string().default("IDR"),
   paymentTerms: z.string().optional(),
+  signerUserId: z.string().optional(),
   notes: z
     .array(
       z.object({
@@ -845,6 +846,7 @@ export default function QuotationAddForm({
       status: "DRAFT",
       picId: "",
       clientId: "",
+      signerUserId: "",
       currencyCode: "IDR",
       paymentTerms: "",
       items: [
@@ -878,11 +880,10 @@ export default function QuotationAddForm({
     try {
       setLoadingMaster(true);
 
-      const [resC, resP, resN, resS, resCurr] = await Promise.all([
+      const [resC, resP, resN, resCurr] = await Promise.all([
         fetchApi("/clients/order"),
         fetchApi("/products/order"),
         fetchApi("/quotation-notes-categories"),
-        fetchApi("/sales?isActive=true"),
         fetchApi("/currencies"),
       ]);
 
@@ -914,6 +915,7 @@ export default function QuotationAddForm({
   const handleFinalSubmit = (data: AddQuotationFormValues) => {
     const jsonPayload = {
       date: data.date,
+      ...(data.signerUserId ? { signerUserId: data.signerUserId } : {}),
       validUntil: data.validUntil || undefined,
       status: data.status,
       clientId: data.clientId,
@@ -1123,6 +1125,26 @@ export default function QuotationAddForm({
                           {...field}
                         />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="signerUserId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Penandatangan Quotation</FormLabel>
+
+                      <FormControl>
+                        <QuotationSignerSelect
+                          mode="create"
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
+                      </FormControl>
+
                       <FormMessage />
                     </FormItem>
                   )}
