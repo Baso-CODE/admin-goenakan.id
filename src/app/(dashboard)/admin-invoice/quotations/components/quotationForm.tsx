@@ -69,6 +69,7 @@ import {
   QuotationNotesSection,
 } from "./helper/quotationNotesSection";
 import { Currency } from "./quotationFormAdd";
+import QuotationSignerSelect from "./quotationSignerSelect";
 
 export type PICData = {
   id: string;
@@ -868,6 +869,7 @@ const quotationSchema = z.object({
   status: z.enum(QUOTATION_STATUSES).default("DRAFT"),
   isManualClient: z.boolean().default(false),
   currencyCode: z.string().default("IDR"),
+  signerUserId: z.string().optional(),
   paymentTerms: z.string().optional(),
   clientId: z.string().optional(),
   picId: z.string().optional(),
@@ -1001,6 +1003,7 @@ export default function QuotationForm({
         isManualClient: false,
         picId: "",
         currencyCode: "IDR",
+        signerUserId: "",
         paymentTerms: "",
         items: [
           {
@@ -1028,8 +1031,9 @@ export default function QuotationForm({
         ? new Date(initialData.validUntil)
         : undefined,
       picId: initialData.picId || "",
-      currencyCode: initialData.currencyCode || "IDR", //  TAMBAH
-      paymentTerms: initialData.paymentTerms || "", //  TAMBAH
+      currencyCode: initialData.currencyCode || "IDR",
+      paymentTerms: initialData.paymentTerms || "",
+      signerUserId: initialData.signerUserId || "",
     };
   }, [initialData]);
 
@@ -1361,6 +1365,27 @@ export default function QuotationForm({
                         {...field}
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="signerUserId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Penandatangan Quotation</FormLabel>
+
+                    <FormControl>
+                      <QuotationSignerSelect
+                        mode="edit"
+                        value={field.value}
+                        onChange={field.onChange}
+                        currentSignerName={initialData?.signerName}
+                      />
+                    </FormControl>
+
                     <FormMessage />
                   </FormItem>
                 )}
