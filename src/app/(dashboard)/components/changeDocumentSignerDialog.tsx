@@ -37,18 +37,20 @@ type SignerUser = {
 };
 
 type Props = {
-  invoiceId: number;
+  documentType: "invoice" | "quotation";
+  documentId: number | string;
   currentSignerUserId?: string | null;
   currentSignerName?: string | null;
-  invoiceStatus: string;
+  documentStatus: string;
   onSaved: () => Promise<void> | void;
 };
 
-export default function ChangeInvoiceSignerDialog({
-  invoiceId,
+export default function ChangeDocumentSignerDialog({
+  documentType,
+  documentId,
   currentSignerUserId,
   currentSignerName,
-  invoiceStatus,
+  documentStatus,
   onSaved,
 }: Props) {
   const { data: session } = useSession();
@@ -62,7 +64,9 @@ export default function ChangeInvoiceSignerDialog({
   const [saving, setSaving] = useState(false);
 
   const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
+  const documentLabel = documentType === "invoice" ? "Invoice" : "Quotation";
 
+  const endpoint = documentType === "invoice" ? "invoices" : "quotations";
   useEffect(() => {
     if (!open || !isSuperAdmin || status !== "authenticated") {
       return;
@@ -138,7 +142,7 @@ export default function ChangeInvoiceSignerDialog({
     try {
       setSaving(true);
 
-      const res = await fetchApi(`/invoices/${invoiceId}/signer`, {
+      const res = await fetchApi(`/${endpoint}/${documentId}/signer`, {
         method: "PATCH",
         body: JSON.stringify({
           signerUserId: selectedUserId,
@@ -150,13 +154,13 @@ export default function ChangeInvoiceSignerDialog({
 
       if (!res.ok) {
         throw new Error(
-          result?.message || "Gagal mengganti penandatangan Invoice.",
+          result?.message || `Gagal mengganti penandatangan ${documentLabel}.`,
         );
       }
 
       await onSaved();
 
-      toast.success("Penandatangan Invoice berhasil diganti.");
+      toast.success(`Penandatangan ${documentLabel} berhasil diganti.`);
 
       setOpen(false);
     } catch (error) {
@@ -175,7 +179,7 @@ export default function ChangeInvoiceSignerDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" disabled={invoiceStatus === "CANCELLED"}>
+        <Button variant="outline" disabled={documentStatus === "CANCELLED"}>
           <PenLine className="mr-2 h-4 w-4" />
           Ganti Penandatangan
         </Button>
@@ -183,11 +187,11 @@ export default function ChangeInvoiceSignerDialog({
 
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Ganti Penandatangan Invoice</DialogTitle>
+          <DialogTitle>Ganti Penandatangan {documentLabel}</DialogTitle>
 
           <DialogDescription>
-            Ubah nama dan tanda tangan yang tercetak pada Invoice ini. Identitas
-            pembuat tidak berubah.
+            Ubah nama dan tanda tangan yang tercetak pada
+            {` ${documentLabel}`} ini. Identitas pembuat tidak berubah.
           </DialogDescription>
         </DialogHeader>
 
@@ -273,15 +277,15 @@ export default function ChangeInvoiceSignerDialog({
             />
 
             <p className="text-xs text-muted-foreground">
-              Minimal 10 karakter. Alasan disimpan pada histori perubahan
-              Invoice.
+              Minimal 10 karakter. Alasan disimpan pada histori perubahan{" "}
+              {documentLabel}.
             </p>
           </div>
 
-          {["PAID", "UNPAID", "OVERDUE"].includes(invoiceStatus) && (
+          {!["DRAFT", "CANCELLED"].includes(documentStatus) && (
             <p className="text-xs text-amber-700">
-              Invoice ini mungkin sudah diterbitkan. Pastikan perubahan telah
-              disetujui dan client menerima revisi yang benar.
+              {documentLabel} ini mungkin sudah diterbitkan. Pastikan perubahan
+              telah disetujui dan client menerima revisi yang benar.
             </p>
           )}
         </div>

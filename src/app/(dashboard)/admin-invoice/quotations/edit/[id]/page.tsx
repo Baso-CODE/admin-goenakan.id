@@ -2,7 +2,6 @@
 
 import { cleanQuotationPayload } from "@/helper/cleanQuotationPayload";
 import { useApi } from "@/hooks/useApi";
-import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -11,7 +10,6 @@ import QuotationForm, {
 } from "../../components/quotationForm";
 
 export default function EditQuotationPage() {
-  const { data: session } = useSession();
   const { fetchApi, status } = useApi();
   const { id } = useParams();
   const router = useRouter();
@@ -125,24 +123,8 @@ export default function EditQuotationPage() {
     try {
       const payload = cleanQuotationPayload(data);
 
-      // Jangan mengirim ulang signer lama ketika
-      // user hanya mengedit item, notes, atau harga.
-      const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
-
-      const previousSignerId = initialData?.signerUserId || "";
-
-      const nextSignerId = data.signerUserId || "";
-
-      const signerChanged =
-        isSuperAdmin &&
-        Boolean(nextSignerId) &&
-        nextSignerId !== previousSignerId;
-
-      if (signerChanged) {
-        payload.signerUserId = nextSignerId;
-      } else {
-        delete payload.signerUserId;
-      }
+      // Penggantian signer wajib melalui endpoint khusus.
+      delete payload.signerUserId;
 
       payload.items = payload.items.map((item: any, index: number) => ({
         ...item,
