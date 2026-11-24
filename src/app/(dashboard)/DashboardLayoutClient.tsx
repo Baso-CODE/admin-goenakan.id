@@ -23,6 +23,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React from "react";
+import PageGuideButton from "./components/pageGuideButton";
 
 export default function DashboardLayoutClient({
   children,
@@ -111,7 +112,11 @@ export default function DashboardLayoutClient({
           </div>
 
           {/* RIGHT: NOTIFICATION CENTER */}
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <PageGuideButton />
+
+            <Separator orientation="vertical" className="h-5" />
+
             <NotificationBell />
           </div>
         </header>

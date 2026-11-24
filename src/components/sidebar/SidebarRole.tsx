@@ -16,6 +16,7 @@ import { getAccessibleAdminRoutes } from "@/lib/adminAccess";
 import type { LucideIcon } from "lucide-react";
 import {
   AudioWaveform,
+  BookOpen,
   Calculator,
   Command,
   FileSpreadsheet,
@@ -271,6 +272,26 @@ export default function SidebarRole({ ...props }) {
           </>
         )}
       </SidebarContent>
+
+      {role && role !== "CUSTOMER" && (
+        <SidebarGroup>
+          <div className="px-2 pb-2 text-xs font-semibold text-muted-foreground group-data-[collapsible=icon]:hidden">
+            Support
+          </div>
+
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Documentation">
+                <Link href="/documentation">
+                  <BookOpen className="h-4 w-4" />
+
+                  <span className="font-medium">Documentation</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+      )}
 
       <SidebarFooter>
         <NavUser user={userData} />
