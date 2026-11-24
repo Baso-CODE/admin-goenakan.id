@@ -1,26 +1,6 @@
 "use client";
 
-import { format } from "date-fns";
-import { id as idLocale } from "date-fns/locale";
-import {
-  ArrowLeft,
-  Box,
-  CalendarIcon,
-  Edit3,
-  FileText,
-  History,
-  Lock,
-  MessageSquare,
-  Printer,
-  Send,
-  Trash2,
-  User,
-} from "lucide-react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
-
+import ChangeDocumentSignerDialog from "@/app/(dashboard)/components/changeDocumentSignerDialog";
 import { WhatsappCodeMatcher } from "@/components/tracking/whatsappCodeMatcher";
 import {
   AlertDialog,
@@ -47,6 +27,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useApi } from "@/hooks/useApi";
+import { format } from "date-fns";
+import { id as idLocale } from "date-fns/locale";
+import {
+  ArrowLeft,
+  Box,
+  CalendarIcon,
+  Edit3,
+  FileText,
+  History,
+  Lock,
+  MessageSquare,
+  Printer,
+  Send,
+  Trash2,
+  User,
+} from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { FollowUpStepperDialog } from "./followUpStepperDialog";
 //  PASTIKAN KAMU MENG-IMPORT FUNGSI FORMAT CURRENCY DARI UTILS JIKA ADA
 // import { formatCurrency } from "@/lib/utils";
@@ -113,6 +113,15 @@ type QuotationDetail = {
   manualClientAddress?: string | null;
   items: QuotationItem[];
   followUps: QuotationFollowUp[];
+  signerUserId?: string | null;
+  signerName?: string | null;
+  signerSignatureUrl?: string | null;
+
+  createdBy?: {
+    id: string;
+    name: string | null;
+    email: string | null;
+  } | null;
 };
 
 export default function QuotationDetail() {
@@ -203,6 +212,15 @@ export default function QuotationDetail() {
               <Edit3 className="h-4 w-4" /> Edit
             </Button>
           </Link>
+
+          <ChangeDocumentSignerDialog
+            documentType="quotation"
+            documentId={data.id}
+            currentSignerUserId={data.signerUserId ?? null}
+            currentSignerName={data.signerName ?? data.createdBy?.name ?? null}
+            documentStatus={data.status}
+            onSaved={fetchDetail}
+          />
 
           {/* Tombol Print */}
           <Button

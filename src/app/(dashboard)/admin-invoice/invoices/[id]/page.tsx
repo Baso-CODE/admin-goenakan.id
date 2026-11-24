@@ -14,7 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
 import { toast } from "sonner";
 
-import ChangeInvoiceSignerDialog from "@/app/(dashboard)/components/changeInvoiceSignerDialog";
+import ChangeDocumentSignerDialog from "@/app/(dashboard)/components/changeDocumentSignerDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -605,13 +605,14 @@ export default function InvoiceDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <ChangeInvoiceSignerDialog
-              invoiceId={invoice.id}
+            <ChangeDocumentSignerDialog
+              documentType="invoice"
+              documentId={invoice.id}
               currentSignerUserId={invoice.signerUserId ?? null}
               currentSignerName={
                 invoice.signerInfo?.name ?? invoice.signerName ?? null
               }
-              invoiceStatus={invoice.status}
+              documentStatus={invoice.status}
               onSaved={loadData}
             />
             <Button variant="outline" onClick={handlePrint}>

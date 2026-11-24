@@ -69,7 +69,6 @@ import {
   QuotationNotesSection,
 } from "./helper/quotationNotesSection";
 import { Currency } from "./quotationFormAdd";
-import QuotationSignerSelect from "./quotationSignerSelect";
 
 export type PICData = {
   id: string;
@@ -1369,8 +1368,21 @@ export default function QuotationForm({
                   </FormItem>
                 )}
               />
+              <div className="space-y-2">
+                <FormLabel>Penandatangan Quotation</FormLabel>
 
-              <FormField
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <p className="text-sm font-medium">
+                    {initialData?.signerName || "Belum ditentukan"}
+                  </p>
+
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Penggantian penandatangan dilakukan melalui halaman Detail
+                    Quotation oleh Super Admin.
+                  </p>
+                </div>
+              </div>
+              {/* <FormField
                 control={form.control}
                 name="signerUserId"
                 render={({ field }) => (
@@ -1389,7 +1401,7 @@ export default function QuotationForm({
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+              /> */}
             </CardContent>
           </Card>
 
