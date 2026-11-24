@@ -42,7 +42,7 @@ export default function CustomerComparisonGraphs({
                   stroke="#e2e8f0"
                 />
                 <XAxis
-                  dataKey="month"
+                  dataKey="label"
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fill: "#64748b" }}
@@ -110,7 +110,7 @@ export default function CustomerComparisonGraphs({
                   stroke="#e2e8f0"
                 />
                 <XAxis
-                  dataKey="month"
+                  dataKey="label"
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fill: "#64748b" }}

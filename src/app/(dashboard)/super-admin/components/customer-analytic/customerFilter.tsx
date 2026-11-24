@@ -88,6 +88,8 @@ export default function CustomerFilter({
               <SelectItem value="7days">Last 7 Days</SelectItem>
               <SelectItem value="14days">Last 14 Days</SelectItem>
               <SelectItem value="30days">Last 30 Days</SelectItem>
+              <SelectItem value="90days">Last 90 Days</SelectItem>
+              <SelectItem value="1year">Last 1 Year</SelectItem>
               <SelectItem value="custom">Custom Range...</SelectItem>
             </SelectContent>
           </Select>

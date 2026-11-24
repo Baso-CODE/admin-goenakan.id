@@ -3,6 +3,7 @@
 import { useApi } from "@/hooks/useApi";
 import { useCallback, useEffect, useState } from "react";
 
+import CustomerChannelOrderChart from "../customer-analytic/customerChannelOrderChart";
 import CustomerComparisonGraphs from "../customer-analytic/customerComparisonGraphs";
 import CustomerFilter from "../customer-analytic/customerFilter";
 import CustomerMetrics from "../customer-analytic/customerMetrics";
@@ -111,7 +112,12 @@ export default function CustomerAnalyticTab() {
             {/* 4. ROW 2 GRAFIK: NEW VS REPEAT COMPARISON */}
             <CustomerComparisonGraphs data={customerData?.graphs?.comparison} />
 
-            {/* 5. TABEL DETAIL BY REGION DENGAN SORTING */}
+            {/* 5. CHANNEL ORDER PER MONTH */}
+            <CustomerChannelOrderChart
+              data={customerData?.graphs?.channelOrders}
+            />
+
+            {/* 6. TABEL DETAIL BY REGION DENGAN SORTING */}
             <CustomerRegionTable data={customerData?.regionData} />
           </>
         )
