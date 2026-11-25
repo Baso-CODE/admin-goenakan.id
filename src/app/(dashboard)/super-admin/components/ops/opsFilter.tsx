@@ -67,8 +67,8 @@ export default function OpsFilter({
         <h3 className="text-sm font-semibold text-slate-800">
           Global Date Filter (Ops)
         </h3>
-        <p className="text-xs text-muted-foreground font-medium ">
-          *Impacts Logistics, Sample, and Quotation metrics below.
+        <p className="text-xs text-muted-foreground font-medium">
+          *Impacts Logistics and Sample metrics below.
         </p>
       </div>
 
