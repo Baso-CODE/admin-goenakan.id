@@ -1,5 +1,6 @@
 "use client";
 
+import ChangeSalesOwnerDialog from "@/app/(dashboard)/components/changeSalesOwnerDialog";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import {
@@ -194,6 +195,7 @@ export default function OrderDetailPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <ChangeSalesOwnerDialog documentType="order" documentId={order.id} />
             <Button variant="outline" onClick={() => window.print()}>
               <Printer className="mr-2 h-4 w-4" /> Print
             </Button>

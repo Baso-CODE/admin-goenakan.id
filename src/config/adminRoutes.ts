@@ -3,6 +3,7 @@ export type AdminRoute = {
   url: string;
   permission?: string;
   superAdminOnly?: boolean;
+  allowedRoles?: string[];
   defaultPriority?: number;
   section:
     | "Dashboard"
@@ -17,6 +18,14 @@ export type AdminRoute = {
 };
 
 export const ADMIN_ROUTES: AdminRoute[] = [
+  {
+    title: "My Sales Dashboard",
+    url: "/admin-sales/dashboard",
+    allowedRoles: ["ADMIN_SALES"],
+    defaultPriority: 2,
+    section: "Dashboard",
+    group: "Dashboard",
+  },
   {
     title: "Main Dashboard",
     url: "/super-admin",

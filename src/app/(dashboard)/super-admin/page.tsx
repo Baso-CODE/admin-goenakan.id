@@ -1,3 +1,4 @@
+import SalesPerformanceDashboard from "../components/salesPerformanceDashboard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import CustomerAnalyticTab from "./components/tabs/customerAnalyticTab";
@@ -37,6 +38,7 @@ export default function SuperAdminPage() {
             <TabsTrigger value="operations">Ops Dashboard</TabsTrigger>
 
             <TabsTrigger value="quotation">Quotation</TabsTrigger>
+            <TabsTrigger value="sales-performance">Sales Performance</TabsTrigger>
           </TabsList>
         </div>
 
@@ -63,6 +65,9 @@ export default function SuperAdminPage() {
         {/* TAB 5: QUOTATION ANALYTICS */}
         <TabsContent value="quotation" className="outline-none">
           <QuotationAnalyticTab />
+        </TabsContent>
+        <TabsContent value="sales-performance" className="outline-none">
+          <SalesPerformanceDashboard />
         </TabsContent>
       </Tabs>
     </div>
