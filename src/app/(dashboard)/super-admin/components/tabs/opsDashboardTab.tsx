@@ -6,7 +6,6 @@ import OpsLogisticsLateDeliveries from "../customer-analytic/opsLogisticsLateDel
 import OpsFilter from "../ops/opsFilter";
 import OpsLogisticsAverages from "../ops/opsLogisticsAverages";
 import OpsLogisticsMetrics from "../ops/opsLogisticsMetrics";
-import OpsQuotationSection from "../ops/opsQuotationSection";
 import OpsSampleSection from "../ops/opsSampleSection";
 
 export default function OpsDashboardTab() {
@@ -114,7 +113,7 @@ export default function OpsDashboardTab() {
             <OpsSampleSection data={opsData?.sample} />
 
             {/* SECTION C: QUOTATION */}
-            <OpsQuotationSection data={opsData?.quotation} />
+            {/* <OpsQuotationSection data={opsData?.quotation} /> */}
           </>
         )
       )}
