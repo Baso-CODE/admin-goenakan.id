@@ -1,5 +1,6 @@
 "use client";
 
+import ChangeSalesOwnerDialog from "@/app/(dashboard)/components/changeSalesOwnerDialog";
 import ChangeDocumentSignerDialog from "@/app/(dashboard)/components/changeDocumentSignerDialog";
 import { WhatsappCodeMatcher } from "@/components/tracking/whatsappCodeMatcher";
 import {
@@ -212,6 +213,8 @@ export default function QuotationDetail() {
               <Edit3 className="h-4 w-4" /> Edit
             </Button>
           </Link>
+
+          <ChangeSalesOwnerDialog documentType="quotation" documentId={data.id} />
 
           <ChangeDocumentSignerDialog
             documentType="quotation"

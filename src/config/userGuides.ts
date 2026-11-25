@@ -3,7 +3,8 @@ export type GuideModule =
   | "quotation"
   | "signature"
   | "user"
-  | "role";
+  | "role"
+  | "sales";
 
 export type UserGuide = {
   id: string;
@@ -26,6 +27,11 @@ export const GUIDE_MODULES: Record<
     href: string;
   }
 > = {
+  sales: {
+    title: "Sales Performance",
+    description: "Performa Sales, atribusi Order dan Quotation, serta leaderboard.",
+    href: "/admin-sales/dashboard",
+  },
   invoice: {
     title: "Invoice Management",
     description:
@@ -59,6 +65,22 @@ export const GUIDE_MODULES: Record<
 };
 
 export const USER_GUIDES: UserGuide[] = [
+  {
+    id: "sales-personal-dashboard", module: "sales",
+    title: "Cara Membaca My Sales Dashboard",
+    description: "Melihat performa pribadi, omzet, order, customer, dan konversi quotation.",
+    roles: ["ADMIN_SALES"],
+    steps: ["Login sebagai Admin Sales.", "Buka My Sales Dashboard pada sidebar.", "Pilih periode dan mata uang, lalu klik Apply Filter.", "Periksa Sales Overview, Quotation Performance dan grafik.", "Pastikan setiap Order dan Quotation memiliki Sales Owner yang tepat."],
+    warnings: ["Tanda tangan bukan penentu kredit penjualan.", "Hubungi Super Admin jika Sales Owner tidak sesuai."],
+  },
+  {
+    id: "sales-owner-management", module: "sales",
+    title: "Cara Mengubah Sales Owner dan Membaca Sales Performance",
+    description: "Mengatur atribusi transaksi dan membandingkan performa Admin Sales.",
+    superAdminOnly: true,
+    steps: ["Buka Main Dashboard lalu tab Sales Performance.", "Gunakan Date Filter, Sales dan Currency.", "Klik nama Sales di leaderboard untuk melihat performa individu.", "Untuk memperbaiki atribusi, buka detail Order atau Quotation.", "Klik Change Sales Owner, pilih Sales yang benar, isi alasan minimal 10 karakter, lalu simpan.", "Muat ulang dashboard dan periksa perubahan."],
+    warnings: ["Penggantian owner dapat mengubah laporan historis.", "Penggantian penandatangan tidak mengubah owner.", "Owner dokumen yang terkait tidak otomatis berubah."],
+  },
   // ==========================================
   // INVOICE MANAGEMENT
   // ==========================================
@@ -543,6 +565,10 @@ export function getVisibleGuides(role: string, permissions: string[]) {
 export function getGuideModuleByPath(pathname: string): GuideModule | null {
   const matches = (base: string) =>
     pathname === base || pathname.startsWith(`${base}/`);
+
+  if (pathname === "/super-admin" || matches("/admin-sales/dashboard")) {
+    return "sales";
+  }
 
   if (matches("/admin-invoice/invoices")) {
     return "invoice";

@@ -75,6 +75,7 @@ export default function SidebarRole({ ...props }) {
   );
 
   const isSuperAdmin = role === "SUPER_ADMIN";
+  const isAdminSales = role === "ADMIN_SALES";
 
   const accessibleRoutes = useMemo(
     () => getAccessibleAdminRoutes(role, userPermissions),
@@ -146,8 +147,14 @@ export default function SidebarRole({ ...props }) {
       });
     }
 
+    if (isAdminSales) {
+      pages.unshift({
+        title: "My Sales Dashboard", url: "/admin-sales/dashboard",
+        section: "Dashboard", group: "Dashboard", icon: Frame,
+      });
+    }
     return pages;
-  }, [visibleSections, isSuperAdmin]);
+  }, [visibleSections, isSuperAdmin, isAdminSales]);
 
   const searchResults = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -256,6 +263,18 @@ export default function SidebarRole({ ...props }) {
                         <Frame />
                         <span className="font-medium">Main Dashboard</span>
                       </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroup>
+            )}
+
+            {isAdminSales && (
+              <SidebarGroup>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="My Sales Dashboard">
+                      <Link href="/admin-sales/dashboard"><Frame /><span className="font-medium">My Sales Dashboard</span></Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>

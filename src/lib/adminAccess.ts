@@ -5,6 +5,11 @@ export function canAccessAdminRoute(
   role: string,
   permissions: string[],
 ): boolean {
+  if (route.allowedRoles) {
+    return route.allowedRoles.includes(role) &&
+      (!route.permission || permissions.includes(route.permission));
+  }
+
   if (role === "SUPER_ADMIN") {
     return true;
   }

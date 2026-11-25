@@ -30,6 +30,7 @@ const MODULE_ICONS = {
   signature: PenLine,
   user: Users,
   role: ShieldCheck,
+  sales: Users,
 };
 
 type Props = {
