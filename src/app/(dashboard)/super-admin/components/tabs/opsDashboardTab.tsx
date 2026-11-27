@@ -1,122 +1,88 @@
 "use client";
 
-import { useApi } from "@/hooks/useApi";
-import { useCallback, useEffect, useState } from "react";
+import { Truck } from "lucide-react";
+import type { ComponentProps } from "react";
+
 import OpsLogisticsLateDeliveries from "../customer-analytic/opsLogisticsLateDeliveries";
-import OpsFilter from "../ops/opsFilter";
 import OpsLogisticsAverages from "../ops/opsLogisticsAverages";
 import OpsLogisticsMetrics from "../ops/opsLogisticsMetrics";
-import OpsSampleSection from "../ops/opsSampleSection";
+
+import {
+  AnalyticsPeriodFilter,
+  useAnalyticsPeriod,
+  type AnalyticsPeriodData,
+} from "../shared/analyticsPeriodFilter";
+
+interface OpsAnalyticsData extends AnalyticsPeriodData {
+  logistics: {
+    metrics: NonNullable<ComponentProps<typeof OpsLogisticsMetrics>["data"]>;
+
+    averages: ComponentProps<typeof OpsLogisticsAverages>["data"];
+
+    lateDeliveries: ComponentProps<typeof OpsLogisticsLateDeliveries>["data"];
+  };
+}
 
 export default function OpsDashboardTab() {
-  // State untuk Range Date & Comparison
-  const [dateRange, setDateRange] = useState("30days");
-  const [comparison, setComparison] = useState("none");
+  const analytics = useAnalyticsPeriod<OpsAnalyticsData>(
+    "/analytics/operations",
+  );
 
-  // State untuk menyimpan input custom date
-  const [customStartDate, setCustomStartDate] = useState("");
-  const [customEndDate, setCustomEndDate] = useState("");
+  const { data } = analytics;
 
-  const [opsData, setOpsData] = useState<any>(null);
+  const metrics = data?.logistics.metrics;
 
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Mengambil fungsi fetchApi
-  const { fetchApi } = useApi();
-
-  // FUNGSI UTAMA: Mengambil data dari API Backend
-  const fetchOpsAnalyticData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams({
-        range: dateRange,
-      });
-
-      if (dateRange === "custom") {
-        if (customStartDate) params.append("startDate", customStartDate);
-        if (customEndDate) params.append("endDate", customEndDate);
-      }
-
-      const res = await fetchApi(`/analytics/operations?${params.toString()}`);
-      const result = await res.json();
-
-      if (res.ok && result.success) {
-        setOpsData(result.data);
-      } else {
-        throw new Error(result.message || "Failed to fetch operations data");
-      }
-    } catch (err) {
-      console.error("❌ Error fetching ops analytics:", err);
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [dateRange, customStartDate, customEndDate, fetchApi]);
-
-  // Panggil otomatis saat pertama kali halaman dimuat
-  useEffect(() => {
-    fetchOpsAnalyticData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Panggil ulang saat tombol "Apply Filter" ditekan
-  const handleApplyFilter = () => {
-    fetchOpsAnalyticData();
-  };
+  const hasPipelineActivity = metrics
+    ? [
+        metrics.production,
+        metrics.packaging,
+        metrics.shipping,
+        metrics.sendToCustomer,
+        metrics.complete,
+      ].some((value) => value > 0)
+    : false;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 mt-6 pb-10">
-      {/*  KOMPONEN FILTER BARU */}
-      <OpsFilter
-        dateRange={dateRange}
-        setDateRange={setDateRange}
-        customStartDate={customStartDate}
-        setCustomStartDate={setCustomStartDate}
-        customEndDate={customEndDate}
-        setCustomEndDate={setCustomEndDate}
-        comparison={comparison}
-        setComparison={setComparison}
-        onApply={handleApplyFilter}
-      />
-
-      {/* Menampilkan pesan error jika API gagal */}
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-md text-sm text-center">
-          Gagal memuat data operasional: {error}
+    <div className="mt-6 min-w-0 space-y-6 pb-10 animate-in fade-in duration-500">
+      {/* HEADER */}
+      <div className="flex items-center gap-3">
+        <div className="rounded-xl border bg-blue-50 p-3 dark:bg-blue-950/40">
+          <Truck className="h-6 w-6 text-blue-600" />
         </div>
-      )}
 
-      {isLoading ? (
-        <div className="flex justify-center items-center h-64 text-slate-500">
-          Memuat data operasional...
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">
+            Operations Dashboard
+          </h2>
+
+          <p className="text-sm text-muted-foreground">
+            Monitor produksi, pengiriman, fulfillment, dan performa logistik.
+          </p>
         </div>
-      ) : (
-        !error && (
-          <>
-            {/* SECTION A: LOGISTICS */}
-            <div className="space-y-4">
-              <OpsLogisticsMetrics data={opsData?.logistics?.metrics} />
+      </div>
 
-              {/* Mengirimkan data persentase performa rata-rata */}
-              <OpsLogisticsAverages data={opsData?.logistics?.averages} />
+      {/* FILTER & CONTENT */}
+      <AnalyticsPeriodFilter
+        state={analytics}
+        description="Filter produksi, pengiriman, dan performa logistik berdasarkan periode."
+        emptyMessage={
+          metrics && !hasPipelineActivity
+            ? "Seluruh Logistics Pipeline menunjukkan angka 0 pada periode ini. Periksa rentang tanggal atau gunakan periode yang lebih panjang."
+            : null
+        }>
+        {data && (
+          <div className="min-w-0 space-y-6">
+            {/* LOGISTICS METRICS */}
+            <OpsLogisticsMetrics data={data.logistics.metrics} />
 
-              {/* Mengirimkan data grafik keterlambatan */}
-              <OpsLogisticsLateDeliveries
-                data={opsData?.logistics?.lateDeliveries}
-              />
-            </div>
+            {/* LOGISTICS AVERAGES */}
+            <OpsLogisticsAverages data={data.logistics.averages} />
 
-            {/* SECTION B: SAMPLE */}
-            <OpsSampleSection data={opsData?.sample} />
-
-            {/* SECTION C: QUOTATION */}
-            {/* <OpsQuotationSection data={opsData?.quotation} /> */}
-          </>
-        )
-      )}
+            {/* LATE DELIVERIES */}
+            <OpsLogisticsLateDeliveries data={data.logistics.lateDeliveries} />
+          </div>
+        )}
+      </AnalyticsPeriodFilter>
     </div>
   );
 }

@@ -68,7 +68,7 @@ export default function OpsFilter({
           Global Date Filter (Ops)
         </h3>
         <p className="text-xs text-muted-foreground font-medium">
-          *Impacts Logistics and Sample metrics below.
+          Filter production, shipping, and logistics performance.
         </p>
       </div>
 
