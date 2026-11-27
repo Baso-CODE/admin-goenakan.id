@@ -1,127 +1,90 @@
 "use client";
 
-import { useApi } from "@/hooks/useApi";
-import { useCallback, useEffect, useState } from "react";
+import { UsersRound } from "lucide-react";
+import type { ComponentProps } from "react";
 
 import CustomerChannelOrderChart from "../customer-analytic/customerChannelOrderChart";
 import CustomerComparisonGraphs from "../customer-analytic/customerComparisonGraphs";
-import CustomerFilter from "../customer-analytic/customerFilter";
 import CustomerMetrics from "../customer-analytic/customerMetrics";
 import CustomerRegionTable from "../customer-analytic/customerRegionTable";
 import CustomerRetentionGraphs from "../customer-analytic/customerRetentionGraphs";
 
-export default function CustomerAnalyticTab() {
-  const [dateRange, setDateRange] = useState("30days");
-  const [comparison, setComparison] = useState("none");
+import {
+  AnalyticsPeriodFilter,
+  useAnalyticsPeriod,
+  type AnalyticsPeriodData,
+} from "../shared/analyticsPeriodFilter";
 
-  const [customStartDate, setCustomStartDate] = useState("");
-  const [customEndDate, setCustomEndDate] = useState("");
-
-  const [customerData, setCustomerData] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Mengambil fungsi fetchApi dari custom hook milikmu
-  const { fetchApi } = useApi();
-
-  // FUNGSI UTAMA: Mengambil data dari API Backend
-  const fetchCustomerAnalyticData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams({
-        range: dateRange,
-      });
-
-      if (dateRange === "custom") {
-        if (customStartDate) params.append("startDate", customStartDate);
-        if (customEndDate) params.append("endDate", customEndDate);
-      }
-
-      // Memanggil API Backend
-      const res = await fetchApi(`/analytics/customers?${params.toString()}`);
-      const result = await res.json();
-
-      if (res.ok && result.success) {
-        setCustomerData(result.data);
-      } else {
-        throw new Error(result.message || "Failed to fetch customer data");
-      }
-    } catch (err) {
-      console.error("❌ Error fetching customer analytics:", err);
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [dateRange, customStartDate, customEndDate, fetchApi]);
-
-  // Panggil otomatis saat pertama kali halaman dimuat
-  useEffect(() => {
-    fetchCustomerAnalyticData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Panggil ulang saat tombol "Apply Filter" ditekan
-  const handleApplyFilter = () => {
-    fetchCustomerAnalyticData();
+interface CustomerAnalyticsData extends AnalyticsPeriodData {
+  metrics: NonNullable<ComponentProps<typeof CustomerMetrics>["data"]> & {
+    totalUniqueCustomer: number;
   };
 
+  graphs: {
+    retention: ComponentProps<typeof CustomerRetentionGraphs>["data"];
+
+    comparison: ComponentProps<typeof CustomerComparisonGraphs>["data"];
+
+    channelOrders: ComponentProps<typeof CustomerChannelOrderChart>["data"];
+  };
+
+  regionData: ComponentProps<typeof CustomerRegionTable>["data"];
+}
+
+export default function CustomerAnalyticTab() {
+  const analytics = useAnalyticsPeriod<CustomerAnalyticsData>(
+    "/analytics/customers",
+  );
+
+  const { data } = analytics;
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 mt-6">
-      {/* 1. GLOBAL FILTER */}
-      <CustomerFilter
-        dateRange={dateRange}
-        setDateRange={setDateRange}
-        customStartDate={customStartDate}
-        setCustomStartDate={setCustomStartDate}
-        customEndDate={customEndDate}
-        setCustomEndDate={setCustomEndDate}
-        comparison={comparison}
-        setComparison={setComparison}
-        onApply={handleApplyFilter}
-      />
-
-      {/* Menampilkan pesan error jika API gagal */}
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-md text-sm text-center">
-          Gagal memuat data pelanggan: {error}
+    <div className="mt-6 min-w-0 space-y-6 pb-10 animate-in fade-in duration-500">
+      {/* HEADER */}
+      <div className="flex items-center gap-3">
+        <div className="rounded-xl border bg-blue-50 p-3 dark:bg-blue-950/40">
+          <UsersRound className="h-6 w-6 text-blue-600" />
         </div>
-      )}
 
-      {/* Tampilkan indikator loading atau komponen anak jika data sudah siap */}
-      {isLoading ? (
-        <div className="flex justify-center items-center h-64 text-slate-500">
-          Memuat data analitik pelanggan...
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">
+            Customer Analytics
+          </h2>
+
+          <p className="text-sm text-muted-foreground">
+            Pantau pertumbuhan, retensi, dan distribusi pelanggan perusahaan.
+          </p>
         </div>
-      ) : (
-        !error && (
-          <>
-            {/* 
-                 PERBAIKAN DI SINI 
-                Kita melakukan "Passing Props" dengan memasukkan data spesifik 
-                dari API ke masing-masing komponen anak.
-            */}
+      </div>
 
-            {/* 2. KEY METRICS */}
-            <CustomerMetrics data={customerData?.metrics} />
+      {/* FILTER & CONTENT */}
+      <AnalyticsPeriodFilter
+        state={analytics}
+        description="Filter aktivitas pelanggan berdasarkan periode."
+        emptyMessage={
+          data?.metrics.totalUniqueCustomer === 0
+            ? "Tidak ada pelanggan dengan transaksi yang memenuhi kriteria pada periode ini. Coba gunakan Last 90 Days atau Last 1 Year."
+            : null
+        }>
+        {data && (
+          <div className="min-w-0 space-y-6">
+            {/* CUSTOMER METRICS */}
+            <CustomerMetrics data={data.metrics} />
 
-            {/* 3. ROW 1 GRAFIK: RETENTION & CHURN */}
-            <CustomerRetentionGraphs data={customerData?.graphs?.retention} />
+            {/* RETENTION */}
+            <CustomerRetentionGraphs data={data.graphs.retention} />
 
-            {/* 4. ROW 2 GRAFIK: NEW VS REPEAT COMPARISON */}
-            <CustomerComparisonGraphs data={customerData?.graphs?.comparison} />
+            {/* NEW VS RETURNING */}
+            <CustomerComparisonGraphs data={data.graphs.comparison} />
 
-            {/* 5. CHANNEL ORDER PER MONTH */}
-            <CustomerChannelOrderChart
-              data={customerData?.graphs?.channelOrders}
-            />
+            {/* ORDER BY CHANNEL */}
+            <CustomerChannelOrderChart data={data.graphs.channelOrders} />
 
-            {/* 6. TABEL DETAIL BY REGION DENGAN SORTING */}
-            <CustomerRegionTable data={customerData?.regionData} />
-          </>
-        )
-      )}
+            {/* CUSTOMER REGION */}
+            <CustomerRegionTable data={data.regionData} />
+          </div>
+        )}
+      </AnalyticsPeriodFilter>
     </div>
   );
 }

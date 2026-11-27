@@ -1,138 +1,116 @@
 "use client";
 
-import { useApi } from "@/hooks/useApi";
-import { useCallback, useEffect, useState } from "react";
+import { ChartNoAxesCombined } from "lucide-react";
+import type { ComponentProps } from "react";
 
 import SalesCategoryPieCharts from "../sales-overview/salesCategoryPieCharts";
-import SalesFilter from "../sales-overview/salesFilter";
 import SalesOrderStackedBar from "../sales-overview/salesOrderStackedBar";
 import SalesOverviewCard from "../sales-overview/salesOverviewCard";
 import SalesOverviewGraphs from "../sales-overview/salesOverviewGraphs";
 import SalesTopBottomProducts from "../sales-overview/salesTopBottomProducts";
 
+import {
+  AnalyticsPeriodFilter,
+  useAnalyticsPeriod,
+  type AnalyticsPeriodData,
+} from "../shared/analyticsPeriodFilter";
+
+interface SalesTrendItem {
+  label: string;
+  revenue: number;
+  order: number;
+  profit: number;
+  categories: Record<string, number>;
+}
+
+interface SalesOverviewData extends AnalyticsPeriodData {
+  metrics: NonNullable<ComponentProps<typeof SalesOverviewCard>["metrics"]>;
+
+  graphs: {
+    trend: SalesTrendItem[];
+  };
+
+  pieCharts: ComponentProps<typeof SalesCategoryPieCharts>["data"];
+
+  productsPerformance: ComponentProps<typeof SalesTopBottomProducts>["data"];
+}
+
 export default function SalesOverviewTab() {
-  const [dateRange, setDateRange] = useState("today");
-  const [comparison, setComparison] = useState("previous_period");
+  const analytics = useAnalyticsPeriod<SalesOverviewData>(
+    "/analytics/sales-overview",
+  );
 
-  const [customStartDate, setCustomStartDate] = useState("");
-  const [customEndDate, setCustomEndDate] = useState("");
+  const { data } = analytics;
 
-  const [dashboardData, setDashboardData] = useState<any>(null);
+  // ========================================
+  // NORMALIZE CHART DATA
+  // ========================================
+  // Backend mengirim label dan nested categories.
+  // Komponen chart existing menggunakan month
+  // dan kategori sebagai flat keys.
+  const trendData = (data?.graphs?.trend || []).map((item) => ({
+    month: item.label,
+    revenue: item.revenue,
+    order: item.order,
+    profit: item.profit,
+  }));
 
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  //  Mengambil fetchApi dari custom hook milikmu
-  const { fetchApi } = useApi();
-
-  // Data dummy sebagai fallback
-  const dummyMetrics = {
-    revenue: "$0",
-    orders: "0",
-    averagePurchase: "$0",
-    profit: "$0",
-  };
-
-  //  Menggunakan useCallback dan fetchApi persis seperti pola kodemu
-  const fetchDashboardData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams({
-        range: dateRange,
-      });
-
-      if (dateRange === "custom") {
-        if (customStartDate) params.append("startDate", customStartDate);
-        if (customEndDate) params.append("endDate", customEndDate);
-      }
-
-      //  Menggunakan fetchApi (URL tidak perlu http://localhost lagi jika sudah diatur di useApi)
-      const res = await fetchApi(
-        `/analytics/sales-overview?${params.toString()}`,
-      );
-      const result = await res.json();
-
-      if (res.ok && result.success) {
-        setDashboardData(result.data);
-      } else {
-        throw new Error(result.message || "Failed to fetch dashboard data");
-      }
-    } catch (err) {
-      console.error("❌ Error fetching dashboard:", err);
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [dateRange, customStartDate, customEndDate, fetchApi]);
-
-  // Panggil saat pertama kali halaman dimuat
-  useEffect(() => {
-    fetchDashboardData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  // Catatan: Array dependencies sengaja dikosongkan agar tidak otomatis fetch
-  // saat user baru mengetik tanggal. Kita mengandalkan tombol "Apply".
-
-  // Panggil saat tombol Apply diklik
-  const handleApplyFilter = () => {
-    fetchDashboardData();
-  };
-
-  const isComparing = comparison !== "none";
+  const stackedBarData = (data?.graphs?.trend || []).map((item) => ({
+    ...item.categories,
+    month: item.label,
+    revenue: item.revenue,
+    order: item.order,
+    profit: item.profit,
+  }));
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 mt-6">
-      <SalesFilter
-        dateRange={dateRange}
-        setDateRange={setDateRange}
-        customStartDate={customStartDate}
-        setCustomStartDate={setCustomStartDate}
-        customEndDate={customEndDate}
-        setCustomEndDate={setCustomEndDate}
-        comparison={comparison}
-        setComparison={setComparison}
-        onApply={handleApplyFilter}
-      />
-
-      {/* Menampilkan pesan error jika API gagal */}
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-md text-sm text-center">
-          Gagal memuat data: {error}
+    <div className="mt-6 min-w-0 space-y-6 pb-10 animate-in fade-in duration-500">
+      {/* HEADER */}
+      <div className="flex items-center gap-3">
+        <div className="rounded-xl border bg-blue-50 p-3 dark:bg-blue-950/40">
+          <ChartNoAxesCombined className="h-6 w-6 text-blue-600" />
         </div>
-      )}
 
-      {/* Tampilkan indikator loading */}
-      {isLoading ? (
-        <div className="flex justify-center items-center h-64 text-slate-500">
-          Memuat data analitik...
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">Sales Overview</h2>
+
+          <p className="text-sm text-muted-foreground">
+            Pantau pendapatan, transaksi, dan performa produk perusahaan.
+          </p>
         </div>
-      ) : (
-        !error && (
-          <>
-            {/* 2. BAGIAN METRIK */}
-            <SalesOverviewCard
-              metrics={dashboardData ? dashboardData.metrics : dummyMetrics}
-            />
+      </div>
 
-            {/* 3. BAGIAN GRAFIK */}
-            <SalesOverviewGraphs data={dashboardData?.graphs?.trend} />
+      {/* FILTER & CONTENT */}
+      <AnalyticsPeriodFilter
+        state={analytics}
+        description="Filter pendapatan dan transaksi berdasarkan periode."
+        emptyMessage={
+          data?.metrics.orders === 0
+            ? "Tidak ada transaksi yang memenuhi kriteria pada periode ini. Coba gunakan rentang waktu yang lebih panjang."
+            : null
+        }>
+        {data && (
+          <div className="min-w-0 space-y-6">
+            {/* METRICS */}
+            <SalesOverviewCard metrics={data.metrics} />
 
-            {/* 4. BAGIAN GRAFIK LINGKARAN */}
+            {/* SALES TREND */}
+            <SalesOverviewGraphs data={trendData} />
+
+            {/* PRODUCT CATEGORY */}
             <SalesCategoryPieCharts
-              hasComparison={isComparing}
-              data={dashboardData?.pieCharts}
+              hasComparison={false}
+              data={data.pieCharts}
             />
 
-            {/* 5. BAGIAN GRAFIK STACKED BAR */}
-            <SalesOrderStackedBar data={dashboardData?.graphs?.trend} />
+            {/* STACKED BAR */}
+            <SalesOrderStackedBar data={stackedBarData} />
 
-            {/* 6. TABEL TOP 5 & BOTTOM 5 PRODUK */}
-            <SalesTopBottomProducts data={dashboardData?.productsPerformance} />
-          </>
-        )
-      )}
+            {/* PRODUCT PERFORMANCE */}
+            <SalesTopBottomProducts data={data.productsPerformance} />
+          </div>
+        )}
+      </AnalyticsPeriodFilter>
     </div>
   );
 }
